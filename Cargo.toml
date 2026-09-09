@@ -1,0 +1,24 @@
+[package]
+name = "rust-plots"
+version = "0.1.0"
+edition = "2021"
+description = "A Rust port of the core functionality of R's `graphics` package, aiming for visual fidelity with R's own output."
+license = "GPL-2.0-or-later"
+authors = ["rust-plots contributors"]
+rust-version = "1.74"
+
+[lib]
+name = "rust_plots"
+path = "src/lib.rs"
+
+[dependencies]
+tiny-skia = "0.11"
+ab_glyph = "0.2"
+
+[dev-dependencies]
+# used only by integration tests that shell out to Rscript for ground truth,
+# and are skipped automatically if `Rscript` is not on PATH.
+
+[[example]]
+name = "gallery"
+path = "examples/gallery.rs"

@@ -1,0 +1,72 @@
+//! Cross-checks `rust_plots::afm::str_width_inches` against R's own
+//! `strwidth()` on a `pdf()` device (which uses the same Helvetica AFM
+//! metrics by default). Skipped if `Rscript` isn't available.
+
+use std::process::Command;
+
+use rust_plots::afm::{str_width_inches, FontFace};
+
+fn rscript_available() -> bool {
+    Command::new("Rscript")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn r_strwidth(s: &str, pointsize: f64, cex: f64, font: i32) -> f64 {
+    let script = format!(
+        "pdf(file = tempfile(), pointsize = {pointsize}, family = 'Helvetica'); \
+         cat(strwidth('{s}', units = 'in', cex = {cex}, font = {font})); \
+         invisible(dev.off())"
+    );
+    let out = Command::new("Rscript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .expect("run Rscript");
+    assert!(
+        out.status.success(),
+        "Rscript failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().parse().unwrap()
+}
+
+#[test]
+fn str_width_matches_r() {
+    if !rscript_available() {
+        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+        return;
+    }
+
+    let cases: &[(&str, f64, f64, i32)] = &[
+        ("Hello, World!", 12.0, 1.0, 1),
+        ("Hello, World!", 12.0, 1.5, 1),
+        ("The quick brown fox", 10.0, 1.0, 1),
+        ("Bold Text", 14.0, 1.0, 2),
+        ("Italic Text", 14.0, 1.0, 3),
+        ("0123456789", 12.0, 2.0, 1),
+        ("x", 12.0, 1.0, 1),
+    ];
+
+    for &(s, ps, cex, font) in cases {
+        let expected = r_strwidth(s, ps, cex, font);
+        let face = FontFace::from_r_font_code(font);
+        let actual = str_width_inches(s, face, ps, cex);
+        // R's PostScript/PDF kern-pair lookup has an internal indexing quirk
+        // (`devPS.c`'s `KPstart`/`KPend` construction silently drops the
+        // last-in-file kerning pair for some first characters). We
+        // intentionally don't replicate that engine bug - we apply every
+        // documented kerning pair (skipping ones involving "space", which
+        // *is* documented behaviour). This can very occasionally leave us
+        // one kerning pair (a handful of AFM units) away from R for a given
+        // string, so allow a small relative tolerance rather than an exact
+        // match.
+        let tol = (expected.abs() * 0.01).max(1e-6);
+        assert!(
+            (actual - expected).abs() < tol,
+            "mismatch for {s:?} ps={ps} cex={cex} font={font}: rust={actual} r={expected}"
+        );
+    }
+}

@@ -1,0 +1,213 @@
+//! `par()` state: the subset of R's graphics parameters this crate
+//! implements, with R's exact default values (cross-checked against
+//! `Rscript -e 'str(par())'` and `r-source/src/library/graphics/src/par.c`).
+//!
+//! Multi-panel layouts (`par(mfrow=)`/`layout()`) are out of scope for
+//! now (see the crate README), so `cexbase`/`mex`/`scale` are always
+//! `1.0` here - i.e. we only implement the single-panel (`mfrow =
+//! c(1,1)`) case, which is what `updateNDC2Dev` reduces to when there's
+//! only one figure on the device.
+
+use crate::afm::FontFace;
+use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};
+use crate::lty::LineType;
+
+use super::backend::{LineEnd, LineJoin};
+
+/// The four margin/rectangle sides in R's `mar`/`oma`/`fig`/`plt`
+/// convention: bottom, left, top, right.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Sides<T> {
+    pub bottom: T,
+    pub left: T,
+    pub top: T,
+    pub right: T,
+}
+
+impl<T: Copy> Sides<T> {
+    pub const fn new(bottom: T, left: T, top: T, right: T) -> Self {
+        Sides {
+            bottom,
+            left,
+            top,
+            right,
+        }
+    }
+}
+
+/// Axis style (`par(xaxs=)`/`par(yaxs=)`). Only `"r"` (the default, 4%
+/// range expansion) and `"i"` (exact, no expansion) are implemented; R's
+/// `"s"`/`"e"`/`"d"` styles are treated as `"r"` (matching R's own
+/// fallback, since only S and few other historical devices ever
+/// implemented them differently - R's engine treats all non-`"i"` styles
+/// like `"r"`).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AxisStyle {
+    Regular,
+    Exact,
+}
+
+impl AxisStyle {
+    pub fn parse(s: &str) -> AxisStyle {
+        match s {
+            "i" => AxisStyle::Exact,
+            _ => AxisStyle::Regular,
+        }
+    }
+}
+
+/// The graphics parameter set (`par()`), restricted to what this crate
+/// implements. Field names match R's own where practical.
+#[derive(Clone, Debug)]
+pub struct Par {
+    /// Margins in lines: bottom, left, top, right. Default `c(5.1, 4.1,
+    /// 4.1, 2.1)`.
+    pub mar: Sides<f64>,
+    /// Outer margins in lines. Default `c(0, 0, 0, 0)`.
+    pub oma: Sides<f64>,
+    pub xaxs: AxisStyle,
+    pub yaxs: AxisStyle,
+    pub xlog: bool,
+    pub ylog: bool,
+
+    pub col: Color,
+    pub bg: Color,
+    pub fg: Color,
+    pub col_axis: Color,
+    pub col_lab: Color,
+    pub col_main: Color,
+    pub col_sub: Color,
+
+    pub palette: Vec<Color>,
+
+    pub lwd: f64,
+    pub lty: LineType,
+    pub lend: LineEnd,
+    pub ljoin: LineJoin,
+    pub lmitre: f64,
+
+    pub pch: i32,
+
+    /// Base point size, in big points (`par(ps)`). Default `12`.
+    pub ps: f64,
+    pub cex: f64,
+    pub cex_axis: f64,
+    pub cex_lab: f64,
+    pub cex_main: f64,
+    pub cex_sub: f64,
+
+    pub font: i32,
+    pub font_axis: i32,
+    pub font_lab: i32,
+    pub font_main: i32,
+    pub font_sub: i32,
+
+    /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
+    /// horizontal, 2 = perpendicular to axis, 3 = vertical.
+    pub las: i32,
+    /// Tick mark length as a fraction of the smaller plot-region
+    /// dimension (negative = outward, R's default).
+    pub tcl: f64,
+    /// Margin line positions for axis title/labels/line, `c(3, 1, 0)` by
+    /// default.
+    pub mgp: [f64; 3],
+    pub lheight: f64,
+    /// Default text justification (`par(adj)`).
+    pub adj: f64,
+    pub xpd: bool,
+    pub ann: bool,
+}
+
+impl Default for Par {
+    fn default() -> Self {
+        Par {
+            mar: Sides::new(5.1, 4.1, 4.1, 2.1),
+            oma: Sides::new(0.0, 0.0, 0.0, 0.0),
+            xaxs: AxisStyle::Regular,
+            yaxs: AxisStyle::Regular,
+            xlog: false,
+            ylog: false,
+
+            col: Color::BLACK,
+            bg: Color::WHITE,
+            fg: Color::BLACK,
+            col_axis: Color::BLACK,
+            col_lab: Color::BLACK,
+            col_main: Color::BLACK,
+            col_sub: Color::BLACK,
+
+            palette: DEFAULT_PALETTE.to_vec(),
+
+            lwd: 1.0,
+            lty: LineType::Pattern(&[]),
+            lend: LineEnd::Round,
+            ljoin: LineJoin::Round,
+            lmitre: 10.0,
+
+            pch: 1,
+
+            ps: 12.0,
+            cex: 1.0,
+            cex_axis: 1.0,
+            cex_lab: 1.0,
+            cex_main: 1.2,
+            cex_sub: 1.0,
+
+            font: 1,
+            font_axis: 1,
+            font_lab: 1,
+            font_main: 2,
+            font_sub: 1,
+
+            las: 0,
+            tcl: -0.3,
+            mgp: [3.0, 1.0, 0.0],
+            lheight: 1.0,
+            adj: 0.5,
+            xpd: false,
+            ann: true,
+        }
+    }
+}
+
+impl Par {
+    /// The height (in inches) of "one line" of text at the current
+    /// `ps`, i.e. what R calls `cra[1] * ipr[1]` for a device whose
+    /// native raster unit is points (`pdf`/`postscript`'s convention:
+    /// `cra[1] = 1.2 * ps`, `ipr[1] = 1/72`). This is the unit `mar`/
+    /// `oma`/`mgp` margins are measured in, and does *not* scale with
+    /// `par(cex)` (only with `ps`) - see the module docs.
+    pub fn line_height_inches(&self) -> f64 {
+        1.2 * self.ps / 72.0
+    }
+
+    /// Margins in inches: bottom, left, top, right.
+    pub fn mai(&self) -> Sides<f64> {
+        let lh = self.line_height_inches();
+        Sides::new(
+            self.mar.bottom * lh,
+            self.mar.left * lh,
+            self.mar.top * lh,
+            self.mar.right * lh,
+        )
+    }
+
+    /// Outer margins in inches.
+    pub fn omi(&self) -> Sides<f64> {
+        let lh = self.line_height_inches();
+        Sides::new(
+            self.oma.bottom * lh,
+            self.oma.left * lh,
+            self.oma.top * lh,
+            self.oma.right * lh,
+        )
+    }
+
+    pub fn resolve_color(&self, spec: ColorSpec) -> Option<Color> {
+        spec.resolve(&self.palette)
+    }
+
+    pub fn font_face(&self, code: i32) -> FontFace {
+        FontFace::from_r_font_code(code)
+    }
+}

@@ -1,0 +1,209 @@
+//! Color parsing and the R color model.
+//!
+//! R identifies colors via strings (`"red"`, `"#FF0000"`, `"#FF000080"`),
+//! small integers that index the current [`palette`](Palette), or `NA`
+//! (meaning "don't draw"). This module mirrors that model closely enough
+//! that [`Color::parse`] accepts the same strings R's `col2rgb()`/graphics
+//! code would accept.
+
+use crate::named_colors::NAMED_COLORS;
+
+/// An RGBA color, 8 bits per channel - the same representation R uses
+/// internally (`rcolor` is a packed `AABBGGRR` `u32`).
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl Color {
+    pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
+        Color { r, g, b, a: 255 }
+    }
+
+    pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Color { r, g, b, a }
+    }
+
+    pub const TRANSPARENT: Color = Color::rgba(0, 0, 0, 0);
+    pub const BLACK: Color = Color::rgb(0, 0, 0);
+    pub const WHITE: Color = Color::rgb(255, 255, 255);
+
+    /// Parse a color specification the way R's graphics code would:
+    /// `"NA"`/`"transparent"`/empty => `None`; `"#rgb"`, `"#rrggbb"`,
+    /// `"#rrggbbaa"` hex forms; or one of R's 657 built-in named colors
+    /// (case-insensitive, matching the `colors()` database).
+    pub fn parse(spec: &str) -> Option<Color> {
+        let s = spec.trim();
+        if s.is_empty() || s.eq_ignore_ascii_case("NA") || s.eq_ignore_ascii_case("transparent") {
+            return None;
+        }
+        if let Some(hex) = s.strip_prefix('#') {
+            return Self::parse_hex(hex);
+        }
+        let lower = s.to_ascii_lowercase();
+        NAMED_COLORS
+            .iter()
+            .find(|(name, ..)| *name == lower)
+            .map(|&(_, r, g, b)| Color::rgb(r, g, b))
+    }
+
+    fn parse_hex(hex: &str) -> Option<Color> {
+        let expand = |c: char| -> Option<u8> {
+            let v = c.to_digit(16)?;
+            Some((v * 16 + v) as u8)
+        };
+        let pair = |s: &str| u8::from_str_radix(s, 16).ok();
+        match hex.len() {
+            3 => {
+                let mut chars = hex.chars();
+                let r = expand(chars.next()?)?;
+                let g = expand(chars.next()?)?;
+                let b = expand(chars.next()?)?;
+                Some(Color::rgb(r, g, b))
+            }
+            4 => {
+                let mut chars = hex.chars();
+                let r = expand(chars.next()?)?;
+                let g = expand(chars.next()?)?;
+                let b = expand(chars.next()?)?;
+                let a = expand(chars.next()?)?;
+                Some(Color::rgba(r, g, b, a))
+            }
+            6 => Some(Color::rgb(
+                pair(&hex[0..2])?,
+                pair(&hex[2..4])?,
+                pair(&hex[4..6])?,
+            )),
+            8 => Some(Color::rgba(
+                pair(&hex[0..2])?,
+                pair(&hex[2..4])?,
+                pair(&hex[4..6])?,
+                pair(&hex[6..8])?,
+            )),
+            _ => None,
+        }
+    }
+
+    /// Render as `#rrggbb` (or `#rrggbbaa` if not fully opaque), as used by
+    /// the SVG/PDF backends.
+    pub fn to_hex(self) -> String {
+        if self.a == 255 {
+            format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
+        } else {
+            format!("#{:02x}{:02x}{:02x}{:02x}", self.r, self.g, self.b, self.a)
+        }
+    }
+
+    pub fn with_alpha(self, a: u8) -> Color {
+        Color { a, ..self }
+    }
+}
+
+/// R's default `palette()` since R 4.0.0 (the "R4" palette). `col = 1` is
+/// the first entry (black), `col = 2` the second, etc. - R's small-integer
+/// colors are 1-indexed.
+pub const DEFAULT_PALETTE: [Color; 8] = [
+    Color::rgb(0x00, 0x00, 0x00), // black
+    Color::rgb(0xDF, 0x53, 0x6B), // red-ish
+    Color::rgb(0x61, 0xD0, 0x4F), // green
+    Color::rgb(0x22, 0x97, 0xE6), // blue
+    Color::rgb(0x28, 0xE2, 0xE5), // cyan
+    Color::rgb(0xCD, 0x0B, 0xBC), // magenta
+    Color::rgb(0xF5, 0xC7, 0x10), // yellow
+    Color::rgb(0x9E, 0x9E, 0x9E), // gray
+];
+
+/// A resolvable color specification: either an explicit color, a palette
+/// index (R's small-integer colors, 1-based, recycling like R does), or
+/// "no color" (R's `NA`).
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ColorSpec {
+    None,
+    Color(Color),
+    Index(i32),
+}
+
+impl ColorSpec {
+    pub fn resolve(self, palette: &[Color]) -> Option<Color> {
+        match self {
+            ColorSpec::None => None,
+            ColorSpec::Color(c) => Some(c),
+            ColorSpec::Index(0) => None,
+            ColorSpec::Index(i) => {
+                if palette.is_empty() {
+                    return None;
+                }
+                let n = palette.len() as i32;
+                let idx = ((i - 1).rem_euclid(n)) as usize;
+                Some(palette[idx])
+            }
+        }
+    }
+}
+
+impl From<Color> for ColorSpec {
+    fn from(c: Color) -> Self {
+        ColorSpec::Color(c)
+    }
+}
+
+impl From<i32> for ColorSpec {
+    fn from(i: i32) -> Self {
+        ColorSpec::Index(i)
+    }
+}
+
+impl From<&str> for ColorSpec {
+    fn from(s: &str) -> Self {
+        match Color::parse(s) {
+            Some(c) => ColorSpec::Color(c),
+            None => ColorSpec::None,
+        }
+    }
+}
+
+impl From<Option<Color>> for ColorSpec {
+    fn from(c: Option<Color>) -> Self {
+        match c {
+            Some(c) => ColorSpec::Color(c),
+            None => ColorSpec::None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_hex() {
+        assert_eq!(Color::parse("#FF0000"), Some(Color::rgb(255, 0, 0)));
+        assert_eq!(Color::parse("#f00"), Some(Color::rgb(255, 0, 0)));
+        assert_eq!(Color::parse("#00000080"), Some(Color::rgba(0, 0, 0, 0x80)));
+    }
+
+    #[test]
+    fn parses_named() {
+        assert_eq!(Color::parse("white"), Some(Color::rgb(255, 255, 255)));
+        assert_eq!(Color::parse("Red"), Some(Color::rgb(255, 0, 0)));
+        assert_eq!(
+            Color::parse("steelblue"),
+            Some(Color::rgb(0x46, 0x82, 0xB4))
+        );
+    }
+
+    #[test]
+    fn na_and_transparent() {
+        assert_eq!(Color::parse("NA"), None);
+        assert_eq!(Color::parse("transparent"), None);
+    }
+
+    #[test]
+    fn palette_recycles() {
+        let spec = ColorSpec::Index(9);
+        assert_eq!(spec.resolve(&DEFAULT_PALETTE), Some(DEFAULT_PALETTE[0]));
+    }
+}
