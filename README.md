@@ -1,4 +1,4 @@
-# rust-plots
+# rs-graphics
 
 A Rust port of the core functionality of R's `graphics` package (see
 `r-source/src/library/graphics/` for the reference implementation this

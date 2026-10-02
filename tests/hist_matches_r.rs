@@ -5,10 +5,10 @@
 
 use std::process::Command;
 
-use rust_plots::backend::pdf::PdfBackend;
-use rust_plots::device::Device;
-use rust_plots::highlevel::{hist, HistOptions};
-use rust_plots::par::Par;
+use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::device::Device;
+use rs_graphics::highlevel::{hist, HistOptions};
+use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")

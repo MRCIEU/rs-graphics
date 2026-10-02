@@ -11,7 +11,7 @@
 
 use std::process::Command;
 
-use rust_plots::pretty::ge_pretty;
+use rs_graphics::pretty::ge_pretty;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")

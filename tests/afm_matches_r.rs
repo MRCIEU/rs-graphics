@@ -4,7 +4,7 @@
 
 use std::process::Command;
 
-use rust_plots::afm::{str_width_inches, FontFace};
+use rs_graphics::afm::{str_width_inches, FontFace};
 
 fn rscript_available() -> bool {
     Command::new("Rscript")

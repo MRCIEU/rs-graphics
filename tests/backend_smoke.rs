@@ -2,13 +2,13 @@
 //! `device`/high-level plotting layers) with a handful of primitives, to
 //! catch runtime panics/obviously wrong output early.
 
-use rust_plots::afm::FontFace;
-use rust_plots::backend::pdf::PdfBackend;
-use rust_plots::backend::raster::RasterBackend;
-use rust_plots::backend::svg::SvgBackend;
-use rust_plots::backend::{Backend, Stroke, TextStyle};
-use rust_plots::color::Color;
-use rust_plots::geometry::{Point, Rect};
+use rs_graphics::afm::FontFace;
+use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::raster::RasterBackend;
+use rs_graphics::backend::svg::SvgBackend;
+use rs_graphics::backend::{Backend, Stroke, TextStyle};
+use rs_graphics::color::Color;
+use rs_graphics::geometry::{Point, Rect};
 
 fn exercise(b: &mut dyn Backend) {
     let stroke = Stroke::simple(Color::BLACK, 1.0);

@@ -6,7 +6,7 @@
 
 use std::process::Command;
 
-use rust_plots::highlevel::boxplot::boxplot_stats;
+use rs_graphics::highlevel::boxplot::boxplot_stats;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")

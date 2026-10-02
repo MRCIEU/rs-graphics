@@ -9,15 +9,17 @@
 
 use std::fs;
 
-use rust_plots::backend::pdf::PdfBackend;
-use rust_plots::backend::raster::RasterBackend;
-use rust_plots::backend::svg::SvgBackend;
-use rust_plots::backend::Backend;
-use rust_plots::color::{Color, ColorSpec};
-use rust_plots::device::Device;
-use rust_plots::highlevel::{barplot, boxplot, hist, pie, plot};
-use rust_plots::highlevel::{BarplotOptions, BoxplotOptions, HistOptions, PieOptions, PlotOptions};
-use rust_plots::par::Par;
+use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::raster::RasterBackend;
+use rs_graphics::backend::svg::SvgBackend;
+use rs_graphics::backend::Backend;
+use rs_graphics::color::{Color, ColorSpec};
+use rs_graphics::device::Device;
+use rs_graphics::highlevel::{barplot, boxplot, hist, pie, plot};
+use rs_graphics::highlevel::{
+    BarplotOptions, BoxplotOptions, HistOptions, PieOptions, PlotOptions,
+};
+use rs_graphics::par::Par;
 
 /// A tiny seeded PRNG (splitmix64-style LCG) so the gallery's sample data
 /// is reproducible without pulling in an external `rand` dependency.
@@ -113,7 +115,7 @@ fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
     let y: Vec<f64> = x.iter().map(|&xi| xi.sin()).collect();
 
     let opts = PlotOptions {
-        type_: rust_plots::highlevel::PlotType::Lines,
+        type_: rs_graphics::highlevel::PlotType::Lines,
         col: ColorSpec::Index(2),
         lwd: 2.0,
         main: Some("plot(): line"),

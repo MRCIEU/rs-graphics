@@ -132,7 +132,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-plots"
+name = "rs-graphics"
 version = "0.1.0"
 dependencies = [
  "ab_glyph",
