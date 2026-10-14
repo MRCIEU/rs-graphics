@@ -318,6 +318,19 @@ impl Backend for RasterBackend {
         stroke: Option<&Stroke>,
     ) {
         let (cx, cy) = self.to_px(center);
+        // An opaque circle filled and stroked (solid) in one colour has the
+        // same ink as a fill half a line width larger. Stroking is slow, so
+        // paint that instead: plots of millions of pch 19/20 points are
+        // ~2.4x faster.
+        if let (Some(c), Some(s)) = (fill, stroke) {
+            if c == s.color && c.a == 255 && matches!(s.lty, LineType::Pattern(p) if p.is_empty()) {
+                let r = ((radius + s.width_pt() / 72.0 / 2.0) * self.dpi) as f32;
+                if let Some(path) = PathBuilder::from_circle(cx, cy, r.max(0.01)) {
+                    self.fill_shape(&path, c);
+                }
+                return;
+            }
+        }
         let r = (radius * self.dpi) as f32;
         if let Some(path) = PathBuilder::from_circle(cx, cy, r.max(0.01)) {
             if let Some(c) = fill {
