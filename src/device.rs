@@ -16,10 +16,12 @@ use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par};
 use crate::pch;
-use crate::pretty::ge_pretty;
+use crate::pretty::pretty_ticks;
 
 mod legend;
+mod mtext;
 pub use legend::{LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
+pub use mtext::MtextOptions;
 
 /// Which axis/box side, in R's `side` convention: `1` = bottom, `2` =
 /// left, `3` = top, `4` = right.
@@ -52,6 +54,15 @@ pub struct Device<B: Backend> {
     hold_figure: bool,
     /// Whether anything has been plotted yet (R's `gpptr(dd)->state`).
     used: bool,
+}
+
+/// Where drawing is clipped to: R's `xpd = FALSE` (plot region), `TRUE`
+/// (figure region) and `NA` (the whole device).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Clip {
+    Plot,
+    Figure,
+    Device,
 }
 
 /// A resolved style bundle for a stroked primitive; kept small so
@@ -336,10 +347,7 @@ impl<B: Backend> Device<B> {
         } else {
             (self.usr.2, self.usr.3)
         };
-        let (lo, hi, ndiv) = ge_pretty(lo.min(hi), lo.max(hi), 5);
-        (0..=ndiv)
-            .map(|i| lo + i as f64 * (hi - lo) / ndiv as f64)
-            .collect()
+        pretty_ticks(lo.min(hi), lo.max(hi), 5)
     }
 
     // ---------------------------------------------------------------
@@ -376,7 +384,15 @@ impl<B: Backend> Device<B> {
     // ---------------------------------------------------------------
 
     fn push_clip_for(&mut self, xpd: bool) {
-        let rect = if xpd { self.fig } else { self.plt };
+        self.push_clip_region(if xpd { Clip::Figure } else { Clip::Plot });
+    }
+
+    fn push_clip_region(&mut self, clip: Clip) {
+        let rect = match clip {
+            Clip::Plot => self.plt,
+            Clip::Figure => self.fig,
+            Clip::Device => Rect::new(0.0, 0.0, self.width_in, self.height_in),
+        };
         self.backend.push_clip(rect);
     }
 
@@ -695,6 +711,24 @@ impl<B: Backend> Device<B> {
         cex: f64,
         font: i32,
     ) {
+        let clip = if self.par.xpd { Clip::Figure } else { Clip::Plot };
+        self.text_at_clipped(clip, anchor, label, hadj, vadj, rotation_deg, col, cex, font);
+    }
+
+    /// [`Device::text_at`] clipped to `clip` instead of the `par(xpd)` region.
+    #[allow(clippy::too_many_arguments)]
+    fn text_at_clipped(
+        &mut self,
+        clip: Clip,
+        anchor: Point,
+        label: &str,
+        hadj: f64,
+        vadj: Option<f64>,
+        rotation_deg: f64,
+        col: ColorSpec,
+        cex: f64,
+        font: i32,
+    ) {
         let Some(color) = self.resolve(col) else {
             return;
         };
@@ -722,7 +756,7 @@ impl<B: Backend> Device<B> {
             rotation_deg,
             ..TextStyle::new(color, face, size_pt)
         };
-        self.push_clip_for(self.par.xpd);
+        self.push_clip_region(clip);
         self.backend.draw_text(origin, label, &style);
         self.pop_clip();
     }
@@ -1109,36 +1143,60 @@ impl<B: Backend> Device<B> {
         self.par.xpd = saved_xpd;
     }
 
-    /// `arrows(x0, y0, x1, y1, length = 0.25, ...)`: a segment plus a
-    /// simple filled-triangle arrowhead at the end point(s), `length` in
-    /// inches (matching R's default unit for the `length` argument).
+    /// `arrows(x0, y0, x1, y1, length, angle, code, col =, lwd =, lty =)`,
+    /// a port of `C_arrows` / `GArrow()`: each segment is drawn with open
+    /// heads - two lines of `length` inches at `angle` degrees to the shaft -
+    /// at its start (`code = 1`), end (`2`, R's default) or both ends (`3`).
+    /// `angle = 90` gives flat caps, as for error bars. R's defaults are
+    /// `length = 0.25`, `angle = 30`, `code = 2`.
+    ///
+    /// As in R, segments with a non-finite coordinate are skipped, and the
+    /// heads of a segment shorter than 1/1000 inch are not drawn (R also
+    /// warns). Clipped according to `par(xpd)`.
+    #[allow(clippy::too_many_arguments)]
     pub fn arrows(
         &mut self,
-        x0: f64,
-        y0: f64,
-        x1: f64,
-        y1: f64,
+        x0: &[f64],
+        y0: &[f64],
+        x1: &[f64],
+        y1: &[f64],
+        length: f64,
+        angle: f64,
+        code: u8,
         style: LineStyle,
-        head_length_in: f64,
     ) {
         let Some(color) = self.resolve(style.col) else {
             return;
         };
         let stroke = self.stroke_of(color, style.lwd, style.lty);
+        let angle = angle.to_radians();
         self.push_clip_for(self.par.xpd);
-        let p0 = self.user_to_inches(x0, y0);
-        let p1 = self.user_to_inches(x1, y1);
-        self.backend.draw_line(p0, p1, &stroke);
-        let angle = (p1.y - p0.y).atan2(p1.x - p0.x);
-        let spread = 20f64.to_radians();
-        let back = |a: f64| {
-            Point::new(
-                p1.x - head_length_in * (angle + a).cos(),
-                p1.y - head_length_in * (angle + a).sin(),
-            )
-        };
-        let tri = [p1, back(spread), back(-spread)];
-        self.backend.draw_polygon(&tri, Some(color), None);
+        for i in 0..x0.len().min(y0.len()).min(x1.len()).min(y1.len()) {
+            if ![x0[i], y0[i], x1[i], y1[i]].iter().all(|v| v.is_finite()) {
+                continue;
+            }
+            let from = self.user_to_inches(x0[i], y0[i]);
+            let to = self.user_to_inches(x1[i], y1[i]);
+            self.backend.draw_line(from, to, &stroke);
+            if code & 3 == 0 || length == 0.0 || (from.x - to.x).hypot(from.y - to.y) < 1e-3 {
+                continue;
+            }
+            // A head at `tip`, opening back along the shaft towards `tail`.
+            let mut head = |tip: Point, tail: Point| {
+                let rot = (tail.y - tip.y).atan2(tail.x - tip.x);
+                let barb = |a: f64| {
+                    Point::new(tip.x + length * (rot + a).cos(), tip.y + length * (rot + a).sin())
+                };
+                self.backend
+                    .draw_polyline(&[barb(angle), tip, barb(-angle)], &stroke);
+            };
+            if code & 1 != 0 {
+                head(from, to);
+            }
+            if code & 2 != 0 {
+                head(to, from);
+            }
+        }
         self.pop_clip();
     }
 

@@ -205,6 +205,11 @@ impl PdfBackend {
         }
     }
 
+    /// A PDF string literal body for `s` in the fonts' WinAnsiEncoding.
+    /// Like R's `pdf()` (whose default ISOLatin1 encoding agrees with WinAnsi
+    /// above 0x9F), Latin-1 characters are written as their single byte, as
+    /// an octal escape so the content stream stays ASCII. Characters with no
+    /// byte in the encoding are drawn as `?`.
     fn escape_pdf_string(s: &str) -> String {
         let mut out = String::with_capacity(s.len());
         for c in s.chars() {
@@ -212,7 +217,9 @@ impl PdfBackend {
                 '(' => out.push_str("\\("),
                 ')' => out.push_str("\\)"),
                 '\\' => out.push_str("\\\\"),
-                _ => out.push(c),
+                ' '..='~' => out.push(c),
+                '\u{a0}'..='\u{ff}' => out.push_str(&format!("\\{:03o}", c as u32)),
+                _ => out.push('?'),
             }
         }
         out

@@ -20,11 +20,16 @@ crate's test suite (see [Testing](#testing) below).
   with R's exact default values.
 - Coordinate systems and clipping (`src/device.rs`): `plot.new()`/
   `plot.window()` equivalents, user/device coordinate transforms, log
-  axes, and R's `xpd`-style clip regions (plot region vs. figure
-  region).
+  axes, and R's `xpd`-style clip regions (plot region, figure region,
+  or the whole device for outer-margin text).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
-  `text`, `box`, `abline`, `axis`, `title`, `legend`, `arrows` - all
-  implemented as `Device` methods (see `src/device.rs`). `legend()`
+  `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
+  - all implemented as `Device` methods (see `src/device.rs`).
+  `mtext()` (`Device::mtext` + `MtextOptions`, `src/device/mtext.rs`)
+  covers all four sides of the figure and outer (`oma`) margins with
+  `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
+  R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
+  gives error-bar caps). `legend()`
   (`Device::legend_with`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
   filled boxes and merged point+line keys.
@@ -69,7 +74,7 @@ the corresponding `*.default` R function:
 
 To keep this a tractable "core functionality" port, the following R
 `graphics` features are **not implemented**: `split.screen()`/`par(fig=)`/
-`par(new=)`/`mtext(outer = TRUE)`, `persp()`/3D plotting,
+`par(new=)`, `persp()`/3D plotting,
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
 `image()`/raster images, `symbols()`, `smoothScatter()`,
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, and
@@ -138,6 +143,14 @@ A few fidelity-relevant decisions worth calling out:
   "new page" in a multi-panel sequence (the figure counter wrapping
   round) is emulated by repainting the background over earlier content,
   rather than starting a fresh page as R's multi-page devices do.
+- **Latin-1 text.** Strings may contain Latin-1 characters (`±`, `é`,
+  `×`, ...): string widths use each glyph's AFM metrics looked up by its
+  ISOLatin1 glyph name (as R's `pdf()` does via `ISOLatin1.enc`, not by the
+  AFM's Standard Encoding codes), and the PDF backend writes them as
+  WinAnsi bytes. Characters outside Latin-1 are drawn as `?` in PDF
+  output (SVG/PNG draw them as-is). Kerning is applied to string widths
+  but, unlike R's `pdf()` (`TJ` arrays), not to glyph positions inside a
+  drawn string.
 - **Joint tick-label formatting.** Default axis labels are formatted as
   a vector, like `formatReal()` (`0.0 0.5 1.0`; scientific only when
   strictly narrower).
@@ -202,6 +215,16 @@ against a real R installation by shelling out to `Rscript`:
   for several `col`/`bg`/`cex`/`lwd`/`par(cex)` combinations: each painted
   path's bounding box, fill/stroke operator, colours, line width and cap,
   and each character's text origin/size, vs. an uncompressed R `pdf()`.
+- `tests/mtext_matches_r.rs` - `mtext()` on every side, inner and outer
+  margins, with `line`/`at`/`adj`/`padj`/`cex`/`font` and `las = 0..3`, in
+  a 2x2 `mfrow` page with `oma`: text origins, sizes and rotations.
+- `tests/arrows_matches_r.rs` - every shaft and head vertex for heads at
+  either/both ends, `angle = 90` caps, an `NA` segment and a zero-length
+  arrow.
+- `tests/axis_zero_tick_matches_r.rs` - default tick labels for axes that
+  straddle zero (`CreateAtVector()`'s snapping of near-zero ticks to 0).
+- `tests/latin1_text_matches_r.rs` - bytes written and text origins for
+  strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but

@@ -54,10 +54,26 @@ impl FontFace {
     }
 }
 
+/// Glyph names of Latin-1 code points 0xA0..=0xFF, from R's
+/// `grDevices/enc/ISOLatin1.enc` (identical to WinAnsiEncoding in this range).
+const LATIN1_UPPER_NAMES: [&str; 96] = [
+    "space", "exclamdown", "cent", "sterling", "currency", "yen", "brokenbar", "section",
+    "dieresis", "copyright", "ordfeminine", "guillemotleft", "logicalnot", "hyphen", "registered", "macron",
+    "degree", "plusminus", "twosuperior", "threesuperior", "acute", "mu", "paragraph", "periodcentered",
+    "cedilla", "onesuperior", "ordmasculine", "guillemotright", "onequarter", "onehalf", "threequarters", "questiondown",
+    "Agrave", "Aacute", "Acircumflex", "Atilde", "Adieresis", "Aring", "AE", "Ccedilla",
+    "Egrave", "Eacute", "Ecircumflex", "Edieresis", "Igrave", "Iacute", "Icircumflex", "Idieresis",
+    "Eth", "Ntilde", "Ograve", "Oacute", "Ocircumflex", "Otilde", "Odieresis", "multiply",
+    "Oslash", "Ugrave", "Uacute", "Ucircumflex", "Udieresis", "Yacute", "Thorn", "germandbls",
+    "agrave", "aacute", "acircumflex", "atilde", "adieresis", "aring", "ae", "ccedilla",
+    "egrave", "eacute", "ecircumflex", "edieresis", "igrave", "iacute", "icircumflex", "idieresis",
+    "eth", "ntilde", "ograve", "oacute", "ocircumflex", "otilde", "odieresis", "divide",
+    "oslash", "ugrave", "uacute", "ucircumflex", "udieresis", "yacute", "thorn", "ydieresis",
+];
+
 /// Character widths and kerning pairs (in 1/1000 em units, the AFM
-/// convention) for a single font face, indexed by Latin-1 code point for
-/// the printable ASCII range (where Adobe Standard Encoding and Latin-1
-/// agree).
+/// convention) for a single font face, indexed by Latin-1 code point
+/// (ASCII and 0xA0..=0xFF; other characters get the space width).
 pub struct FontMetrics {
     widths: [u16; 256],
     /// Per-glyph bounding-box `ury` (AFM `B llx lly urx ury`), in 1/1000
@@ -75,14 +91,13 @@ pub struct FontMetrics {
 
 impl FontMetrics {
     fn parse(afm: &str) -> Self {
-        let mut widths = [0u16; 256];
-
-        let mut bbox_ury = [0i16; 256];
-        let mut bbox_lly = [0i16; 256];
         let mut ascent_units = 718.0;
         let mut descent_units = -207.0;
-        let mut name_to_code: HashMap<String, u8> = HashMap::new();
-        let mut kerning: HashMap<(u8, u8), i16> = HashMap::new();
+        // Every glyph's (WX, lly, ury) by name, including the ones the AFM
+        // leaves unencoded (`C -1`), and the names of the ASCII codes.
+        let mut glyphs: HashMap<String, (u16, i16, i16)> = HashMap::new();
+        let mut ascii_names: [Option<String>; 128] = std::array::from_fn(|_| None);
+        let mut kern_pairs: Vec<(String, String, i16)> = Vec::new();
 
         for line in afm.lines() {
             let line = line.trim();
@@ -118,16 +133,11 @@ impl FontMetrics {
                         name = Some(v.trim());
                     }
                 }
-                if let (Some(code), Some(wx)) = (code, wx) {
-                    if (0..256).contains(&code) {
-                        widths[code as usize] = wx;
-                        if let Some((lly, ury)) = bbox_val {
-                            bbox_lly[code as usize] = lly;
-                            bbox_ury[code as usize] = ury;
-                        }
-                        if let Some(name) = name {
-                            name_to_code.insert(name.to_string(), code as u8);
-                        }
+                if let (Some(name), Some(wx)) = (name, wx) {
+                    let (lly, ury) = bbox_val.unwrap_or((0, 0));
+                    glyphs.insert(name.to_string(), (wx, lly, ury));
+                    if let Some(code) = code.filter(|c| (0..128).contains(c)) {
+                        ascii_names[code as usize] = Some(name.to_string());
                     }
                 }
             } else if let Some(rest) = line.strip_prefix("KPX ") {
@@ -139,19 +149,51 @@ impl FontMetrics {
                     if n1 == "space" || n2 == "space" {
                         continue;
                     }
-                    if let (Some(&c1), Some(&c2), Ok(kern)) = (
-                        name_to_code.get(n1),
-                        name_to_code.get(n2),
-                        kern.parse::<i16>(),
-                    ) {
-                        kerning.insert((c1, c2), kern);
+                    if let Ok(kern) = kern.parse::<i16>() {
+                        kern_pairs.push((n1.to_string(), n2.to_string(), kern));
                     }
                 }
             }
         }
-        // Adobe Standard Encoding and Latin-1 agree on ASCII (32-126); a
-        // "space" width is a reasonable fallback for anything else we
-        // haven't mapped (accented letters, etc.) rather than 0.
+
+        // Code -> glyph name, as R's pdf()/postscript() devices map single-byte
+        // text through their encoding (ISOLatin1.enc by default): ASCII as the
+        // AFM's own (Standard Encoding) codes, which agree with ISOLatin1 there
+        // apart from `-` (R's `/minus`, deliberately not replicated); the upper
+        // half by Latin-1 glyph name; 128-159 unmapped.
+        let mut names: [Option<&str>; 256] = [None; 256];
+        for (code, name) in ascii_names.iter().enumerate() {
+            names[code] = name.as_deref();
+        }
+        for (i, name) in LATIN1_UPPER_NAMES.iter().enumerate() {
+            names[0xA0 + i] = Some(name);
+        }
+
+        let mut widths = [0u16; 256];
+        let mut bbox_ury = [0i16; 256];
+        let mut bbox_lly = [0i16; 256];
+        let mut codes_of: HashMap<&str, Vec<u8>> = HashMap::new();
+        for (code, name) in names.iter().enumerate() {
+            let Some(name) = name else { continue };
+            if let Some(&(wx, lly, ury)) = glyphs.get(*name) {
+                widths[code] = wx;
+                bbox_lly[code] = lly;
+                bbox_ury[code] = ury;
+                codes_of.entry(name).or_default().push(code as u8);
+            }
+        }
+        let mut kerning: HashMap<(u8, u8), i16> = HashMap::new();
+        for (n1, n2, kern) in &kern_pairs {
+            if let (Some(c1s), Some(c2s)) = (codes_of.get(n1.as_str()), codes_of.get(n2.as_str())) {
+                for &c1 in c1s {
+                    for &c2 in c2s {
+                        kerning.insert((c1, c2), *kern);
+                    }
+                }
+            }
+        }
+        // A "space" width is a reasonable fallback for anything unmapped
+        // rather than 0.
         let default_width = widths[b' ' as usize].max(1);
         FontMetrics {
             widths,

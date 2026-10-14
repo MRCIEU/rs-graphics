@@ -232,13 +232,26 @@ pub fn ge_pretty(lo_in: f64, up_in: f64, ndiv_in: i32) -> (f64, f64, i32) {
 
 /// Convenience wrapper returning the actual tick values, mirroring what
 /// `axis()` / `axTicks()` would show for a default (`n = 5`) linear axis.
+///
+/// Ticks are placed as `CreateAtVector()` (`graphics.c`) does for a linear
+/// axis: `lo + (i / ndiv) * (up - lo)`, with any tick closer to zero than
+/// `|up - lo| / (100 * ndiv)` set to exactly 0 (otherwise e.g. -0.2..0.4
+/// would get a `2.775558e-17` tick).
 pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
     let (lo, up, ndiv) = ge_pretty(lo, up, ndiv);
-    let mut ticks = Vec::with_capacity(ndiv as usize + 1);
-    for i in 0..=ndiv {
-        ticks.push(lo + (i as f64) * (up - lo) / (ndiv as f64));
-    }
-    ticks
+    let dn = ndiv.max(1) as f64;
+    let range = up - lo;
+    let small = range.abs() / (100.0 * dn);
+    (0..=ndiv)
+        .map(|i| {
+            let at = lo + (i as f64 / dn) * range;
+            if at.abs() < small {
+                0.0
+            } else {
+                at
+            }
+        })
+        .collect()
 }
 
 /// Port of base R's `pretty.default()` (the user-facing `pretty()`
