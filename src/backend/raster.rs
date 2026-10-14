@@ -154,25 +154,25 @@ impl RasterBackend {
         }
         let paint = Self::paint_for(stroke.color);
         let sk_stroke = Self::tiny_skia_stroke(stroke, self.dpi);
-        let mask = self.current_mask().cloned();
+        let mask = self.clip_masks.last();
         self.pixmap.stroke_path(
             path,
             &paint,
             &sk_stroke,
             Transform::identity(),
-            mask.as_ref(),
+            mask,
         );
     }
 
     fn fill_shape(&mut self, path: &Path, fill: Color) {
         let paint = Self::paint_for(fill);
-        let mask = self.current_mask().cloned();
+        let mask = self.clip_masks.last();
         self.pixmap.fill_path(
             path,
             &paint,
             FillRule::Winding,
             Transform::identity(),
-            mask.as_ref(),
+            mask,
         );
     }
 
