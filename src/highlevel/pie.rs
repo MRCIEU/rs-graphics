@@ -6,7 +6,6 @@ use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::device::Device;
 use crate::lty::LineType;
-use crate::par::AxisStyle;
 
 /// R's default pie slice color cycle (used when `col` isn't given).
 const DEFAULT_COLORS: [&str; 6] = [
@@ -23,8 +22,9 @@ const DEFAULT_COLORS: [&str; 6] = [
 #[derive(Clone, Debug)]
 pub struct PieOptions<'a> {
     pub labels: Option<Vec<String>>,
-    /// Pie radius, as a fraction of the plot region half-extent. R's
-    /// default is `0.8`.
+    /// Pie radius in user units, where the plot region's shorter side
+    /// spans `[-1, 1]` before the usual 4% axis extension. R's default is
+    /// `0.8`.
     pub radius: f64,
     /// Slice fill colors, cycled if shorter than `x`. Defaults to R's
     /// built-in 6-color cycle if `None`.
@@ -69,9 +69,9 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
 
     dev.plot_new();
 
-    // Adjust xlim/ylim so the circle isn't distorted by a non-square
-    // plot region (matches `pie()`'s manual `pin`-ratio pre-scaling +
-    // `plot.window(..., asp = 1)`).
+    // Pre-scale xlim/ylim by the plot region's aspect ratio, then
+    // `plot.window(xlim, ylim, asp = 1)` (with the current `xaxs`/`yaxs`,
+    // i.e. R's default 4% extension), exactly as `pie.R` does.
     let plt = dev.plot_region();
     let (w, h) = (plt.width(), plt.height());
     let (xlim, ylim) = if w > h {
@@ -79,12 +79,7 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
     } else {
         ((-1.0, 1.0), (-(h / w), h / w))
     };
-    let (saved_xaxs, saved_yaxs) = (dev.par.xaxs, dev.par.yaxs);
-    dev.par.xaxs = AxisStyle::Exact;
-    dev.par.yaxs = AxisStyle::Exact;
-    dev.plot_window(xlim, ylim, false, false);
-    dev.par.xaxs = saved_xaxs;
-    dev.par.yaxs = saved_yaxs;
+    dev.plot_window_asp(xlim, ylim, 1.0);
 
     let twopi = if opts.clockwise { -2.0 * PI } else { 2.0 * PI };
     let init = opts.init_angle_deg.to_radians();
@@ -95,10 +90,12 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
 
     let mut cum = Vec::with_capacity(nx + 1);
     cum.push(0.0);
+    // `c(0, cumsum(x) / sum(x))`: divide the running sum (not each term),
+    // so slice fractions - and hence edge counts - round exactly as in R.
     let mut acc = 0.0;
     for &v in x {
-        acc += v / total;
-        cum.push(acc);
+        acc += v;
+        cum.push(acc / total);
     }
 
     let lwd = dev.par.lwd;

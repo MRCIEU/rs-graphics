@@ -193,6 +193,9 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/layout_matches_r.rs` - bar rectangles and text origins for
   `mfrow`/`mfcol`/`mfg`/`oma`/`par(cex)` and `layout()` (spanning,
   `lcm()`, `respect`) vs. an uncompressed R `pdf()`.
+- `tests/pie_matches_r.rs` - every slice/tick-line vertex and text origin
+  of `pie()` (square, wide and tall pages, `clockwise`, `init.angle`,
+  `radius`, `par(xaxs = "i")`) vs. an uncompressed R `pdf()`.
 - `tests/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
 - `tests/pch_matches_r.rs` - every `pch = 0:25` plus character symbols,

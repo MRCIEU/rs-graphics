@@ -277,6 +277,42 @@ impl<B: Backend> Device<B> {
     /// `GScale`'s extra edge-case handling for near-zero/non-finite
     /// ranges - see the crate README for the fidelity tradeoffs made
     /// here.
+    /// `plot.window(xlim, ylim, asp = asp)` on linear axes: widens
+    /// whichever range is needed so one x unit is `asp` y units long on
+    /// the page (centred on the given limits), *then* applies
+    /// `par(xaxs/yaxs)` as usual. Port of `C_plot_window`'s `asp` branch.
+    pub fn plot_window_asp(&mut self, xlim: (f64, f64), ylim: (f64, f64), asp: f64) {
+        if !(asp.is_finite() && asp > 0.0) {
+            self.plot_window(xlim, ylim, false, false);
+            return;
+        }
+        let (pin1, pin2) = (self.plt.width(), self.plt.height());
+        let xdelta = (xlim.1 - xlim.0).abs() / asp;
+        let ydelta = (ylim.1 - ylim.0).abs();
+        let (mut xadd, mut yadd) = if xdelta == 0.0 && ydelta == 0.0 {
+            let a = if xlim.0 == 0.0 { 1.0 } else { 0.4 } * asp;
+            (a * asp, a)
+        } else {
+            let scale = (pin1 / xdelta).min(pin2 / ydelta);
+            (
+                0.5 * (pin1 / scale - xdelta) * asp,
+                0.5 * (pin2 / scale - ydelta),
+            )
+        };
+        if xlim.1 < xlim.0 {
+            xadd = -xadd;
+        }
+        if ylim.1 < ylim.0 {
+            yadd = -yadd;
+        }
+        self.plot_window(
+            (xlim.0 - xadd, xlim.1 + xadd),
+            (ylim.0 - yadd, ylim.1 + yadd),
+            false,
+            false,
+        );
+    }
+
     fn expand_range(min: f64, max: f64, style: AxisStyle) -> (f64, f64) {
         match style {
             AxisStyle::Exact => (min, max),
