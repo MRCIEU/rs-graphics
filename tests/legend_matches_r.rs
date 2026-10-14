@@ -1,0 +1,305 @@
+//! Cross-checks `legend()` layout (box rectangle + every label origin)
+//! against a real R `pdf()` device's uncompressed output, for keyword
+//! positions, `inset`, multi-column / horizontal layouts, titles, filled
+//! boxes, `cex`/`intersp` and corner-pair positioning. Skipped if
+//! `Rscript` isn't available.
+
+use std::process::Command;
+
+use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::color::{Color, ColorSpec};
+use rs_graphics::device::{Device, LegendEntry, LegendKeyword, LegendOptions, LegendPos};
+use rs_graphics::highlevel::{plot, PlotOptions};
+use rs_graphics::lty::LineType;
+use rs_graphics::par::Par;
+
+fn rscript_available() -> bool {
+    Command::new("Rscript")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// `(x, y)` of every text matrix, sorted.
+fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    for line in pdf.lines() {
+        let Some(idx) = line.find(" Tm") else {
+            continue;
+        };
+        // Reversed: [y, x, ...].
+        let nums: Vec<f64> = line[..idx]
+            .split_whitespace()
+            .rev()
+            .take(6)
+            .filter_map(|t| t.parse().ok())
+            .collect();
+        if nums.len() == 6 {
+            out.push((nums[1], nums[0]));
+        }
+    }
+    out.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    out
+}
+
+/// `[x, y_bottom, w, h]` of every drawn rectangle (`... re` without a clip),
+/// ignoring full-page backgrounds, normalised so `h > 0`.
+fn rects(pdf: &str) -> Vec<[f64; 4]> {
+    let mut out = Vec::new();
+    for line in pdf.lines() {
+        let line = line.trim();
+        if !line.ends_with(" re") {
+            continue;
+        }
+        let nums: Vec<f64> = line
+            .split_whitespace()
+            .filter_map(|t| t.parse().ok())
+            .collect();
+        // Skip the page background and the plot-region `box()` (which R
+        // draws as a polyline rather than a rectangle).
+        if nums.len() != 4
+            || nums[2] >= 431.0
+            || (nums[0] - 59.04).abs() < 0.01 && (nums[1] - 73.44).abs() < 0.01
+        {
+            continue;
+        }
+        let (x, y, w, h) = (nums[0], nums[1], nums[2], nums[3]);
+        out.push(if h < 0.0 {
+            [x, y + h, w, -h]
+        } else {
+            [x, y, w, h]
+        });
+    }
+    out.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    out
+}
+
+fn black() -> ColorSpec {
+    ColorSpec::Color(Color::BLACK)
+}
+
+fn named(s: &str) -> ColorSpec {
+    ColorSpec::Color(Color::parse(s).unwrap())
+}
+
+fn solid() -> LineType {
+    LineType::from_code(1)
+}
+
+struct Case {
+    name: &'static str,
+    r: &'static str,
+    run: fn(&mut Device<PdfBackend>),
+}
+
+fn cases() -> Vec<Case> {
+    vec![
+        Case {
+            name: "topright_title_merge",
+            r: r#"legend("topright", legend=c("alpha","beta gamma"), col=c(1,2), pch=c(19,1), lty=c(1,2), lwd=c(1,2), title="Key")"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::point("alpha", ColorSpec::Index(1), 19).with_line(1.0, solid()),
+                    LegendEntry::point("beta gamma", ColorSpec::Index(2), 1)
+                        .with_line(2.0, LineType::from_code(2)),
+                ];
+                let o = LegendOptions {
+                    title: Some("Key".into()),
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
+            },
+        },
+        Case {
+            name: "bottomleft_inset",
+            r: r#"legend("bottomleft", legend=c("a","bb","ccc"), pch=c(1,2,3), inset=0.05)"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::point("a", black(), 1),
+                    LegendEntry::point("bb", black(), 2),
+                    LegendEntry::point("ccc", black(), 3),
+                ];
+                let o = LegendOptions {
+                    inset: (0.05, 0.05),
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Keyword(LegendKeyword::BottomLeft), &e, &o);
+            },
+        },
+        Case {
+            name: "center_ncol2_nobox",
+            r: r#"legend("center", legend=c("one","two","three"), lty=1:3, col=2:4, ncol=2, bty="n")"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::line("one", ColorSpec::Index(2), 1.0, LineType::from_code(1)),
+                    LegendEntry::line("two", ColorSpec::Index(3), 1.0, LineType::from_code(2)),
+                    LegendEntry::line("three", ColorSpec::Index(4), 1.0, LineType::from_code(3)),
+                ];
+                let o = LegendOptions {
+                    ncol: 2,
+                    bty_box: false,
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Keyword(LegendKeyword::Center), &e, &o);
+            },
+        },
+        Case {
+            name: "top_horiz_fill",
+            r: r#"legend("top", legend=c("x","yy"), fill=c("red","blue"), horiz=TRUE)"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::filled("x", named("red")),
+                    LegendEntry::filled("yy", named("blue")),
+                ];
+                let o = LegendOptions {
+                    horiz: true,
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Keyword(LegendKeyword::Top), &e, &o);
+            },
+        },
+        Case {
+            name: "xy_cex_intersp_title",
+            r: r#"legend(5, 20, legend=c("p","qq","rrr"), pch=1:3, cex=0.8, y.intersp=1.5, x.intersp=2, title="T")"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::point("p", black(), 1),
+                    LegendEntry::point("qq", black(), 2),
+                    LegendEntry::point("rrr", black(), 3),
+                ];
+                let o = LegendOptions {
+                    cex: 0.8,
+                    y_intersp: 1.5,
+                    x_intersp: 2.0,
+                    title: Some("T".into()),
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Xy(5.0, 20.0), &e, &o);
+            },
+        },
+        Case {
+            name: "corners",
+            r: r#"legend(c(5,15), c(10,20), legend=c("a","b"), pch=1:2)"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::point("a", black(), 1),
+                    LegendEntry::point("b", black(), 2),
+                ];
+                d.legend_with(
+                    LegendPos::Corners(5.0, 10.0, 15.0, 20.0),
+                    &e,
+                    &LegendOptions::default(),
+                );
+            },
+        },
+        Case {
+            name: "right_long_title_seglen",
+            r: r#"legend("right", legend=c("lo","hi"), lty=1, lwd=2, seg.len=3, title="A rather long legend title")"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::line("lo", black(), 2.0, solid()),
+                    LegendEntry::line("hi", black(), 2.0, solid()),
+                ];
+                let o = LegendOptions {
+                    seg_len: 3.0,
+                    title: Some("A rather long legend title".into()),
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Keyword(LegendKeyword::Right), &e, &o);
+            },
+        },
+        Case {
+            name: "topleft_text_width",
+            r: r#"legend("topleft", legend=c("a","b"), pch=1:2, text.width=2)"#,
+            run: |d| {
+                let e = vec![
+                    LegendEntry::point("a", black(), 1),
+                    LegendEntry::point("b", black(), 2),
+                ];
+                let o = LegendOptions {
+                    text_width: Some(2.0),
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o);
+            },
+        },
+    ]
+}
+
+#[test]
+fn legend_layout_matches_r() {
+    if !rscript_available() {
+        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+        return;
+    }
+    let cases = cases();
+    let dir = std::env::temp_dir();
+    let mut script = String::from("x <- 1:25; y <- sin(x * 0.35) * 8 + x * 0.6\n");
+    for c in &cases {
+        script.push_str(&format!(
+            "pdf(file = '{}/rs_graphics_legend_{}.pdf', width = 6, height = 4, compress = FALSE)\n\
+             plot(x, y, pch = 19, xlab = 'x', ylab = 'y')\n{}\ninvisible(dev.off())\n",
+            dir.display(),
+            c.name,
+            c.r
+        ));
+    }
+    let script_path = dir.join("rs_graphics_legend.R");
+    std::fs::write(&script_path, script).unwrap();
+    let out = Command::new("Rscript")
+        .arg(&script_path)
+        .output()
+        .expect("run Rscript");
+    assert!(
+        out.status.success(),
+        "Rscript failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let x: Vec<f64> = (1..=25).map(|i| i as f64).collect();
+    let y: Vec<f64> = x.iter().map(|v| (v * 0.35).sin() * 8.0 + v * 0.6).collect();
+
+    for c in &cases {
+        let path = dir.join(format!("rs_graphics_legend_{}.pdf", c.name));
+        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
+
+        let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+        let opts = PlotOptions {
+            pch: 19,
+            xlab: Some("x"),
+            ylab: Some("y"),
+            ..PlotOptions::default()
+        };
+        plot(&mut dev, &x, &y, &opts);
+        (c.run)(&mut dev);
+        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
+
+        let (r_t, our_t) = (text_origins(&r_pdf), text_origins(&ours));
+        assert_eq!(our_t.len(), r_t.len(), "{}: text item count", c.name);
+        for (a, b) in our_t.iter().zip(&r_t) {
+            assert!(
+                (a.0 - b.0).abs() < 0.05 && (a.1 - b.1).abs() < 0.05,
+                "{}: text origin differs: ours={a:?} r={b:?}\nours={our_t:?}\nr={r_t:?}",
+                c.name
+            );
+        }
+
+        let (r_r, our_r) = (rects(&r_pdf), rects(&ours));
+        assert_eq!(
+            our_r.len(),
+            r_r.len(),
+            "{}: rect count\nours={our_r:?}\nr={r_r:?}",
+            c.name
+        );
+        for (a, b) in our_r.iter().zip(&r_r) {
+            for k in 0..4 {
+                assert!(
+                    (a[k] - b[k]).abs() < 0.05,
+                    "{}: rect differs: ours={a:?} r={b:?}",
+                    c.name
+                );
+            }
+        }
+    }
+}

@@ -1,17 +1,16 @@
 //! PNG rasterization backend, built on `tiny-skia` for path filling/
-//! stroking and `ab_glyph` (with bundled DejaVu Sans faces, see
+//! stroking and `ab_glyph` (with bundled Liberation Sans faces, see
 //! `assets/fonts/`) for glyph rasterization.
 //!
 //! Text *layout* (advance widths, kerning) still always comes from
 //! `crate::afm`'s Helvetica AFM tables - the same ones `pdf()`/`svg()`
 //! effectively rely on - so a string's overall width/position matches R
-//! exactly. Only individual glyph *shapes* come from DejaVu Sans here,
-//! since PNG is the one backend that has no choice but to rasterize
-//! actual glyph outlines. This is a deliberate, documented tradeoff (see
-//! the crate README): DejaVu Sans is metrically different from
-//! Helvetica, so at the level of individual glyphs, PNG output will look
-//! subtly different from R's `png()` (which typically also uses a
-//! platform/Cairo font, not literally Helvetica either).
+//! exactly. Only individual glyph *shapes* come from Liberation Sans
+//! here, since PNG is the one backend that has no choice but to rasterize
+//! actual glyph outlines. Liberation Sans (SIL OFL) is metric-compatible
+//! with Arial, whose advance widths are identical to Helvetica's, so
+//! glyphs sit naturally in their AFM-derived positions and the shapes are
+//! close to the Helvetica that R's own `png()` draws.
 
 use std::sync::OnceLock;
 
@@ -36,18 +35,20 @@ struct Fonts {
 fn fonts() -> &'static Fonts {
     static FONTS: OnceLock<Fonts> = OnceLock::new();
     FONTS.get_or_init(|| Fonts {
-        plain: FontArc::try_from_slice(include_bytes!("../../assets/fonts/DejaVuSans.ttf"))
-            .expect("bundled DejaVuSans.ttf must parse"),
-        bold: FontArc::try_from_slice(include_bytes!("../../assets/fonts/DejaVuSans-Bold.ttf"))
-            .expect("bundled DejaVuSans-Bold.ttf must parse"),
+        plain: FontArc::try_from_slice(include_bytes!(
+            "../../assets/fonts/LiberationSans-Regular.ttf"
+        ))
+        .expect("bundled LiberationSans-Regular.ttf must parse"),
+        bold: FontArc::try_from_slice(include_bytes!("../../assets/fonts/LiberationSans-Bold.ttf"))
+            .expect("bundled LiberationSans-Bold.ttf must parse"),
         italic: FontArc::try_from_slice(include_bytes!(
-            "../../assets/fonts/DejaVuSans-Oblique.ttf"
+            "../../assets/fonts/LiberationSans-Italic.ttf"
         ))
-        .expect("bundled DejaVuSans-Oblique.ttf must parse"),
+        .expect("bundled LiberationSans-Italic.ttf must parse"),
         bold_italic: FontArc::try_from_slice(include_bytes!(
-            "../../assets/fonts/DejaVuSans-BoldOblique.ttf"
+            "../../assets/fonts/LiberationSans-BoldItalic.ttf"
         ))
-        .expect("bundled DejaVuSans-BoldOblique.ttf must parse"),
+        .expect("bundled LiberationSans-BoldItalic.ttf must parse"),
     })
 }
 
@@ -337,8 +338,7 @@ impl Backend for RasterBackend {
         // Cumulative x-offsets from R's Helvetica AFM tables, in inches -
         // this is what actually determines each glyph's position, so
         // multi-character strings line up exactly where the SVG/PDF
-        // backends would place them, even though DejaVu's own glyph
-        // shapes/widths differ from Helvetica's.
+        // backends would place them.
         let offsets = afm::char_x_offsets_inches(text, style.face, style.size_pt, 1.0);
         let theta = style.rotation_deg.to_radians();
         let (cos_t, sin_t) = (theta.cos() as f64, theta.sin() as f64);
@@ -354,6 +354,7 @@ impl Backend for RasterBackend {
             let (anchor_px_x, anchor_px_y) = self.to_px(anchor_in);
 
             let glyph_id = font.glyph_id(ch);
+
             let glyph: AbGlyph = glyph_id.with_scale_and_position(scale, ab_glyph::point(0.0, 0.0));
             let Some(outlined) = font.outline_glyph(glyph) else {
                 continue;

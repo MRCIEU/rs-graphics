@@ -12,14 +12,21 @@ use crate::afm::{self};
 use crate::backend::{Backend, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
+use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par};
 use crate::pch;
 use crate::pretty::ge_pretty;
 
+mod legend;
+pub use legend::{LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
+
 /// Which axis/box side, in R's `side` convention: `1` = bottom, `2` =
 /// left, `3` = top, `4` = right.
 pub type Side = i32;
+
+/// `dev->yLineBias` for R's pdf/png/svg devices (see `GMtext()`).
+const Y_LINE_BIAS: f64 = 0.2;
 
 pub struct Device<B: Backend> {
     backend: B,
@@ -35,6 +42,16 @@ pub struct Device<B: Backend> {
     usr: (f64, f64, f64, f64),
     xlog: bool,
     ylog: bool,
+    /// How figures are arranged (`mfrow`/`mfcol`/`layout()`); the default
+    /// is a single figure.
+    arrangement: Arrangement,
+    /// `par("mfg")`'s `currentFigure`, 1-based.
+    current_figure: usize,
+    /// `par(new = TRUE)` as set by [`Device::mfg`]: the next `plot_new()`
+    /// reuses the current figure instead of advancing.
+    hold_figure: bool,
+    /// Whether anything has been plotted yet (R's `gpptr(dd)->state`).
+    used: bool,
 }
 
 /// A resolved style bundle for a stroked primitive; kept small so
@@ -65,6 +82,14 @@ impl<B: Backend> Device<B> {
             usr: (0.0, 1.0, 0.0, 1.0),
             xlog: false,
             ylog: false,
+            arrangement: Arrangement::Grid {
+                nrow: 1,
+                ncol: 1,
+                by_col: false,
+            },
+            current_figure: 1,
+            hold_figure: false,
+            used: false,
         };
         dev.recompute_layout();
         dev
@@ -91,12 +116,23 @@ impl<B: Backend> Device<B> {
     }
 
     fn recompute_layout(&mut self) {
+        // Inner region: the device minus the outer margins; figures are
+        // fractions (NIC) of it.
         let omi = self.par.omi();
-        self.fig = Rect::new(
+        let inner = Rect::new(
             omi.left,
             omi.bottom,
             self.width_in - omi.right,
             self.height_in - omi.top,
+        );
+        let [fx0, fx1, fy0, fy1] =
+            self.arrangement
+                .figure_region_nic(self.current_figure, inner.width(), inner.height());
+        self.fig = Rect::new(
+            inner.x0 + fx0 * inner.width(),
+            inner.y0 + fy0 * inner.height(),
+            inner.x0 + fx1 * inner.width(),
+            inner.y0 + fy1 * inner.height(),
         );
         let mai = self.par.mai();
         self.plt = Rect::new(
@@ -107,15 +143,111 @@ impl<B: Backend> Device<B> {
         );
     }
 
-    /// `plot.new()`: clears the device to `par("bg")` and (re)computes the
-    /// figure/plot regions from the current margins.
-    pub fn plot_new(&mut self) {
-        self.recompute_layout();
-        self.backend.draw_rect(
-            Rect::new(0.0, 0.0, self.width_in, self.height_in),
-            Some(self.par.bg),
-            None,
+    /// `par(mfrow = c(nrow, ncol))`: a grid of figures filled row by row.
+    /// Like R, also sets `par(cex)` to 0.83 (2 x 2) or 0.66 (more than 2
+    /// rows or columns) and `mex` to 1. The next `plot_new()` starts a new
+    /// page at the first figure.
+    ///
+    /// # Panics
+    /// If `nrow` or `ncol` is zero.
+    pub fn mfrow(&mut self, nrow: usize, ncol: usize) {
+        self.set_arrangement(Arrangement::Grid {
+            nrow,
+            ncol,
+            by_col: false,
+        });
+    }
+
+    /// `par(mfcol = c(nrow, ncol))`: as [`Device::mfrow`] but filled
+    /// column by column.
+    pub fn mfcol(&mut self, nrow: usize, ncol: usize) {
+        self.set_arrangement(Arrangement::Grid {
+            nrow,
+            ncol,
+            by_col: true,
+        });
+    }
+
+    /// `layout(mat, widths, heights, respect)`: see [`Layout`]. Sets
+    /// `par(cex)`/`mex` like [`Device::mfrow`] does, based on the layout
+    /// matrix's dimensions.
+    pub fn layout(&mut self, layout: Layout) {
+        self.set_arrangement(Arrangement::Layout(layout));
+    }
+
+    fn set_arrangement(&mut self, arrangement: Arrangement) {
+        assert!(
+            arrangement.nrow() > 0 && arrangement.ncol() > 0,
+            "a figure grid needs at least one row and one column"
         );
+        self.par.cex = arrangement.cex_base();
+        self.par.mex = 1.0;
+        // R sets `currentFigure = lastFigure` so the next plot.new()
+        // wraps round to figure 1 on a fresh page.
+        self.current_figure = arrangement.last_figure();
+        self.arrangement = arrangement;
+        self.hold_figure = false;
+        self.recompute_layout();
+    }
+
+    /// `par(mfg = c(row, col))`: makes the figure at (`row`, `col`)
+    /// (1-based) the one the next `plot_new()` draws into, without
+    /// advancing or starting a new page. As in R, the figure number is
+    /// derived from the `mfrow`/`mfcol` ordering even under `layout()`.
+    ///
+    /// # Panics
+    /// If `row`/`col` are outside the current arrangement.
+    pub fn mfg(&mut self, row: usize, col: usize) {
+        let (nrow, ncol) = (self.arrangement.nrow(), self.arrangement.ncol());
+        assert!(
+            (1..=nrow).contains(&row) && (1..=ncol).contains(&col),
+            "mfg out of range"
+        );
+        let by_col = matches!(self.arrangement, Arrangement::Grid { by_col: true, .. });
+        self.current_figure = if by_col {
+            (col - 1) * nrow + row
+        } else {
+            (row - 1) * ncol + col
+        };
+        self.hold_figure = true;
+        self.recompute_layout();
+    }
+
+    /// The current figure number (`par("mfg")`'s position, 1-based).
+    pub fn current_figure(&self) -> usize {
+        self.current_figure
+    }
+
+    /// The current figure region in device inches.
+    pub fn figure_region(&self) -> Rect {
+        self.fig
+    }
+
+    /// `plot.new()`: advances to the next figure (starting a new "page"
+    /// after the last one) and recomputes the figure/plot regions from the
+    /// current margins. A new page clears the device to `par("bg")`.
+    ///
+    /// The backends hold a single page, so "a new page" is emulated by
+    /// painting the background over whatever was drawn before.
+    pub fn plot_new(&mut self) {
+        let mut new_page = false;
+        if !self.hold_figure || !self.used {
+            self.current_figure += 1;
+            if self.current_figure > self.arrangement.last_figure() || !self.used {
+                self.current_figure = 1;
+                new_page = true;
+            }
+        }
+        self.hold_figure = false;
+        self.used = true;
+        self.recompute_layout();
+        if new_page {
+            self.backend.draw_rect(
+                Rect::new(0.0, 0.0, self.width_in, self.height_in),
+                Some(self.par.bg),
+                None,
+            );
+        }
     }
 
     /// `plot.window(xlim, ylim, log)`: sets up the user-coordinate system.
@@ -192,6 +324,14 @@ impl<B: Backend> Device<B> {
         self.par.line_height_inches()
     }
 
+    /// Font size in points for `par(ps) * par(cex) * cex`, after any
+    /// rounding the backend's real-world counterpart applies (R's `pdf()`
+    /// rounds to whole points; `svg()`/`png()` don't).
+    fn font_size_pt(&self, cex: f64) -> f64 {
+        self.backend
+            .effective_font_size(self.par.ps * self.par.cex * cex)
+    }
+
     // ---------------------------------------------------------------
     // Clipping (matches R's `xpd`: FALSE clips to the plot region, TRUE
     // clips to the figure region - we treat R's `NA`, "clip to device",
@@ -266,7 +406,10 @@ impl<B: Backend> Device<B> {
         } else if (32..=126).contains(&pch) {
             let ch = char::from_u32(pch as u32).unwrap_or('?');
             let face = self.par.font_face(self.par.font);
-            let size_pt = self.par.ps * self.par.cex;
+            let size_pt = self.font_size_pt(1.0);
+            if size_pt <= 0.0 {
+                return;
+            }
             let style = TextStyle::new(col, face, size_pt);
             let w = afm::str_width_inches(&ch.to_string(), face, size_pt, 1.0);
             let (asc, desc) = afm::ascent_descent_inches(face, size_pt, 1.0);
@@ -458,7 +601,7 @@ impl<B: Backend> Device<B> {
     /// `text` under the current `par(font=, ps=)` (times `cex`).
     pub fn text_metrics(&self, text: &str, font: i32, cex: f64) -> (f64, f64) {
         let face = self.par.font_face(font);
-        let size = self.par.ps * cex;
+        let size = self.backend.effective_font_size(self.par.ps * cex);
         (
             afm::str_width_inches(text, face, size, 1.0),
             afm::str_height_inches(face, size, 1.0),
@@ -505,10 +648,56 @@ impl<B: Backend> Device<B> {
             return;
         }
         let face = self.par.font_face(font);
-        let size_pt = self.par.ps * self.par.cex * cex;
+        let size_pt = self.font_size_pt(cex);
+        if size_pt <= 0.0 {
+            return;
+        }
         let w = afm::str_width_inches(label, face, size_pt, 1.0);
         let (asc, desc) = afm::ascent_descent_inches(face, size_pt, 1.0);
         let origin = resolve_text_origin(anchor, w, asc, desc, hadj, vadj, rotation_deg);
+        let style = TextStyle {
+            rotation_deg,
+            ..TextStyle::new(color, face, size_pt)
+        };
+        self.push_clip_for(self.par.xpd);
+        self.backend.draw_text(origin, label, &style);
+        self.pop_clip();
+    }
+
+    /// Text placed the way R's `GEText()` does for a finite `yc`: the
+    /// *baseline* sits at `anchor - yc * height(M)` (so `yc = 0.0` puts
+    /// the baseline exactly on the anchor). Unlike [`Device::text_at`], which justifies against the font's
+    /// nominal ascent/descent box, this reproduces what `title()`/`mtext()`
+    /// do.
+    #[allow(clippy::too_many_arguments)]
+    fn text_gc_at(
+        &mut self,
+        anchor: Point,
+        label: &str,
+        xc: f64,
+        yc: f64,
+        rotation_deg: f64,
+        col: ColorSpec,
+        cex: f64,
+        font: i32,
+    ) {
+        let Some(color) = self.resolve(col) else {
+            return;
+        };
+        if label.is_empty() {
+            return;
+        }
+        let face = self.par.font_face(font);
+        let size_pt = self.font_size_pt(cex);
+        if size_pt <= 0.0 {
+            return;
+        }
+        let width = afm::str_width_inches(label, face, size_pt, 1.0);
+        let dy = -yc * afm::m_height_inches(face, size_pt, 1.0);
+        let dx = -xc * width;
+        let theta = rotation_deg.to_radians();
+        let (c, s) = (theta.cos(), theta.sin());
+        let origin = Point::new(anchor.x + dx * c - dy * s, anchor.y + dx * s + dy * c);
         let style = TextStyle {
             rotation_deg,
             ..TextStyle::new(color, face, size_pt)
@@ -534,6 +723,13 @@ impl<B: Backend> Device<B> {
     /// `axis(side, at=, labels=, ...)`. `at`/`labels` default to R's
     /// automatic tick placement (`pretty()` on the current axis range)
     /// and `format!("{}", v)`-style numeric labels.
+    ///
+    /// Follows `C_axis()` in `plot.c`: the axis line runs from the first to
+    /// the last tick (clamped to the plot range), ticks use the signed
+    /// `par(tcl)`, and labels are placed by `GMtext()` at line `mgp[1]`
+    /// (plus its `yLineBias` nudge) with `yc = padj`, rotated/justified
+    /// according to `las`, and dropped when they would overlap the previous
+    /// label by less than `gap.axis`.
     #[allow(clippy::too_many_arguments)]
     pub fn axis(
         &mut self,
@@ -545,6 +741,38 @@ impl<B: Backend> Device<B> {
         font_axis: i32,
         las: i32,
     ) {
+        self.axis_impl(side, at, labels, col, cex_axis, font_axis, las, true);
+    }
+
+    /// As [`Device::axis`] but draws only the tick labels - no axis line
+    /// or tick marks - like R's `axis(..., lty = 0)` (used by `barplot()`
+    /// for its category names).
+    #[allow(clippy::too_many_arguments)]
+    pub fn axis_labels(
+        &mut self,
+        side: Side,
+        at: Option<Vec<f64>>,
+        labels: Option<Vec<String>>,
+        col: ColorSpec,
+        cex_axis: f64,
+        font_axis: i32,
+        las: i32,
+    ) {
+        self.axis_impl(side, at, labels, col, cex_axis, font_axis, las, false);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn axis_impl(
+        &mut self,
+        side: Side,
+        at: Option<Vec<f64>>,
+        labels: Option<Vec<String>>,
+        col: ColorSpec,
+        cex_axis: f64,
+        font_axis: i32,
+        las: i32,
+        draw_line_and_ticks: bool,
+    ) {
         let Some(color) = self.resolve(col) else {
             return;
         };
@@ -554,102 +782,180 @@ impl<B: Backend> Device<B> {
         let saved_xpd = self.par.xpd;
         self.par.xpd = true;
         let ticks = at.unwrap_or_else(|| self.default_ticks(side));
-        let labels =
-            labels.unwrap_or_else(|| ticks.iter().map(|v| format_axis_label(*v)).collect());
+        let labels = labels.unwrap_or_else(|| format_axis_labels(&ticks));
         let stroke = self.stroke_of(color, self.par.lwd, LineType::Pattern(&[]));
         let lh = self.line_height();
-        let tick_len = self.par.tcl.abs() * lh; // R's `tcl` is negative-by-default = outward
-        let label_offset = self.par.mgp[1] * lh;
-        let size_pt = self.par.ps * self.par.cex * cex_axis;
+        let is_x = side == 1 || side == 3;
 
-        // Axis baseline itself.
-        let axis_line = match side {
-            1 => (
-                Point::new(self.plt.x0, self.plt.y0),
-                Point::new(self.plt.x1, self.plt.y0),
-            ),
-            3 => (
-                Point::new(self.plt.x0, self.plt.y1),
-                Point::new(self.plt.x1, self.plt.y1),
-            ),
-            2 => (
-                Point::new(self.plt.x0, self.plt.y0),
-                Point::new(self.plt.x0, self.plt.y1),
-            ),
-            _ => (
-                Point::new(self.plt.x1, self.plt.y0),
-                Point::new(self.plt.x1, self.plt.y1),
-            ),
+        // Position of the axis line, and which way is "outward" (away from
+        // the plot region) along the perpendicular coordinate.
+        let (edge, outward) = match side {
+            1 => (self.plt.y0, -1.0),
+            2 => (self.plt.x0, -1.0),
+            3 => (self.plt.y1, 1.0),
+            _ => (self.plt.x1, 1.0),
         };
-        self.backend.draw_line(axis_line.0, axis_line.1, &stroke);
+        let at_perp = |perp: f64, along: f64| {
+            if is_x {
+                Point::new(along, perp)
+            } else {
+                Point::new(perp, along)
+            }
+        };
+        let (a_lo, a_hi) = if is_x {
+            (self.plt.x0, self.plt.x1)
+        } else {
+            (self.plt.y0, self.plt.y1)
+        };
 
+        // Where each tick sits along the axis (device inches), and whether
+        // it lies inside the plot's user range.
+        let mut items: Vec<(f64, bool, &str)> = Vec::new();
         for (v, label) in ticks.iter().zip(labels.iter()) {
-            let along = if side == 1 || side == 3 {
+            let (along, inside) = if is_x {
                 let uv = if self.xlog { 10f64.powf(*v) } else { *v };
-                if uv < self.range_min(true) - 1e-9 || uv > self.range_max(true) + 1e-9 {
-                    continue;
-                }
-                self.user_to_inches(uv, self.range_min(false)).x
+                let inside = uv >= self.range_min(true) - 1e-9 && uv <= self.range_max(true) + 1e-9;
+                (self.user_to_inches(uv, self.range_min(false)).x, inside)
             } else {
                 let uv = if self.ylog { 10f64.powf(*v) } else { *v };
-                if uv < self.range_min(false) - 1e-9 || uv > self.range_max(false) + 1e-9 {
-                    continue;
-                }
-                self.user_to_inches(self.range_min(true), uv).y
+                let inside =
+                    uv >= self.range_min(false) - 1e-9 && uv <= self.range_max(false) + 1e-9;
+                (self.user_to_inches(self.range_min(true), uv).y, inside)
             };
+            if along.is_finite() {
+                items.push((along, inside, label.as_str()));
+            }
+        }
+        if items.is_empty() {
+            self.par.xpd = saved_xpd;
+            return;
+        }
+        // R sorts `at` and draws labels in increasing position order.
+        items.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-            let (tick_p0, tick_p1, label_anchor, hadj, vadj);
-            match side {
-                1 => {
-                    tick_p0 = Point::new(along, self.plt.y0);
-                    tick_p1 = Point::new(along, self.plt.y0 - tick_len);
-                    label_anchor = Point::new(along, self.plt.y0 - label_offset);
-                    hadj = 0.5;
-                    vadj = 1.0;
-                }
-                3 => {
-                    tick_p0 = Point::new(along, self.plt.y1);
-                    tick_p1 = Point::new(along, self.plt.y1 + tick_len);
-                    label_anchor = Point::new(along, self.plt.y1 + label_offset);
-                    hadj = 0.5;
-                    vadj = 0.0;
-                }
-                2 => {
-                    tick_p0 = Point::new(self.plt.x0, along);
-                    tick_p1 = Point::new(self.plt.x0 - tick_len, along);
-                    label_anchor = Point::new(self.plt.x0 - label_offset, along);
-                    hadj = 1.0;
-                    vadj = 0.5;
-                }
-                _ => {
-                    tick_p0 = Point::new(self.plt.x1, along);
-                    tick_p1 = Point::new(self.plt.x1 + tick_len, along);
-                    label_anchor = Point::new(self.plt.x1 + label_offset, along);
-                    hadj = 0.0;
-                    vadj = 0.5;
+        // Axis line: first to last tick, clamped to the plot range.
+        let base = edge + outward * self.par.mgp[2] * lh;
+        let first = items.first().unwrap().0.clamp(a_lo, a_hi);
+        let last = items.last().unwrap().0.clamp(a_lo, a_hi);
+        if draw_line_and_ticks {
+            self.backend
+                .draw_line(at_perp(base, first), at_perp(base, last), &stroke);
+        }
+
+        // Ticks (`tcl` is signed: negative = outward, R's default).
+        let tick_end = base - outward * self.par.tcl * lh;
+        for &(along, inside, _) in &items {
+            if inside && draw_line_and_ticks {
+                self.backend
+                    .draw_line(at_perp(base, along), at_perp(tick_end, along), &stroke);
+            }
+        }
+
+        // Labels.
+        let perpendicular = if is_x {
+            las == 2 || las == 3
+        } else {
+            las == 1 || las == 2
+        };
+        // `ComputePAdjValue()` with the default `padj = NA`.
+        let padj = match las {
+            1 => {
+                if is_x {
+                    0.0
+                } else {
+                    0.5
                 }
             }
-            self.backend.draw_line(tick_p0, tick_p1, &stroke);
-            let rotation = if las == 2 || las == 3 { 90.0 } else { 0.0 };
-            let (hadj, vadj) = if rotation != 0.0 {
-                (vadj, hadj)
+            2 => 0.5,
+            3 => {
+                if is_x {
+                    0.5
+                } else {
+                    0.0
+                }
+            }
+            _ => 0.0,
+        };
+        // `par(adj)` override that `C_axis()` applies for the labels.
+        let hadj = if perpendicular {
+            if side == 1 || side == 2 {
+                1.0
             } else {
-                (hadj, vadj)
+                0.0
+            }
+        } else {
+            0.5
+        };
+        // `GMtext()`'s rotation and line-bias rules.
+        let (angle, bias) = match side {
+            1 => {
+                if las == 2 || las == 3 {
+                    (90.0, 0.0)
+                } else {
+                    (0.0, 1.0 - Y_LINE_BIAS)
+                }
+            }
+            2 => {
+                if las == 1 || las == 2 {
+                    (0.0, 0.0)
+                } else {
+                    (90.0, Y_LINE_BIAS)
+                }
+            }
+            3 => {
+                if las == 2 || las == 3 {
+                    (90.0, 0.0)
+                } else {
+                    (0.0, Y_LINE_BIAS)
+                }
+            }
+            _ => {
+                if las == 1 || las == 2 {
+                    (0.0, 0.0)
+                } else {
+                    (90.0, 1.0 - Y_LINE_BIAS)
+                }
+            }
+        };
+        let label_perp = edge + outward * (self.par.mgp[1] + bias) * lh;
+
+        let face = self.par.font_face(font_axis);
+        let size_pt = self.font_size_pt(cex_axis);
+        let m_h = afm::m_height_inches(face, size_pt, 1.0);
+        let m_w = afm::str_width_inches("m", face, size_pt, 1.0);
+        // `gap.axis` default: 1 "m" width (parallel) / 0.25 "m" height
+        // (perpendicular) of clear space between adjacent labels.
+        let gap = if perpendicular { 0.25 * m_h } else { m_w };
+
+        let mut tlast = f64::NEG_INFINITY;
+        for &(along, inside, label) in &items {
+            // Labels are only drawn strictly inside the (epsilon-widened)
+            // user range, like ticks.
+            if !inside {
+                continue;
+            }
+            let labw = if perpendicular {
+                m_h
+            } else {
+                afm::str_width_inches(label, face, size_pt, 1.0)
             };
-            self.text_at(
-                label_anchor,
-                label,
-                hadj,
-                vadj,
-                rotation,
-                ColorSpec::Color(color),
-                size_pt / self.par.ps / self.par.cex,
-                font_axis,
-            );
+            let tnew = along - 0.5 * labw;
+            if tnew - tlast >= gap {
+                self.text_gc_at(
+                    at_perp(label_perp, along),
+                    label,
+                    hadj,
+                    padj,
+                    angle,
+                    ColorSpec::Color(color),
+                    cex_axis,
+                    font_axis,
+                );
+                tlast = along + 0.5 * labw;
+            }
         }
         self.par.xpd = saved_xpd;
     }
-
     fn range_min(&self, is_x: bool) -> f64 {
         if is_x {
             let (x0, x1, ..) = self.usr;
@@ -701,14 +1007,18 @@ impl<B: Backend> Device<B> {
         let saved_xpd = self.par.xpd;
         self.par.xpd = true;
         let lh = self.line_height();
+        // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
+        // text is baseline-anchored (yadj = 0) and `GMtext` nudges the line
+        // by `yLineBias` (0.2 on pdf/png/svg devices) - `1 - bias` on side 1,
+        // `bias` on sides 2/3.
         if let Some(xlab) = xlab {
-            let y = self.plt.y0 - self.par.mgp[0] * lh;
+            let y = self.plt.y0 - (self.par.mgp[0] + (1.0 - Y_LINE_BIAS)) * lh;
             let x = (self.plt.x0 + self.plt.x1) / 2.0;
-            self.text_at(
+            self.text_gc_at(
                 Point::new(x, y),
                 xlab,
                 0.5,
-                1.0,
+                0.0,
                 0.0,
                 ColorSpec::Color(self.par.col_lab),
                 self.par.cex_lab,
@@ -716,13 +1026,13 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(ylab) = ylab {
-            let x = self.plt.x0 - self.par.mgp[0] * lh;
+            let x = self.plt.x0 - (self.par.mgp[0] + Y_LINE_BIAS) * lh;
             let y = (self.plt.y0 + self.plt.y1) / 2.0;
-            self.text_at(
+            self.text_gc_at(
                 Point::new(x, y),
                 ylab,
                 0.5,
-                1.0,
+                0.0,
                 90.0,
                 ColorSpec::Color(self.par.col_lab),
                 self.par.cex_lab,
@@ -730,13 +1040,15 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(main) = main {
-            let y = self.plt.y1 + (self.par.mar.top - 1.0).max(0.2) * lh;
+            // `vpos = 0.5 * mar[2]`, `adjy = 0.5` (finite, so `GEText`
+            // uses `yc * height(M)`, not exact ink centring).
+            let y = self.plt.y1 + 0.5 * self.par.mar.top * lh;
             let x = (self.plt.x0 + self.plt.x1) / 2.0;
-            self.text_at(
+            self.text_gc_at(
                 Point::new(x, y),
                 main,
                 0.5,
-                0.0,
+                0.5,
                 0.0,
                 ColorSpec::Color(self.par.col_main),
                 self.par.cex_main,
@@ -744,13 +1056,13 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(sub) = sub {
-            let y = self.plt.y0 - (self.par.mgp[0] + 1.5) * lh;
+            let y = self.plt.y0 - (self.par.mgp[0] + 1.0 + (1.0 - Y_LINE_BIAS)) * lh;
             let x = (self.plt.x0 + self.plt.x1) / 2.0;
-            self.text_at(
+            self.text_gc_at(
                 Point::new(x, y),
                 sub,
                 0.5,
-                1.0,
+                0.0,
                 0.0,
                 ColorSpec::Color(self.par.col_sub),
                 self.par.cex_sub,
@@ -793,107 +1105,8 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// A simple `legend(x, y, legend=, col=, pch=, lty=, ...)`, anchored
-    /// at a user-coordinate point that becomes the legend box's top-left
-    /// corner (matching `legend("topleft", ...)`-style usage; R's
-    /// keyword positions like `"topright"` aren't implemented, callers
-    /// resolve those to a user coordinate themselves).
-    pub fn legend(&mut self, x: f64, y: f64, entries: &[LegendEntry]) {
-        if entries.is_empty() {
-            return;
-        }
-        let lh = self.line_height();
-        let size_pt = self.par.ps * self.par.cex;
-        let face = self.par.font_face(self.par.font);
-        let text_h = afm::str_height_inches(face, size_pt, 1.0);
-        let line_gap = text_h * 1.2;
-        let symbol_col_w = 2.0 * lh;
-        let pad = 0.3 * lh;
-
-        let max_label_w = entries
-            .iter()
-            .map(|e| afm::str_width_inches(&e.label, face, size_pt, 1.0))
-            .fold(0.0_f64, f64::max);
-        let box_w = pad * 2.0 + symbol_col_w + max_label_w;
-        let box_h = pad * 2.0 + entries.len() as f64 * line_gap;
-
-        let top_left = self.user_to_inches(x, y);
-        let rect = Rect::new(
-            top_left.x,
-            top_left.y - box_h,
-            top_left.x + box_w,
-            top_left.y,
-        );
-        let border_stroke = Stroke::simple(self.par.fg, 1.0);
-        self.backend
-            .draw_rect(rect, Some(self.par.bg), Some(&border_stroke));
-
-        for (i, entry) in entries.iter().enumerate() {
-            let row_top = top_left.y - pad - i as f64 * line_gap;
-            let row_mid_y = row_top - line_gap / 2.0;
-            let symbol_x_mid = top_left.x + pad + symbol_col_w / 2.0;
-            if let Some(col) = self.resolve(entry.col) {
-                if let Some(pch) = entry.pch {
-                    let size = pch::symbol_size_inches(self.par.ps, self.par.cex);
-                    self.draw_pch(pch, Point::new(symbol_x_mid, row_mid_y), size, col, None);
-                } else {
-                    let stroke = self.stroke_of(col, entry.lwd, entry.lty);
-                    let half = symbol_col_w / 2.0 - pad * 0.3;
-                    self.backend.draw_line(
-                        Point::new(symbol_x_mid - half, row_mid_y),
-                        Point::new(symbol_x_mid + half, row_mid_y),
-                        &stroke,
-                    );
-                }
-            }
-            let label_x = top_left.x + pad + symbol_col_w;
-            self.text_at(
-                Point::new(label_x, row_mid_y),
-                &entry.label,
-                0.0,
-                0.5,
-                0.0,
-                ColorSpec::Color(self.par.col),
-                1.0,
-                self.par.font,
-            );
-        }
-    }
-
     pub fn backend_mut(&mut self) -> &mut B {
         &mut self.backend
-    }
-}
-
-/// One row of a [`Device::legend`] call.
-#[derive(Clone, Debug)]
-pub struct LegendEntry {
-    pub label: String,
-    pub col: ColorSpec,
-    pub pch: Option<i32>,
-    pub lwd: f64,
-    pub lty: LineType,
-}
-
-impl LegendEntry {
-    pub fn point(label: impl Into<String>, col: ColorSpec, pch: i32) -> Self {
-        LegendEntry {
-            label: label.into(),
-            col,
-            pch: Some(pch),
-            lwd: 1.0,
-            lty: LineType::Pattern(&[]),
-        }
-    }
-
-    pub fn line(label: impl Into<String>, col: ColorSpec, lwd: f64, lty: LineType) -> Self {
-        LegendEntry {
-            label: label.into(),
-            col,
-            pch: None,
-            lwd,
-            lty,
-        }
     }
 }
 
@@ -922,12 +1135,78 @@ fn cex_factor(size_inches: f64) -> f64 {
 
 /// Default numeric axis label formatting: R's `axis()` uses roughly
 /// `format(at, trim = TRUE)`, which drops unnecessary trailing zeros.
-fn format_axis_label(v: f64) -> String {
-    if v == v.trunc() && v.abs() < 1e15 {
-        format!("{}", v as i64)
-    } else {
-        let s = format!("{v:.10}");
-        let s = s.trim_end_matches('0').trim_end_matches('.');
-        s.to_string()
+///
+/// The tick vector is formatted *jointly*, like R's `formatReal()` (7
+/// significant digits): all labels share the same number of decimals
+/// (`0.0 0.5 1.0`, not `0 0.5 1`), and scientific notation is chosen when
+/// it is strictly narrower than fixed notation (`0 1e+05 2e+05`).
+fn format_axis_labels(vals: &[f64]) -> Vec<String> {
+    // (significant digits, decimal exponent) of each finite value.
+    let sci: Vec<Option<(i32, i32)>> = vals
+        .iter()
+        .map(|&v| {
+            if !v.is_finite() {
+                return None;
+            }
+            if v == 0.0 {
+                return Some((1, 0));
+            }
+            let s = format!("{:.6e}", v.abs());
+            let (mant, exp) = s.split_once('e')?;
+            let digits = mant.replace('.', "");
+            let nsig = digits.trim_end_matches('0').len().max(1) as i32;
+            Some((nsig, exp.parse().ok()?))
+        })
+        .collect();
+    let finite: Vec<(i32, i32)> = sci.iter().flatten().copied().collect();
+    if finite.is_empty() {
+        return vals.iter().map(|v| format!("{v}")).collect();
+    }
+    let rgt = finite.iter().map(|&(s, e)| s - e - 1).max().unwrap().max(0);
+    let left = finite.iter().map(|&(_, e)| e + 1).max().unwrap().max(1);
+    let mxsl = finite.iter().map(|&(s, _)| s).max().unwrap();
+    let max_abs_exp = finite.iter().map(|&(_, e)| e.abs()).max().unwrap();
+    let neg = vals.iter().any(|&v| v < 0.0) as i32;
+    let fixed_w = neg + left + if rgt > 0 { rgt + 1 } else { 0 };
+    let exp_w = if max_abs_exp >= 100 { 5 } else { 4 };
+    let sci_w = neg + if mxsl > 1 { mxsl + 1 } else { mxsl } + exp_w;
+    vals.iter()
+        .map(|&v| {
+            if !v.is_finite() {
+                return format!("{v}");
+            }
+            if fixed_w <= sci_w {
+                format!("{:.*}", rgt as usize, if v == 0.0 { 0.0 } else { v })
+            } else {
+                let s = format!("{:.*e}", (mxsl - 1) as usize, v);
+                let (m, e) = s.split_once('e').unwrap();
+                let e: i32 = e.parse().unwrap();
+                format!("{m}e{}{:02}", if e < 0 { '-' } else { '+' }, e.abs())
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_axis_labels;
+
+    fn f(v: &[f64]) -> Vec<String> {
+        format_axis_labels(v)
+    }
+
+    #[test]
+    fn axis_labels_share_decimals() {
+        assert_eq!(f(&[0.0, 0.5, 1.0]), ["0.0", "0.5", "1.0"]);
+        assert_eq!(f(&[0.0, 2.0, 4.0]), ["0", "2", "4"]);
+        assert_eq!(f(&[-1.0, -0.5, 0.0]), ["-1.0", "-0.5", "0.0"]);
+        assert_eq!(f(&[0.0, 0.25, 0.5]), ["0.00", "0.25", "0.50"]);
+    }
+
+    #[test]
+    fn axis_labels_scientific_when_narrower() {
+        assert_eq!(f(&[0.0, 1e5, 2e5]), ["0e+00", "1e+05", "2e+05"]);
+        assert_eq!(f(&[0.0, 50000.0, 100000.0]), ["0e+00", "5e+04", "1e+05"]);
+        assert_eq!(f(&[0.0, 2000.0, 4000.0]), ["0", "2000", "4000"]);
     }
 }

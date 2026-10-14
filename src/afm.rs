@@ -60,6 +60,10 @@ impl FontFace {
 /// agree).
 pub struct FontMetrics {
     widths: [u16; 256],
+    /// Per-glyph bounding-box `ury` (AFM `B llx lly urx ury`), in 1/1000
+    /// em units; `PostScriptMetricInfo()` reports this as the glyph's
+    /// ascent.
+    bbox_ury: [i16; 256],
     pub ascent_units: f64,
     pub descent_units: f64,
     default_width: u16,
@@ -69,6 +73,8 @@ pub struct FontMetrics {
 impl FontMetrics {
     fn parse(afm: &str) -> Self {
         let mut widths = [0u16; 256];
+
+        let mut bbox_ury = [0i16; 256];
         let mut ascent_units = 718.0;
         let mut descent_units = -207.0;
         let mut name_to_code: HashMap<String, u8> = HashMap::new();
@@ -89,9 +95,18 @@ impl FontMetrics {
                 let mut code: Option<i64> = None;
                 let mut wx: Option<u16> = None;
                 let mut name: Option<&str> = None;
+                let mut bbox_ury_val: Option<i16> = None;
                 for field in line.split(';') {
                     let field = field.trim();
-                    if let Some(v) = field.strip_prefix("C ") {
+                    if let Some(v) = field.strip_prefix("B ") {
+                        let n: Vec<i16> = v
+                            .split_whitespace()
+                            .filter_map(|t| t.parse().ok())
+                            .collect();
+                        if n.len() == 4 {
+                            bbox_ury_val = Some(n[3]);
+                        }
+                    } else if let Some(v) = field.strip_prefix("C ") {
                         code = v.trim().parse().ok();
                     } else if let Some(v) = field.strip_prefix("WX ") {
                         wx = v.trim().parse().ok();
@@ -102,6 +117,9 @@ impl FontMetrics {
                 if let (Some(code), Some(wx)) = (code, wx) {
                     if (0..256).contains(&code) {
                         widths[code as usize] = wx;
+                        if let Some(ury) = bbox_ury_val {
+                            bbox_ury[code as usize] = ury;
+                        }
                         if let Some(name) = name {
                             name_to_code.insert(name.to_string(), code as u8);
                         }
@@ -132,6 +150,7 @@ impl FontMetrics {
         let default_width = widths[b' ' as usize].max(1);
         FontMetrics {
             widths,
+            bbox_ury,
             ascent_units,
             descent_units,
             default_width,
@@ -148,6 +167,18 @@ impl FontMetrics {
             }
         }
         self.default_width as f64
+    }
+
+    /// Ascent of one glyph's bounding box in 1/1000 em units, as reported
+    /// by R's `PostScriptMetricInfo()`. Characters outside Latin-1 fall
+    /// back to `0`.
+    fn glyph_ascent_units(&self, c: char) -> f64 {
+        let code = c as u32;
+        if code < 256 {
+            self.bbox_ury[code as usize] as f64
+        } else {
+            0.0
+        }
     }
 
     fn kern_units(&self, a: char, b: char) -> f64 {
@@ -247,9 +278,24 @@ pub fn ascent_descent_inches(face: FontFace, pointsize: f64, cex: f64) -> (f64, 
     (m.ascent_units * scale, -m.descent_units * scale)
 }
 
+/// Height in inches of the glyph `M` - what R's `strheight()` returns for
+/// a single-line string (`GEStrHeight()` uses the ascent of `M`, not the
+/// string's own ink). This is the `height` R's `GEText()` multiplies `yc`
+/// by when positioning text with a finite vertical adjustment.
+pub fn m_height_inches(face: FontFace, pointsize: f64, cex: f64) -> f64 {
+    let m = metrics_table(face);
+    m.glyph_ascent_units('M') / 1000.0 * pointsize * cex / 72.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn m_height_is_718_units() {
+        let h = m_height_inches(FontFace::Plain, 72.0, 1.0);
+        assert!((h - 0.718).abs() < 1e-9);
+    }
 
     #[test]
     fn helvetica_space_is_278_units() {

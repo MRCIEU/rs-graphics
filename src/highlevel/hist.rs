@@ -152,12 +152,7 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
 
     if opts.axes {
         let fg = ColorSpec::Color(dev.par.fg);
-        let (cex_axis, font_axis, las, lwd) = (
-            dev.par.cex_axis,
-            dev.par.font_axis,
-            dev.par.las,
-            dev.par.lwd,
-        );
+        let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
         dev.axis(1, None, None, fg, cex_axis, font_axis, las);
         // R removes non-integer y ticks when plotting frequencies.
         let yticks = if opts.freq {
@@ -168,8 +163,8 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
         } else {
             dev.default_ticks(2)
         };
+        // R's `plot.histogram()` draws axes but no `box()`.
         dev.axis(2, Some(yticks), None, fg, cex_axis, font_axis, las);
-        dev.box_plot(fg, lwd, LineType::Pattern(&[]));
     }
 
     if dev.par.ann {

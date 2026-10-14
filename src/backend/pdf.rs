@@ -280,6 +280,19 @@ impl Backend for PdfBackend {
         (self.width_in, self.height_in)
     }
 
+    /// R's `pdf()` device (`PDF_Text`, `PDF_StrWidth`, `PDF_MetricInfo` in
+    /// `devPS.c`) uses `floor(cex * ps + 0.5)` points for drawing *and*
+    /// for all string metrics - so e.g. `cex.main = 1.2` at 12pt is set in
+    /// 14pt (not 14.4pt) and laid out with 14pt widths. Text whose rounded
+    /// size is 0 is not drawn at all (callers check for a size `<= 0`).
+    fn effective_font_size(&self, requested_pt: f64) -> f64 {
+        (requested_pt + 0.5).floor()
+    }
+
+    fn transparent_default_bg(&self) -> bool {
+        true
+    }
+
     fn push_clip(&mut self, rect: Rect) {
         self.content.push_str("q\n");
         let (x0, y0) = self.pt(Point::new(rect.x0, rect.y0));
@@ -368,5 +381,21 @@ impl Backend for PdfBackend {
         );
         let _ = writeln!(self.content, "({}) Tj", Self::escape_pdf_string(text));
         self.content.push_str("ET\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backend::svg::SvgBackend;
+
+    #[test]
+    fn pdf_rounds_font_size_like_r_but_svg_does_not() {
+        let pdf = PdfBackend::new(6.0, 4.0);
+        assert_eq!(pdf.effective_font_size(14.4), 14.0);
+        assert_eq!(pdf.effective_font_size(10.5), 11.0);
+        assert_eq!(pdf.effective_font_size(0.4), 0.0);
+        let svg = SvgBackend::new(6.0, 4.0);
+        assert_eq!(svg.effective_font_size(14.4), 14.4);
     }
 }

@@ -13,7 +13,7 @@ pub mod hist;
 pub mod pie;
 pub mod plot;
 
-pub use barplot::{barplot, BarplotOptions};
+pub use barplot::{barplot, barplot_matrix, gray_colors, BarplotOptions};
 pub use boxplot::{boxplot, BoxStats, BoxplotOptions};
 pub use hist::{hist, HistOptions, HistResult};
 pub use pie::{pie, PieOptions};

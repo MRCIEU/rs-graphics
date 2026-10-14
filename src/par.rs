@@ -2,11 +2,12 @@
 //! implements, with R's exact default values (cross-checked against
 //! `Rscript -e 'str(par())'` and `r-source/src/library/graphics/src/par.c`).
 //!
-//! Multi-panel layouts (`par(mfrow=)`/`layout()`) are out of scope for
-//! now (see the crate README), so `cexbase`/`mex`/`scale` are always
-//! `1.0` here - i.e. we only implement the single-panel (`mfrow =
-//! c(1,1)`) case, which is what `updateNDC2Dev` reduces to when there's
-//! only one figure on the device.
+//! `par(cex)` is R's `cexbase` (assigning it resets the per-call `cex` to
+//! 1), so `cex` here scales both text *and* the "line" unit that margins
+//! are measured in, exactly as `mapNDC2Dev()` does (`yNDCPerLine = mex *
+//! cexbase * cra[1] / ...`). Multi-panel layouts
+//! (`Device::mfrow()`/`mfcol()`/`layout()`) set `cex` (0.83 for 2 x 2, 0.66
+//! beyond that) and `mex` just as R's `par(mfrow=)` does.
 
 use crate::afm::FontFace;
 use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};
@@ -90,7 +91,11 @@ pub struct Par {
 
     /// Base point size, in big points (`par(ps)`). Default `12`.
     pub ps: f64,
+    /// `par(cex)`, i.e. R's `cexbase`. Also scales the margin "line"
+    /// unit (see [`Par::line_height_inches`]).
     pub cex: f64,
+    /// `par(mex)`: margin-line expansion factor (a multiple of `cex`).
+    pub mex: f64,
     pub cex_axis: f64,
     pub cex_lab: f64,
     pub cex_main: f64,
@@ -148,6 +153,7 @@ impl Default for Par {
 
             ps: 12.0,
             cex: 1.0,
+            mex: 1.0,
             cex_axis: 1.0,
             cex_lab: 1.0,
             cex_main: 1.2,
@@ -171,14 +177,13 @@ impl Default for Par {
 }
 
 impl Par {
-    /// The height (in inches) of "one line" of text at the current
-    /// `ps`, i.e. what R calls `cra[1] * ipr[1]` for a device whose
-    /// native raster unit is points (`pdf`/`postscript`'s convention:
-    /// `cra[1] = 1.2 * ps`, `ipr[1] = 1/72`). This is the unit `mar`/
-    /// `oma`/`mgp` margins are measured in, and does *not* scale with
-    /// `par(cex)` (only with `ps`) - see the module docs.
+    /// The height (in inches) of "one line" of margin text: `mex * cex *
+    /// cra[1] * ipr[1]`, where `cra[1] * ipr[1] = 1.2 * ps / 72` for a
+    /// device whose native raster unit is points (`pdf`/`postscript`'s
+    /// convention). This is the unit `mar`/`oma`/`mgp`/`tcl` are measured
+    /// in - see `yNDCPerLine` in `mapNDC2Dev()`.
     pub fn line_height_inches(&self) -> f64 {
-        1.2 * self.ps / 72.0
+        self.mex * self.cex * 1.2 * self.ps / 72.0
     }
 
     /// Margins in inches: bottom, left, top, right.

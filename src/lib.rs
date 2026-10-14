@@ -4,6 +4,7 @@ pub mod color;
 pub mod device;
 pub mod geometry;
 pub mod highlevel;
+pub mod layout;
 pub mod lty;
 pub mod named_colors;
 pub mod par;

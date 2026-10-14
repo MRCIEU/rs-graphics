@@ -14,7 +14,10 @@
 //! `postscript()` devices use), regardless of backend. That keeps layout
 //! math (label centering, legend sizing, tick offsets, ...) identical to
 //! R no matter which backend ends up rasterizing the glyphs. Only the
-//! actual glyph *painting* is backend-specific, via [`Backend::text`].
+//! actual glyph *painting* is backend-specific, via [`Backend::draw_text`].
+//!
+//! The one per-device quirk is the point size itself: see
+//! [`Backend::effective_font_size`].
 
 pub mod pdf;
 pub mod raster;
@@ -159,4 +162,25 @@ pub trait Backend {
     /// resolved justification/`adj` using `crate::afm` metrics, so
     /// backends only need to paint glyphs starting exactly here.
     fn draw_text(&mut self, origin: Point, text: &str, style: &TextStyle);
+
+    /// The point size this device actually sets text at, given the size
+    /// R would request (`par(ps) * cex`). The `crate::device` layer routes
+    /// *every* text size through this - for both layout (string widths,
+    /// ascent/"M" height) and drawing - mirroring how R's own devices
+    /// apply their quirks inside `strWidth`/`metricInfo`/`text`.
+    ///
+    /// The default is the identity, which matches R's cairo and Quartz
+    /// devices (`svg()`, `png()`). R's `pdf()`/`postscript()` devices round
+    /// to a whole number of points, see [`pdf::PdfBackend`].
+    fn effective_font_size(&self, requested_pt: f64) -> f64 {
+        requested_pt
+    }
+
+    /// Whether R's counterpart device has a transparent `par("bg")` (R's
+    /// `pdf()` does; `png()`/`svg()` default to white). `legend()`'s box
+    /// fill defaults to `par("bg")`, so on such a device it is *not* filled
+    /// by default and plot content shows through.
+    fn transparent_default_bg(&self) -> bool {
+        false
+    }
 }
