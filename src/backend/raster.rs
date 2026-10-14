@@ -248,6 +248,10 @@ impl Backend for RasterBackend {
         (self.width_in, self.height_in)
     }
 
+    fn device_unit_inches(&self) -> f64 {
+        1.0 / self.dpi
+    }
+
     fn push_clip(&mut self, rect: Rect) {
         let (x0, y1) = self.to_px(Point::new(rect.x0, rect.y1));
         let (x1, y0) = self.to_px(Point::new(rect.x1, rect.y0));

@@ -368,19 +368,22 @@ impl<B: Backend> Device<B> {
     ) {
         let Some(col) = self.resolve(col) else { return };
         let bg = self.resolve(bg);
-        let size = pch::symbol_size_inches(self.par.ps, self.par.cex * cex);
         self.push_clip_for(self.par.xpd);
         for (&x, &y) in xs.iter().zip(ys) {
             if !x.is_finite() || !y.is_finite() {
                 continue;
             }
             let p = self.user_to_inches(x, y);
-            self.draw_pch(pch, p, size, col, bg);
+            self.draw_pch(pch, p, cex, col, bg);
         }
         self.pop_clip();
     }
 
-    fn draw_pch(&mut self, pch: i32, p: Point, size: f64, col: Color, bg: Option<Color>) {
+    /// One symbol, as `GSymbol()`/`GESymbol()` draw it. `cex` is the
+    /// per-point `cex` (R multiplies it by `cexbase`, i.e. `par(cex)`).
+    fn draw_pch(&mut self, pch: i32, p: Point, cex: f64, col: Color, bg: Option<Color>) {
+        let cex = self.par.cex * cex;
+        let size = pch::symbol_size_inches(self.par.ps, cex);
         if let Some(geom) = pch::pch_geometry(pch, p.x, p.y, size) {
             let stroke = Stroke::simple(col, self.par.lwd);
             for shape in &geom.outline_only {
@@ -388,6 +391,9 @@ impl<B: Backend> Device<B> {
             }
             for shape in &geom.filled_with_col {
                 self.paint_shape(shape, Some(col), None);
+            }
+            for shape in &geom.filled_and_stroked_with_col {
+                self.paint_shape(shape, Some(col), Some(&stroke));
             }
             for shape in &geom.filled_with_bg {
                 self.paint_shape(shape, bg, Some(&stroke));
@@ -397,24 +403,31 @@ impl<B: Backend> Device<B> {
                     .draw_line(Point::new(a.0, a.1), Point::new(b.0, b.1), &stroke);
             }
         } else if pch == '.' as i32 {
-            let xc = (cex_factor(size)).max(0.5) / 72.0;
+            // A filled 0.01in square scaled by `cex`, but at least one
+            // device unit across.
+            if cex <= 0.0 {
+                return;
+            }
+            let xc = (cex * 0.005).max(0.5 * self.backend.device_unit_inches());
             self.backend.draw_rect(
                 Rect::new(p.x - xc, p.y - xc, p.x + xc, p.y + xc),
                 Some(col),
                 None,
             );
         } else if (32..=126).contains(&pch) {
-            let ch = char::from_u32(pch as u32).unwrap_or('?');
+            // `GEText(x, y, str, hadj = NA, yc = NA)`: centred on the
+            // advance width, and vertically on the glyph's own bounding box.
+            let ch = char::from_u32(pch as u32).unwrap_or('?').to_string();
             let face = self.par.font_face(self.par.font);
-            let size_pt = self.font_size_pt(1.0);
+            let size_pt = self.backend.effective_font_size(self.par.ps * cex);
             if size_pt <= 0.0 {
                 return;
             }
             let style = TextStyle::new(col, face, size_pt);
-            let w = afm::str_width_inches(&ch.to_string(), face, size_pt, 1.0);
-            let (asc, desc) = afm::ascent_descent_inches(face, size_pt, 1.0);
-            let origin = resolve_text_origin(p, w, asc, desc, 0.5, 0.5, 0.0);
-            self.backend.draw_text(origin, &ch.to_string(), &style);
+            let w = afm::str_width_inches(&ch, face, size_pt, 1.0);
+            let (asc, desc) = afm::glyph_ascent_descent_inches(&ch, face, size_pt, 1.0);
+            let origin = Point::new(p.x - 0.5 * w, p.y - 0.5 * (asc - desc));
+            self.backend.draw_text(origin, &ch, &style);
         }
     }
 
@@ -609,7 +622,8 @@ impl<B: Backend> Device<B> {
     }
 
     /// `text(x, y, labels, adj=, srt=, col=, cex=, font=)` in user
-    /// coordinates.
+    /// coordinates. `vadj = None` is R's `NA` vertical adjustment, which
+    /// `text()` uses unless `adj` has two elements (so it is the default).
     #[allow(clippy::too_many_arguments)]
     pub fn text(
         &mut self,
@@ -617,7 +631,7 @@ impl<B: Backend> Device<B> {
         y: f64,
         label: &str,
         hadj: f64,
-        vadj: f64,
+        vadj: Option<f64>,
         rotation_deg: f64,
         col: ColorSpec,
         cex: f64,
@@ -627,55 +641,19 @@ impl<B: Backend> Device<B> {
         self.text_at(p, label, hadj, vadj, rotation_deg, col, cex, font);
     }
 
-    /// As [`Device::text`] but the anchor is already in device inches
-    /// (used for axis labels, titles, legends, ...).
+    /// As [`Device::text`] but the anchor is already in device inches.
+    /// Placement follows `GEText()`: horizontally `hadj` of the string's
+    /// width; vertically, a finite `vadj` puts the baseline `vadj *
+    /// height("M")` below the anchor, while `None` (`NA`) centres the ink
+    /// of the string's glyphs on it (baseline at `anchor - (ury + lly) / 2`
+    /// of the glyph bounding boxes).
     #[allow(clippy::too_many_arguments)]
     pub fn text_at(
         &mut self,
         anchor: Point,
         label: &str,
         hadj: f64,
-        vadj: f64,
-        rotation_deg: f64,
-        col: ColorSpec,
-        cex: f64,
-        font: i32,
-    ) {
-        let Some(color) = self.resolve(col) else {
-            return;
-        };
-        if label.is_empty() {
-            return;
-        }
-        let face = self.par.font_face(font);
-        let size_pt = self.font_size_pt(cex);
-        if size_pt <= 0.0 {
-            return;
-        }
-        let w = afm::str_width_inches(label, face, size_pt, 1.0);
-        let (asc, desc) = afm::ascent_descent_inches(face, size_pt, 1.0);
-        let origin = resolve_text_origin(anchor, w, asc, desc, hadj, vadj, rotation_deg);
-        let style = TextStyle {
-            rotation_deg,
-            ..TextStyle::new(color, face, size_pt)
-        };
-        self.push_clip_for(self.par.xpd);
-        self.backend.draw_text(origin, label, &style);
-        self.pop_clip();
-    }
-
-    /// Text placed the way R's `GEText()` does for a finite `yc`: the
-    /// *baseline* sits at `anchor - yc * height(M)` (so `yc = 0.0` puts
-    /// the baseline exactly on the anchor). Unlike [`Device::text_at`], which justifies against the font's
-    /// nominal ascent/descent box, this reproduces what `title()`/`mtext()`
-    /// do.
-    #[allow(clippy::too_many_arguments)]
-    fn text_gc_at(
-        &mut self,
-        anchor: Point,
-        label: &str,
-        xc: f64,
-        yc: f64,
+        vadj: Option<f64>,
         rotation_deg: f64,
         col: ColorSpec,
         cex: f64,
@@ -693,8 +671,14 @@ impl<B: Backend> Device<B> {
             return;
         }
         let width = afm::str_width_inches(label, face, size_pt, 1.0);
-        let dy = -yc * afm::m_height_inches(face, size_pt, 1.0);
-        let dx = -xc * width;
+        let dy = match vadj {
+            Some(yc) => -yc * afm::m_height_inches(face, size_pt, 1.0),
+            None => {
+                let (asc, desc) = afm::glyph_ascent_descent_inches(label, face, size_pt, 1.0);
+                -0.5 * (asc - desc)
+            }
+        };
+        let dx = -hadj * width;
         let theta = rotation_deg.to_radians();
         let (c, s) = (theta.cos(), theta.sin());
         let origin = Point::new(anchor.x + dx * c - dy * s, anchor.y + dx * s + dy * c);
@@ -705,6 +689,23 @@ impl<B: Backend> Device<B> {
         self.push_clip_for(self.par.xpd);
         self.backend.draw_text(origin, label, &style);
         self.pop_clip();
+    }
+
+    /// [`Device::text_at`] with a finite vertical adjustment `yc`, as
+    /// `title()`/`mtext()`/`axis()`/`legend()` use.
+    #[allow(clippy::too_many_arguments)]
+    fn text_gc_at(
+        &mut self,
+        anchor: Point,
+        label: &str,
+        xc: f64,
+        yc: f64,
+        rotation_deg: f64,
+        col: ColorSpec,
+        cex: f64,
+        font: i32,
+    ) {
+        self.text_at(anchor, label, xc, Some(yc), rotation_deg, col, cex, font);
     }
 
     // ---------------------------------------------------------------
@@ -1108,29 +1109,6 @@ impl<B: Backend> Device<B> {
     pub fn backend_mut(&mut self) -> &mut B {
         &mut self.backend
     }
-}
-
-/// Resolve a text anchor + `adj`/`srt` into the baseline-left origin a
-/// [`Backend::draw_text`] expects. See the module docs in `backend/mod.rs`
-/// for why this lives outside the `Backend` trait.
-fn resolve_text_origin(
-    anchor: Point,
-    width: f64,
-    ascent: f64,
-    descent: f64,
-    hadj: f64,
-    vadj: f64,
-    rotation_deg: f64,
-) -> Point {
-    let dx = -hadj * width;
-    let dy = descent - vadj * (ascent + descent);
-    let theta = rotation_deg.to_radians();
-    let (c, s) = (theta.cos(), theta.sin());
-    Point::new(anchor.x + dx * c - dy * s, anchor.y + dx * s + dy * c)
-}
-
-fn cex_factor(size_inches: f64) -> f64 {
-    size_inches * 72.0
 }
 
 /// Default numeric axis label formatting: R's `axis()` uses roughly

@@ -23,7 +23,7 @@ use rs_graphics::highlevel::{
 };
 use rs_graphics::layout::Layout;
 use rs_graphics::lty::LineType;
-use rs_graphics::par::Par;
+use rs_graphics::par::{Par, Sides};
 
 /// Parses one of the `examples/data/*.txt` files (one number per line).
 ///
@@ -246,6 +246,29 @@ fn draw_pie<B: Backend>(dev: &mut Device<B>) {
     pie(dev, &values, &opts);
 }
 
+/// A chart of every plotting symbol: `pch = 0:25` (with `col`, `bg`) plus
+/// some character symbols, each labelled underneath.
+fn draw_pch<B: Backend>(dev: &mut Device<B>) {
+    dev.par.mar = Sides::new(0.5, 0.5, 2.5, 0.5);
+    dev.plot_new();
+    dev.plot_window((0.5, 7.5), (-0.2, 5.4), false, false);
+    let blue = ColorSpec::Color(Color::parse("blue").unwrap());
+    let red = ColorSpec::Color(Color::parse("red").unwrap());
+    let black = ColorSpec::Color(Color::BLACK);
+    for pch in 0..26 {
+        let (x, y) = ((pch % 7) as f64 + 1.0, 5.0 - (pch / 7) as f64);
+        dev.points(&[x], &[y], pch, blue, red, 2.0);
+        dev.text(x, y - 0.45, &pch.to_string(), 0.5, None, 0.0, black, 0.8, 1);
+    }
+    for (i, ch) in [".", "a", "M", "+", "*", "#", "o"].iter().enumerate() {
+        let x = i as f64 + 1.0;
+        let pch = ch.chars().next().unwrap() as i32;
+        dev.points(&[x], &[0.6], pch, blue, red, 2.0);
+        dev.text(x, 0.15, &format!("\"{ch}\""), 0.5, None, 0.0, black, 0.8, 1);
+    }
+    dev.title(Some("pch: col = \"blue\", bg = \"red\", cex = 2"), None, None, None);
+}
+
 /// `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))`: one wide panel above two.
 fn draw_multipanel<B: Backend>(dev: &mut Device<B>) {
     dev.layout(Layout::new(&[vec![1, 1], vec![2, 3]]).expect("valid layout"));
@@ -267,6 +290,7 @@ fn main() {
     save_gallery_plot!("boxplot", 6.0, 4.0, draw_boxplot);
     save_gallery_plot!("pie", 6.0, 6.0, draw_pie);
     save_gallery_plot!("multipanel", 8.0, 6.0, draw_multipanel);
+    save_gallery_plot!("pch", 7.0, 6.0, draw_pch);
 
     println!("\nGallery complete. See gallery_output/ for SVG/PDF/PNG output.");
 }

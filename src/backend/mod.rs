@@ -163,6 +163,13 @@ pub trait Backend {
     /// backends only need to paint glyphs starting exactly here.
     fn draw_text(&mut self, origin: Point, text: &str, style: &TextStyle);
 
+    /// Size of one device unit in inches (R's `pch = "."` is at least one
+    /// unit across). `1/72` for vector devices (R's `pdf()`/`svg()` use
+    /// big points); a pixel for raster devices.
+    fn device_unit_inches(&self) -> f64 {
+        1.0 / 72.0
+    }
+
     /// The point size this device actually sets text at, given the size
     /// R would request (`par(ps) * cex`). The `crate::device` layer routes
     /// *every* text size through this - for both layout (string widths,

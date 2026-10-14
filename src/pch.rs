@@ -27,9 +27,13 @@ pub struct PchGeometry {
     /// Shapes stroked with `col`, not filled (R forces `fill =
     /// R_TRANWHITE` for the "open" pch 0-14 family).
     pub outline_only: Vec<Shape>,
-    /// Shapes filled solidly with `col`, no separate border (the "solid"
-    /// pch 15-20 family).
+    /// Shapes filled solidly with `col`, no border (pch 15-18, for which
+    /// R sets `gc->col = R_TRANWHITE`).
     pub filled_with_col: Vec<Shape>,
+    /// Shapes filled with `col` *and* stroked with `col` at `par(lwd)` (pch
+    /// 19 and 20, which keep `gc->col`), so the stroke makes them `lwd / 2`
+    /// larger in radius than pch 16.
+    pub filled_and_stroked_with_col: Vec<Shape>,
     /// Shapes filled with the symbol's background color (`bg`/`points(...,
     /// bg=)`) and stroked with `col` (the pch 21-25 family).
     pub filled_with_bg: Vec<Shape>,
@@ -256,14 +260,14 @@ pub fn pch_geometry(pch: i32, x: f64, y: f64, size: f64) -> Option<PchGeometry> 
             ]));
         }
         19 => {
-            g.filled_with_col.push(Shape::Circle {
+            g.filled_and_stroked_with_col.push(Shape::Circle {
                 cx: x,
                 cy: y,
                 r: RADIUS * size,
             });
         }
         20 => {
-            g.filled_with_col.push(Shape::Circle {
+            g.filled_and_stroked_with_col.push(Shape::Circle {
                 cx: x,
                 cy: y,
                 r: SMALL * size,
@@ -336,9 +340,16 @@ mod tests {
     }
 
     #[test]
-    fn filled_circle_pch_is_filled_with_col() {
-        let g = pch_geometry(19, 0.0, 0.0, symbol_size_inches(12.0, 1.0)).unwrap();
+    fn solid_pch_16_has_no_border_but_19_and_20_do() {
+        let size = symbol_size_inches(12.0, 1.0);
+        let g = pch_geometry(16, 0.0, 0.0, size).unwrap();
         assert_eq!(g.filled_with_col.len(), 1);
+        assert!(g.filled_and_stroked_with_col.is_empty());
+        for pch in [19, 20] {
+            let g = pch_geometry(pch, 0.0, 0.0, size).unwrap();
+            assert!(g.filled_with_col.is_empty());
+            assert_eq!(g.filled_and_stroked_with_col.len(), 1);
+        }
     }
 
     #[test]

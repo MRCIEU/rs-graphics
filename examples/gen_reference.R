@@ -97,4 +97,19 @@ save_all("multipanel", 8, 6, function() {
   barplot(c(A = 23, B = 41, C = 12, D = 35, E = 28), main = "barplot()", ylab = "value")
 })
 
+save_all("pch", 7, 6, function() {
+  par(mar = c(0.5, 0.5, 2.5, 0.5))
+  plot.new()
+  plot.window(c(0.5, 7.5), c(-0.2, 5.4))
+  pch <- 0:25
+  x <- pch %% 7 + 1
+  y <- 5 - pch %/% 7
+  points(x, y, pch = pch, col = "blue", bg = "red", cex = 2)
+  text(x, y - 0.45, pch, cex = 0.8)
+  chars <- c(".", "a", "M", "+", "*", "#", "o")
+  points(seq_along(chars), rep(0.6, length(chars)), pch = chars, col = "blue", bg = "red", cex = 2)
+  text(seq_along(chars), 0.15, sprintf('"%s"', chars), cex = 0.8)
+  title(main = 'pch: col = "blue", bg = "red", cex = 2')
+})
+
 cat("\nReference gallery complete. See reference_output/ for comparison.\n")

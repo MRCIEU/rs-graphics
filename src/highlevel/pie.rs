@@ -147,7 +147,7 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
                 1.1 * py,
                 label,
                 hadj,
-                0.5,
+                None,
                 0.0,
                 ColorSpec::Color(col_lab),
                 1.0,

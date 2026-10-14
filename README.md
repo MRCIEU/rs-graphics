@@ -34,7 +34,8 @@ crate's test suite (see [Testing](#testing) below).
   `layout()` with spanning figures, relative / `lcm()` widths and
   heights, and `respect` (logical or matrix) - a port of `layoutRegions()`
   in `graphics.c`.
-- R's built-in plotting characters `pch = 0..25` (`src/pch.rs`), line
+- R's built-in plotting characters `pch = 0..25` (`src/pch.rs`) plus
+  character symbols (`pch = "."`, `"a"`, ...), line
   types `lty` (`src/lty.rs`), the R4 default color palette and all 657
   named colors (`src/color.rs`, `src/named_colors.rs`), and the exact
   `pretty()`/`GEPretty()` axis tick-placement algorithms - both of
@@ -192,6 +193,12 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/layout_matches_r.rs` - bar rectangles and text origins for
   `mfrow`/`mfcol`/`mfg`/`oma`/`par(cex)` and `layout()` (spanning,
   `lcm()`, `respect`) vs. an uncompressed R `pdf()`.
+- `tests/text_matches_r.rs` - `text()` origins for single/two-element
+  `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
+- `tests/pch_matches_r.rs` - every `pch = 0:25` plus character symbols,
+  for several `col`/`bg`/`cex`/`lwd`/`par(cex)` combinations: each painted
+  path's bounding box, fill/stroke operator, colours, line width and cap,
+  and each character's text origin/size, vs. an uncompressed R `pdf()`.
 
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but

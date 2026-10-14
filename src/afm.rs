@@ -64,6 +64,9 @@ pub struct FontMetrics {
     /// em units; `PostScriptMetricInfo()` reports this as the glyph's
     /// ascent.
     bbox_ury: [i16; 256],
+    /// Per-glyph bounding-box `lly`; `PostScriptMetricInfo()` reports
+    /// `-lly` as the glyph's descent.
+    bbox_lly: [i16; 256],
     pub ascent_units: f64,
     pub descent_units: f64,
     default_width: u16,
@@ -75,6 +78,7 @@ impl FontMetrics {
         let mut widths = [0u16; 256];
 
         let mut bbox_ury = [0i16; 256];
+        let mut bbox_lly = [0i16; 256];
         let mut ascent_units = 718.0;
         let mut descent_units = -207.0;
         let mut name_to_code: HashMap<String, u8> = HashMap::new();
@@ -95,7 +99,7 @@ impl FontMetrics {
                 let mut code: Option<i64> = None;
                 let mut wx: Option<u16> = None;
                 let mut name: Option<&str> = None;
-                let mut bbox_ury_val: Option<i16> = None;
+                let mut bbox_val: Option<(i16, i16)> = None;
                 for field in line.split(';') {
                     let field = field.trim();
                     if let Some(v) = field.strip_prefix("B ") {
@@ -104,7 +108,7 @@ impl FontMetrics {
                             .filter_map(|t| t.parse().ok())
                             .collect();
                         if n.len() == 4 {
-                            bbox_ury_val = Some(n[3]);
+                            bbox_val = Some((n[1], n[3]));
                         }
                     } else if let Some(v) = field.strip_prefix("C ") {
                         code = v.trim().parse().ok();
@@ -117,7 +121,8 @@ impl FontMetrics {
                 if let (Some(code), Some(wx)) = (code, wx) {
                     if (0..256).contains(&code) {
                         widths[code as usize] = wx;
-                        if let Some(ury) = bbox_ury_val {
+                        if let Some((lly, ury)) = bbox_val {
+                            bbox_lly[code as usize] = lly;
                             bbox_ury[code as usize] = ury;
                         }
                         if let Some(name) = name {
@@ -151,6 +156,7 @@ impl FontMetrics {
         FontMetrics {
             widths,
             bbox_ury,
+            bbox_lly,
             ascent_units,
             descent_units,
             default_width,
@@ -176,6 +182,17 @@ impl FontMetrics {
         let code = c as u32;
         if code < 256 {
             self.bbox_ury[code as usize] as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Lowest point of one glyph's bounding box (AFM `lly`), in 1/1000 em
+    /// units; `0` outside Latin-1.
+    fn glyph_lly_units(&self, c: char) -> f64 {
+        let code = c as u32;
+        if code < 256 {
+            self.bbox_lly[code as usize] as f64
         } else {
             0.0
         }
@@ -285,6 +302,26 @@ pub fn ascent_descent_inches(face: FontFace, pointsize: f64, cex: f64) -> (f64, 
 pub fn m_height_inches(face: FontFace, pointsize: f64, cex: f64) -> f64 {
     let m = metrics_table(face);
     m.glyph_ascent_units('M') / 1000.0 * pointsize * cex / 72.0
+}
+
+/// `(ascent, descent)` of the ink of `s` in inches, as R's
+/// `PostScriptMetricInfo()` reports it: the maximum glyph `ury` and minus
+/// the minimum glyph `lly` (so descent is positive below the baseline).
+/// `GEText()` uses these to centre text vertically when `adj[2]` is `NA`
+/// (e.g. character `pch`).
+pub fn glyph_ascent_descent_inches(s: &str, face: FontFace, pointsize: f64, cex: f64) -> (f64, f64) {
+    let m = metrics_table(face);
+    let scale = pointsize * cex / 72.0 / 1000.0;
+    let mut chars = s.chars();
+    let Some(first) = chars.next() else {
+        return (0.0, 0.0);
+    };
+    let (mut ury, mut lly) = (m.glyph_ascent_units(first), m.glyph_lly_units(first));
+    for c in chars {
+        ury = ury.max(m.glyph_ascent_units(c));
+        lly = lly.min(m.glyph_lly_units(c));
+    }
+    (ury * scale, -lly * scale)
 }
 
 #[cfg(test)]

@@ -23,7 +23,6 @@ use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
-use crate::pch;
 
 use super::Device;
 
@@ -480,11 +479,10 @@ impl<B: Backend> Device<B> {
                 } else {
                     xt[i]
                 };
-                let size =
-                    pch::symbol_size_inches(self.par.ps, self.par.cex * e.pt_cex.unwrap_or(cex));
+                let pt_cex = e.pt_cex.unwrap_or(cex);
                 let bg = self.resolve(e.pt_bg);
                 self.par.lwd = e.pt_lwd.or(e.lwd).unwrap_or(saved_lwd);
-                self.draw_pch(e.pch.unwrap_or(0), Point::new(x1, yt[i]), size, col, bg);
+                self.draw_pch(e.pch.unwrap_or(0), Point::new(x1, yt[i]), pt_cex, col, bg);
             }
             self.par.lwd = saved_lwd;
         }
