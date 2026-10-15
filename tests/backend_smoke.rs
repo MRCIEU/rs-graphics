@@ -107,3 +107,44 @@ fn raster_backend_produces_valid_png_of_expected_size() {
         "expected non-white pixel at circle center, got {px:?}"
     );
 }
+
+/// Draws `exercise()` plus enough shapes crossing tile boundaries to be
+/// painted over several flushes' worth of tiles, with `threads` threads.
+fn raster_with_threads(threads: usize) -> tiny_skia::Pixmap {
+    let mut b = RasterBackend::new(6.0, 4.0, 96.0, Color::WHITE).with_threads(threads);
+    exercise(&mut b);
+    b.push_clip(Rect::new(0.7, 0.6, 5.3, 3.4));
+    let stroke = Stroke::simple(Color::rgb(200, 0, 0), 2.0);
+    for i in 0..2000 {
+        let t = i as f64 * 0.618_034;
+        let p = Point::new(0.2 + 5.6 * t.fract(), 0.2 + 3.6 * (t * 7.3).fract());
+        b.draw_circle(
+            p,
+            0.02 + 0.03 * (t * 3.1).fract(),
+            Some(Color::rgb(0, 0, 160)),
+            Some(&stroke),
+        );
+    }
+    b.pop_clip();
+    tiny_skia::Pixmap::decode_png(&b.finish()).expect("valid png")
+}
+
+#[test]
+fn raster_output_is_independent_of_thread_count() {
+    let one = raster_with_threads(1);
+    let two = raster_with_threads(2);
+    let seven = raster_with_threads(7);
+    assert!(two.data() == seven.data(), "2 and 7 threads differ");
+    // Tiles only change anti-aliasing rounding at shape edges.
+    let max_diff = one
+        .data()
+        .iter()
+        .zip(two.data())
+        .map(|(a, b)| a.abs_diff(*b))
+        .max()
+        .unwrap();
+    assert!(
+        max_diff <= 32,
+        "1 vs 2 threads: max channel difference {max_diff}"
+    );
+}
