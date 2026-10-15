@@ -3,7 +3,7 @@ name = "rs-graphics"
 version = "0.1.0"
 edition = "2021"
 description = "A Rust port of the core functionality of R's `graphics` package, aiming for visual fidelity with R's own output."
-license = "GPL-2.0-or-later"
+license = "GPL-3.0-or-later"
 authors = ["rs-graphics contributors"]
 rust-version = "1.74"
 
