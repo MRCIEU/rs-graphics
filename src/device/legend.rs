@@ -13,10 +13,9 @@
 //! per-entry `cex`/`x.intersp`/`seg.len` recycling (these are scalars on
 //! [`LegendOptions`]), `text.width = NA`, and `adj`.
 //!
-//! Note: `legend()`'s own `par("cex")` handling follows `legend.R`
-//! (`xc`/`yc` scale with `par("cex")`), but unlike R's `strwidth()` we also
-//! apply `par("cex")` to measured text. The two only differ when
-//! `par(cex)` is not 1.
+//! `par(cex)` scales everything as in `legend.R`: the character cell
+//! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and
+//! `text(cex = )` both multiply by `par("cex")`, i.e. `cexbase`).
 
 use crate::afm;
 use crate::backend::Backend;

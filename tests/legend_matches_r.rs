@@ -1,7 +1,7 @@
 //! Cross-checks `legend()` layout (box rectangle + every label origin)
 //! against a real R `pdf()` device's uncompressed output, for keyword
 //! positions, `inset`, multi-column / horizontal layouts, titles, filled
-//! boxes, `cex`/`intersp` and corner-pair positioning. Skipped if
+//! boxes, `cex`/`intersp`, `par(cex)` and corner-pair positioning. Skipped if
 //! `Rscript` isn't available.
 
 use std::process::Command;
@@ -207,6 +207,23 @@ fn cases() -> Vec<Case> {
                     ..Default::default()
                 };
                 d.legend_with(LegendPos::Keyword(LegendKeyword::Right), &e, &o);
+            },
+        },
+        Case {
+            name: "par_cex",
+            r: r#"par(cex = 1.5); legend("topright", legend=c("alpha","beta gamma"), pch=1:2, lty=1, cex=0.8, title="Key")"#,
+            run: |d| {
+                d.par.cex = 1.5;
+                let e = vec![
+                    LegendEntry::point("alpha", black(), 1).with_line(1.0, solid()),
+                    LegendEntry::point("beta gamma", black(), 2).with_line(1.0, solid()),
+                ];
+                let o = LegendOptions {
+                    cex: 0.8,
+                    title: Some("Key".into()),
+                    ..Default::default()
+                };
+                d.legend_with(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
             },
         },
         Case {

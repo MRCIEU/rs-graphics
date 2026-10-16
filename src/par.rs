@@ -246,8 +246,15 @@ impl Default for Par {
 }
 
 impl Par {
+    /// The colour to draw `spec` with, or `None` for nothing. Colour 0 is
+    /// the background, `par.bg`, as in R (`RGBpar3`); like any fully
+    /// transparent colour it draws nothing when `bg` is transparent (the
+    /// PDF default).
     pub fn resolve_color(&self, spec: ColorSpec) -> Option<Color> {
-        spec.resolve(&self.palette)
+        match spec {
+            ColorSpec::Index(0) => Some(self.bg).filter(|c| c.a > 0),
+            _ => spec.resolve(&self.palette),
+        }
     }
 
     pub fn font_face(&self, code: i32) -> FontFace {

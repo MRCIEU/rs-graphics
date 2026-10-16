@@ -256,6 +256,9 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/text_metrics_matches_r.rs` - `Device::text_metrics` vs. R's
   `strwidth()`/`strheight()`: `cex`, `font`, multi-line text, `par(ps)`
   and a 2x2 `mfrow`.
+- `tests/colour_zero_matches_r.rs` - colour 0 is `par("bg")` (with
+  `pdf(bg = )`, the transparent default, and after `par(bg = )`): every
+  painting operator and its colours.
 - `tests/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
   `legend()` spacing come from the device's starting point size, not a
   later `par(ps)`, as R's `cra`.

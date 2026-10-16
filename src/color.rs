@@ -132,7 +132,9 @@ pub enum ColorSpec {
 
 impl ColorSpec {
     /// The colour to draw with, or `None` for nothing: `NA`, index 0, and
-    /// fully transparent colours (R's devices skip those).
+    /// fully transparent colours (R's devices skip those). Index 0 is the
+    /// background colour in R, which this doesn't know; use
+    /// [`Par::resolve_color`](crate::par::Par::resolve_color) for that.
     pub fn resolve(self, palette: &[Color]) -> Option<Color> {
         let c = match self {
             ColorSpec::None => None,
