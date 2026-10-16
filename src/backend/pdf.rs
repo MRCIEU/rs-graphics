@@ -28,7 +28,19 @@ pub struct PdfBackend {
     clip_depth: u32,
     last_fill: Option<Color>,
     last_stroke_color: Option<Color>,
+    last_line: LineState,
     compress: bool,
+}
+
+/// The line-style parameters last written to the content stream (`None`:
+/// unknown), so each is written only when it changes, as R's `pdf()` does.
+#[derive(Default)]
+struct LineState {
+    width: Option<f64>,
+    cap: Option<u8>,
+    join: Option<u8>,
+    mitre: Option<f64>,
+    dash: Option<Vec<f64>>,
 }
 
 impl PdfBackend {
@@ -40,6 +52,7 @@ impl PdfBackend {
             clip_depth: 0,
             last_fill: None,
             last_stroke_color: None,
+            last_line: LineState::default(),
             compress: true,
         }
     }
@@ -83,39 +96,60 @@ impl PdfBackend {
         }
     }
 
+    /// Write whichever of `stroke`'s colour and line-style parameters
+    /// differ from those last written.
     fn set_stroke_style(&mut self, stroke: &Stroke) {
         self.set_stroke_color(stroke.color);
-        self.op(&[stroke.width_pt()], 3, "w");
+        let width = stroke.width_pt();
+        if self.last_line.width != Some(width) {
+            self.op(&[width], 3, "w");
+            self.last_line.width = Some(width);
+        }
         let cap = match stroke.lend {
             LineEnd::Butt => 0,
             LineEnd::Round => 1,
             LineEnd::Square => 2,
         };
+        if self.last_line.cap != Some(cap) {
+            let _ = writeln!(self.content, "{cap} J");
+            self.last_line.cap = Some(cap);
+        }
         let join = match stroke.ljoin {
             LineJoin::Mitre => 0,
             LineJoin::Round => 1,
             LineJoin::Bevel => 2,
         };
-        let _ = write!(self.content, "{cap} J {join} j ");
-        self.op(&[stroke.lmitre], 2, "M");
-        match stroke
+        if self.last_line.join != Some(join) {
+            let _ = writeln!(self.content, "{join} j");
+            self.last_line.join = Some(join);
+        }
+        if self.last_line.mitre != Some(stroke.lmitre) {
+            self.op(&[stroke.lmitre], 2, "M");
+            self.last_line.mitre = Some(stroke.lmitre);
+        }
+        let dash = stroke
             .lty
             .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Round)
-        {
-            Some(dashes) => {
-                self.content.push('[');
-                for (i, &d) in dashes.iter().enumerate() {
-                    if i > 0 {
-                        self.content.push(' ');
-                    }
-                    push_fixed(&mut self.content, d, 3);
+            .unwrap_or_default();
+        if self.last_line.dash.as_ref() != Some(&dash) {
+            self.content.push('[');
+            for (i, &d) in dash.iter().enumerate() {
+                if i > 0 {
+                    self.content.push(' ');
                 }
-                self.content.push_str("] 0 d\n");
+                push_fixed(&mut self.content, d, 3);
             }
-            None => {
-                let _ = writeln!(self.content, "[] 0 d");
-            }
+            self.content.push_str("] 0 d\n");
+            self.last_line.dash = Some(dash);
         }
+    }
+
+    /// Forget the colours and line style last written: `Q` restores the
+    /// graphics state saved by `q`, so they may no longer be in effect.
+    fn forget_state(&mut self) {
+        self.last_fill = None;
+        self.last_stroke_color = None;
+        self.last_line = LineState::default();
     }
 
     fn path_moveto_lineto(&mut self, points: &[Point], close: bool) {
@@ -432,19 +466,15 @@ impl Backend for PdfBackend {
         let h = rect.height() * 72.0;
         self.op(&[x0, y0, w, h], 3, "re W n");
         self.clip_depth += 1;
-        // Restoring `q`/`Q` also resets the fill/stroke color cache
-        // assumptions, since PDF graphics state (including color) is
-        // saved/restored by q/Q too.
-        self.last_fill = None;
-        self.last_stroke_color = None;
+        // `q`/`Q` save and restore the colours and line style too.
+        self.forget_state();
     }
 
     fn pop_clip(&mut self) {
         if self.clip_depth > 0 {
             self.content.push_str("Q\n");
             self.clip_depth -= 1;
-            self.last_fill = None;
-            self.last_stroke_color = None;
+            self.forget_state();
         }
     }
 
