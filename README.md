@@ -23,7 +23,9 @@ crate's test suite (see [Testing](#testing) below).
   axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, `at`/
   `pos`/`abline(h=, v=)` in data units, `abline(a, b)` straight on the
   page or curved with `abline_untf`, and `xlog`/`ylog` for `plot()`,
-  `hist()` and `barplot()`), `par(lab=)`, and R's `xpd`-style clip regions (plot region, figure region,
+  `hist()` and `barplot()`), `par(lab=)`, `par(xaxp=/yaxp=)` (set by
+  `plot_window()` as R's `GAxisPars()`, read by `axis()` via
+  `CreateAtVector()`, overridable inline), and R's `xpd`-style clip regions (plot region, figure region,
   or the whole device for outer-margin text).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
@@ -277,6 +279,10 @@ against a real R installation by shelling out to `Rscript`:
   line's vertices, colour, width and dash pattern.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
+- `tests/axp_matches_r.rs` - `par("xaxp")`/`par("yaxp")` after
+  `plot.window()` (linear, log with each tick rule, reversed, `par(lab)`),
+  and the ticks drawn with `xaxp`/`yaxp` changed afterwards, inline in
+  `axis()` and in `plot()`.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 

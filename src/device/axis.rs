@@ -78,6 +78,9 @@ pub struct AxisOptions {
     pub col_axis: Option<ColorSpec>,
     /// `par(las)`: label orientation.
     pub las: Option<i32>,
+    /// `par(xaxp)` (sides 1, 3) or `par(yaxp)` (sides 2, 4) for the
+    /// default ticks when `at` is `None`.
+    pub axp: Option<[f64; 3]>,
     /// `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4):
     /// `AxisType::None` draws nothing.
     pub axt: Option<AxisType>,
@@ -111,6 +114,7 @@ impl Default for AxisOptions {
             cex_axis: None,
             col_axis: None,
             las: None,
+            axp: None,
             axt: None,
             tck: None,
             tcl: None,
@@ -155,7 +159,10 @@ impl<B: Backend> Device<B> {
             lineoff = 0.0;
         }
 
-        let at = opts.at.clone().unwrap_or_else(|| self.default_ticks(side));
+        let at = opts.at.clone().unwrap_or_else(|| match opts.axp {
+            Some(axp) => self.ticks_from_axp(side, axp),
+            None => self.default_ticks(side),
+        });
         let labels = if opts.draw_labels {
             let labels = match &opts.labels {
                 None => format_axis_labels(&at),

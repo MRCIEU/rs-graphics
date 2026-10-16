@@ -72,6 +72,11 @@ pub struct PlotOptions<'a> {
     /// leaves out that axis; `None` uses `par(xaxt/yaxt)`.
     pub xaxt: Option<AxisType>,
     pub yaxt: Option<AxisType>,
+    /// Inline `xaxp`/`yaxp` (`plot(x, y, xaxp = c(1, 10, 3))`): the default
+    /// ticks of that axis; `None` uses `par(xaxp/yaxp)` as `plot_window()`
+    /// sets it. Like R, `par()` itself is left unchanged.
+    pub xaxp: Option<[f64; 3]>,
+    pub yaxp: Option<[f64; 3]>,
 }
 
 impl<'a> Default for PlotOptions<'a> {
@@ -95,6 +100,8 @@ impl<'a> Default for PlotOptions<'a> {
             axes: true,
             xaxt: None,
             yaxt: None,
+            xaxp: None,
+            yaxp: None,
         }
     }
 }
@@ -143,7 +150,7 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
             dev.par.las,
             dev.par.lwd,
         );
-        let axis = |dev: &mut Device<B>, side, axt| {
+        let axis = |dev: &mut Device<B>, side, axt, axp| {
             let o = AxisOptions {
                 col: Some(fg),
                 col_axis: Some(fg),
@@ -151,12 +158,13 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
                 font: Some(font_axis),
                 las: Some(las),
                 axt,
+                axp,
                 ..AxisOptions::default()
             };
             dev.axis_with(side, &o);
         };
-        axis(dev, 1, opts.xaxt);
-        axis(dev, 2, opts.yaxt);
+        axis(dev, 1, opts.xaxt, opts.xaxp);
+        axis(dev, 2, opts.yaxt, opts.yaxp);
         dev.box_plot(fg, lwd, LineType::Pattern(&[]));
     }
 

@@ -16,7 +16,7 @@ use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par};
 use crate::pch;
-use crate::pretty::{log_axis_ticks, pretty_ticks};
+use crate::pretty::{axis_pars, create_at_vector};
 
 mod abline;
 mod axis;
@@ -300,6 +300,8 @@ impl<B: Backend> Device<B> {
         let (ux0, ux1) = Self::gscale(xlim.0, xlim.1, self.par.xaxs, xlog);
         let (uy0, uy1) = Self::gscale(ylim.0, ylim.1, self.par.yaxs, ylog);
         self.usr = (ux0, ux1, uy0, uy1);
+        self.par.xaxp = axis_pars(ux0, ux1, self.par.lab[0], xlog);
+        self.par.yaxp = axis_pars(uy0, uy1, self.par.lab[1], ylog);
     }
 
     /// `plot.window(xlim, ylim, asp = asp)` on linear axes: widens
@@ -407,21 +409,24 @@ impl<B: Backend> Device<B> {
     }
 
     /// Default tick locations R's `axis()` would pick for `side` when no
-    /// `at=` is given, in data units: `pretty()` on the current `usr` range
-    /// for that axis, aiming for `par("lab")[1]` (x) or `[2]` (y)
-    /// intervals, or R's log-axis rules (see [`log_axis_ticks`]) on a log
-    /// axis.
+    /// `at=` is given (R's `axTicks(side)`), in data units: from
+    /// `par("xaxp")` (sides 1, 3) or `par("yaxp")` (sides 2, 4), which
+    /// `plot_window()` sets with `pretty()` (or R's log-axis rules) and
+    /// `par("lab")`.
     pub fn default_ticks(&self, side: Side) -> Vec<f64> {
-        let (lo, hi, log, n) = if side == 1 || side == 3 {
+        let axp = if side == 1 || side == 3 { self.par.xaxp } else { self.par.yaxp };
+        self.ticks_from_axp(side, axp)
+    }
+
+    /// `CreateAtVector()` for `side`'s axis with the given `axp`.
+    fn ticks_from_axp(&self, side: Side, axp: [f64; 3]) -> Vec<f64> {
+        let (lo, hi, log, nint) = if side == 1 || side == 3 {
             (self.usr.0, self.usr.1, self.xlog, self.par.lab[0])
         } else {
             (self.usr.2, self.usr.3, self.ylog, self.par.lab[1])
         };
-        if log {
-            log_axis_ticks(lo.min(hi), lo.max(hi), n)
-        } else {
-            pretty_ticks(lo.min(hi), lo.max(hi), n)
-        }
+        let data = |v: f64| if log { 10f64.powf(v) } else { v };
+        create_at_vector(axp, data(lo), data(hi), nint, log)
     }
 
     // ---------------------------------------------------------------

@@ -254,111 +254,199 @@ pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
         .collect()
 }
 
-/// Default tick values, in data units, for a log axis whose `usr` range is
-/// `log_lo..log_hi` (log10 units, `log_lo < log_hi`), with `nint` intervals
-/// (`par("lab")`, 5 by default): `GAxisPars()` + `GLPretty()`
-/// (`graphics.c`) then `CreateAtVector()`'s log branch (`plot.c`).
+/// `GAxisPars()` (`graphics.c`): `par("xaxp")`/`par("yaxp")` for a `usr`
+/// range `min..max` (log10 units on a log axis; may be decreasing) and
+/// `n = par("lab")` intervals: `[first tick, last tick, intervals]`.
 ///
-/// Over less than about two decades the ticks are linear `pretty()` values;
-/// otherwise powers of ten with 1, 2, 5 (up to 2 decades between the
-/// outermost powers inside the range), 1, 5 (3 decades) or 1 (more, every
-/// few decades so there are about `nint` intervals) times each.
-pub fn log_axis_ticks(log_lo: f64, log_hi: f64, nint: i32) -> Vec<f64> {
-    // `GAxisPars()`: avoid infinities.
-    let log_hi = log_hi.min(308.0);
-    let log_lo = log_lo.max(-307.0).min(log_hi);
-    let (dl, dh) = (10f64.powf(log_lo), 10f64.powf(log_hi));
-
-    // `GLPretty()`.
-    let (mut p1, mut p2) = (dl.log10().ceil(), dh.log10().floor());
-    if p2 <= p1 && dh / dl > 10.0 {
-        p1 = (dl.log10() - 0.5).ceil();
-        p2 = (dh.log10() + 0.5).floor();
-    }
-    if p2 <= p1 {
-        // Very small range: a linear axis.
-        return pretty_ticks(dl, dh, nint);
-    }
-    let axp0 = 10f64.powf(p1);
-    let axp1 = 10f64.powf(p2);
-    let span = p2 - p1;
-
-    // `CreateAtVector()`, log branch, with its fuzz on `usr`.
-    let umin = dl * (1.0 - 1e-12);
-    let umax = dh * (1.0 + 1e-12);
-    let mut at = Vec::new();
-    if span <= 2.0 {
-        // 1, 2, 5 times 10^k.
-        let mut dn = axp0;
-        for f in [0.2, 0.5] {
-            if f * dn >= umin {
-                at.push(f * dn);
-            }
+/// On a log axis (`GLPretty()`) the first two are powers of ten and the
+/// third a code for [`create_at_vector`]: 3 (1, 2, 5 times each power, for
+/// up to 2 decades between them), 2 (1, 5; 3 decades) or 1 (powers of ten
+/// only); under about two decades it is the negated interval count of
+/// linear `pretty()` ticks instead. A range too small for `pretty()` gives
+/// the range itself, less 0.5% at each end, with 1 interval (R warns).
+pub fn axis_pars(min: f64, max: f64, n: i32, log: bool) -> [f64; 3] {
+    const EPS_FAC_2: f64 = 16.0;
+    let swap = min > max;
+    let (mut min, mut max) = if swap { (max, min) } else { (min, max) };
+    let (min_o, max_o) = (min, max);
+    let mut n = n;
+    if log {
+        if max > 308.0 {
+            max = 308.0;
+            min = min.min(max);
         }
-        loop {
-            if dn > umax {
-                break;
-            }
-            at.push(dn);
-            if 2.0 * dn > umax {
-                break;
-            }
-            at.push(2.0 * dn);
-            if 5.0 * dn > umax {
-                break;
-            }
-            at.push(5.0 * dn);
-            dn *= 10.0;
+        if min < -307.0 {
+            min = -307.0;
+            max = max.max(min);
         }
-    } else if span <= 3.0 {
-        // 1, 5 times 10^k.
-        let mut dn = axp0;
-        if 0.5 * dn >= umin {
-            at.push(0.5 * dn);
+        let (dl, dh) = (10f64.powf(min), 10f64.powf(max));
+        // `GLPretty()`.
+        let (mut p1, mut p2) = (dl.log10().ceil(), dh.log10().floor());
+        if p2 <= p1 && dh / dl > 10.0 {
+            p1 = (dl.log10() - 0.5).ceil();
+            p2 = (dh.log10() + 0.5).floor();
         }
-        loop {
-            if dn > umax {
-                break;
-            }
-            at.push(dn);
-            if 5.0 * dn > umax {
-                break;
-            }
-            at.push(5.0 * dn);
-            dn *= 10.0;
+        if p2 <= p1 {
+            let (lo, up, ndiv) = ge_pretty(dl, dh, n);
+            (min, max, n) = (lo, up, -ndiv);
+        } else {
+            min = 10f64.powf(p1);
+            max = 10f64.powf(p2);
+            n = if p2 - p1 <= 2.0 {
+                3
+            } else if p2 - p1 <= 3.0 {
+                2
+            } else {
+                1
+            };
         }
     } else {
-        // 10^k, every `ne` decades.
-        let i = (axp1.log10().floor() - axp0.log10().ceil() + 0.25) as i32;
-        let mut ne = i / nint;
-        let d0 = umax.log10() - axp0.log10();
-        if ne < 1 {
-            ne = 1;
-        } else {
-            while ne > 1 && (nint * ne) as f64 > d0 {
-                ne -= 1;
-            }
+        let (lo, up, ndiv) = ge_pretty(min, max, n);
+        (min, max, n) = (lo, up, ndiv);
+    }
+    let t = min.abs().max(max.abs());
+    let mut tf = if t > 1.0 {
+        (t * f64::EPSILON) * EPS_FAC_2
+    } else {
+        (t * EPS_FAC_2) * f64::EPSILON
+    };
+    if tf == 0.0 {
+        tf = f64::MIN_POSITIVE;
+    }
+    if (max - min).abs() <= tf {
+        // Not `pretty()`: the range itself, shrunk by 0.5% at each end.
+        let eps = 0.005 * (max_o - min_o);
+        (min, max) = (min_o + eps, max_o - eps);
+        if log {
+            (min, max) = (10f64.powf(min), 10f64.powf(max));
         }
-        let k = 1 + ne / 308;
-        if k > 1 {
-            ne = k * (ne / k);
-        }
-        let d1 = d0 - (nint * ne) as f64;
-        let start = if d1 > 5.0 {
-            axp0 * 10f64.powf((d1 / 2.0).floor())
-        } else {
-            axp0
-        };
-        let rng = 10f64.powf(ne as f64 / k as f64);
-        let mut dn = start;
-        while dn < umax {
-            at.push(dn);
-            for _ in 0..k {
-                dn *= rng;
-            }
+        n = 1;
+    }
+    let axp = [min, max, n as f64];
+    if swap { [axp[1], axp[0], axp[2]] } else { axp }
+}
+
+/// `CreateAtVector()` (`plot.c`): the default tick values, in data units,
+/// for `axp` (see [`axis_pars`]) on an axis whose `usr` range in data units
+/// is `umin..umax`, with `nint = par("lab")` intervals (used for powers of
+/// ten on a log axis, every few decades so there are about `nint`).
+pub fn create_at_vector(axp: [f64; 3], umin: f64, umax: f64, nint: i32, log: bool) -> Vec<f64> {
+    if !log || axp[2] < 0.0 {
+        // Linear: `n` equal steps from `axp[0]` to `axp[1]`, with ticks
+        // within `range / (100 n)` of zero set to 0.
+        let n = (axp[2].abs() + 0.25) as i32;
+        let dn = n.max(1) as f64;
+        let rng = axp[1] - axp[0];
+        let small = rng.abs() / 100.0 / dn;
+        return (0..=n)
+            .map(|i| {
+                let a = axp[0] + (i as f64 / dn) * rng;
+                if a.abs() < small { 0.0 } else { a }
+            })
+            .collect();
+    }
+    let (mut umin, mut umax) = (umin, umax);
+    let mut axp = axp;
+    let mut reversed = false;
+    if umin > umax {
+        reversed = axp[0] > axp[1];
+        if reversed {
+            (umin, umax) = (umax, umin);
+            axp.swap(0, 1);
         }
     }
+    // A fuzz, since we compare things like `0.2 * dn >= umin`.
+    if (umin * (1.0 - 1e-12)).abs() > 0.0 {
+        umin *= 1.0 - 1e-12;
+    }
+    if (umax * (1.0 + 1e-12)).abs() <= f64::MAX {
+        umax *= 1.0 + 1e-12;
+    }
+    let mut at = Vec::new();
+    let mut dn = axp[0];
+    match (axp[2] + 0.5) as i32 {
+        1 => {
+            // 10^k, every `ne` decades.
+            let i = (axp[1].log10().floor() - axp[0].log10().ceil() + 0.25) as i32;
+            let mut ne = i / nint;
+            let d0 = umax.log10() - dn.log10();
+            if ne < 1 {
+                ne = 1;
+            } else {
+                while ne > 1 && (nint * ne) as f64 > d0 {
+                    ne -= 1;
+                }
+            }
+            let k = 1 + ne / 308;
+            if k > 1 {
+                ne = k * (ne / k);
+            }
+            let d1 = d0 - (nint * ne) as f64;
+            if d1 > 5.0 {
+                dn *= 10f64.powf((d1 / 2.0).floor());
+            }
+            let rng = 10f64.powf(ne as f64 / k as f64);
+            while dn < umax {
+                at.push(dn);
+                for _ in 0..k {
+                    dn *= rng;
+                }
+            }
+        }
+        2 => {
+            // 1, 5 times 10^k.
+            if 0.5 * dn >= umin {
+                at.push(0.5 * dn);
+            }
+            loop {
+                if dn > umax {
+                    break;
+                }
+                at.push(dn);
+                if 5.0 * dn > umax {
+                    break;
+                }
+                at.push(5.0 * dn);
+                dn *= 10.0;
+            }
+        }
+        3 => {
+            // 1, 2, 5 times 10^k.
+            for f in [0.2, 0.5] {
+                if f * dn >= umin {
+                    at.push(f * dn);
+                }
+            }
+            loop {
+                if dn > umax {
+                    break;
+                }
+                at.push(dn);
+                if 2.0 * dn > umax {
+                    break;
+                }
+                at.push(2.0 * dn);
+                if 5.0 * dn > umax {
+                    break;
+                }
+                at.push(5.0 * dn);
+                dn *= 10.0;
+            }
+        }
+        code => panic!("log axis: invalid axp[3] = {code}"),
+    }
+    if reversed {
+        at.reverse();
+    }
     at
+}
+
+/// Default tick values, in data units, for a log axis whose `usr` range is
+/// `log_lo..log_hi` (log10 units) with `nint` intervals: [`axis_pars`] then
+/// [`create_at_vector`].
+pub fn log_axis_ticks(log_lo: f64, log_hi: f64, nint: i32) -> Vec<f64> {
+    let axp = axis_pars(log_lo, log_hi, nint, true);
+    create_at_vector(axp, 10f64.powf(log_lo), 10f64.powf(log_hi), nint, true)
 }
 
 /// Port of base R's `pretty.default()` (the user-facing `pretty()`

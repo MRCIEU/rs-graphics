@@ -142,6 +142,13 @@ pub struct Par {
     /// axes for default ticks (the third value, label length, is unused,
     /// as in R). `c(5, 5, 7)` by default.
     pub lab: [i32; 3],
+    /// `par(xaxp)` / `par(yaxp)`: the first and last default tick and the
+    /// number of intervals between them (on a log axis, a tick-rule code
+    /// instead: see [`crate::pretty::axis_pars`]). `plot_window()` sets
+    /// them from the axis range and `par(lab)`; change them afterwards to
+    /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
+    pub xaxp: [f64; 3],
+    pub yaxp: [f64; 3],
     pub lheight: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
@@ -197,6 +204,8 @@ impl Default for Par {
             tcl: -0.5,
             mgp: [3.0, 1.0, 0.0],
             lab: [5, 5, 7],
+            xaxp: [0.0, 1.0, 5.0],
+            yaxp: [0.0, 1.0, 5.0],
             lheight: 1.0,
             adj: 0.5,
             xpd: false,
