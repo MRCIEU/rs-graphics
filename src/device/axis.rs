@@ -31,8 +31,9 @@ pub struct AxisOptions {
     /// `None`: `pretty()` on the axis range.
     pub at: Option<Vec<f64>>,
     /// Labels for `at` (requires `at`). `None`: `at` formatted like R's
-    /// `formatReal()`.
-    pub labels: Option<Vec<String>>,
+    /// `formatReal()`. An inner `None` is a character `NA`: its tick is
+    /// drawn but not its label, which also doesn't count for `gap_axis`.
+    pub labels: Option<Vec<Option<String>>>,
     /// `labels = FALSE` when false: no labels at all.
     pub draw_labels: bool,
     /// `tick`: draw the axis line and tick marks.
@@ -165,7 +166,7 @@ impl<B: Backend> Device<B> {
         });
         let labels = if opts.draw_labels {
             let labels = match &opts.labels {
-                None => format_axis_labels(&at),
+                None => format_axis_labels(&at).into_iter().map(Some).collect(),
                 Some(l) => {
                     assert!(opts.at.is_some(), "axis: 'labels' is supplied and not 'at'");
                     l.clone()
@@ -190,7 +191,7 @@ impl<B: Backend> Device<B> {
         let mut ticks: Vec<(f64, Option<&str>)> = at
             .iter()
             .enumerate()
-            .map(|(i, &v)| (v, labels.get(i).map(String::as_str)))
+            .map(|(i, &v)| (v, labels.get(i).and_then(Option::as_deref)))
             .collect();
         ticks.sort_by(|a, b| a.0.total_cmp(&b.0));
         ticks.retain(|t| t.0.is_finite());

@@ -1053,7 +1053,7 @@ impl<B: Backend> Device<B> {
     ) {
         let opts = AxisOptions {
             at,
-            labels,
+            labels: labels.map(|l| l.into_iter().map(Some).collect()),
             col: Some(col),
             col_axis: Some(col),
             cex_axis: Some(cex_axis),
@@ -1080,7 +1080,7 @@ impl<B: Backend> Device<B> {
     ) {
         let opts = AxisOptions {
             at,
-            labels,
+            labels: labels.map(|l| l.into_iter().map(Some).collect()),
             tick: false,
             col: Some(col),
             col_axis: Some(col),

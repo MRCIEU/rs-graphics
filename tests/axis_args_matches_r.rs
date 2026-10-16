@@ -40,6 +40,20 @@ fn col(name: &str) -> Option<ColorSpec> {
     Some(ColorSpec::Color(Color::parse(name).unwrap()))
 }
 
+/// `c(...)` of strings, `"NA"` being `NA`.
+fn labels(l: &[&str]) -> Vec<Option<String>> {
+    l.iter().map(|s| (*s != "NA").then(|| s.to_string())).collect()
+}
+
+/// `c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ')`.
+fn alternating_na() -> Vec<Option<String>> {
+    let mut l: Vec<Option<String>> = ('A'..='J')
+        .flat_map(|c| [None, Some(c.to_string().repeat(3))])
+        .collect();
+    l.push(Some("ZZZ".into()));
+    l
+}
+
 fn seq(from: f64, to: f64, by: f64) -> Vec<f64> {
     let n = ((to - from) / by).round() as usize;
     (0..=n).map(|i| from + i as f64 * by).collect()
@@ -193,7 +207,7 @@ fn cases() -> Vec<Case> {
                 let o = AxisOptions {
                     tick: false,
                     at: Some(vec![2.0, 5.0, 7.0]),
-                    labels: Some(vec!["a".into(), "bb".into(), "ccc".into()]),
+                    labels: Some(labels(&["a", "bb", "ccc"])),
                     ..Default::default()
                 };
                 d.axis_with(3, &o);
@@ -231,23 +245,69 @@ fn cases() -> Vec<Case> {
                 // the wider `/minus` glyph, which we deliberately don't.
                 let o = AxisOptions {
                     at: Some(vec![-1.0, 0.0, 5.0, 10.0, 11.0]),
-                    labels: Some(["a", "b", "c", "d", "e"].map(String::from).to_vec()),
+                    labels: Some(labels(&["a", "b", "c", "d", "e"])),
                     ..Default::default()
                 };
                 d.axis_with(1, &o);
                 let o = AxisOptions {
                     at: Some(vec![-2.0, 5.0, 12.0]),
-                    labels: Some(["lo", "mid", "hi"].map(String::from).to_vec()),
+                    labels: Some(labels(&["lo", "mid", "hi"])),
                     las: Some(1),
                     ..Default::default()
                 };
                 d.axis_with(2, &o);
                 let o = AxisOptions {
                     at: Some(vec![8.0, 2.0]),
-                    labels: Some(vec!["eight".into(), "two".into()]),
+                    labels: Some(labels(&["eight", "two"])),
                     ..Default::default()
                 };
                 d.axis_with(4, &o);
+            },
+        },
+        Case {
+            name: "na_labels",
+            r_par: "",
+            r: "axis(1, at = 0:4 * 2.5, labels = c('a', NA, 'c', NA, 'e')); \
+                axis(3, at = seq(0, 10, 0.5), labels = c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ')); \
+                axis(2, at = c(1, 5, 9), labels = c(NA, NA, NA))",
+            xlim: (0.0, 10.0),
+            setup: |_| {},
+            draw: |d| {
+                let o = AxisOptions {
+                    at: Some(seq(0.0, 10.0, 2.5)),
+                    labels: Some(labels(&["a", "NA", "c", "NA", "e"])),
+                    ..Default::default()
+                };
+                d.axis_with(1, &o);
+                // NA between labels spaced so that `gap.axis` would drop
+                // every one of them if the NAs took part.
+                let o = AxisOptions {
+                    at: Some(seq(0.0, 10.0, 0.5)),
+                    labels: Some(alternating_na()),
+                    ..Default::default()
+                };
+                d.axis_with(3, &o);
+                let o = AxisOptions {
+                    at: Some(vec![1.0, 5.0, 9.0]),
+                    labels: Some(labels(&["NA", "NA", "NA"])),
+                    ..Default::default()
+                };
+                d.axis_with(2, &o);
+            },
+        },
+        Case {
+            name: "na_labels_reversed",
+            r_par: "",
+            r: "axis(1, at = seq(0, 10, 0.5), labels = c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ'))",
+            xlim: (10.0, 0.0),
+            setup: |_| {},
+            draw: |d| {
+                let o = AxisOptions {
+                    at: Some(seq(0.0, 10.0, 0.5)),
+                    labels: Some(alternating_na()),
+                    ..Default::default()
+                };
+                d.axis_with(1, &o);
             },
         },
     ]

@@ -35,7 +35,8 @@ crate's test suite (see [Testing](#testing) below).
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
   gives error-bar caps). `axis()` (`Device::axis_with` + `AxisOptions`,
-  `src/device/axis.rs`) takes R's `line`/`pos`/`outer`, `tick`/`labels`,
+  `src/device/axis.rs`) takes R's `line`/`pos`/`outer`, `tick`/`labels`
+  (`None` entries are `NA`: tick drawn, label skipped),
   `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, `lty`/`lwd`/`lwd.ticks` and
   `col`/`col.ticks`/`col.axis`/`cex.axis`/`font`/`las`, and
   `xaxt`/`yaxt = "n"` (`Par::xaxt`/`yaxt`, `AxisOptions::axt`,
@@ -264,8 +265,8 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/axis_zero_tick_matches_r.rs` - default tick labels for axes that
   straddle zero (`CreateAtVector()`'s snapping of near-zero ticks to 0).
 - `tests/axis_args_matches_r.rs` - `axis()` with `line`, `pos`, `outer`,
-  `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, line styles and colours, and a
-  reversed axis under `par(xpd = TRUE)`: every axis line and tick vertex,
+  `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, line styles and colours, `NA`
+  labels, and a reversed axis under `par(xpd = TRUE)`: every axis line and tick vertex,
   colour, width and dash, and every label origin, direction and colour.
 - `tests/par_new_matches_r.rs` - `par(new = TRUE)`: a second y axis,
   overlays in a 2x2 page, `plot.new()` not resetting it, drawing and outer
