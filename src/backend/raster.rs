@@ -15,14 +15,20 @@
 //! # Multi-threaded drawing
 //! Drawing calls are not painted immediately. Each is recorded as a
 //! command (already in pixel space, with its clip state and pixel bounding
-//! box), and the canvas is held as square tiles of [`TILE`] pixels. Every
-//! [`FLUSH_AT`] commands, and in [`RasterBackend::finish`], the pending
+//! box), and the canvas is held as square tiles of `TILE` pixels. Every
+//! `FLUSH_AT` commands, and in [`RasterBackend::finish`], the pending
 //! commands are binned into the tiles they touch and the tiles are painted
 //! on separate threads, each in command order. Paths are only translated
 //! by whole pixels, so shapes are anti-aliased as on one big canvas, apart
-//! from the small edge effects described at [`PAD`]. The output does not
+//! from the small edge effects described at `PAD`. The output does not
 //! depend on the number of threads (above one; see
 //! [`RasterBackend::with_threads`]).
+//!
+//! Small shapes that repeat, such as plotting symbols, are not rasterized
+//! one by one: each distinct shape is rasterized once per sub-pixel
+//! position used (on a 1/16-pixel grid) and its coverage is stamped, with
+//! the shape moved by at most 1/32 of a pixel (`Stamps`). This is several
+//! times faster on any number of threads.
 
 use std::sync::{Mutex, OnceLock};
 
@@ -87,6 +93,25 @@ const PAD: u32 = 4;
 
 /// Margin around a hairline's path that contains all its ink, in pixels.
 const HAIRLINE_MARGIN: f32 = 4.0;
+
+/// Stamped shapes have their reference point snapped to this many
+/// positions per pixel, in x and y (see [`Stamps`]).
+const SPRITE_SUB: i32 = 16;
+
+/// Path coordinates relative to the reference point are rounded to this
+/// many positions per pixel to recognise equal shapes.
+const SHAPE_SUB: f32 = 256.0;
+
+/// Largest shape (pixels across its path, before stroking) that is stamped.
+const STAMP_MAX_SIZE: f32 = 64.0;
+
+/// Widest stroke (pixels) that is stamped.
+const STAMP_MAX_STROKE: f32 = 16.0;
+
+/// Most distinct shapes, and sprites, per flush; later ones are painted
+/// as paths.
+const STAMP_MAX_SHAPES: usize = 1024;
+const STAMP_MAX_SPRITES: usize = 1 << 16;
 
 /// Pending commands that trigger painting, bounding the memory they take.
 const FLUSH_AT: usize = 1 << 21;
@@ -156,6 +181,445 @@ impl Tile {
     }
 }
 
+/// What a stamped shape paints, with its reference point at the origin.
+enum ShapeKind {
+    /// A filled circle of this radius (an `Op::Circle`).
+    Circle(f32),
+    /// A filled path (an `Op::Fill`).
+    Fill,
+    /// A stroked path (an `Op::Stroke`) in this style.
+    Stroke(SkStroke),
+}
+
+/// A shape that repeats across commands (e.g. a plotting symbol), drawn by
+/// stamping pre-rasterized coverage rather than as a path each time.
+struct StampShape {
+    kind: ShapeKind,
+    /// The path's verbs and its points relative to the reference point,
+    /// in `1 / SHAPE_SUB` pixels (empty for circles).
+    verbs: Vec<u8>,
+    points: Vec<(i32, i32)>,
+    /// Sprite pixel (0, 0) relative to the pixel of the snapped reference
+    /// point, and the sprite size.
+    dx: i32,
+    dy: i32,
+    w: u32,
+    h: u32,
+    /// Index into `Stamps::sprites` for each sub-pixel offset
+    /// (`sub_y * SPRITE_SUB + sub_x`), or `NO_SPRITE` until one is used.
+    sprite: Vec<u32>,
+}
+
+const NO_SPRITE: u32 = u32::MAX;
+
+impl StampShape {
+    fn new(kind: ShapeKind, verbs: Vec<u8>, points: Vec<(i32, i32)>) -> Self {
+        let (mut x0, mut y0, mut x1, mut y1) = (0f32, 0f32, 0f32, 0f32);
+        match kind {
+            ShapeKind::Circle(r) => (x0, y0, x1, y1) = (-r, -r, r, r),
+            _ => {
+                for &(x, y) in &points {
+                    let (x, y) = (x as f32 / SHAPE_SUB, y as f32 / SHAPE_SUB);
+                    (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+                }
+            }
+        }
+        // Room for anti-aliasing, and for the stroke: mitre joins can reach
+        // `miter_limit * width / 2` out, square caps `width / sqrt(2)`.
+        let pad = match &kind {
+            ShapeKind::Stroke(s) if s.line_join == tiny_skia::LineJoin::Miter => {
+                s.width * s.miter_limit.max(1.5) / 2.0 + 2.0
+            }
+            ShapeKind::Stroke(s) => s.width * 0.75 + 2.0,
+            _ => 2.0,
+        };
+        let dx = (x0 - pad).floor() as i32;
+        let dy = (y0 - pad).floor() as i32;
+        // + 1 for the sub-pixel offset of the reference point.
+        let w = ((x1 + pad).ceil() as i32 + 1 - dx) as u32;
+        let h = ((y1 + pad).ceil() as i32 + 1 - dy) as u32;
+        StampShape {
+            kind,
+            verbs,
+            points,
+            dx,
+            dy,
+            w,
+            h,
+            sprite: vec![NO_SPRITE; (SPRITE_SUB * SPRITE_SUB) as usize],
+        }
+    }
+
+    /// Rasterize the coverage with the reference point at sub-pixel offset
+    /// `sub`: drawn in opaque black on a transparent pixmap, whose alpha is
+    /// then exactly the coverage tiny-skia blends with (strokes at most a
+    /// pixel wide are hairlines, whose alpha also folds in their width).
+    fn render(&self, sub: u32) -> Vec<u8> {
+        let (sub_x, sub_y) = (sub as i32 % SPRITE_SUB, sub as i32 / SPRITE_SUB);
+        let ox = sub_x as f32 / SPRITE_SUB as f32 - self.dx as f32;
+        let oy = sub_y as f32 / SPRITE_SUB as f32 - self.dy as f32;
+        let Some(mut pixmap) = Pixmap::new(self.w, self.h) else {
+            return Vec::new();
+        };
+        if let Some(path) = self.path_at(ox, oy) {
+            let paint = paint_for(Color::BLACK);
+            let id = Transform::identity();
+            match &self.kind {
+                ShapeKind::Stroke(stroke) => pixmap.stroke_path(&path, &paint, stroke, id, None),
+                _ => pixmap.fill_path(&path, &paint, FillRule::Winding, id, None),
+            }
+        }
+        pixmap.pixels().iter().map(|p| p.alpha()).collect()
+    }
+
+    /// The shape's path with its reference point at `(ox, oy)`.
+    fn path_at(&self, ox: f32, oy: f32) -> Option<Path> {
+        match self.kind {
+            ShapeKind::Circle(r) => PathBuilder::from_circle(ox, oy, r),
+            _ => {
+                let mut pb = PathBuilder::new();
+                let mut pts = self
+                    .points
+                    .iter()
+                    .map(|&(x, y)| (ox + x as f32 / SHAPE_SUB, oy + y as f32 / SHAPE_SUB));
+                let mut next = || pts.next().expect("a point per verb");
+                for &v in &self.verbs {
+                    match v {
+                        VERB_MOVE => {
+                            let (x, y) = next();
+                            pb.move_to(x, y)
+                        }
+                        VERB_LINE => {
+                            let (x, y) = next();
+                            pb.line_to(x, y)
+                        }
+                        VERB_QUAD => {
+                            let ((x1, y1), (x, y)) = (next(), next());
+                            pb.quad_to(x1, y1, x, y)
+                        }
+                        VERB_CUBIC => {
+                            let ((x1, y1), (x2, y2), (x, y)) = (next(), next(), next());
+                            pb.cubic_to(x1, y1, x2, y2, x, y)
+                        }
+                        _ => pb.close(),
+                    }
+                }
+                pb.finish()
+            }
+        }
+    }
+}
+
+const VERB_MOVE: u8 = 0;
+const VERB_LINE: u8 = 1;
+const VERB_QUAD: u8 = 2;
+const VERB_CUBIC: u8 = 3;
+const VERB_CLOSE: u8 = 4;
+
+/// The reference point of a stampable command: a circle's centre or a
+/// path's first point.
+fn reference_point(op: &Op) -> Option<(f32, f32)> {
+    match op {
+        Op::Circle { cx, cy, .. } => Some((*cx, *cy)),
+        Op::Fill { path, .. } | Op::Stroke { path, .. } => {
+            path.points().first().map(|p| (p.x, p.y))
+        }
+        Op::Glyphs { .. } => None,
+    }
+}
+
+/// `(x, y)` snapped to the sprite grid: the pixel holding it, and the
+/// sub-pixel offset index.
+fn snap(x: f32, y: f32) -> (i32, i32, u32) {
+    let qx = (x * SPRITE_SUB as f32).round() as i32;
+    let qy = (y * SPRITE_SUB as f32).round() as i32;
+    let sub = qy.rem_euclid(SPRITE_SUB) * SPRITE_SUB + qx.rem_euclid(SPRITE_SUB);
+    (
+        qx.div_euclid(SPRITE_SUB),
+        qy.div_euclid(SPRITE_SUB),
+        sub as u32,
+    )
+}
+
+/// Which commands of a flush are stamped, and the sprites they use.
+///
+/// Scatter plots draw the same few symbols thousands of times. Each
+/// distinct small shape (same path relative to its first point, to
+/// `1 / SHAPE_SUB` px, and same stroke style) is rasterized once per
+/// sub-pixel offset of its reference point actually used, and every
+/// command drawing it snaps its reference point to that `1 / SPRITE_SUB`
+/// grid (moving it at most 1/32 px) and stamps the coverage.
+struct Stamps {
+    shapes: Vec<StampShape>,
+    /// Per command: index into `sprites`, or `NO_SPRITE` to paint a path.
+    sprite_of: Vec<u32>,
+    /// `(shape, sub-pixel offset)` of each sprite, then its coverage.
+    sprite_keys: Vec<(u32, u32)>,
+    sprites: Vec<Vec<u8>>,
+}
+
+impl Stamps {
+    /// Choose the stamped commands of `commands`.
+    fn plan(commands: &[Command], strokes: &[SkStroke]) -> Self {
+        let mut stamps = Stamps {
+            shapes: Vec::new(),
+            sprite_of: vec![NO_SPRITE; commands.len()],
+            sprite_keys: Vec::new(),
+            sprites: Vec::new(),
+        };
+        // Shapes by hash of their key, and the last shape found (most
+        // commands repeat the previous one).
+        let mut by_hash: std::collections::HashMap<u64, Vec<u32>> = Default::default();
+        let mut last: Option<u32> = None;
+        let (mut verbs, mut points) = (Vec::new(), Vec::new());
+        for (i, c) in commands.iter().enumerate() {
+            let Some((rx, ry)) = reference_point(&c.op) else {
+                continue;
+            };
+            // The stroke style, or `None` for fills; skip what isn't stamped.
+            let stroke = match &c.op {
+                Op::Circle { r, .. } if *r <= STAMP_MAX_SIZE / 2.0 => None,
+                Op::Fill { path, .. } if small(path) => None,
+                Op::Stroke {
+                    path,
+                    stroke,
+                    color,
+                } => {
+                    let s = &strokes[*stroke as usize];
+                    if !small(path) || s.dash.is_some() || s.width > STAMP_MAX_STROKE {
+                        continue;
+                    }
+                    // tiny-skia scales a hairline's colour by its width. For
+                    // an opaque colour stamping matches that to two levels,
+                    // but a translucent one compounds the rounding.
+                    if s.width <= 1.0 && color.a != 255 {
+                        continue;
+                    }
+                    Some(s)
+                }
+                _ => continue,
+            };
+            verbs.clear();
+            points.clear();
+            if let Op::Fill { path, .. } | Op::Stroke { path, .. } = &c.op {
+                verbs.extend(path.segments().map(|seg| match seg {
+                    tiny_skia::PathSegment::MoveTo(_) => VERB_MOVE,
+                    tiny_skia::PathSegment::LineTo(_) => VERB_LINE,
+                    tiny_skia::PathSegment::QuadTo(..) => VERB_QUAD,
+                    tiny_skia::PathSegment::CubicTo(..) => VERB_CUBIC,
+                    tiny_skia::PathSegment::Close => VERB_CLOSE,
+                }));
+                points.extend(path.points().iter().map(|p| {
+                    (
+                        ((p.x - rx) * SHAPE_SUB).round() as i32,
+                        ((p.y - ry) * SHAPE_SUB).round() as i32,
+                    )
+                }));
+            }
+            let same = |shape: &StampShape| match (&shape.kind, &c.op) {
+                (ShapeKind::Circle(a), Op::Circle { r, .. }) => a == r,
+                (ShapeKind::Fill, Op::Fill { .. }) => {
+                    shape.verbs == verbs && shape.points == points
+                }
+                (ShapeKind::Stroke(a), Op::Stroke { .. }) => {
+                    Some(a) == stroke && shape.verbs == verbs && shape.points == points
+                }
+                _ => false,
+            };
+            let shape = match last.filter(|&k| same(&stamps.shapes[k as usize])) {
+                Some(k) => k,
+                None => {
+                    let hash = shape_hash(&c.op, stroke, &verbs, &points);
+                    let found = by_hash.get(&hash).and_then(|ks| {
+                        ks.iter()
+                            .copied()
+                            .find(|&k| same(&stamps.shapes[k as usize]))
+                    });
+                    match found {
+                        Some(k) => k,
+                        None if stamps.shapes.len() < STAMP_MAX_SHAPES => {
+                            let kind = match &c.op {
+                                Op::Circle { r, .. } => ShapeKind::Circle(*r),
+                                Op::Fill { .. } => ShapeKind::Fill,
+                                _ => ShapeKind::Stroke(stroke.expect("a stroke").clone()),
+                            };
+                            let k = stamps.shapes.len() as u32;
+                            stamps.shapes.push(StampShape::new(
+                                kind,
+                                verbs.clone(),
+                                points.clone(),
+                            ));
+                            by_hash.entry(hash).or_default().push(k);
+                            k
+                        }
+                        None => continue,
+                    }
+                }
+            };
+            last = Some(shape);
+            let (_, _, sub) = snap(rx, ry);
+            let slot = &mut stamps.shapes[shape as usize].sprite[sub as usize];
+            if *slot == NO_SPRITE {
+                if stamps.sprite_keys.len() == STAMP_MAX_SPRITES {
+                    continue;
+                }
+                *slot = stamps.sprite_keys.len() as u32;
+                stamps.sprite_keys.push((shape, sub));
+            }
+            stamps.sprite_of[i] = *slot;
+        }
+        stamps
+    }
+
+    /// Rasterize the planned sprites, on up to `threads` threads.
+    fn render(&mut self, threads: usize) {
+        let shapes = &self.shapes;
+        let render = |&(shape, sub): &(u32, u32)| shapes[shape as usize].render(sub);
+        let threads = threads.min(self.sprite_keys.len() / 16 + 1);
+        self.sprites = if threads <= 1 {
+            self.sprite_keys.iter().map(render).collect()
+        } else {
+            let per_thread = self.sprite_keys.len().div_ceil(threads);
+            std::thread::scope(|s| {
+                let handles: Vec<_> = self
+                    .sprite_keys
+                    .chunks(per_thread)
+                    .map(|chunk| s.spawn(move || chunk.iter().map(render).collect::<Vec<_>>()))
+                    .collect();
+                handles
+                    .into_iter()
+                    .flat_map(|h| h.join().expect("sprite drawing thread panicked"))
+                    .collect()
+            })
+        };
+    }
+
+    /// Stamp command `i` (planned as stamped) into `pixmap`, whose top-left
+    /// is page pixel `origin`, under `clip`.
+    fn stamp(
+        &self,
+        i: usize,
+        op: &Op,
+        pixmap: &mut Pixmap,
+        clip: Option<&Mask>,
+        origin: (i32, i32),
+    ) {
+        let sprite = self.sprite_of[i] as usize;
+        let shape = &self.shapes[self.sprite_keys[sprite].0 as usize];
+        let (rx, ry) = reference_point(op).expect("stamped commands have one");
+        let (px, py, _) = snap(rx, ry);
+        let color = match op {
+            Op::Circle { color, .. } | Op::Fill { color, .. } | Op::Stroke { color, .. } => *color,
+            Op::Glyphs { .. } => unreachable!("glyphs aren't stamped"),
+        };
+        let at = (px + shape.dx - origin.0, py + shape.dy - origin.1);
+        blend_coverage(
+            pixmap,
+            clip,
+            at,
+            &self.sprites[sprite],
+            shape.w as i32,
+            color,
+        );
+    }
+}
+
+/// Whether `path` is small enough to stamp.
+fn small(path: &Path) -> bool {
+    let b = path.bounds();
+    b.width() <= STAMP_MAX_SIZE && b.height() <= STAMP_MAX_SIZE
+}
+
+/// A hash of a shape's key (see `Stamps::plan`).
+fn shape_hash(op: &Op, stroke: Option<&SkStroke>, verbs: &[u8], points: &[(i32, i32)]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    match op {
+        Op::Circle { r, .. } => (0u8, r.to_bits()).hash(&mut h),
+        _ => {
+            if let Some(s) = stroke {
+                (1u8, s.width.to_bits(), s.miter_limit.to_bits()).hash(&mut h);
+                (s.line_cap as u8, s.line_join as u8).hash(&mut h);
+            }
+            verbs.hash(&mut h);
+            points.hash(&mut h);
+        }
+    }
+    h.finish()
+}
+
+/// Blend `color` with per-pixel coverage `cov` (a `w`-pixel-wide image
+/// whose pixel (0, 0) goes at `at` in `pixmap`) under `clip`, exactly as
+/// tiny-skia's low-precision pipeline blends a solid-colour path fill with
+/// that coverage: `Source` + `lerp` for an opaque colour without a mask;
+/// otherwise mask, then coverage, then `SourceOver`.
+fn blend_coverage(
+    pixmap: &mut Pixmap,
+    clip: Option<&Mask>,
+    at: (i32, i32),
+    cov: &[u8],
+    cw: i32,
+    color: Color,
+) {
+    if cw == 0 {
+        return;
+    }
+    let ch = cov.len() as i32 / cw;
+    let (x0, y0) = at;
+    let (w, h) = (pixmap.width() as i32, pixmap.height() as i32);
+    let (sx0, sx1) = ((-x0).max(0), cw.min(w - x0));
+    let (sy0, sy1) = ((-y0).max(0), ch.min(h - y0));
+    if sx0 >= sx1 || sy0 >= sy1 {
+        return;
+    }
+    let c = to_sk_color(color).premultiply();
+    let to_u16 = |v: f32| (v * 255.0 + 0.5) as u16;
+    let src = [
+        to_u16(c.red()),
+        to_u16(c.green()),
+        to_u16(c.blue()),
+        to_u16(c.alpha()),
+    ];
+    let opaque_fast = src[3] == 255 && clip.is_none();
+    let div255 = |v: u32| (v + 255) >> 8;
+    let pixels = pixmap.pixels_mut();
+    for sy in sy0..sy1 {
+        let row = (y0 + sy) * w + x0;
+        for sx in sx0..sx1 {
+            let k = cov[(sy * cw + sx) as usize] as u32;
+            if k == 0 {
+                continue;
+            }
+            let idx = (row + sx) as usize;
+            let d = pixels[idx];
+            let d = [d.red(), d.green(), d.blue(), d.alpha()].map(u32::from);
+            let mut s = src.map(u32::from);
+            let out = if opaque_fast {
+                if k == 255 {
+                    s
+                } else {
+                    [0, 1, 2, 3].map(|i| div255(d[i] * (255 - k) + s[i] * k))
+                }
+            } else {
+                if let Some(m) = clip {
+                    let m = m.data()[idx] as u32;
+                    if m == 0 {
+                        continue;
+                    }
+                    s = s.map(|v| div255(v * m));
+                }
+                if k < 255 {
+                    s = s.map(|v| div255(v * k));
+                }
+                [0, 1, 2, 3].map(|i| s[i] + div255(d[i] * (255 - s[3])))
+            };
+            let [r, g, b, a] = out.map(|v| v.min(255) as u8);
+            pixels[idx] = PremultipliedColorU8::from_rgba(r, g, b, a)
+                .unwrap_or(PremultipliedColorU8::TRANSPARENT);
+        }
+    }
+}
+
 /// A hairline painted on its own: `pixmap` goes at page pixel `(x, y)`.
 struct Prepainted {
     x: i32,
@@ -219,7 +683,7 @@ impl RasterBackend {
     /// Paint with at most `threads` threads (default: the number of CPUs).
     /// With one thread the output is exactly that of drawing onto a single
     /// canvas; with more, edge pixels of some shapes can differ from it by
-    /// a few levels (see [`PAD`]), but not between thread counts above one.
+    /// a few levels (see `PAD`), but not between thread counts above one.
     pub fn with_threads(mut self, threads: usize) -> Self {
         self.flush();
         let canvas = self.canvas();
@@ -403,6 +867,8 @@ impl RasterBackend {
         let (w, h) = (self.width_px as f32, self.height_px as f32);
         let in_canvas =
             |r: &SkRect| r.left() >= 0.0 && r.top() >= 0.0 && r.right() <= w && r.bottom() <= h;
+        let mut stamps = Stamps::plan(&self.commands, &self.strokes);
+        stamps.render(self.threads);
         let mut bins: Vec<Vec<u32>> = vec![Vec::new(); self.tiles.len()];
         // Hairlines that a tile would cut (see `Prepainted`), in order.
         let mut cut_hairlines: Vec<u32> = Vec::new();
@@ -418,7 +884,8 @@ impl RasterBackend {
                     bins[(ty * self.tiles_x + tx) as usize].push(i as u32);
                 }
             }
-            if self.tiles.len() > 1 {
+            // Stamped hairlines are rasterized whole, never cut.
+            if self.tiles.len() > 1 && stamps.sprite_of[i] == NO_SPRITE {
                 if let Some(r) = hairline_bounds(c, &self.strokes) {
                     let first = &self.tiles[(ty0 * self.tiles_x + tx0) as usize];
                     let one_tile = tx0 == tx_end && ty0 == ty_end;
@@ -444,6 +911,7 @@ impl RasterBackend {
             clips: &self.clips,
             cut_hairlines: &cut_hairlines,
             prepainted: &prepainted,
+            stamps: &stamps,
         };
         if threads <= 1 {
             for (tile, bin) in work {
@@ -564,6 +1032,7 @@ struct PaintContext<'a> {
     /// Hairline commands painted on their own, sorted, and their pixmaps.
     cut_hairlines: &'a [u32],
     prepainted: &'a [Option<Prepainted>],
+    stamps: &'a Stamps,
 }
 
 impl PaintContext<'_> {
@@ -586,6 +1055,11 @@ impl PaintContext<'_> {
             };
             let mask = masks[mi].1.as_ref();
             let pixmap = &mut tile.pixmap;
+            if self.stamps.sprite_of[i as usize] != NO_SPRITE {
+                self.stamps
+                    .stamp(i as usize, &cmd.op, pixmap, mask, (ox, oy));
+                continue;
+            }
             match &cmd.op {
                 Op::Fill { path, color } => {
                     pixmap.fill_path(path, &paint_for(*color), FillRule::Winding, to_tile, mask);
@@ -901,5 +1375,100 @@ impl Backend for RasterBackend {
             },
             bounds,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Stamping blends exactly as tiny-skia paints the same shape at the
+    /// same coordinates: opaque and translucent, with and without a clip.
+    /// Hairlines (strokes at most a pixel wide) are only stamped in opaque
+    /// colours, and may differ by two levels: tiny-skia scales their colour
+    /// by their width before blending, which rounds once more (twice where
+    /// segments overlap).
+    #[test]
+    fn stamped_shapes_match_painted_paths() {
+        let thick = SkStroke {
+            width: 1.5,
+            ..Default::default()
+        };
+        let hair = SkStroke {
+            width: 0.75,
+            line_join: tiny_skia::LineJoin::Round,
+            line_cap: tiny_skia::LineCap::Round,
+            ..Default::default()
+        };
+        let tri = [(0, 0), (1500, 0), (750, 1300)];
+        let square = [(0, 0), (1200, 0), (1200, 1200), (0, 1200)];
+        let poly = |pts: &[(i32, i32)]| {
+            let mut v = vec![VERB_MOVE];
+            v.extend(std::iter::repeat(VERB_LINE).take(pts.len() - 1));
+            v.push(VERB_CLOSE);
+            v
+        };
+        let shapes = [
+            (StampShape::new(ShapeKind::Circle(0.7), vec![], vec![]), 0),
+            (StampShape::new(ShapeKind::Circle(6.25), vec![], vec![]), 0),
+            (
+                StampShape::new(ShapeKind::Fill, poly(&tri), tri.to_vec()),
+                0,
+            ),
+            (
+                StampShape::new(
+                    ShapeKind::Stroke(thick),
+                    poly(&square[..4]),
+                    square[..4].to_vec(),
+                ),
+                0,
+            ),
+            (
+                StampShape::new(ShapeKind::Stroke(hair), poly(&tri), tri.to_vec()),
+                2,
+            ),
+        ];
+        let colors = [Color::rgb(200, 30, 30), Color::rgba(0, 0, 160, 128)];
+        for (shape, tolerance) in &shapes {
+            let mut clip = Mask::new(shape.w, shape.h).unwrap();
+            clip.data_mut().fill(255);
+            let rect = SkRect::from_ltrb(0.3, 1.4, shape.w as f32, shape.h as f32 - 2.7).unwrap();
+            let rect = PathBuilder::from_rect(rect);
+            clip.intersect_path(&rect, FillRule::Winding, true, Transform::identity());
+            for mask in [None, Some(&clip)] {
+                for sub in [0, 3 + 11 * 16, 8 * 17, 15 + 16] {
+                    let ox = (sub % 16) as f32 / 16.0 - shape.dx as f32;
+                    let oy = (sub / 16) as f32 / 16.0 - shape.dy as f32;
+                    let path = shape.path_at(ox, oy).unwrap();
+                    let cov = shape.render(sub);
+                    let mut painted = Pixmap::new(shape.w, shape.h).unwrap();
+                    painted.fill(tiny_skia::Color::from_rgba8(240, 230, 140, 255));
+                    let mut stamped = painted.clone();
+                    let hairline = matches!(&shape.kind, ShapeKind::Stroke(s) if s.width <= 1.0);
+                    for color in colors.into_iter().filter(|c| !hairline || c.a == 255) {
+                        let (paint, id) = (paint_for(color), Transform::identity());
+                        match &shape.kind {
+                            ShapeKind::Stroke(s) => painted.stroke_path(&path, &paint, s, id, mask),
+                            _ => painted.fill_path(&path, &paint, FillRule::Winding, id, mask),
+                        }
+                        blend_coverage(&mut stamped, mask, (0, 0), &cov, shape.w as i32, color);
+                    }
+                    let max = painted
+                        .data()
+                        .iter()
+                        .zip(stamped.data())
+                        .map(|(a, b)| a.abs_diff(*b))
+                        .max()
+                        .unwrap();
+                    assert!(
+                        max <= *tolerance,
+                        "shape {}x{}, sub {sub}, masked {}: max difference {max}",
+                        shape.w,
+                        shape.h,
+                        mask.is_some()
+                    );
+                }
+            }
+        }
     }
 }
