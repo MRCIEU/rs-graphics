@@ -3,7 +3,7 @@
 //! of numeric groups drawn as vertical boxes at `x = 1, 2, ..., n` (no
 //! `horizontal`, `notch`, or `varwidth` support).
 
-use crate::backend::Backend;
+use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
 use crate::device::{Device, LineStyle};
 use crate::lty::LineType;
@@ -166,56 +166,50 @@ pub fn boxplot<B: Backend>(
     let fill = opts.col;
     for (i, s) in stats.iter().enumerate() {
         let x = at[i];
-        if s.lower_whisker.is_finite() && s.q1.is_finite() {
-            dev.segments(
-                &[x],
-                &[s.lower_whisker],
-                &[x],
-                &[s.q1],
-                LineStyle::new(border, lwd, LineType::from_code(2)), // whisklty = "dashed"
-            );
-            dev.segments(
-                &[x - cap_half],
-                &[s.lower_whisker],
-                &[x + cap_half],
-                &[s.lower_whisker],
-                LineStyle::new(border, lwd, LineType::Pattern(&[])),
-            );
-        }
-        if s.q3.is_finite() && s.upper_whisker.is_finite() {
-            dev.segments(
-                &[x],
-                &[s.q3],
-                &[x],
-                &[s.upper_whisker],
-                LineStyle::new(border, lwd, LineType::from_code(2)),
-            );
-            dev.segments(
-                &[x - cap_half],
-                &[s.upper_whisker],
-                &[x + cap_half],
-                &[s.upper_whisker],
-                LineStyle::new(border, lwd, LineType::Pattern(&[])),
-            );
-        }
-        if s.q1.is_finite() && s.q3.is_finite() {
-            dev.polygon(
-                &[x - half, x + half, x + half, x - half],
-                &[s.q1, s.q1, s.q3, s.q3],
-                fill,
-                border,
-                lwd,
-                LineType::Pattern(&[]),
-            );
+        // In `bxp()`'s order: box fill, median, whiskers, staples, then the
+        // box border on top, then outliers.
+        let box_xs = [x - half, x + half, x + half, x - half];
+        let box_ys = [s.q1, s.q1, s.q3, s.q3];
+        let has_box = s.q1.is_finite() && s.q3.is_finite();
+        if has_box {
+            dev.polygon(&box_xs, &box_ys, fill, ColorSpec::None, lwd, LineType::Blank);
         }
         if s.median.is_finite() {
-            // medlwd = 3 * par(lwd)
+            // medlwd = 3 * par(lwd), with `lend = 1` (butt), "to avoid
+            // overlap": round ends would reach past the box sides.
+            let lend = std::mem::replace(&mut dev.par.lend, LineEnd::Butt);
             dev.segments(
                 &[x - half],
                 &[s.median],
                 &[x + half],
                 &[s.median],
                 LineStyle::new(border, 3.0 * lwd, LineType::Pattern(&[])),
+            );
+            dev.par.lend = lend;
+        }
+        // Whiskers run from their ends to the hinges (which matters for
+        // where the dashes fall); whisklty = "dashed". Then the staples.
+        let ends = [(s.lower_whisker, s.q1), (s.upper_whisker, s.q3)];
+        let ends: Vec<(f64, f64)> = ends
+            .into_iter()
+            .filter(|(w, h)| w.is_finite() && h.is_finite())
+            .collect();
+        for &(w, h) in &ends {
+            let dashed = LineStyle::new(border, lwd, LineType::from_code(2));
+            dev.segments(&[x], &[w], &[x], &[h], dashed);
+        }
+        for &(w, _) in &ends {
+            let solid = LineStyle::new(border, lwd, LineType::Pattern(&[]));
+            dev.segments(&[x - cap_half], &[w], &[x + cap_half], &[w], solid);
+        }
+        if has_box {
+            dev.polygon(
+                &box_xs,
+                &box_ys,
+                ColorSpec::None,
+                border,
+                lwd,
+                LineType::Pattern(&[]),
             );
         }
         if !s.outliers.is_empty() {
