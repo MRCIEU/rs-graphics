@@ -181,7 +181,7 @@ A few fidelity-relevant decisions worth calling out:
 
 ```sh
 cargo run --example gallery
-# -> gallery_output/{plot_scatter,plot_line,plot_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,pie,multipanel,pch}.{svg,pdf,png}
+# -> gallery_output/{plot_scatter,plot_line,plot_log,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,pie,multipanel,pch}.{svg,pdf,png}
 ```
 
 `examples/gen_reference.R` produces the real-R equivalent of the same

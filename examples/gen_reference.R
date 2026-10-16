@@ -50,6 +50,18 @@ save_all("plot_log", 6, 4, function() {
        xlab = "x", ylab = "2 * x^1.5")
 })
 
+save_all("abline_log", 6, 4, function() {
+  x <- 10^((0:15) / 5)
+  y <- 2 * x^1.5 * 10^(0.15 * sin(3 * (0:15)))
+  plot(x, y, pch = 19, log = "xy", main = "abline() on log axes", xlab = "x", ylab = "y")
+  abline(h = 1000, v = 10, col = "grey", lty = 2)
+  abline(log10(2), 1.5, col = "#DF536B", lwd = 2)
+  abline(2000, 20, untf = TRUE, col = "#61D04F", lwd = 2)
+  legend("topleft", legend = c("abline(log10(2), 1.5)", "abline(2000, 20, untf = TRUE)",
+                               "abline(h = 1000, v = 10)"),
+         col = c("#DF536B", "#61D04F", "grey"), lwd = c(2, 2, 1), lty = c(1, 1, 2), bg = "white")
+})
+
 save_all("legend", 6, 4, function() {
   x <- seq(0, 10, by = 0.25)
   plot(x, sin(x), type = "l", col = "#DF536B", lwd = 2, ylim = c(-1, 1.6),

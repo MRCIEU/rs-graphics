@@ -137,6 +137,42 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
     plot(dev, &x, &y, &opts);
 }
 
+fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
+    let x: Vec<f64> = (0..=15).map(|i| 10f64.powf(i as f64 / 5.0)).collect();
+    let y: Vec<f64> = x
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| 2.0 * v.powf(1.5) * 10f64.powf(0.15 * (3.0 * i as f64).sin()))
+        .collect();
+
+    let opts = PlotOptions {
+        pch: 19,
+        xlog: true,
+        ylog: true,
+        main: Some("abline() on log axes"),
+        xlab: Some("x"),
+        ylab: Some("y"),
+        ..PlotOptions::default()
+    };
+    plot(dev, &x, &y, &opts);
+    let grey = ColorSpec::Color(Color::parse("grey").unwrap());
+    let dashed = LineType::from_code(2);
+    dev.abline(None, None, Some(1000.0), Some(10.0), grey, 1.0, dashed);
+    let solid = LineType::from_code(1);
+    dev.abline(Some(2f64.log10()), Some(1.5), None, None, ColorSpec::Index(2), 2.0, solid);
+    dev.abline_untf(2000.0, 20.0, ColorSpec::Index(3), 2.0, solid);
+    let entries = vec![
+        LegendEntry::line("abline(log10(2), 1.5)", ColorSpec::Index(2), 2.0, solid),
+        LegendEntry::line("abline(2000, 20, untf = TRUE)", ColorSpec::Index(3), 2.0, solid),
+        LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, dashed),
+    ];
+    let o = LegendOptions {
+        bg: Some(ColorSpec::Color(Color::WHITE)),
+        ..LegendOptions::default()
+    };
+    dev.legend_with(LegendPos::Keyword(LegendKeyword::TopLeft), &entries, &o);
+}
+
 fn draw_legend<B: Backend>(dev: &mut Device<B>) {
     let x: Vec<f64> = (0..=40).map(|i| i as f64 * 0.25).collect();
     let sin: Vec<f64> = x.iter().map(|&v| v.sin()).collect();
@@ -301,6 +337,7 @@ fn main() {
     save_gallery_plot!("plot_scatter", 6.0, 4.0, draw_scatter);
     save_gallery_plot!("plot_line", 6.0, 4.0, draw_lineplot);
     save_gallery_plot!("plot_log", 6.0, 4.0, draw_log);
+    save_gallery_plot!("abline_log", 6.0, 4.0, draw_abline_log);
     save_gallery_plot!("legend", 6.0, 4.0, draw_legend);
     save_gallery_plot!("hist", 6.0, 4.0, draw_hist);
     save_gallery_plot!("barplot", 6.0, 4.0, draw_barplot);
