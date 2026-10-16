@@ -40,6 +40,9 @@ pub struct PdfBackend {
     pages: Vec<String>,
     /// Whether a page has been started (by the first `new_page()`).
     started: bool,
+    /// Whether any text used the Symbol font, which then gets a font
+    /// resource (`/F5`); other output is unchanged.
+    uses_symbol: bool,
 }
 
 /// The line-style parameters last written to the content stream (`None`:
@@ -67,6 +70,7 @@ impl PdfBackend {
             background: Color::TRANSPARENT,
             pages: Vec::new(),
             started: false,
+            uses_symbol: false,
         }
     }
 
@@ -223,6 +227,7 @@ impl PdfBackend {
             FontFace::Bold => "/F2",
             FontFace::Italic => "/F3",
             FontFace::BoldItalic => "/F4",
+            FontFace::Symbol => "/F5",
         }
     }
 
@@ -232,6 +237,7 @@ impl PdfBackend {
             FontFace::Bold => "Helvetica-Bold",
             FontFace::Italic => "Helvetica-Oblique",
             FontFace::BoldItalic => "Helvetica-BoldOblique",
+            FontFace::Symbol => "Symbol",
         }
     }
 
@@ -240,7 +246,10 @@ impl PdfBackend {
     /// above 0x9F), Latin-1 characters are written as their single byte, as
     /// an octal escape so the content stream stays ASCII. Characters with no
     /// byte in the encoding are drawn as `?`.
-    fn escape_pdf_string(s: &str) -> String {
+    ///
+    /// With `symbol`, `s` is in the Symbol font's own encoding (one `char`
+    /// per code), so every code up to 255 is written as its byte.
+    fn escape_pdf_string(s: &str, symbol: bool) -> String {
         let mut out = String::with_capacity(s.len());
         for c in s.chars() {
             match c {
@@ -249,6 +258,7 @@ impl PdfBackend {
                 '\\' => out.push_str("\\\\"),
                 ' '..='~' => out.push(c),
                 '\u{a0}'..='\u{ff}' => out.push_str(&format!("\\{:03o}", c as u32)),
+                '\u{80}'..='\u{9f}' if symbol => out.push_str(&format!("\\{:03o}", c as u32)),
                 _ => out.push('?'),
             }
         }
@@ -266,7 +276,8 @@ impl PdfBackend {
         let n_pages = pages.len();
 
         // 1: Catalog, 2: Pages, then a Page and its Contents per page
-        // (3 and 4 for one page), then the four fonts.
+        // (3 and 4 for one page), then the four Helvetica fonts and, if
+        // used, Symbol.
         let font0 = 3 + 2 * n_pages;
         let mut objects: Vec<Vec<u8>> = Vec::new();
         objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
@@ -274,11 +285,16 @@ impl PdfBackend {
         objects.push(
             format!("<< /Type /Pages /Kids [{}] /Count {n_pages} >>", kids.join(" ")).into_bytes(),
         );
+        let symbol_res = if self.uses_symbol {
+            format!(" /F5 {} 0 R", font0 + 4)
+        } else {
+            String::new()
+        };
         for (i, content) in pages.into_iter().enumerate() {
             objects.push(
                 format!(
                     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w_pt:.3} {h_pt:.3}] \
-                     /Resources << /Font << /F1 {} 0 R /F2 {} 0 R /F3 {} 0 R /F4 {} 0 R >> >> \
+                     /Resources << /Font << /F1 {} 0 R /F2 {} 0 R /F3 {} 0 R /F4 {} 0 R{symbol_res} >> >> \
                      /Contents {} 0 R >>",
                     font0,
                     font0 + 1,
@@ -318,6 +334,10 @@ impl PdfBackend {
                 )
                 .into_bytes(),
             );
+        }
+        if self.uses_symbol {
+            // A standard 14 font with its own built-in encoding.
+            objects.push(b"<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>".to_vec());
         }
 
         let mut out = Vec::new();
@@ -439,6 +459,8 @@ impl Backend for PdfBackend {
             return;
         }
         self.set_fill(style.color);
+        let symbol = style.face == FontFace::Symbol;
+        self.uses_symbol |= symbol;
         let (x, y) = self.pt(origin);
         let theta = style.rotation_deg.to_radians();
         let (c, s) = (theta.cos(), theta.sin());
@@ -451,7 +473,7 @@ impl Backend for PdfBackend {
             self.content.push(' ');
         }
         self.op(&[x, y], 3, "Tm");
-        let _ = writeln!(self.content, "({}) Tj", Self::escape_pdf_string(text));
+        let _ = writeln!(self.content, "({}) Tj", Self::escape_pdf_string(text, symbol));
         self.content.push_str("ET\n");
     }
 }

@@ -17,12 +17,14 @@ use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par, Pty, Sides};
 use crate::pch;
+use crate::plotmath::Label;
 use crate::pretty::{axis_pars, create_at_vector};
 
 mod abline;
 mod axis;
 mod legend;
 mod mtext;
+mod plotmath;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
 pub use legend::{LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
@@ -1103,7 +1105,7 @@ impl<B: Backend> Device<B> {
     ) {
         let opts = AxisOptions {
             at,
-            labels: labels.map(|l| l.into_iter().map(Some).collect()),
+            labels: labels.map(|l| l.into_iter().map(|t| Some(Label::Text(t))).collect()),
             col: Some(col),
             col_axis: Some(col),
             cex_axis: Some(cex_axis),
@@ -1130,7 +1132,7 @@ impl<B: Backend> Device<B> {
     ) {
         let opts = AxisOptions {
             at,
-            labels: labels.map(|l| l.into_iter().map(Some).collect()),
+            labels: labels.map(|l| l.into_iter().map(|t| Some(Label::Text(t))).collect()),
             tick: false,
             col: Some(col),
             col_axis: Some(col),
@@ -1287,7 +1289,7 @@ impl<B: Backend> Device<B> {
 /// significant digits): all labels share the same number of decimals
 /// (`0.0 0.5 1.0`, not `0 0.5 1`), and scientific notation is chosen when
 /// it is strictly narrower than fixed notation (`0 1e+05 2e+05`).
-fn format_axis_labels(vals: &[f64]) -> Vec<String> {
+pub(crate) fn format_axis_labels(vals: &[f64]) -> Vec<String> {
     // (significant digits, decimal exponent) of each finite value.
     let sci: Vec<Option<(i32, i32)>> = vals
         .iter()

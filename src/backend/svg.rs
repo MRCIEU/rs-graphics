@@ -401,7 +401,12 @@ impl Backend for SvgBackend {
             out.push_str(")\"");
         }
         out.push('>');
-        out.push_str(&escape_xml(text));
+        if style.face == crate::afm::FontFace::Symbol {
+            let text: String = text.chars().map(crate::afm::symbol_to_unicode).collect();
+            out.push_str(&escape_xml(&text));
+        } else {
+            out.push_str(&escape_xml(text));
+        }
         out.push_str("</text>\n");
     }
 }

@@ -9,4 +9,5 @@ pub mod lty;
 pub mod named_colors;
 pub mod par;
 pub mod pch;
+pub mod plotmath;
 pub mod pretty;

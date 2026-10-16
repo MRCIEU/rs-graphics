@@ -7,7 +7,9 @@
 //! `mgp[1]` lines beyond the axis line; when neither `line` nor `pos` is
 //! given, the axis line sits at `mgp[2]` and the labels at `mgp[1]`, both
 //! measured from the plot region. Lines and labels are clipped to the
-//! device, as R forces `xpd = NA`.
+//! device, as R forces `xpd = NA`. Expression labels ([`Label::Math`]) are
+//! drawn by `GMMathText()`'s rules and, as in R, never dropped for
+//! overlapping (`gap.axis` applies to text labels only).
 
 use crate::afm;
 use crate::backend::Backend;
@@ -15,6 +17,7 @@ use crate::color::ColorSpec;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::AxisType;
+use crate::plotmath::Label;
 
 use super::{Clip, Device, Side, Y_LINE_BIAS, format_axis_labels};
 
@@ -31,10 +34,12 @@ pub struct AxisOptions {
     /// `None`: the default ticks from `axp` (else `par(xaxp/yaxp)`), as
     /// [`Device::default_ticks`].
     pub at: Option<Vec<f64>>,
-    /// Labels for `at` (requires `at`). `None`: `at` formatted like R's
-    /// `formatReal()`. An inner `None` is a character `NA`: its tick is
-    /// drawn but not its label, which also doesn't count for `gap_axis`.
-    pub labels: Option<Vec<Option<String>>>,
+    /// Labels for `at` (requires `at`): text or plotmath expressions
+    /// (`Some("a".into())`, `Some(Label::math("10^5"))`). `None`: `at`
+    /// formatted like R's `formatReal()`. An inner `None` is a character
+    /// `NA`: its tick is drawn but not its label, which also doesn't count
+    /// for `gap_axis`.
+    pub labels: Option<Vec<Option<Label>>>,
     /// `labels = FALSE` when false: no labels at all.
     pub draw_labels: bool,
     /// `tick`: draw the axis line and tick marks.
@@ -167,7 +172,10 @@ impl<B: Backend> Device<B> {
         });
         let labels = if opts.draw_labels {
             let labels = match &opts.labels {
-                None => format_axis_labels(&at).into_iter().map(Some).collect(),
+                None => format_axis_labels(&at)
+                    .into_iter()
+                    .map(|l| Some(Label::Text(l)))
+                    .collect(),
                 Some(l) => {
                     assert!(opts.at.is_some(), "axis: 'labels' is supplied and not 'at'");
                     l.clone()
@@ -189,10 +197,10 @@ impl<B: Backend> Device<B> {
             return;
         }
         // Sort by `at`, dropping non-finite positions (which sort last).
-        let mut ticks: Vec<(f64, Option<&str>)> = at
+        let mut ticks: Vec<(f64, Option<&Label>)> = at
             .iter()
             .enumerate()
-            .map(|(i, &v)| (v, labels.get(i).and_then(Option::as_deref)))
+            .map(|(i, &v)| (v, labels.get(i).and_then(Option::as_ref)))
             .collect();
         ticks.sort_by(|a, b| a.0.total_cmp(&b.0));
         ticks.retain(|t| t.0.is_finite());
@@ -381,6 +389,19 @@ impl<B: Backend> Device<B> {
                 default_padj(side, las)
             };
             let temp = along(v);
+            let label = match label {
+                Label::Text(t) => t.as_str(),
+                Label::Math(expr) => {
+                    // `GMMathText()`: aligned by `par(adj)` (= `hadj`) and
+                    // `padj`, in the plain font at `cex.axis`.
+                    if let Some(col) = self.resolve(col_axis) {
+                        let cex = self.par.cex * cex;
+                        let anchor = point(label_perp, temp);
+                        self.math_text(anchor, expr, hadj, padj, angle, col, cex, Clip::Device);
+                    }
+                    continue;
+                }
+            };
             let labw = if perpendicular {
                 m_h
             } else {

@@ -12,6 +12,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::lty::LineType;
+use rs_graphics::plotmath::Label as AxisLabel;
 use rs_graphics::par::{AxisType, Par, Sides};
 
 fn rscript_available() -> bool {
@@ -41,14 +42,14 @@ fn col(name: &str) -> Option<ColorSpec> {
 }
 
 /// `c(...)` of strings, `"NA"` being `NA`.
-fn labels(l: &[&str]) -> Vec<Option<String>> {
-    l.iter().map(|s| (*s != "NA").then(|| s.to_string())).collect()
+fn labels(l: &[&str]) -> Vec<Option<AxisLabel>> {
+    l.iter().map(|s| (*s != "NA").then(|| AxisLabel::from(*s))).collect()
 }
 
 /// `c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ')`.
-fn alternating_na() -> Vec<Option<String>> {
-    let mut l: Vec<Option<String>> = ('A'..='J')
-        .flat_map(|c| [None, Some(c.to_string().repeat(3))])
+fn alternating_na() -> Vec<Option<AxisLabel>> {
+    let mut l: Vec<Option<AxisLabel>> = ('A'..='J')
+        .flat_map(|c| [None, Some(AxisLabel::from(c.to_string().repeat(3)))])
         .collect();
     l.push(Some("ZZZ".into()));
     l

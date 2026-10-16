@@ -78,6 +78,9 @@ fn font_for(face: FontFace) -> &'static FontArc {
         FontFace::Bold => &f.bold,
         FontFace::Italic => &f.italic,
         FontFace::BoldItalic => &f.bold_italic,
+        // Liberation Sans has the Greek letters and maths symbols; text
+        // is mapped from the Symbol encoding to Unicode below.
+        FontFace::Symbol => &f.plain,
     }
 }
 
@@ -1356,7 +1359,11 @@ impl Backend for RasterBackend {
             let anchor_in = Point::new(origin.x + rx, origin.y + ry);
             let (anchor_px_x, anchor_px_y) = self.to_px(anchor_in);
 
-            let glyph_id = font.glyph_id(ch);
+            let glyph_id = if style.face == FontFace::Symbol {
+                font.glyph_id(afm::symbol_to_unicode(ch))
+            } else {
+                font.glyph_id(ch)
+            };
 
             let glyph: AbGlyph = glyph_id.with_scale_and_position(scale, ab_glyph::point(0.0, 0.0));
             let Some(outlined) = font.outline_glyph(glyph) else {

@@ -37,12 +37,22 @@ crate's test suite (see [Testing](#testing) below).
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
   gives error-bar caps). `axis()` (`Device::axis_with` + `AxisOptions`,
   `src/device/axis.rs`) takes R's `line`/`pos`/`outer`, `tick`/`labels`
-  (`None` entries are `NA`: tick drawn, label skipped),
+  (`None` entries are `NA`: tick drawn, label skipped; labels may be
+  plotmath expressions, `Label::math("10^5")`),
   `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, `lty`/`lwd`/`lwd.ticks` and
   `col`/`col.ticks`/`col.axis`/`cex.axis`/`font`/`las`, and
   `xaxt`/`yaxt = "n"` (`Par::xaxt`/`yaxt`, `AxisOptions::axt`,
   `PlotOptions::xaxt`/`yaxt`);
   `Device::axis(side, at, labels, col, cex, font, las)` is a shorthand.
+- Plotmath (`src/plotmath.rs`, `src/device/plotmath.rs`): expressions in
+  R syntax (`"alpha[i]^2"`, `"-log[10](italic(p))"`, `"x %+-% y"`) parsed
+  into R's call tree and laid out as `plotmath.c` does: super/subscripts,
+  Greek letters and maths symbols from the Symbol font (`FontFace::Symbol`,
+  R's `font = 5`; PDF uses the standard `/Symbol` font, SVG/PNG its
+  Unicode equivalents), operators, relations, spacing, `paste()`,
+  `list()`, parentheses and `group()`, font styles, and generic `f(x)`.
+  Used by `axis()` so far. Accents, fractions, `sqrt`, big operators and
+  `bgroup` are rejected as not yet supported.
   `legend()`
   (`Device::legend_with`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
@@ -64,7 +74,7 @@ crate's test suite (see [Testing](#testing) below).
   named colors (`src/color.rs`, `src/named_colors.rs`), and the exact
   `pretty()`/`GEPretty()` axis tick-placement algorithms - both of
   which R uses, with **different constants** (`src/pretty.rs`).
-- Text layout (`src/afm.rs`): Helvetica AFM metrics (the same tables
+- Text layout (`src/afm.rs`): Helvetica and Symbol AFM metrics (the same tables
   R's own `pdf()`/`postscript()` devices use) drive *all* string
   width/height/justification math, shared identically across all three
   backends - see [Design notes](#design-notes) below.
@@ -109,8 +119,10 @@ To keep this a tractable "core functionality" port, the following R
 `persp()`/3D plotting,
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
 `image()`/raster images, `symbols()`, `smoothScatter()`,
-`cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, and
-interactive input (`identify()`/`locator()`). `barplot()` doesn't
+`cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
+fonts, plotmath in `title()`/`mtext()`/`text()`/`legend()` and the
+plotmath constructs listed above, and interactive input
+(`identify()`/`locator()`). `barplot()` doesn't
 support `density`/`angle` hatching, `offset`, or `add`, and
 `boxplot()` doesn't support `at`/`width`/`add` or `pars`. These would all be
 reasonable follow-ups but are left for future work.
@@ -259,6 +271,9 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/colour_zero_matches_r.rs` - colour 0 is `par("bg")` (with
   `pdf(bg = )`, the transparent default, and after `par(bg = )`): every
   painting operator and its colours.
+- `tests/plotmath_axis_matches_r.rs` - expression labels on all four
+  axis sides (rotation, `cex.axis`, `hadj`/`padj`, `las`): every text
+  item's font, size, origin and string, and the `/` stroke.
 - `tests/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
   `legend()` spacing come from the device's starting point size, not a
   later `par(ps)`, as R's `cra`.

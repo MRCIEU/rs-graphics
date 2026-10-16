@@ -25,14 +25,20 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// The four standard font faces R exposes via `par(font=)`/`par(font.axis=)`
-/// etc.: `1` = plain, `2` = bold, `3` = italic, `4` = bold italic.
+/// The font faces R exposes via `par(font=)`/`par(font.axis=)` etc.: `1` =
+/// plain, `2` = bold, `3` = italic, `4` = bold italic, `5` = symbol.
+///
+/// Text in [`FontFace::Symbol`] is in Adobe Symbol encoding, one `char`
+/// per code (e.g. `'a'` is alpha, `'\u{B1}'` plus-minus), as R's
+/// `pdf()` writes it; [`symbol_to_unicode`] maps it for devices that need
+/// Unicode.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum FontFace {
     Plain,
     Bold,
     Italic,
     BoldItalic,
+    Symbol,
 }
 
 impl FontFace {
@@ -41,6 +47,7 @@ impl FontFace {
             2 => FontFace::Bold,
             3 => FontFace::Italic,
             4 => FontFace::BoldItalic,
+            5 => FontFace::Symbol,
             _ => FontFace::Plain,
         }
     }
@@ -51,7 +58,50 @@ impl FontFace {
             FontFace::Bold => include_str!("../assets/afm/Helvetica-Bold.afm"),
             FontFace::Italic => include_str!("../assets/afm/Helvetica-Oblique.afm"),
             FontFace::BoldItalic => include_str!("../assets/afm/Helvetica-BoldOblique.afm"),
+            FontFace::Symbol => include_str!("../assets/afm/Symbol.afm"),
         }
+    }
+}
+
+/// Unicode for an Adobe Symbol code (R's `s2unicode` table in `util.c`,
+/// the variant without Private Use Area code points). Codes below 32 map
+/// to themselves; codes above 255 aren't Symbol codes and are returned
+/// unchanged.
+pub fn symbol_to_unicode(c: char) -> char {
+    #[rustfmt::skip]
+    const S2UNICODE: [u16; 224] = [
+        0x0020, 0x0021, 0x2200, 0x0023, 0x2203, 0x0025, 0x0026, 0x220D,
+        0x0028, 0x0029, 0x2217, 0x002B, 0x002C, 0x2212, 0x002E, 0x002F,
+        0x0030, 0x0031, 0x0032, 0x0033, 0x0034, 0x0035, 0x0036, 0x0037,
+        0x0038, 0x0039, 0x003A, 0x003B, 0x003C, 0x003D, 0x003E, 0x003F,
+        0x2245, 0x0391, 0x0392, 0x03A7, 0x0394, 0x0395, 0x03A6, 0x0393,
+        0x0397, 0x0399, 0x03D1, 0x039A, 0x039B, 0x039C, 0x039D, 0x039F,
+        0x03A0, 0x0398, 0x03A1, 0x03A3, 0x03A4, 0x03A5, 0x03C2, 0x03A9,
+        0x039E, 0x03A8, 0x0396, 0x005B, 0x2234, 0x005D, 0x22A5, 0x005F,
+        0x23AF, 0x03B1, 0x03B2, 0x03C7, 0x03B4, 0x03B5, 0x03C6, 0x03B3,
+        0x03B7, 0x03B9, 0x03D5, 0x03BA, 0x03BB, 0x03BC, 0x03BD, 0x03BF,
+        0x03C0, 0x03B8, 0x03C1, 0x03C3, 0x03C4, 0x03C5, 0x03D6, 0x03C9,
+        0x03BE, 0x03C8, 0x03B6, 0x007B, 0x007C, 0x007D, 0x223C, 0x0020,
+        0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
+        0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
+        0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
+        0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
+        0x20AC, 0x03D2, 0x2032, 0x2264, 0x2044, 0x221E, 0x0192, 0x2663,
+        0x2666, 0x2665, 0x2660, 0x2194, 0x2190, 0x2191, 0x2192, 0x2193,
+        0x00B0, 0x00B1, 0x2033, 0x2265, 0x00D7, 0x221D, 0x2202, 0x2022,
+        0x00F7, 0x2260, 0x2261, 0x2248, 0x2026, 0x23D0, 0x23AF, 0x21B5,
+        0x2135, 0x2111, 0x211C, 0x2118, 0x2297, 0x2295, 0x2205, 0x2229,
+        0x222A, 0x2283, 0x2287, 0x2284, 0x2282, 0x2286, 0x2208, 0x2209,
+        0x2220, 0x2207, 0x00AE, 0x00A9, 0x2122, 0x220F, 0x221A, 0x22C5,
+        0x00AC, 0x2227, 0x2228, 0x21D4, 0x21D0, 0x21D1, 0x21D2, 0x21D3,
+        0x25CA, 0x2329, 0x00AE, 0x00A9, 0x2122, 0x2211, 0x239B, 0x239C,
+        0x239D, 0x23A1, 0x23A2, 0x23A3, 0x23A7, 0x23A8, 0x23A9, 0x23AA,
+        0x0020, 0x232A, 0x222B, 0x2320, 0x23AE, 0x2321, 0x239E, 0x239F,
+        0x23A0, 0x23A4, 0x23A5, 0x23A6, 0x23AB, 0x23AC, 0x23AD, 0x0020,
+    ];
+    match c as u32 {
+        code @ 32..=255 => char::from_u32(S2UNICODE[code as usize - 32] as u32).unwrap_or(c),
+        _ => c,
     }
 }
 
@@ -91,13 +141,15 @@ pub struct FontMetrics {
 }
 
 impl FontMetrics {
-    fn parse(afm: &str) -> Self {
+    /// `symbol`: index glyphs by the AFM's own codes (the font-specific
+    /// Symbol encoding) instead of R's ISOLatin1 text encoding.
+    fn parse(afm: &str, symbol: bool) -> Self {
         let mut ascent_units = 718.0;
         let mut descent_units = -207.0;
         // Every glyph's (WX, lly, ury) by name, including the ones the AFM
         // leaves unencoded (`C -1`), and the names of the ASCII codes.
         let mut glyphs: HashMap<String, (u16, i16, i16)> = HashMap::new();
-        let mut ascii_names: [Option<String>; 128] = std::array::from_fn(|_| None);
+        let mut code_names: [Option<String>; 256] = std::array::from_fn(|_| None);
         let mut kern_pairs: Vec<(String, String, i16)> = Vec::new();
 
         for line in afm.lines() {
@@ -137,8 +189,8 @@ impl FontMetrics {
                 if let (Some(name), Some(wx)) = (name, wx) {
                     let (lly, ury) = bbox_val.unwrap_or((0, 0));
                     glyphs.insert(name.to_string(), (wx, lly, ury));
-                    if let Some(code) = code.filter(|c| (0..128).contains(c)) {
-                        ascii_names[code as usize] = Some(name.to_string());
+                    if let Some(code) = code.filter(|c| (0..256).contains(c)) {
+                        code_names[code as usize] = Some(name.to_string());
                     }
                 }
             } else if let Some(rest) = line.strip_prefix("KPX ") {
@@ -162,12 +214,17 @@ impl FontMetrics {
         // AFM's own (Standard Encoding) codes, which agree with ISOLatin1 there
         // apart from `-` (R's `/minus`, deliberately not replicated); the upper
         // half by Latin-1 glyph name; 128-159 unmapped.
+        // The Symbol font keeps its own encoding for every code.
         let mut names: [Option<&str>; 256] = [None; 256];
-        for (code, name) in ascii_names.iter().enumerate() {
-            names[code] = name.as_deref();
+        for (code, name) in code_names.iter().enumerate() {
+            if symbol || code < 128 {
+                names[code] = name.as_deref();
+            }
         }
-        for (i, name) in LATIN1_UPPER_NAMES.iter().enumerate() {
-            names[0xA0 + i] = Some(name);
+        if !symbol {
+            for (i, name) in LATIN1_UPPER_NAMES.iter().enumerate() {
+                names[0xA0 + i] = Some(name);
+            }
         }
 
         let mut widths = [0u16; 256];
@@ -275,13 +332,15 @@ fn metrics_table(face: FontFace) -> &'static FontMetrics {
     static BOLD: OnceLock<FontMetrics> = OnceLock::new();
     static ITALIC: OnceLock<FontMetrics> = OnceLock::new();
     static BOLD_ITALIC: OnceLock<FontMetrics> = OnceLock::new();
-    let (cell, face) = match face {
-        FontFace::Plain => (&PLAIN, face),
-        FontFace::Bold => (&BOLD, face),
-        FontFace::Italic => (&ITALIC, face),
-        FontFace::BoldItalic => (&BOLD_ITALIC, face),
+    static SYMBOL: OnceLock<FontMetrics> = OnceLock::new();
+    let cell = match face {
+        FontFace::Plain => &PLAIN,
+        FontFace::Bold => &BOLD,
+        FontFace::Italic => &ITALIC,
+        FontFace::BoldItalic => &BOLD_ITALIC,
+        FontFace::Symbol => &SYMBOL,
     };
-    cell.get_or_init(|| FontMetrics::parse(face.afm_source()))
+    cell.get_or_init(|| FontMetrics::parse(face.afm_source(), face == FontFace::Symbol))
 }
 
 /// Width of `s`, in inches, set in `face` at `pointsize * cex` points -
@@ -348,6 +407,19 @@ pub fn m_height_inches(face: FontFace, pointsize: f64, cex: f64) -> f64 {
     m.glyph_ascent_units('M') / 1000.0 * pointsize * cex / 72.0
 }
 
+/// `(ascent, descent, width)` of one glyph in inches, as R's
+/// `PostScriptMetricInfo()` reports it for a single character: the AFM
+/// `B` box's `ury` and `-lly`, and `WX`.
+pub fn glyph_metric_inches(c: char, face: FontFace, pointsize: f64) -> (f64, f64, f64) {
+    let m = metrics_table(face);
+    let scale = pointsize / 72.0 / 1000.0;
+    (
+        m.glyph_ascent_units(c) * scale,
+        -m.glyph_lly_units(c) * scale,
+        m.char_width_units(c) * scale,
+    )
+}
+
 /// `(ascent, descent)` of the ink of `s` in inches, as R's
 /// `PostScriptMetricInfo()` reports it: the maximum glyph `ury` and minus
 /// the minimum glyph `lly` (so descent is positive below the baseline).
@@ -371,6 +443,16 @@ pub fn glyph_ascent_descent_inches(s: &str, face: FontFace, pointsize: f64, cex:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn symbol_font_uses_its_own_encoding() {
+        // alpha is code 97 ('a') in Symbol, 631 units wide; minus 549.
+        let w = |c| glyph_metric_inches(c, FontFace::Symbol, 72.0).2 * 1000.0;
+        assert!((w('a') - 631.0).abs() < 1e-9 && (w('-') - 549.0).abs() < 1e-9);
+        assert_eq!(symbol_to_unicode('a'), '\u{3B1}');
+        assert_eq!(symbol_to_unicode('\u{B1}'), '\u{B1}');
+        assert_eq!(symbol_to_unicode('-'), '\u{2212}');
+    }
 
     #[test]
     fn m_height_is_718_units() {
