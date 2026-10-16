@@ -270,7 +270,8 @@ against a real R installation by shelling out to `Rscript`:
   with `xlim`), and `par(lab)` on linear and log axes: every painted path
   and text item in order.
 - `tests/abline_matches_r.rs` - `abline()` with vectors of `h`/`v` and
-  recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log axes): every
+  recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log axes), and
+  `coef =` (a fitted `lm()` line, extra values ignored): every
   line's vertices, colour, width and dash pattern.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.

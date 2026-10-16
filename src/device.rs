@@ -776,6 +776,21 @@ impl<B: Backend> Device<B> {
         });
     }
 
+    /// `abline(coef = coef)`: the line with intercept `coef[0]` and slope
+    /// `coef[1]`, e.g. a fitted regression's coefficients. Like R, values
+    /// after the first two are ignored.
+    ///
+    /// # Panics
+    /// If `coef` has fewer than two values, or they aren't finite (R: "'a'
+    /// and 'b' must be finite").
+    pub fn abline_coef(&mut self, coef: &[f64], col: ColorSpec, lwd: f64, lty: LineType) {
+        assert!(
+            coef.len() >= 2 && coef[0].is_finite() && coef[1].is_finite(),
+            "abline: 'a' and 'b' must be finite"
+        );
+        self.abline(Some(coef[0]), Some(coef[1]), None, None, col, lwd, lty);
+    }
+
     /// `abline(a, b, untf = TRUE)`: the line `y = a + b * x` in data units,
     /// curved on a log axis. Without log axes, the same as
     /// [`Device::abline`].

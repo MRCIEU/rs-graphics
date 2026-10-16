@@ -1,5 +1,5 @@
 //! Cross-checks `abline()` with vectors of `h`/`v` and recycled `col`/
-//! `lty`/`lwd` against a real R `pdf()` device's uncompressed output: every
+//! `lty`/`lwd`, and `coef =`, against a real R `pdf()` device's uncompressed output: every
 //! stroked path in drawing order (vertices, colour, width, dash pattern),
 //! on linear and log axes. Skipped if `Rscript` isn't available.
 
@@ -72,6 +72,27 @@ fn cases() -> Vec<Case> {
                     lwd: vec![3.0],
                     ..Default::default()
                 });
+            },
+        },
+        Case {
+            name: "coef",
+            r: "x <- 1:10; y <- c(2.1, 2.9, 4.2, 4.8, 6.3, 6.9, 8.1, 9.2, 9.8, 11.4)\n\
+                abline(coef = coef(lm(y ~ x)), col = 'red')\n\
+                abline(coef = c(2, -0.3, 99), lty = 2)",
+            log: "",
+            lims: ((0.0, 10.0), (0.0, 12.0)),
+            draw: |d| {
+                // Least squares, as `lm(y ~ x)`.
+                let x: Vec<f64> = (1..=10).map(f64::from).collect();
+                let y = [2.1, 2.9, 4.2, 4.8, 6.3, 6.9, 8.1, 9.2, 9.8, 11.4];
+                let (mx, my) = (x.iter().sum::<f64>() / 10.0, y.iter().sum::<f64>() / 10.0);
+                let sxy: f64 = x.iter().zip(&y).map(|(a, b)| (a - mx) * (b - my)).sum();
+                let sxx: f64 = x.iter().map(|a| (a - mx) * (a - mx)).sum();
+                let slope = sxy / sxx;
+                let red = col(&["red"])[0];
+                d.abline_coef(&[my - slope * mx, slope], red, 1.0, LineType::from_code(1));
+                let black = ColorSpec::Index(1);
+                d.abline_coef(&[2.0, -0.3, 99.0], black, 1.0, LineType::from_code(2));
             },
         },
         Case {
@@ -239,4 +260,13 @@ fn abline_matches_r() {
             assert!(close(&a.dash, &b.dash, 0.005), "dash differs. {ctx}");
         }
     }
+}
+
+#[test]
+#[should_panic(expected = "'a' and 'b' must be finite")]
+fn abline_coef_needs_two_values() {
+    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+    dev.plot_new();
+    dev.plot_window((0.0, 1.0), (0.0, 1.0), false, false);
+    dev.abline_coef(&[1.0], ColorSpec::Index(1), 1.0, LineType::from_code(1));
 }
