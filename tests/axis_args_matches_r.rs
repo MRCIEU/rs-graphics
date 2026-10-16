@@ -1,7 +1,7 @@
 //! Cross-checks `axis()`'s arguments (`line`, `pos`, `outer`, `tck`/`tcl`,
 //! `hadj`, `padj`, `gap.axis`, `tick`, `labels`, `lty`, `lwd`/`lwd.ticks`,
-//! `col`/`col.ticks`/`col.axis`, `cex.axis`, `font`) and its tick limits
-//! (reversed axes, `par(xpd = TRUE)`) against a real R `pdf()` device's
+//! `col`/`col.ticks`/`col.axis`, `cex.axis`, `font`, `xaxt`/`yaxt`) and
+//! its tick limits (reversed axes, `par(xpd = TRUE)`) against a real R `pdf()` device's
 //! uncompressed output: every stroked path in drawing order (vertices,
 //! colour, width, dash pattern) and every label (origin, direction,
 //! colour). Skipped if `Rscript` isn't available.
@@ -12,7 +12,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::lty::LineType;
-use rs_graphics::par::{Par, Sides};
+use rs_graphics::par::{AxisType, Par, Sides};
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -199,6 +199,21 @@ fn cases() -> Vec<Case> {
                 d.axis_with(3, &o);
                 let o = AxisOptions { lwd: 0.0, lwd_ticks: Some(2.0), ..Default::default() };
                 d.axis_with(4, &o);
+            },
+        },
+        Case {
+            name: "axt",
+            r_par: "par(xaxt = 'n')",
+            r: "axis(1); axis(3, xaxt = 's'); axis(2, yaxt = 'n'); axis(4)",
+            xlim: (0.0, 10.0),
+            setup: |p| p.xaxt = AxisType::None,
+            draw: |d| {
+                d.axis_with(1, &AxisOptions::default());
+                let o = AxisOptions { axt: Some(AxisType::Standard), ..Default::default() };
+                d.axis_with(3, &o);
+                let o = AxisOptions { axt: Some(AxisType::None), ..Default::default() };
+                d.axis_with(2, &o);
+                d.axis_with(4, &AxisOptions::default());
             },
         },
         Case {

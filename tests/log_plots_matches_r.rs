@@ -1,5 +1,5 @@
 //! Cross-checks `abline()`, `hist()` (incl. `add = TRUE`) and `barplot()`
-//! on log axes, and `par(lab)`, against a real R `pdf()` device's uncompressed output: every
+//! on log axes, `par(lab)` and `plot(xaxt = "n")`, against a real R `pdf()` device's uncompressed output: every
 //! painted path in drawing order (operator and vertices, `re` expanded to
 //! its corners) and every text item in order (origin and string). Skipped
 //! if `Rscript` isn't available.
@@ -18,7 +18,7 @@ use rs_graphics::highlevel::{
     barplot, barplot_matrix, hist, plot, BarplotOptions, HistOptions, PlotOptions,
 };
 use rs_graphics::lty::LineType;
-use rs_graphics::par::Par;
+use rs_graphics::par::{AxisType, Par};
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -168,6 +168,24 @@ fn cases() -> Vec<Case> {
                     ..Default::default()
                 };
                 barplot_matrix(d, &[vec![2.0, 5.0], vec![30.0, 60.0]], &o);
+            },
+        },
+        Case {
+            name: "plot_xaxt",
+            r: "plot(1:10, xaxt = 'n', xlab = 'x', ylab = 'y')\n\
+                axis(1, at = c(2, 5, 8), labels = c('a', 'b', 'c'))",
+            draw: |d| {
+                let x: Vec<f64> = (1..=10).map(f64::from).collect();
+                let o = PlotOptions {
+                    xaxt: Some(AxisType::None),
+                    xlab: Some("x"),
+                    ylab: Some("y"),
+                    ..Default::default()
+                };
+                plot(d, &x, &x, &o);
+                let fg = ColorSpec::Index(1);
+                let labels = ["a", "b", "c"].map(String::from).to_vec();
+                d.axis(1, Some(vec![2.0, 5.0, 8.0]), Some(labels), fg, 1.0, 1, 0);
             },
         },
         Case {

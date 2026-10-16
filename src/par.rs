@@ -57,6 +57,24 @@ impl AxisStyle {
     }
 }
 
+/// `par(xaxt/yaxt)`: whether `axis()` draws on that axis. R's `"s"`, `"l"`
+/// and `"t"` all mean [`AxisType::Standard`]; `"n"` suppresses the axis
+/// (`plot(x, y, xaxt = "n")` before a custom `axis(1, ...)`).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AxisType {
+    Standard,
+    None,
+}
+
+impl AxisType {
+    pub fn parse(s: &str) -> AxisType {
+        match s {
+            "n" => AxisType::None,
+            _ => AxisType::Standard,
+        }
+    }
+}
+
 /// The graphics parameter set (`par()`), restricted to what this crate
 /// implements. Field names match R's own where practical.
 #[derive(Clone, Debug)]
@@ -110,6 +128,10 @@ pub struct Par {
     /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
     /// horizontal, 2 = perpendicular to axis, 3 = vertical.
     pub las: i32,
+    /// `par(xaxt)` / `par(yaxt)`: [`AxisType::None`] stops `axis()`
+    /// drawing on the x (sides 1, 3) / y (sides 2, 4) axis.
+    pub xaxt: AxisType,
+    pub yaxt: AxisType,
     /// Tick mark length in margin lines (negative = outward; R's default
     /// is -0.5).
     pub tcl: f64,
@@ -170,6 +192,8 @@ impl Default for Par {
             font_sub: 1,
 
             las: 0,
+            xaxt: AxisType::Standard,
+            yaxt: AxisType::Standard,
             tcl: -0.5,
             mgp: [3.0, 1.0, 0.0],
             lab: [5, 5, 7],

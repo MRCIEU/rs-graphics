@@ -6,8 +6,9 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
-use crate::device::{Device, LineStyle};
+use crate::device::{AxisOptions, Device, LineStyle};
 use crate::lty::LineType;
+use crate::par::AxisType;
 
 use super::data_range;
 
@@ -67,6 +68,10 @@ pub struct PlotOptions<'a> {
     pub xlab: Option<&'a str>,
     pub ylab: Option<&'a str>,
     pub axes: bool,
+    /// Inline `xaxt`/`yaxt` (`plot(x, y, xaxt = "n")`): `AxisType::None`
+    /// leaves out that axis; `None` uses `par(xaxt/yaxt)`.
+    pub xaxt: Option<AxisType>,
+    pub yaxt: Option<AxisType>,
 }
 
 impl<'a> Default for PlotOptions<'a> {
@@ -88,6 +93,8 @@ impl<'a> Default for PlotOptions<'a> {
             xlab: None,
             ylab: None,
             axes: true,
+            xaxt: None,
+            yaxt: None,
         }
     }
 }
@@ -136,8 +143,20 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
             dev.par.las,
             dev.par.lwd,
         );
-        dev.axis(1, None, None, fg, cex_axis, font_axis, las);
-        dev.axis(2, None, None, fg, cex_axis, font_axis, las);
+        let axis = |dev: &mut Device<B>, side, axt| {
+            let o = AxisOptions {
+                col: Some(fg),
+                col_axis: Some(fg),
+                cex_axis: Some(cex_axis),
+                font: Some(font_axis),
+                las: Some(las),
+                axt,
+                ..AxisOptions::default()
+            };
+            dev.axis_with(side, &o);
+        };
+        axis(dev, 1, opts.xaxt);
+        axis(dev, 2, opts.yaxt);
         dev.box_plot(fg, lwd, LineType::Pattern(&[]));
     }
 

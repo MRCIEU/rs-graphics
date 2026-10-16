@@ -14,6 +14,7 @@ use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::geometry::Point;
 use crate::lty::LineType;
+use crate::par::AxisType;
 
 use super::{Clip, Device, Side, Y_LINE_BIAS, format_axis_labels};
 
@@ -77,6 +78,9 @@ pub struct AxisOptions {
     pub col_axis: Option<ColorSpec>,
     /// `par(las)`: label orientation.
     pub las: Option<i32>,
+    /// `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4):
+    /// `AxisType::None` draws nothing.
+    pub axt: Option<AxisType>,
     /// `par(tck)`: tick length as a fraction of the plot region (of its
     /// height for an x axis if above 0.5, else of its smaller side);
     /// positive points inwards. Overrides `tcl`.
@@ -107,6 +111,7 @@ impl Default for AxisOptions {
             cex_axis: None,
             col_axis: None,
             las: None,
+            axt: None,
             tck: None,
             tcl: None,
         }
@@ -168,6 +173,12 @@ impl<B: Backend> Device<B> {
         } else {
             Vec::new()
         };
+        // `xaxt`/`yaxt = "n"`: nothing drawn (checked after the argument
+        // errors above, as in R).
+        let axt = if x_axis { self.par.xaxt } else { self.par.yaxt };
+        if opts.axt.unwrap_or(axt) == AxisType::None {
+            return;
+        }
         // Sort by `at`, dropping non-finite positions (which sort last).
         let mut ticks: Vec<(f64, Option<&str>)> = at
             .iter()

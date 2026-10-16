@@ -35,7 +35,9 @@ crate's test suite (see [Testing](#testing) below).
   gives error-bar caps). `axis()` (`Device::axis_with` + `AxisOptions`,
   `src/device/axis.rs`) takes R's `line`/`pos`/`outer`, `tick`/`labels`,
   `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, `lty`/`lwd`/`lwd.ticks` and
-  `col`/`col.ticks`/`col.axis`/`cex.axis`/`font`/`las`;
+  `col`/`col.ticks`/`col.axis`/`cex.axis`/`font`/`las`, and
+  `xaxt`/`yaxt = "n"` (`Par::xaxt`/`yaxt`, `AxisOptions::axt`,
+  `PlotOptions::xaxt`/`yaxt`);
   `Device::axis(side, at, labels, col, cex, font, las)` is a shorthand.
   `legend()`
   (`Device::legend_with`, `src/device/legend.rs`) is a port of R's layout
