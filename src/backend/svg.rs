@@ -6,6 +6,12 @@
 //! Internal user units are points (`1/72 inch`), matching PDF and R's
 //! Cairo `svg()` device; the root `<svg>` element's `width`/`height`
 //! attributes carry the physical inch size directly.
+//!
+//! Consecutive shapes with the same style (fill and stroke attributes) are
+//! written inside one `<g>` carrying that style, which they inherit, rather
+//! than repeating it on each: in a scatter plot the style is most of every
+//! point's markup. A shape whose style differs from its neighbours' keeps
+//! its own attributes.
 
 use std::fmt::Write as _;
 
@@ -21,6 +27,15 @@ pub struct SvgBackend {
     body: String,
     clip_stack: Vec<Rect>,
     next_clip_id: u32,
+    /// The shape being written: its markup up to its style attributes, and
+    /// those attributes (each with a leading space).
+    geom: String,
+    style: String,
+    /// The last shape, held back until we know whether the next one shares
+    /// its style.
+    pending: Option<(String, String)>,
+    /// The style of the open `<g>` of same-style shapes, if any.
+    group_style: Option<String>,
 }
 
 impl SvgBackend {
@@ -31,6 +46,57 @@ impl SvgBackend {
             body: String::new(),
             clip_stack: Vec::new(),
             next_clip_id: 0,
+            geom: String::new(),
+            style: String::new(),
+            pending: None,
+            group_style: None,
+        }
+    }
+
+    /// Write the shape in `geom` + `style`: into the open group if it has
+    /// the same style, else into a new group with the held-back shape if
+    /// that has the same style, else hold it back.
+    fn emit_shape(&mut self) {
+        if let Some(group) = &self.group_style {
+            if *group == self.style {
+                self.body.push_str(&self.geom);
+                self.body.push_str("/>\n");
+                return;
+            }
+            self.body.push_str("</g>\n");
+            self.group_style = None;
+        }
+        if let Some((geom, style)) = self.pending.take() {
+            if style == self.style {
+                self.body.push_str("<g");
+                self.body.push_str(&style);
+                self.body.push_str(">\n");
+                self.body.push_str(&geom);
+                self.body.push_str("/>\n");
+                self.body.push_str(&self.geom);
+                self.body.push_str("/>\n");
+                self.group_style = Some(style);
+                return;
+            }
+            self.write_whole(&geom, &style);
+        }
+        self.pending = Some((self.geom.clone(), self.style.clone()));
+    }
+
+    fn write_whole(&mut self, geom: &str, style: &str) {
+        self.body.push_str(geom);
+        self.body.push_str(style);
+        self.body.push_str("/>\n");
+    }
+
+    /// Write out the held-back shape and close any open group, before
+    /// anything else goes into the document.
+    fn flush_shapes(&mut self) {
+        if self.group_style.take().is_some() {
+            self.body.push_str("</g>\n");
+        }
+        if let Some((geom, style)) = self.pending.take() {
+            self.write_whole(&geom, &style);
         }
     }
 
@@ -47,7 +113,8 @@ impl SvgBackend {
     }
 
     /// Full SVG document as a `String`.
-    pub fn finish(self) -> String {
+    pub fn finish(mut self) -> String {
+        self.flush_shapes();
         let mut out = String::new();
         let _ = writeln!(
             out,
@@ -67,10 +134,11 @@ impl SvgBackend {
         out
     }
 
-    /// Append `<tag points="x,y x,y ..."`.
+    /// Start `geom` with `<tag points="x,y x,y ..."`.
     fn push_points(&mut self, tag: &str, points: &[Point]) {
         let height_in = self.height_in;
-        let out = &mut self.body;
+        let out = &mut self.geom;
+        out.clear();
         out.push('<');
         out.push_str(tag);
         out.push_str(" points=\"");
@@ -182,6 +250,7 @@ impl Backend for SvgBackend {
     }
 
     fn push_clip(&mut self, rect: Rect) {
+        self.flush_shapes();
         self.clip_stack.push(rect);
         let id = self.next_clip_id;
         self.next_clip_id += 1;
@@ -199,6 +268,7 @@ impl Backend for SvgBackend {
     }
 
     fn pop_clip(&mut self) {
+        self.flush_shapes();
         if self.clip_stack.pop().is_some() {
             self.body.push_str("</g>\n");
         }
@@ -210,14 +280,16 @@ impl Backend for SvgBackend {
         }
         let (x1, y1) = self.to_pt(p0);
         let (x2, y2) = self.to_pt(p1);
-        let out = &mut self.body;
+        let out = &mut self.geom;
+        out.clear();
         out.push_str("<line");
         push_attr(out, "x1", x1);
         push_attr(out, "y1", y1);
         push_attr(out, "x2", x2);
         push_attr(out, "y2", y2);
-        push_stroke_attrs(out, stroke);
-        out.push_str("/>\n");
+        self.style.clear();
+        push_stroke_attrs(&mut self.style, stroke);
+        self.emit_shape();
     }
 
     fn draw_polyline(&mut self, points: &[Point], stroke: &Stroke) {
@@ -225,10 +297,10 @@ impl Backend for SvgBackend {
             return;
         }
         self.push_points("polyline", points);
-        let out = &mut self.body;
-        out.push_str(" fill=\"none\"");
-        push_stroke_attrs(out, stroke);
-        out.push_str("/>\n");
+        self.style.clear();
+        self.style.push_str(" fill=\"none\"");
+        push_stroke_attrs(&mut self.style, stroke);
+        self.emit_shape();
     }
 
     fn draw_polygon(&mut self, points: &[Point], fill: Option<Color>, stroke: Option<&Stroke>) {
@@ -236,25 +308,27 @@ impl Backend for SvgBackend {
             return;
         }
         self.push_points("polygon", points);
-        let out = &mut self.body;
-        push_fill_attrs(out, fill);
-        push_border_attrs(out, stroke);
-        out.push_str("/>\n");
+        self.style.clear();
+        push_fill_attrs(&mut self.style, fill);
+        push_border_attrs(&mut self.style, stroke);
+        self.emit_shape();
     }
 
     fn draw_rect(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
         let (x0, y0) = self.to_pt(Point::new(rect.x0, rect.y1));
         let w = rect.width() * 72.0;
         let h = rect.height() * 72.0;
-        let out = &mut self.body;
+        let out = &mut self.geom;
+        out.clear();
         out.push_str("<rect");
         push_attr(out, "x", x0);
         push_attr(out, "y", y0);
         push_attr(out, "width", w);
         push_attr(out, "height", h);
-        push_fill_attrs(out, fill);
-        push_border_attrs(out, stroke);
-        out.push_str("/>\n");
+        self.style.clear();
+        push_fill_attrs(&mut self.style, fill);
+        push_border_attrs(&mut self.style, stroke);
+        self.emit_shape();
     }
 
     fn draw_circle(
@@ -265,14 +339,16 @@ impl Backend for SvgBackend {
         stroke: Option<&Stroke>,
     ) {
         let (cx, cy) = self.to_pt(center);
-        let out = &mut self.body;
+        let out = &mut self.geom;
+        out.clear();
         out.push_str("<circle");
         push_attr(out, "cx", cx);
         push_attr(out, "cy", cy);
         push_attr(out, "r", radius * 72.0);
-        push_fill_attrs(out, fill);
-        push_border_attrs(out, stroke);
-        out.push_str("/>\n");
+        self.style.clear();
+        push_fill_attrs(&mut self.style, fill);
+        push_border_attrs(&mut self.style, stroke);
+        self.emit_shape();
     }
 
     fn draw_text(&mut self, origin: Point, text: &str, style: &TextStyle) {
@@ -288,6 +364,7 @@ impl Backend for SvgBackend {
             crate::afm::FontFace::Bold | crate::afm::FontFace::BoldItalic => "bold",
             _ => "normal",
         };
+        self.flush_shapes();
         let out = &mut self.body;
         out.push_str("<text");
         push_attr(out, "x", x);
@@ -308,5 +385,69 @@ impl Backend for SvgBackend {
         out.push('>');
         out.push_str(&escape_xml(text));
         out.push_str("</text>\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn body(svg: &str) -> Vec<&str> {
+        let start = svg.find("viewBox").unwrap();
+        let lines: Vec<&str> = svg[start..].lines().skip(1).collect();
+        lines[..lines.len() - 1].to_vec() // drop `</svg>`
+    }
+
+    /// Runs of same-style shapes share a `<g>`; a shape whose style differs
+    /// from both neighbours keeps its own; text and clips end a run.
+    #[test]
+    fn same_style_shapes_are_grouped() {
+        let red = Color::rgb(255, 0, 0);
+        let blue = Color::rgb(0, 0, 255);
+        let mut b = SvgBackend::new(1.0, 1.0);
+        let dot = |b: &mut SvgBackend, x: f64, c: Color| {
+            b.draw_circle(Point::new(x, 0.5), 0.0125, Some(c), None);
+        };
+        dot(&mut b, 0.125, red);
+        dot(&mut b, 0.25, red);
+        dot(&mut b, 0.375, red);
+        dot(&mut b, 0.5, blue); // alone
+        dot(&mut b, 0.625, red);
+        b.draw_text(
+            Point::new(0.0, 0.0),
+            "t",
+            &TextStyle::new(red, crate::afm::FontFace::Plain, 10.0),
+        );
+        dot(&mut b, 0.75, red); // the text ended the run
+        b.push_clip(Rect::new(0.0, 0.0, 1.0, 1.0));
+        dot(&mut b, 0.875, red);
+        dot(&mut b, 0.9375, red);
+        b.pop_clip();
+        let svg = b.finish();
+        let style = r##" fill="#ff0000" stroke="none""##;
+        assert_eq!(
+            body(&svg),
+            vec![
+                format!("<g{style}>").as_str(),
+                r#"<circle cx="9" cy="36" r="0.9"/>"#,
+                r#"<circle cx="18" cy="36" r="0.9"/>"#,
+                r#"<circle cx="27" cy="36" r="0.9"/>"#,
+                "</g>",
+                r##"<circle cx="36" cy="36" r="0.9" fill="#0000ff" stroke="none"/>"##,
+                format!(r#"<circle cx="45" cy="36" r="0.9"{style}/>"#).as_str(),
+                concat!(
+                    r##"<text x="0" y="72" text-anchor="start" font-family="Helvetica, Arial, sans-serif""##,
+                    r##" font-size="10" font-style="normal" font-weight="normal" fill="#ff0000">t</text>"##
+                ),
+                format!(r#"<circle cx="54" cy="36" r="0.9"{style}/>"#).as_str(),
+                r#"<clipPath id="clip0"><rect x="0" y="0" width="72" height="72"/></clipPath>"#,
+                r#"<g clip-path="url(#clip0)">"#,
+                format!("<g{style}>").as_str(),
+                r#"<circle cx="63" cy="36" r="0.9"/>"#,
+                r#"<circle cx="67.5" cy="36" r="0.9"/>"#,
+                "</g>",
+                "</g>",
+            ]
+        );
     }
 }
