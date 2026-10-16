@@ -1,7 +1,7 @@
 //! Small geometric primitives shared by the backend/device layers.
 //! All coordinates in this crate's internal engine are in **inches**,
 //! origin at the bottom-left, y increasing upward - i.e. exactly PDF's
-//! native page coordinate convention (see the crate-level docs in
+//! native page coordinate convention (see the module docs in
 //! `backend/mod.rs`).
 
 #[derive(Copy, Clone, Debug, PartialEq)]

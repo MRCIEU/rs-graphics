@@ -1,4 +1,4 @@
-//! Cross-checks `rust_plots::pretty::ge_pretty` against R itself.
+//! Cross-checks `rs_graphics::pretty::ge_pretty` against R itself.
 //!
 //! `par("xaxp")` after `plot.window(xlim = c(lo, up), xaxs = "i")` reports
 //! exactly the `(lo, up, ndiv)` triple that R's C-level `GEPretty()`

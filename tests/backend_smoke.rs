@@ -1,6 +1,7 @@
-//! Exercises each backend directly (bypassing the not-yet-written
-//! `device`/high-level plotting layers) with a handful of primitives, to
-//! catch runtime panics/obviously wrong output early.
+//! Exercises each backend directly (bypassing `Device`) with a handful of
+//! primitives, to catch runtime panics/obviously wrong output early. Also
+//! checks PDF compression, `.svgz` output, the PNG `pHYs` chunk, and that
+//! PNG output doesn't depend on the thread count.
 
 use rs_graphics::afm::FontFace;
 use rs_graphics::backend::pdf::PdfBackend;

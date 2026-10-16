@@ -1,8 +1,9 @@
-//! Cross-checks `plot(type = "b")` against a real R `pdf()` device's
-//! uncompressed output: the gapped line segments between points (each
-//! shortened by half a character height at both ends, short ones left
-//! out, broken at `NA`), with `par(cex)` and a log axis. Compares every
-//! stroked two-point path in order and the number of points. Skipped if
+//! Cross-checks `plot(type = "b")` and `plot(type = "c")` against a real R
+//! `pdf()` device's uncompressed output: the gapped line segments between
+//! points (each shortened by half a character height at both ends, short
+//! ones left out, broken at `NA`), with `par(cex)` and a log axis. Compares
+//! every stroked two-point path in order and the number of points (none
+//! for `"c"`). Skipped if
 //! `Rscript` isn't available.
 
 use std::process::Command;

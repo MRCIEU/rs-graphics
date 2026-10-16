@@ -1,7 +1,8 @@
 //! Color parsing and the R color model.
 //!
 //! R identifies colors via strings (`"red"`, `"#FF0000"`, `"#FF000080"`),
-//! small integers that index the current [`palette`](Palette), or `NA`
+//! small integers that index the current palette ([`ColorSpec::Index`];
+//! R's default is [`DEFAULT_PALETTE`]), or `NA`
 //! (meaning "don't draw"). This module mirrors that model closely enough
 //! that [`Color::parse`] accepts the same strings R's `col2rgb()`/graphics
 //! code would accept.
@@ -87,8 +88,7 @@ impl Color {
         }
     }
 
-    /// Render as `#rrggbb` (or `#rrggbbaa` if not fully opaque), as used by
-    /// the SVG/PDF backends.
+    /// Render as `#rrggbb` (or `#rrggbbaa` if not fully opaque).
     pub fn to_hex(self) -> String {
         if self.a == 255 {
             format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b)

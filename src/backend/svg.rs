@@ -1,7 +1,7 @@
 //! SVG backend: a hand-rolled writer producing plain `<svg>` markup with
-//! `<text>` elements (matching how R's own `svg()` Cairo-based device
-//! emits text - real `<text>`, not paths), so a browser/viewer's own font
-//! substitution renders glyphs, same as it would for R's SVG output.
+//! real `<text>` elements, so a browser/viewer's own font substitution
+//! renders glyphs. (R's Cairo-based `svg()` device instead writes glyph
+//! outlines as paths.)
 //!
 //! Internal user units are points (`1/72 inch`), matching PDF and R's
 //! Cairo `svg()` device; the root `<svg>` element's `width`/`height`

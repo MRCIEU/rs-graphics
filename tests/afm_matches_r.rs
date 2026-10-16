@@ -1,4 +1,4 @@
-//! Cross-checks `rust_plots::afm::str_width_inches` against R's own
+//! Cross-checks `rs_graphics::afm::str_width_inches` against R's own
 //! `strwidth()` on a `pdf()` device (which uses the same Helvetica AFM
 //! metrics by default). Skipped if `Rscript` isn't available.
 

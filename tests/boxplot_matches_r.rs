@@ -1,4 +1,4 @@
-//! Cross-checks `rust_plots::highlevel::boxplot::boxplot_stats` against
+//! Cross-checks `rs_graphics::highlevel::boxplot::boxplot_stats` against
 //! R's own `boxplot.stats()` for a handful of fixed datasets (including
 //! ones with outliers, to exercise the whisker-shrinking logic).
 //!

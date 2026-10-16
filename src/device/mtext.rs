@@ -5,9 +5,9 @@
 //! Positions follow `GConvert()`'s `MAR1..4` / `OMA1..4` units: along the
 //! side, `at` is a user coordinate (inner margins) or a fraction of the
 //! inner region (outer margins); across it, `line` counts margin lines out
-//! from the plot region (inner) or in from the edge of the outer margin
-//! (outer). Text is clipped to the figure region (inner), or the device
-//! (outer), as R forces `xpd` to 1 or `NA`.
+//! from the plot region (inner) or from the inner region (outer). Text is
+//! clipped to the figure region (inner), or the device (outer), as R
+//! forces `xpd` to 1 or `NA`.
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
@@ -31,7 +31,8 @@ pub struct MtextOptions {
     /// `adj` (text parallel to the side) or centred (perpendicular).
     pub at: Option<f64>,
     /// Justification along the text; `None`: 0.5 for text parallel to the
-    /// side, otherwise right-justified towards the plot.
+    /// side, otherwise justified at the end nearest the plot (1 on sides 1
+    /// and 2, 0 on sides 3 and 4).
     pub adj: Option<f64>,
     /// Justification across the text; `None`: depends on `side`/`par(las)`
     /// (0, i.e. baseline on the line, for `las = 0`).

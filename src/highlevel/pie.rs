@@ -35,6 +35,8 @@ pub struct PieOptions<'a> {
     /// default is `200`.
     pub edges: usize,
     pub clockwise: bool,
+    /// Starting angle in degrees (R's `init.angle`). Default `0` even when
+    /// `clockwise` (R's default is then `90`).
     pub init_angle_deg: f64,
 }
 

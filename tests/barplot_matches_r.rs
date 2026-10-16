@@ -99,7 +99,7 @@ struct Case {
     run: fn(&mut Device<PdfBackend>),
     /// Compare text origins too. Off where negative tick labels appear: R's
     /// pdf device draws `-` as the wider `minus` glyph (see `devPS.c`,
-    /// `/Differences [ 45/minus ]`), which we don't replicate yet.
+    /// `/Differences [ 45/minus ]`), which we deliberately don't replicate.
     check_text: bool,
 }
 

@@ -14,12 +14,13 @@
 //!
 //! Note: R's C implementation also has an (undocumented, almost certainly
 //! unintentional) indexing bug in the way it builds its kern-pair lookup
-//! table (`KPstart`/`KPend` in `devPS.c`), which can cause it to silently
-//! ignore one legitimate kerning pair per first-character in rare cases.
-//! We deliberately do *not* replicate that bug here - we apply every
-//! kerning pair the AFM file defines (other than the documented
-//! space-exclusion above), which keeps layout essentially identical to R
-//! while staying simple and correct.
+//! table: `KPend` in `devPS.c` is stored inclusive but looped over
+//! exclusive, so R never applies the *last* kerning pair of each first
+//! character. We deliberately do *not* replicate that bug here - we apply
+//! every kerning pair the AFM file defines (other than the documented
+//! space-exclusion above). Strings containing such a pair (e.g. `F r` in
+//! "Frequency") are therefore a fraction of a point wider or narrower than
+//! in R's `pdf()` output.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -317,9 +318,9 @@ pub fn char_x_offsets_inches(s: &str, face: FontFace, pointsize: f64, cex: f64) 
     offsets
 }
 
-/// Nominal single-line string height in inches, following R's convention
-/// of basing `strheight()` on the font's nominal size rather than a
-/// particular string's ink extents.
+/// Nominal font height in inches: the AFM's `Ascender - Descender`. This
+/// is not R's `strheight()`, which is the ascent of `M` (see
+/// [`m_height_inches`]).
 pub fn str_height_inches(face: FontFace, pointsize: f64, cex: f64) -> f64 {
     let m = metrics_table(face);
     let pt = pointsize * cex;
@@ -328,8 +329,9 @@ pub fn str_height_inches(face: FontFace, pointsize: f64, cex: f64) -> f64 {
 
 /// `(ascent, descent)` in inches - the distances the font's nominal
 /// bounding box extends above and below the baseline, respectively (both
-/// non-negative). Used to resolve vertical text justification
-/// (`adj`/`pos`) consistently everywhere text is drawn.
+/// non-negative), from the AFM's `Ascender`/`Descender`. R's text
+/// placement doesn't use these: see [`m_height_inches`] and
+/// [`glyph_ascent_descent_inches`].
 pub fn ascent_descent_inches(face: FontFace, pointsize: f64, cex: f64) -> (f64, f64) {
     let m = metrics_table(face);
     let pt = pointsize * cex;

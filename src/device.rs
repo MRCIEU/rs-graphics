@@ -1,12 +1,13 @@
 //! The stateful graphics device: coordinate transforms (`plot.new()`/
 //! `plot.window()`), clipping, and the primitive drawing operations
 //! (`points`, `lines`, `segments`, `rect`, `polygon`, `text`, `box`,
-//! `abline`, `axis`, `title`, `legend`, `arrows`).
+//! `abline`, `axis`, `title`, `mtext`, `legend`, `arrows`).
 //!
-//! This is intentionally a single, fairly large module: nearly every
-//! high-level plot (`plot()`, `hist()`, `barplot()`, ...) is built purely
-//! out of the primitives here, mirroring how R's own `graphics.c` centers
-//! everything around a handful of `GE*` engine calls.
+//! `axis()`, `abline()`, `legend()` and `mtext()` live in child modules;
+//! everything else is here. Nearly every high-level plot (`plot()`,
+//! `hist()`, `barplot()`, ...) is built purely out of these primitives,
+//! mirroring how R's own `graphics.c` centers everything around a handful
+//! of `GE*` engine calls.
 
 use crate::afm::{self};
 use crate::backend::{Backend, Stroke, TextStyle};
@@ -526,7 +527,8 @@ impl<B: Backend> Device<B> {
     // Coordinate transforms
     // ---------------------------------------------------------------
 
-    /// Map a user-coordinate point to device inches.
+    /// Map a point in data units (not log10 on a log axis) to device
+    /// inches.
     pub fn user_to_inches(&self, x: f64, y: f64) -> Point {
         let ux = if self.xlog { x.log10() } else { x };
         let uy = if self.ylog { y.log10() } else { y };
@@ -574,9 +576,9 @@ impl<B: Backend> Device<B> {
 
     // ---------------------------------------------------------------
     // Clipping (matches R's `xpd`: FALSE clips to the plot region, TRUE
-    // clips to the figure region - we treat R's `NA`, "clip to device",
-    // the same as figure-region clipping, since we don't yet support
-    // outer margins wide enough for that distinction to usually matter).
+    // clips to the figure region. `par.xpd` is a bool, so R's `NA`, "clip
+    // to the device", is only available internally as `Clip::Device`,
+    // used by `axis()` and `mtext(outer = TRUE)`).
     // ---------------------------------------------------------------
 
     fn push_clip_for(&mut self, xpd: bool) {
@@ -736,8 +738,8 @@ impl<B: Backend> Device<B> {
     /// The lines of `plot(type = "b")` (and `"c"`): each segment between
     /// consecutive points, shortened at both ends by half a character
     /// height (`0.5 * par(cex) * 1.2 * ps / 72` inches) so the points stand
-    /// clear, and left out when shorter than that. A port of `C_plotXY`'s
-    /// `case 'b'`.
+    /// clear, and left out when shorter than twice that. A port of
+    /// `C_plotXY`'s `case 'b'`.
     pub fn broken_lines(&mut self, xs: &[f64], ys: &[f64], style: LineStyle) {
         let Some(col) = self.resolve(style.col) else {
             return;
@@ -807,8 +809,8 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `rect()` variant taking a rectangle already in device inches
-    /// (used internally for legends and margin decorations).
+    /// `rect()` variant taking a rectangle already in device inches. Not
+    /// clipped.
     pub fn rect_inches(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
         self.dirty();
         self.backend.draw_rect(rect, fill, stroke);
@@ -913,8 +915,10 @@ impl<B: Backend> Device<B> {
     // Text
     // ---------------------------------------------------------------
 
-    /// Width/height (inches) `strwidth()`/`strheight()` would report for
-    /// `text` under the current `par(font=, ps=)` (times `cex`).
+    /// Width/height (inches) of `text` in font `font` at `par(ps) * cex`
+    /// points (after the backend's font-size rounding; `par(cex)` is not
+    /// applied). The height is the font's nominal `Ascender - Descender`,
+    /// not R's `strheight()` (see [`afm::str_height_inches`]).
     pub fn text_metrics(&self, text: &str, font: i32, cex: f64) -> (f64, f64) {
         let face = self.par.font_face(font);
         let size = self.backend.effective_font_size(self.par.ps * cex);
@@ -1238,8 +1242,7 @@ impl<B: Backend> Device<B> {
     }
 }
 
-/// Default numeric axis label formatting: R's `axis()` uses roughly
-/// `format(at, trim = TRUE)`, which drops unnecessary trailing zeros.
+/// Default numeric axis label formatting, as R's `axis()` does it.
 ///
 /// The tick vector is formatted *jointly*, like R's `formatReal()` (7
 /// significant digits): all labels share the same number of decimals

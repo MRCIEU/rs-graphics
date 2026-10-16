@@ -55,7 +55,7 @@ pub struct PlotOptions<'a> {
     pub lty: LineType,
     pub cex: f64,
     /// Defaults to the finite data range, like R's `plot.window(xlim =
-    /// range(x))`.
+    /// range(x))` (positive values only on a log axis).
     pub xlim: Option<(f64, f64)>,
     pub ylim: Option<(f64, f64)>,
     pub xlog: bool,

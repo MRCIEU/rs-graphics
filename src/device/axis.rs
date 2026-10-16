@@ -28,7 +28,8 @@ const FLT_EPSILON: f64 = f32::EPSILON as f64;
 pub struct AxisOptions {
     /// Tick positions, in user coordinates (data units, also on a log
     /// axis).
-    /// `None`: `pretty()` on the axis range.
+    /// `None`: the default ticks from `axp` (else `par(xaxp/yaxp)`), as
+    /// [`Device::default_ticks`].
     pub at: Option<Vec<f64>>,
     /// Labels for `at` (requires `at`). `None`: `at` formatted like R's
     /// `formatReal()`. An inner `None` is a character `NA`: its tick is

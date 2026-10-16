@@ -1,5 +1,5 @@
 //! Cross-checks `axis()`'s arguments (`line`, `pos`, `outer`, `tck`/`tcl`,
-//! `hadj`, `padj`, `gap.axis`, `tick`, `labels`, `lty`, `lwd`/`lwd.ticks`,
+//! `hadj`, `padj`, `gap.axis`, `tick`, `labels` (incl. `NA`), `lty`, `lwd`/`lwd.ticks`,
 //! `col`/`col.ticks`/`col.axis`, `cex.axis`, `font`, `xaxt`/`yaxt`) and
 //! its tick limits (reversed axes, `par(xpd = TRUE)`) against a real R `pdf()` device's
 //! uncompressed output: every stroked path in drawing order (vertices,

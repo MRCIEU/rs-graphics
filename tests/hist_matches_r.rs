@@ -1,4 +1,4 @@
-//! Cross-checks `rust_plots::highlevel::hist`'s bin edges/counts against
+//! Cross-checks `rs_graphics::highlevel::hist`'s bin edges/counts against
 //! R's own `hist(x, plot = FALSE)` for a handful of fixed datasets.
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.

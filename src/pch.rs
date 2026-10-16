@@ -8,7 +8,7 @@
 //!
 //! The nominal symbol "size" R passes to `GESymbol()` is (see `GSTR_0` in
 //! `graphics.c`, specialised to a device with `cra[1] = 1.2 * pointsize`
-//! and `ipr［1] = 1/72`, true of `pdf()`/`postscript()`):
+//! and `ipr[1] = 1/72`, true of `pdf()`/`postscript()`):
 //! `size_inches = pointsize * cex / 120`.
 
 /// Simple filled/stroked shapes a pch symbol decomposes into.

@@ -1,9 +1,9 @@
 //! `hist(x, ...)`, ported from `hist.default`/`plot.histogram` in
 //! `r-source/src/library/graphics/R/hist.R`, restricted to the default
-//! `breaks = "Sturges"` rule (numeric/vector/function `breaks` and the
-//! `"fd"`/`"scott"` rules aren't implemented) and no `include.lowest`/
-//! `right`/`fuzz` customization (R's defaults, `include.lowest = TRUE`,
-//! `right = TRUE`, are always used).
+//! `breaks = "Sturges"` rule or explicit bin edges (a number of classes, a
+//! function, and the `"fd"`/`"scott"` rules aren't implemented) and no
+//! `include.lowest`/`right`/`fuzz` customization (R's defaults,
+//! `include.lowest = TRUE`, `right = TRUE`, are always used).
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
@@ -22,8 +22,9 @@ fn nclass_sturges(n: usize) -> i32 {
 /// Bin `data` (assumed sorted or not, finite-only) into intervals
 /// `(breaks[i], breaks[i+1]]`, except the first bin which also includes
 /// its left edge (`include.lowest = TRUE`, `right = TRUE`, R's defaults).
-/// Uses a small fixed epsilon rather than R's `fuzz`-based boundary
-/// adjustment (see the crate README for this simplification).
+/// Uses a small fixed epsilon (`1e-9` of the break span, at least `1e-9`)
+/// rather than R's `fuzz`-based boundary adjustment (`1e-7` of the median
+/// bin width).
 fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
     let nb = breaks.len();
     let mut counts = vec![0.0; nb.saturating_sub(1)];

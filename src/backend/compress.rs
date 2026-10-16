@@ -1,6 +1,7 @@
-//! Optional compression for the vector backends' output: zlib for PDF
-//! content streams, gzip for `.svgz`. Big scatter plots produce hundreds of
-//! megabytes of markup, so pieces are deflated on all cores.
+//! Compression for the vector backends' output: zlib for PDF content
+//! streams (on by default), gzip for opt-in `.svgz`. Big scatter plots
+//! produce hundreds of megabytes of markup, so pieces are deflated on all
+//! cores.
 
 /// Deflate level: nearly all of level 6's size gain at a fraction of the
 /// time (on PDF content, 4.2x vs 4.5x smaller, in a tenth of the time).

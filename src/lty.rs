@@ -102,9 +102,10 @@ impl LineType {
     }
 
     /// Dash pattern lengths in points, given `lwd` (R's line-width unit;
-    /// `1 lwd` renders as `1/96 inch` on most devices, i.e. `0.75` points)
-    /// and the line-end style (round/butt caps get an extra `lwd`-sized
-    /// adjustment per `PostScriptSetLineTexture()` in `devPS.c`).
+    /// `1 lwd` renders as `1/96 inch` on most devices, i.e. `0.75` points).
+    /// With `round_cap`, "on" segments are one `lwd` shorter and "off"
+    /// segments one `lwd` longer, as `PostScriptSetLineTexture()` in
+    /// `devPS.c` does for every cap but butt. `None` for blank and solid.
     pub fn dash_lengths_pt(&self, lwd: f64, round_cap: bool) -> Option<Vec<f64>> {
         match self {
             LineType::Blank => None,

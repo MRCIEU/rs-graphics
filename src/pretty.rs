@@ -4,9 +4,10 @@
 //! shared by **two** different callers that use different constants and
 //! post-processing:
 //!
-//! - `GEPretty()` in `r-source/src/main/engine.c` - used by
-//!   `axis()`/`plot.window()` to choose default tick locations. See
-//!   [`ge_pretty`].
+//! - `GEPretty()` in `r-source/src/main/engine.c` - used (through
+//!   `GAxisPars()`, see [`axis_pars`]) by `plot.window()` to set
+//!   `par("xaxp")`/`par("yaxp")`, from which `axis()` places its default
+//!   ticks ([`create_at_vector`]). See [`ge_pretty`].
 //! - `pretty.default()` in `r-source/src/library/base/R/pretty.R` - the
 //!   user-facing `pretty()` function, also used internally by
 //!   `hist.default()` to choose bin edges. See [`pretty_r`].
@@ -233,7 +234,7 @@ pub fn ge_pretty(lo_in: f64, up_in: f64, ndiv_in: i32) -> (f64, f64, i32) {
 /// Convenience wrapper returning the actual tick values, mirroring what
 /// `axis()` / `axTicks()` would show for a default (`n = 5`) linear axis.
 ///
-/// Ticks are placed as `CreateAtVector()` (`graphics.c`) does for a linear
+/// Ticks are placed as `CreateAtVector()` (`plot.c`) does for a linear
 /// axis: `lo + (i / ndiv) * (up - lo)`, with any tick closer to zero than
 /// `|up - lo| / (100 * ndiv)` set to exactly 0 (otherwise e.g. -0.2..0.4
 /// would get a `2.775558e-17` tick).

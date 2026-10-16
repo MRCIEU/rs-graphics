@@ -5,8 +5,8 @@
 //! # Coordinate convention
 //! All coordinates passed to a `Backend` are in **inches**, origin at the
 //! bottom-left of the page, y increasing upward. This is PDF's native
-//! page-coordinate convention, so the PDF backend needs no transform at
-//! all; SVG and the raster backend flip y internally.
+//! page-coordinate convention, so the PDF backend only scales to points;
+//! SVG and the raster backend also flip y internally.
 //!
 //! # Why text metrics aren't part of this trait
 //! Glyph *width* and *height* calculations always go through
@@ -114,7 +114,8 @@ pub use crate::afm::FontFace;
 pub struct TextStyle {
     pub color: Color,
     pub face: FontFace,
-    /// Point size actually used, i.e. `par(ps) * cex`.
+    /// Point size to paint at: `par(ps) * cex` after
+    /// [`Backend::effective_font_size`] (so whole points on PDF).
     pub size_pt: f64,
     /// Rotation in degrees, counterclockwise about the anchor point,
     /// matching R's `srt` text-rotation convention.

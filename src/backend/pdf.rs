@@ -255,7 +255,8 @@ impl PdfBackend {
         out
     }
 
-    /// Serialize the completed single-page PDF as bytes.
+    /// Serialize the PDF as bytes: every page started, including the
+    /// current one.
     pub fn finish(self) -> Vec<u8> {
         let w_pt = self.width_in * 72.0;
         let h_pt = self.height_in * 72.0;
