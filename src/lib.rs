@@ -23,11 +23,21 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! [`device::Device`] holds the page and `par()` state; its methods are
-//! the low-level functions, each taking its data and an options struct
-//! (R's other arguments). Free functions in [`highlevel`] are the
-//! high-level plots. Options can be set field by field or with the
-//! chainable setters above ([`setters`]). [`prelude`] imports it all.
+//! [`device::Device`] holds the page and `par()` state. Its methods are
+//! R's low-level functions (`points()`, `axis()`, `abline()`, `legend()`,
+//! ...), each taking its data and an options struct (R's other
+//! arguments). Free functions in [`highlevel`] are the high-level plots
+//! (`plot()`, `hist()`, ...). Options can be set field by field or with
+//! the chainable setters above ([`setters`]). [`prelude`] imports it all.
+//!
+//! The split follows R's: high-level functions start a new plot, and
+//! low-level ones add to the current one. The low-level functions need
+//! the device's internals (its clip regions, `xpd` limits, symbol
+//! drawing), so they are methods. The high-level plots use only the
+//! public API, so they are free functions, just like plots you write
+//! yourself: `plot(&mut dev, ..)` and `my_panel(&mut dev, ..)` are called
+//! the same way. (`hist(add = TRUE)` adds to the current plot but is still
+//! a high-level function.)
 
 #[doc(hidden)]
 pub mod afm;

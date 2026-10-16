@@ -6,6 +6,10 @@
 //! the common/core use cases (see the crate README for the full list of
 //! simplifications: no formula interfaces, no S3-style dispatch on input
 //! type, etc).
+//!
+//! They use only `Device`'s public API, so they are free functions taking
+//! `&mut Device`, called the same way as plots written outside the crate
+//! (see the crate docs for why the low-level functions are methods).
 
 pub mod barplot;
 pub mod boxplot;
