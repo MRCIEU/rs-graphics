@@ -18,8 +18,10 @@ use crate::par::{AxisStyle, Par};
 use crate::pch;
 use crate::pretty::pretty_ticks;
 
+mod axis;
 mod legend;
 mod mtext;
+pub use axis::AxisOptions;
 pub use legend::{LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
 pub use mtext::MtextOptions;
 
@@ -791,16 +793,10 @@ impl<B: Backend> Device<B> {
         self.backend.draw_rect(self.plt, None, Some(&stroke));
     }
 
-    /// `axis(side, at=, labels=, ...)`. `at`/`labels` default to R's
-    /// automatic tick placement (`pretty()` on the current axis range)
-    /// and `format!("{}", v)`-style numeric labels.
-    ///
-    /// Follows `C_axis()` in `plot.c`: the axis line runs from the first to
-    /// the last tick (clamped to the plot range), ticks use the signed
-    /// `par(tcl)`, and labels are placed by `GMtext()` at line `mgp[1]`
-    /// (plus its `yLineBias` nudge) with `yc = padj`, rotated/justified
-    /// according to `las`, and dropped when they would overlap the previous
-    /// label by less than `gap.axis`.
+    /// `axis(side, at=, labels=, col=, cex.axis=, font=, las=)`: `col` is
+    /// used for the line, ticks and labels. `at`/`labels` default to R's
+    /// automatic ticks and labels. See [`Device::axis_with`] for the other
+    /// arguments.
     #[allow(clippy::too_many_arguments)]
     pub fn axis(
         &mut self,
@@ -812,12 +808,22 @@ impl<B: Backend> Device<B> {
         font_axis: i32,
         las: i32,
     ) {
-        self.axis_impl(side, at, labels, col, cex_axis, font_axis, las, true);
+        let opts = AxisOptions {
+            at,
+            labels,
+            col: Some(col),
+            col_axis: Some(col),
+            cex_axis: Some(cex_axis),
+            font: Some(font_axis),
+            las: Some(las),
+            ..AxisOptions::default()
+        };
+        self.axis_with(side, &opts);
     }
 
     /// As [`Device::axis`] but draws only the tick labels - no axis line
-    /// or tick marks - like R's `axis(..., lty = 0)` (used by `barplot()`
-    /// for its category names).
+    /// or tick marks - like R's `axis(..., tick = FALSE)` (`barplot()`
+    /// uses `lty = 0`, which looks the same, for its category names).
     #[allow(clippy::too_many_arguments)]
     pub fn axis_labels(
         &mut self,
@@ -829,242 +835,18 @@ impl<B: Backend> Device<B> {
         font_axis: i32,
         las: i32,
     ) {
-        self.axis_impl(side, at, labels, col, cex_axis, font_axis, las, false);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn axis_impl(
-        &mut self,
-        side: Side,
-        at: Option<Vec<f64>>,
-        labels: Option<Vec<String>>,
-        col: ColorSpec,
-        cex_axis: f64,
-        font_axis: i32,
-        las: i32,
-        draw_line_and_ticks: bool,
-    ) {
-        let Some(color) = self.resolve(col) else {
-            return;
+        let opts = AxisOptions {
+            at,
+            labels,
+            tick: false,
+            col: Some(col),
+            col_axis: Some(col),
+            cex_axis: Some(cex_axis),
+            font: Some(font_axis),
+            las: Some(las),
+            ..AxisOptions::default()
         };
-        // `axis()` always draws in the margins, outside the plot region,
-        // so it ignores the user's `par(xpd)` and clips to the figure
-        // region instead (matching R, which hardcodes this).
-        let saved_xpd = self.par.xpd;
-        self.par.xpd = true;
-        let ticks = at.unwrap_or_else(|| self.default_ticks(side));
-        let labels = labels.unwrap_or_else(|| format_axis_labels(&ticks));
-        let stroke = self.stroke_of(color, self.par.lwd, LineType::Pattern(&[]));
-        let lh = self.line_height();
-        let is_x = side == 1 || side == 3;
-
-        // Position of the axis line, and which way is "outward" (away from
-        // the plot region) along the perpendicular coordinate.
-        let (edge, outward) = match side {
-            1 => (self.plt.y0, -1.0),
-            2 => (self.plt.x0, -1.0),
-            3 => (self.plt.y1, 1.0),
-            _ => (self.plt.x1, 1.0),
-        };
-        let at_perp = |perp: f64, along: f64| {
-            if is_x {
-                Point::new(along, perp)
-            } else {
-                Point::new(perp, along)
-            }
-        };
-        let (a_lo, a_hi) = if is_x {
-            (self.plt.x0, self.plt.x1)
-        } else {
-            (self.plt.y0, self.plt.y1)
-        };
-
-        // Where each tick sits along the axis (device inches), and whether
-        // it lies inside the plot's user range.
-        let mut items: Vec<(f64, bool, &str)> = Vec::new();
-        for (v, label) in ticks.iter().zip(labels.iter()) {
-            let (along, inside) = if is_x {
-                let uv = if self.xlog { 10f64.powf(*v) } else { *v };
-                let inside = uv >= self.range_min(true) - 1e-9 && uv <= self.range_max(true) + 1e-9;
-                (self.user_to_inches(uv, self.range_min(false)).x, inside)
-            } else {
-                let uv = if self.ylog { 10f64.powf(*v) } else { *v };
-                let inside =
-                    uv >= self.range_min(false) - 1e-9 && uv <= self.range_max(false) + 1e-9;
-                (self.user_to_inches(self.range_min(true), uv).y, inside)
-            };
-            if along.is_finite() {
-                items.push((along, inside, label.as_str()));
-            }
-        }
-        if items.is_empty() {
-            self.par.xpd = saved_xpd;
-            return;
-        }
-        // R sorts `at` and draws labels in increasing position order.
-        items.sort_by(|a, b| a.0.total_cmp(&b.0));
-
-        // Axis line: first to last tick, clamped to the plot range.
-        let base = edge + outward * self.par.mgp[2] * lh;
-        let first = items.first().unwrap().0.clamp(a_lo, a_hi);
-        let last = items.last().unwrap().0.clamp(a_lo, a_hi);
-        if draw_line_and_ticks {
-            self.backend
-                .draw_line(at_perp(base, first), at_perp(base, last), &stroke);
-        }
-
-        // Ticks (`tcl` is signed: negative = outward, R's default).
-        let tick_end = base - outward * self.par.tcl * lh;
-        for &(along, inside, _) in &items {
-            if inside && draw_line_and_ticks {
-                self.backend
-                    .draw_line(at_perp(base, along), at_perp(tick_end, along), &stroke);
-            }
-        }
-
-        // Labels.
-        let perpendicular = if is_x {
-            las == 2 || las == 3
-        } else {
-            las == 1 || las == 2
-        };
-        // `ComputePAdjValue()` with the default `padj = NA`.
-        let padj = match las {
-            1 => {
-                if is_x {
-                    0.0
-                } else {
-                    0.5
-                }
-            }
-            2 => 0.5,
-            3 => {
-                if is_x {
-                    0.5
-                } else {
-                    0.0
-                }
-            }
-            _ => 0.0,
-        };
-        // `par(adj)` override that `C_axis()` applies for the labels.
-        let hadj = if perpendicular {
-            if side == 1 || side == 2 {
-                1.0
-            } else {
-                0.0
-            }
-        } else {
-            0.5
-        };
-        // `GMtext()`'s rotation and line-bias rules.
-        let (angle, bias) = match side {
-            1 => {
-                if las == 2 || las == 3 {
-                    (90.0, 0.0)
-                } else {
-                    (0.0, 1.0 - Y_LINE_BIAS)
-                }
-            }
-            2 => {
-                if las == 1 || las == 2 {
-                    (0.0, 0.0)
-                } else {
-                    (90.0, Y_LINE_BIAS)
-                }
-            }
-            3 => {
-                if las == 2 || las == 3 {
-                    (90.0, 0.0)
-                } else {
-                    (0.0, Y_LINE_BIAS)
-                }
-            }
-            _ => {
-                if las == 1 || las == 2 {
-                    (0.0, 0.0)
-                } else {
-                    (90.0, 1.0 - Y_LINE_BIAS)
-                }
-            }
-        };
-        let label_perp = edge + outward * (self.par.mgp[1] + bias) * lh;
-
-        let face = self.par.font_face(font_axis);
-        let size_pt = self.font_size_pt(cex_axis);
-        let m_h = afm::m_height_inches(face, size_pt, 1.0);
-        let m_w = afm::str_width_inches("m", face, size_pt, 1.0);
-        // `gap.axis` default: 1 "m" width (parallel) / 0.25 "m" height
-        // (perpendicular) of clear space between adjacent labels.
-        let gap = if perpendicular { 0.25 * m_h } else { m_w };
-
-        let mut tlast = f64::NEG_INFINITY;
-        for &(along, inside, label) in &items {
-            // Labels are only drawn strictly inside the (epsilon-widened)
-            // user range, like ticks.
-            if !inside {
-                continue;
-            }
-            let labw = if perpendicular {
-                m_h
-            } else {
-                afm::str_width_inches(label, face, size_pt, 1.0)
-            };
-            let tnew = along - 0.5 * labw;
-            if tnew - tlast >= gap {
-                self.text_gc_at(
-                    at_perp(label_perp, along),
-                    label,
-                    hadj,
-                    padj,
-                    angle,
-                    ColorSpec::Color(color),
-                    cex_axis,
-                    font_axis,
-                );
-                tlast = along + 0.5 * labw;
-            }
-        }
-        self.par.xpd = saved_xpd;
-    }
-    fn range_min(&self, is_x: bool) -> f64 {
-        if is_x {
-            let (x0, x1, ..) = self.usr;
-            let lo = x0.min(x1);
-            if self.xlog {
-                10f64.powf(lo)
-            } else {
-                lo
-            }
-        } else {
-            let (_, _, y0, y1) = self.usr;
-            let lo = y0.min(y1);
-            if self.ylog {
-                10f64.powf(lo)
-            } else {
-                lo
-            }
-        }
-    }
-
-    fn range_max(&self, is_x: bool) -> f64 {
-        if is_x {
-            let (x0, x1, ..) = self.usr;
-            let hi = x0.max(x1);
-            if self.xlog {
-                10f64.powf(hi)
-            } else {
-                hi
-            }
-        } else {
-            let (_, _, y0, y1) = self.usr;
-            let hi = y0.max(y1);
-            if self.ylog {
-                10f64.powf(hi)
-            } else {
-                hi
-            }
-        }
+        self.axis_with(side, &opts);
     }
 
     /// `title(main=, sub=, xlab=, ylab=)`.

@@ -110,8 +110,8 @@ pub struct Par {
     /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
     /// horizontal, 2 = perpendicular to axis, 3 = vertical.
     pub las: i32,
-    /// Tick mark length as a fraction of the smaller plot-region
-    /// dimension (negative = outward, R's default).
+    /// Tick mark length in margin lines (negative = outward; R's default
+    /// is -0.5).
     pub tcl: f64,
     /// Margin line positions for axis title/labels/line, `c(3, 1, 0)` by
     /// default.
@@ -166,7 +166,7 @@ impl Default for Par {
             font_sub: 1,
 
             las: 0,
-            tcl: -0.3,
+            tcl: -0.5,
             mgp: [3.0, 1.0, 0.0],
             lheight: 1.0,
             adj: 0.5,

@@ -29,7 +29,12 @@ crate's test suite (see [Testing](#testing) below).
   covers all four sides of the figure and outer (`oma`) margins with
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
-  gives error-bar caps). `legend()`
+  gives error-bar caps). `axis()` (`Device::axis_with` + `AxisOptions`,
+  `src/device/axis.rs`) takes R's `line`/`pos`/`outer`, `tick`/`labels`,
+  `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, `lty`/`lwd`/`lwd.ticks` and
+  `col`/`col.ticks`/`col.axis`/`cex.axis`/`font`/`las`;
+  `Device::axis(side, at, labels, col, cex, font, las)` is a shorthand.
+  `legend()`
   (`Device::legend_with`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
   filled boxes and merged point+line keys.
@@ -233,6 +238,10 @@ against a real R installation by shelling out to `Rscript`:
   arrow.
 - `tests/axis_zero_tick_matches_r.rs` - default tick labels for axes that
   straddle zero (`CreateAtVector()`'s snapping of near-zero ticks to 0).
+- `tests/axis_args_matches_r.rs` - `axis()` with `line`, `pos`, `outer`,
+  `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, line styles and colours, and a
+  reversed axis under `par(xpd = TRUE)`: every axis line and tick vertex,
+  colour, width and dash, and every label origin, direction and colour.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 
