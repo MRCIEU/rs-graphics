@@ -186,7 +186,13 @@ impl<B: Backend> Device<B> {
         // shrinking produced by mfrow / mfcol specs"), whereas `text_at`
         // multiplies by `par(cex)`.
         let cex = opts.cex.unwrap_or(1.0) / self.par.cex;
+        // Text in the outer margins doesn't count as drawing on the plot,
+        // so leaves `par(new)` as it was.
+        let new = self.hold_figure;
         self.text_at_clipped(clip, anchor, text, adj, Some(padj), rotation, col, cex, font);
+        if opts.outer {
+            self.hold_figure = new;
+        }
     }
 }
 

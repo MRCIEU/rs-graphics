@@ -51,8 +51,9 @@ pub struct Device<B: Backend> {
     arrangement: Arrangement,
     /// `par("mfg")`'s `currentFigure`, 1-based.
     current_figure: usize,
-    /// `par(new = TRUE)` as set by [`Device::mfg`]: the next `plot_new()`
-    /// reuses the current figure instead of advancing.
+    /// `par("new")`, set by [`Device::set_new`] and [`Device::mfg`]: the
+    /// next `plot_new()` reuses the current figure instead of advancing.
+    /// Cleared by drawing (see [`Device::dirty`]), not by `plot_new()`.
     hold_figure: bool,
     /// Whether anything has been plotted yet (R's `gpptr(dd)->state`).
     used: bool,
@@ -226,6 +227,23 @@ impl<B: Backend> Device<B> {
         self.recompute_layout();
     }
 
+    /// `par(new = new)`: with `true`, the next `plot_new()` draws into the
+    /// current figure without advancing or clearing it, so a second plot
+    /// can be overlaid on the first (e.g. with its own `plot_window()` and
+    /// an axis on side 4). As in R, drawing anything (other than
+    /// `mtext(outer = TRUE)`) resets it to `false`, `plot_new()` itself
+    /// does not, and it is ignored (R warns) before anything is plotted.
+    pub fn set_new(&mut self, new: bool) {
+        if self.used {
+            self.hold_figure = new;
+        }
+    }
+
+    /// `par("new")`.
+    pub fn is_new(&self) -> bool {
+        self.hold_figure
+    }
+
     /// The current figure number (`par("mfg")`'s position, 1-based).
     pub fn current_figure(&self) -> usize {
         self.current_figure
@@ -251,7 +269,6 @@ impl<B: Backend> Device<B> {
                 new_page = true;
             }
         }
-        self.hold_figure = false;
         self.used = true;
         self.recompute_layout();
         if new_page {
@@ -389,7 +406,15 @@ impl<B: Backend> Device<B> {
         self.push_clip_region(if xpd { Clip::Figure } else { Clip::Plot });
     }
 
+    /// Marks the current plot as drawn on, which resets `par(new)` (R's
+    /// `GMode()`). Every drawing path goes through here, mostly via
+    /// [`Device::push_clip_region`].
+    fn dirty(&mut self) {
+        self.hold_figure = false;
+    }
+
     fn push_clip_region(&mut self, clip: Clip) {
+        self.dirty();
         let rect = match clip {
             Clip::Plot => self.plt,
             Clip::Figure => self.fig,
@@ -570,6 +595,7 @@ impl<B: Backend> Device<B> {
     /// `rect()` variant taking a rectangle already in device inches
     /// (used internally for legends and margin decorations).
     pub fn rect_inches(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
+        self.dirty();
         self.backend.draw_rect(rect, fill, stroke);
     }
 
@@ -790,6 +816,7 @@ impl<B: Backend> Device<B> {
             return;
         };
         let stroke = self.stroke_of(color, lwd, lty);
+        self.dirty();
         self.backend.draw_rect(self.plt, None, Some(&stroke));
     }
 

@@ -43,7 +43,8 @@ crate's test suite (see [Testing](#testing) below).
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
   `layout()` with spanning figures, relative / `lcm()` widths and
   heights, and `respect` (logical or matrix) - a port of `layoutRegions()`
-  in `graphics.c`.
+  in `graphics.c`. `par(new = TRUE)` (`Device::set_new`) overlays the
+  next plot on the current figure, e.g. for a second y axis.
 - R's built-in plotting characters `pch = 0..25` (`src/pch.rs`) plus
   character symbols (`pch = "."`, `"a"`, ...), line
   types `lty` (`src/lty.rs`), the R4 default color palette and all 657
@@ -88,8 +89,8 @@ the corresponding `*.default` R function:
 ## Out of scope
 
 To keep this a tractable "core functionality" port, the following R
-`graphics` features are **not implemented**: `split.screen()`/`par(fig=)`/
-`par(new=)`, `persp()`/3D plotting,
+`graphics` features are **not implemented**: `split.screen()`/`par(fig=)`,
+`persp()`/3D plotting,
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
 `image()`/raster images, `symbols()`, `smoothScatter()`,
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, and
@@ -242,6 +243,10 @@ against a real R installation by shelling out to `Rscript`:
   `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, line styles and colours, and a
   reversed axis under `par(xpd = TRUE)`: every axis line and tick vertex,
   colour, width and dash, and every label origin, direction and colour.
+- `tests/par_new_matches_r.rs` - `par(new = TRUE)`: a second y axis,
+  overlays in a 2x2 page, `plot.new()` not resetting it, drawing and outer
+  `mtext()` (not) resetting it, and setting it before plotting; every text
+  origin and data-line vertex.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 
