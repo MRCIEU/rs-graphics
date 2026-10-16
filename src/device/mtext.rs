@@ -108,9 +108,10 @@ fn default_at_fraction(adj: f64, side: Side, las: i32) -> f64 {
 
 impl<B: Backend> Device<B> {
     /// `mtext(text, side, line, outer, at, adj, padj, cex, col, font)`, with
-    /// rotation from `par(las)`; see [`MtextOptions`]. `text` is text or a
-    /// plotmath expression (`Label::math(...)`), placed by `GMMathText()`
-    /// (its bounding box aligned by `adj`/`padj`, in the plain font).
+    /// rotation from `par(las)`; see [`MtextOptions`]. `text` is text
+    /// (placed by `GMtext()`) or a plotmath expression (`Label::math(...)`,
+    /// placed by `GMMathText()`: its bounding box aligned by `adj`/`padj`,
+    /// in the plain font).
     pub fn mtext(&mut self, text: impl Into<Label>, opts: &MtextOptions) {
         let text = text.into();
         let side = opts.side;

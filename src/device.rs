@@ -415,8 +415,9 @@ impl<B: Backend> Device<B> {
     ///   in the current figure and draws over it. The flag is not cleared
     ///   here; any drawing clears it, as in R.
     /// - **Regions:** figure and plot regions are computed now from
-    ///   `par.mar`/`oma` (in lines, so `par.cex`, `mex` and `ps` count
-    ///   too), `par.pty` and `par.plt`. Changing these afterwards has no
+    ///   `par.mar`/`oma` (in lines of [`Device::line_height_inches`], so
+    ///   `par.cex`, `mex` and the starting `ps` count too), `par.pty` and
+    ///   `par.plt`. Changing these afterwards has no
     ///   effect until the next call.
     /// - **New page:** what happens depends on the backend. PDF starts
     ///   a new page in the file, SVG discards the previous page, and PNG
@@ -532,8 +533,8 @@ impl<B: Backend> Device<B> {
     /// Default tick locations R's `axis()` would pick for `side` when no
     /// `at=` is given (R's `axTicks(side)`), in data units: from
     /// `par("xaxp")` (sides 1, 3) or `par("yaxp")` (sides 2, 4), which
-    /// `plot_window()` sets with `pretty()` (or R's log-axis rules) and
-    /// `par("lab")`.
+    /// `plot_new()` and `plot_window()` set with `pretty()` (or R's
+    /// log-axis rules) and `par("lab")`.
     pub fn default_ticks(&self, side: Side) -> Vec<f64> {
         let axp = if side == 1 || side == 3 { self.par.xaxp } else { self.par.yaxp };
         self.ticks_from_axp(side, axp)
@@ -905,7 +906,7 @@ impl<B: Backend> Device<B> {
 
 
     // ---------------------------------------------------------------
-    // box() / axis() / title()
+    // title()
     // ---------------------------------------------------------------
 
     /// `title(main=, sub=, xlab=, ylab=)`, each text or a plotmath

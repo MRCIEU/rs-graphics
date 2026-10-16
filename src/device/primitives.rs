@@ -54,6 +54,8 @@ pub struct XyOptions {
     pub lwd: Vec<f64>,
     /// Line type of lines; `None`: `par(lty)`.
     pub lty: Option<LineType>,
+    /// R's inline `xpd`: `Some(true)` clips to the figure region,
+    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
     pub xpd: Option<bool>,
 }
 
@@ -77,6 +79,8 @@ pub struct SegmentsOptions {
     pub lty: Vec<LineType>,
     /// Recycled per segment; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
+    /// R's inline `xpd`: `Some(true)` clips to the figure region,
+    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
     pub xpd: Option<bool>,
 }
 
@@ -103,6 +107,8 @@ pub struct ArrowsOptions {
     pub lty: Vec<LineType>,
     /// Recycled per arrow; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
+    /// R's inline `xpd`: `Some(true)` clips to the figure region,
+    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
     pub xpd: Option<bool>,
 }
 
@@ -142,6 +148,8 @@ pub struct RectOptions {
     pub lty: Vec<LineType>,
     /// Recycled per rectangle; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
+    /// R's inline `xpd`: `Some(true)` clips to the figure region,
+    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
     pub xpd: Option<bool>,
 }
 
@@ -167,6 +175,8 @@ pub struct PolygonOptions {
     pub lty: Vec<LineType>,
     /// One width for all; `None`: `par(lwd)`.
     pub lwd: Option<f64>,
+    /// R's inline `xpd`: `Some(true)` clips to the figure region,
+    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
     pub xpd: Option<bool>,
 }
 
@@ -184,9 +194,11 @@ pub struct TextOptions {
     /// Horizontal adjustment, R's `adj[1]` (0 left, 0.5 centred, 1 right);
     /// `None`: `par(adj)`.
     pub adj: Option<f64>,
-    /// Vertical adjustment, R's `adj[2]`: a finite value puts the baseline
-    /// `vadj * height("M")` below the point; `None` (R's `NA`, the
-    /// default) centres the text's ink, or an expression's box, on it.
+    /// Vertical adjustment, R's `adj[2]`: a finite value puts a text's
+    /// baseline `vadj * height("M")` below the point, or puts the point
+    /// that fraction of an expression's box height above the box's bottom;
+    /// `None` (R's `NA`, the default) centres the text's ink, or an
+    /// expression's box, on it.
     pub vadj: Option<f64>,
     /// Rotation in degrees, counterclockwise (R's `srt`).
     pub srt: f64,
@@ -197,6 +209,8 @@ pub struct TextOptions {
     /// Recycled per label (1 plain, 2 bold, 3 italic, 4 bold italic, 5
     /// Symbol); empty: `par(font)`.
     pub font: Vec<i32>,
+    /// R's inline `xpd`: `Some(true)` clips to the figure region,
+    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
     pub xpd: Option<bool>,
 }
 
@@ -228,7 +242,8 @@ pub enum BoxWhich {
 #[derive(Clone, Debug, Default)]
 pub struct BoxOptions {
     pub which: BoxWhich,
-    /// `None`: `par(fg)`.
+    /// `None`: `par(col)` (R's `C_box`; R's `par(fg = )` sets `col` too,
+    /// so set both `par.fg` and `par.col` to follow it).
     pub col: Option<ColorSpec>,
     /// `None`: solid (R's `box(lty = "solid")`, not `par(lty)`).
     pub lty: Option<LineType>,
@@ -443,9 +458,10 @@ impl<B: Backend> Device<B> {
     /// `arrows(x0, y0, x1, y1, ...)`, a port of `C_arrows` / `GArrow()`:
     /// each segment with open heads - two lines of `length` inches at
     /// `angle` degrees to the shaft - at its start, end or both (`code`).
-    /// Coordinates and styles are recycled to the longest. As in R,
-    /// segments with a non-finite coordinate are skipped, and the heads of
-    /// a segment shorter than 1/1000 inch are not drawn (R also warns).
+    /// Coordinates and styles are recycled to the longest. As in R, an
+    /// arrow with a non-finite end after conversion (including values <= 0
+    /// on a log axis) is skipped, and the heads of a segment shorter than
+    /// 1/1000 inch are not drawn (R also warns).
     pub fn arrows(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: &ArrowsOptions) {
         let n = recycled_len(&[x0.len(), y0.len(), x1.len(), y1.len()]);
         let fg = ColorSpec::Color(self.par.fg);
@@ -459,15 +475,15 @@ impl<B: Backend> Device<B> {
                 x1[i % x1.len()],
                 y1[i % y1.len()],
             );
-            if ![a, b, c, d].iter().all(|v| v.is_finite()) {
+            let from = self.user_to_inches(a, b);
+            let to = self.user_to_inches(c, d);
+            if ![from.x, from.y, to.x, to.y].iter().all(|v| v.is_finite()) {
                 continue;
             }
             let Some(color) = self.resolve(pick(&opts.col, i, fg)) else {
                 continue;
             };
             let stroke = self.stroke_of(color, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty));
-            let from = self.user_to_inches(a, b);
-            let to = self.user_to_inches(c, d);
             self.backend.draw_line(from, to, &stroke);
             if code & 3 == 0 || length == 0.0 || (from.x - to.x).hypot(from.y - to.y) < 1e-3 {
                 continue;
@@ -548,7 +564,9 @@ impl<B: Backend> Device<B> {
 
     /// `text(x, y, labels, ...)` in data units: each label (text, or a
     /// plotmath expression such as `Label::math("alpha^2")`) at its point,
-    /// with coordinates and labels recycled to the longest. Empty `labels`
+    /// with `x`/`y` recycled to the longer and labels recycled over the
+    /// points (extra labels are ignored; R truncates them with a warning).
+    /// Empty `labels`
     /// are R's default, the indices `"1"`, `"2"`, .... Placement follows
     /// `GEText()`/`GEMathText()`: horizontally `adj` of the width;
     /// vertically see [`TextOptions::vadj`].
@@ -587,7 +605,7 @@ impl<B: Backend> Device<B> {
     /// `box(which, ...)`: outlines the plot region, figure, inner region
     /// or the whole device. Not clipped.
     pub fn box_(&mut self, opts: &BoxOptions) {
-        let Some(color) = self.resolve(opts.col.unwrap_or(ColorSpec::Color(self.par.fg))) else {
+        let Some(color) = self.resolve(opts.col.unwrap_or(ColorSpec::Color(self.par.col))) else {
             return;
         };
         let stroke = self.stroke_of(

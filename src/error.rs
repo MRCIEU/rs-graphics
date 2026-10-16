@@ -4,12 +4,15 @@ use std::fmt;
 
 /// A string that isn't a valid value of some parameter, e.g. `"zz"` as a
 /// colour or `"x"` as `par(xaxs)`. Returned by the `FromStr` impls of
-/// [`Color`](crate::color::Color), [`LineType`](crate::lty::LineType) and
-/// the `par()` enums, and by
+/// [`Color`](crate::color::Color), [`LineType`](crate::lty::LineType),
+/// [`LineEnd`](crate::backend::LineEnd), [`LineJoin`](crate::backend::LineJoin),
+/// [`PlotType`](crate::highlevel::PlotType),
+/// [`LegendKeyword`](crate::device::LegendKeyword),
+/// [`Format`](crate::backend::Format) and the `par()` enums, and by
 /// [`AnyBackend::for_path`](crate::backend::AnyBackend::for_path).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {
-    /// What was being parsed, e.g. `"colour"` or `"xaxs"`.
+    /// What was being parsed, e.g. `"colour"` or `"axis style"`.
     pub kind: &'static str,
     /// The rejected input.
     pub value: String,

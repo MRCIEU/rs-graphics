@@ -13,7 +13,8 @@ use crate::lty::LineType;
 
 use super::Device;
 
-/// The arguments of R's `abline()` (`coef`/`reg` excepted), with R's
+/// The arguments of R's `abline()` (`a`/`b`, `coef` and, through its
+/// coefficients, `reg` all go in `coef`), with R's
 /// defaults. Empty `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/
 /// `par("lwd")`; otherwise they are recycled over the lines in drawing
 /// order: the `a`/`b` line, then each `h`, then each `v`.

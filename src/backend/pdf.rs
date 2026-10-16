@@ -1,6 +1,7 @@
 //! Minimal hand-rolled PDF writer, using the 4 standard
 //! Type1 Helvetica faces (`Helvetica`, `-Bold`, `-Oblique`,
-//! `-BoldOblique`) that every PDF viewer/renderer bundles - so, like R's
+//! `-BoldOblique`), plus `Symbol` when plotmath uses it, that every PDF
+//! viewer/renderer bundles - so, like R's
 //! own `pdf()` device default, no font embedding is needed at all, and
 //! text metrics/rendering come from the exact same Adobe AFM data this
 //! crate already uses for layout (`crate::afm`).

@@ -79,7 +79,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   or the whole device for outer-margin text).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
-  - all implemented as `Device` methods (see `src/device.rs`).
+  - each a `Device` method taking its data and an options struct
+  (`src/device.rs` and `src/device/*.rs`; R's `box()` is `box_()`).
   `mtext()` (`Device::mtext` + `MtextOptions`, `src/device/mtext.rs`)
   covers all four sides of the figure and outer (`oma`) margins with
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
@@ -91,8 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, `lty`/`lwd`/`lwd.ticks` and
   `col`/`col.ticks`/`col.axis`/`cex.axis`/`font`/`las`, and
   `xaxt`/`yaxt = "n"` (`Par::xaxt`/`yaxt`, `AxisOptions::axt`,
-  `PlotOptions::xaxt`/`yaxt`);
-  `Device::axis(side, at, labels, col, cex, font, las)` is a shorthand.
+  `PlotOptions::xaxt`/`yaxt`).
 - Plotmath (`src/plotmath.rs`, `src/device/plotmath.rs`): expressions in
   R syntax (`"alpha[i]^2"`, `"-log[10](italic(p))"`, `"x %+-% y"`) parsed
   into R's call tree and laid out as `plotmath.c` does: super/subscripts,
@@ -157,7 +157,7 @@ the corresponding `*.default` R function:
   about 6x smaller again) instead of `finish()`'s plain SVG. It isn't the
   default: browsers display `.svgz` only when served with
   `Content-Encoding: gzip`, though Inkscape and Illustrator open it.
-- `pdf.rs` - hand-rolled single-page PDF writer, using the 4 standard
+- `pdf.rs` - hand-rolled PDF writer (one page per R page), using the 4 standard
   Type1 Helvetica faces every PDF viewer bundles (no font embedding
   needed), matching R's own `pdf()` device's default font. Like R's
   `pdf()`, the content stream is Flate-compressed by default (deflated in
@@ -391,6 +391,16 @@ against a real R installation by shelling out to `Rscript`:
   uncompressed ones.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
+- `tests/axis_matches_r.rs` - tick-label, `xlab`/`ylab` and `main` text
+  origins for `las = 0..3`.
+- `tests/legend_matches_r.rs` - legend box and label origins for keyword
+  positions, `inset`, `ncol`/`horiz`, titles, filled boxes,
+  `cex`/`intersp` and `par(cex)`.
+- `tests/primitives_matches_r.rs` - per-element recycling in `points()`,
+  `segments()`, `arrows()`, `rect()`, `polygon()` and `text()`,
+  `lines(type = )`, `par("fg")` defaults, polygons split at `NA`, default
+  `text()` labels, `box(which = )` and `plot.window(asp = )`: every
+  painted path and text item in order.
 
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but
@@ -405,7 +415,7 @@ GPL-2.0-or-later, so it is licensed under version 3 of the GPL, as R's
 "or later" terms allow. Programs that use rs-graphics must therefore be
 distributed under GPL-3.0 (or a later version).
 
-The crate embeds Adobe's Helvetica AFM metrics (`assets/afm/`, under
+The crate embeds Adobe's Helvetica and Symbol AFM metrics (`assets/afm/`, under
 the notice in `assets/afm/MustRead.html`) and the Liberation Sans fonts
 (`assets/fonts/`, SIL OFL 1.1). Their notices, and those of the
 third-party crates compiled in, are in [NOTICE](NOTICE). Programs that

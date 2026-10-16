@@ -49,11 +49,9 @@ impl<T> From<[T; 4]> for Sides<T> {
 }
 
 /// Axis style (`par(xaxs=)`/`par(yaxs=)`). Only `"r"` (the default, 4%
-/// range expansion) and `"i"` (exact, no expansion) are implemented; R's
-/// `"s"`/`"e"`/`"d"` styles are treated as `"r"` (matching R's own
-/// fallback, since only S and few other historical devices ever
-/// implemented them differently - R's engine treats all non-`"i"` styles
-/// like `"r"`).
+/// range expansion) and `"i"` (exact, no expansion) are implemented. R's
+/// `par()` also accepts `"s"`, `"e"` and `"d"`, but `GScale()` then errors
+/// ("axis style unimplemented"); here they are treated as `"r"`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AxisStyle {
     Regular,
@@ -62,7 +60,8 @@ pub enum AxisStyle {
 
 impl AxisStyle {
     /// R's `xaxs`/`yaxs` values: `"i"` is [`AxisStyle::Exact`]; `"r"`,
-    /// `"s"`, `"e"` and `"d"` are [`AxisStyle::Regular`]. `None` for
+    /// `"s"`, `"e"` and `"d"` are [`AxisStyle::Regular`] (R accepts them
+    /// in `par()` but errors when plotting). `None` for
     /// anything else (R: "invalid 'xaxs' value").
     pub fn parse(s: &str) -> Option<AxisStyle> {
         match s {
@@ -140,11 +139,20 @@ pub struct Par {
     pub pty: Pty,
     pub xaxs: AxisStyle,
     pub yaxs: AxisStyle,
+    /// Unused: log axes are set with
+    /// [`PlotWindowOptions`](crate::device::PlotWindowOptions).
     pub xlog: bool,
+    /// Unused (as `xlog`).
     pub ylog: bool,
 
+    /// `par(col)`: default colour of points, lines, `abline()` and `box()`.
     pub col: Color,
+    /// `par(bg)`: background colour (new pages, default `legend()` box
+    /// fill, colour 0).
     pub bg: Color,
+    /// `par(fg)`: default colour of axes, segments, arrows and
+    /// rectangle/polygon borders. R's `par(fg = )` sets `col` too; here set
+    /// both fields to do the same.
     pub fg: Color,
     pub col_axis: Color,
     pub col_lab: Color,
@@ -201,11 +209,13 @@ pub struct Par {
     pub lab: [i32; 3],
     /// `par(xaxp)` / `par(yaxp)`: the first and last default tick and the
     /// number of intervals between them (on a log axis, a tick-rule code
-    /// instead: see [`crate::pretty::axis_pars`]). `plot_window()` sets
+    /// instead: see [`crate::pretty::axis_pars`]). `plot_new()` and
+    /// `plot_window()` set
     /// them from the axis range and `par(lab)`; change them afterwards to
     /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
     pub xaxp: [f64; 3],
     pub yaxp: [f64; 3],
+    /// Unused (R's `par(lheight)`).
     pub lheight: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,

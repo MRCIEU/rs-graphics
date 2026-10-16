@@ -26,7 +26,8 @@ const FLT_EPSILON: f64 = f32::EPSILON as f64;
 
 /// The arguments of R's `axis()` other than `side`, plus the inline
 /// graphical parameters it uses, with R's defaults. `None` is R's `NA` (or
-/// `NULL`), which falls back to the matching `par()` value.
+/// `NULL`), which falls back to the matching `par()` value unless the
+/// field says otherwise.
 #[derive(Clone, Debug)]
 pub struct AxisOptions {
     /// Tick positions, in user coordinates (data units, also on a log
@@ -45,7 +46,8 @@ pub struct AxisOptions {
     /// `tick`: draw the axis line and tick marks.
     pub tick: bool,
     /// Margin lines from the plot region (inner region for `outer`) to the
-    /// axis line. Labels then sit `mgp[1]` lines beyond it.
+    /// axis line. Labels then sit `mgp[1]` lines beyond it. `None` (R's
+    /// `NA`): the axis line at `mgp[2]` and the labels at `mgp[1]` lines.
     pub line: Option<f64>,
     /// User coordinate (on the other axis) at which to draw the axis line;
     /// overrides `line`. Labels sit `mgp[1]` lines beyond it.

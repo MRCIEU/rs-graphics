@@ -107,7 +107,7 @@ impl Stroke {
     }
 }
 
-/// The four standard font faces, matching `crate::afm::FontFace`.
+/// The font faces: plain, bold, italic, bold italic and Symbol (font 5).
 pub use crate::afm::FontFace;
 
 /// Text-painting parameters. Note there is deliberately no
@@ -197,8 +197,8 @@ pub trait Backend {
     /// The device's background colour, which `par("bg")` starts as: white
     /// (R's `svg()`), the canvas colour for [`raster::RasterBackend`]
     /// (R's `png(bg = )`), or transparent for [`pdf::PdfBackend`] unless
-    /// set with its `with_background` (R's `pdf(bg = )`). New pages are
-    /// filled with it, and `legend()` boxes by default.
+    /// set with its `with_background` (R's `pdf(bg = )`). New pages and
+    /// default `legend()` boxes are filled with `par("bg")`.
     fn default_bg(&self) -> Color {
         Color::WHITE
     }

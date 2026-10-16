@@ -59,7 +59,8 @@ pub struct HistOptions {
     /// length >= 2). If `None`, computed via Sturges' rule + `pretty()`,
     /// matching R's default `breaks = "Sturges"`.
     pub breaks: Option<Vec<f64>>,
-    /// `freq = TRUE` (the default for equal-width bins): plot counts.
+    /// `freq = TRUE` (the default here, even for unequal `breaks`, where
+    /// R defaults to `FALSE`): plot counts.
     /// `freq = FALSE`: plot density (`count / (n * bin width)`).
     pub freq: bool,
     pub col: ColorSpec,

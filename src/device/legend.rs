@@ -93,6 +93,7 @@ pub struct LegendEntry {
     pub label: Label,
     /// Colour of the point/line symbol.
     pub col: ColorSpec,
+    /// Plotting symbol of the key; `None` = no point.
     pub pch: Option<i32>,
     /// `None` = no line segment in the key. A blank `lty` also draws none.
     pub lty: Option<LineType>,

@@ -3,9 +3,9 @@
 //!
 //! Each function here is a fairly direct port of the corresponding
 //! `*.default` R function in `r-source/src/library/graphics/R/`, reduced to
-//! the common/core use cases (see the crate README for the full list of
-//! simplifications: no formula interfaces, no S3-style dispatch on input
-//! type, etc).
+//! the common/core use cases: there are no formula interfaces or
+//! S3-style dispatch on input type, and each module's docs (and the
+//! README's "Out of scope" section) say what else isn't implemented.
 //!
 //! They use only `Device`'s public API, so they are free functions taking
 //! `&mut Device`, called the same way as plots written outside the crate

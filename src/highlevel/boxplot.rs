@@ -103,8 +103,9 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
 /// `bxp`'s arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct BoxplotOptions {
-    /// Category labels under each box (only drawn when there's more than
-    /// one box, matching R's `show.names <- n > 1`).
+    /// Group labels on the name axis (side 1, or 2 if `horizontal`);
+    /// `None` gives `1, 2, ...`. Only drawn when there's more than one
+    /// box, matching R's `show.names <- n > 1`.
     pub names: Option<Vec<String>>,
     pub col: ColorSpec,
     pub border: ColorSpec,
@@ -161,7 +162,7 @@ impl Default for BoxplotOptions {
 }
 
 /// `boxplot(x, ...)` where `x` is a slice of groups (R's `list`/formula
-/// input reduced to its common case). A single group is `boxplot(vec![x])`.
+/// input reduced to its common case). A single group is `boxplot(&mut dev, &[x], &opts)`.
 pub fn boxplot<B: Backend>(
     dev: &mut Device<B>,
     groups: &[Vec<f64>],

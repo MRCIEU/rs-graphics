@@ -5,7 +5,8 @@
 //! R's default is [`DEFAULT_PALETTE`]), or `NA`
 //! (meaning "don't draw"). This module mirrors that model closely enough
 //! that [`Color::parse`] accepts the same strings R's `col2rgb()`/graphics
-//! code would accept.
+//! code would accept, except numeric strings such as `"2"` (R's palette
+//! indices; use [`ColorSpec::Index`]).
 
 use crate::named_colors::NAMED_COLORS;
 

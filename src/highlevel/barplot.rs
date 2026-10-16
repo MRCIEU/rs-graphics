@@ -23,7 +23,7 @@ use crate::plotmath::Label;
 /// `barplot.default`'s arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct BarplotOptions {
-    /// Labels drawn under each bar (R's `names.arg`; R takes them from
+    /// Labels drawn under each bar, or beside it if `horiz` (R's `names.arg`; R takes them from
     /// `names(height)`/`colnames(height)`), only shown if `Some`. For a
     /// `beside` matrix either one name per bar or one per column (centred
     /// under each group of bars).

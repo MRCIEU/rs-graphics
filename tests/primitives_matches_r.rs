@@ -222,12 +222,13 @@ fn cases() -> Vec<Case> {
         },
         Case {
             name: "box_regions",
-            r: "par(oma = c(1, 2, 1, 1), mfrow = c(1, 2), lty = 3)\n\
+            r: "par(oma = c(1, 2, 1, 1), mfrow = c(1, 2), lty = 3, col = 'darkred')\n\
                 plot.new(); box(); box('figure', col = 'red')\n\
                 box('inner', lty = 2, lwd = 2); box('outer', col = 'blue')",
             draw: |d| {
                 d.par.oma = Sides::from([1.0, 2.0, 1.0, 1.0]);
                 d.par.lty = LineType::DOTTED;
+                d.par.col = Color::parse("darkred").unwrap();
                 d.mfrow(1, 2);
                 d.plot_new();
                 d.box_(&BoxOptions::default());
@@ -247,6 +248,26 @@ fn cases() -> Vec<Case> {
                     col: Some("blue".into()),
                     ..BoxOptions::default()
                 });
+            },
+        },
+        Case {
+            name: "arrows_log",
+            r: "plot.new(); plot.window(c(1, 100), c(1, 10), log = 'x')\n\
+                arrows(c(0, 10, -5), 2, c(50, 20, 30), c(5, 8, 9))",
+            draw: |d| {
+                d.plot_new();
+                d.plot_window(
+                    (1.0, 100.0),
+                    (1.0, 10.0),
+                    &PlotWindowOptions::default().xlog(true),
+                );
+                d.arrows(
+                    &[0.0, 10.0, -5.0],
+                    &[2.0],
+                    &[50.0, 20.0, 30.0],
+                    &[5.0, 8.0, 9.0],
+                    &ArrowsOptions::default(),
+                );
             },
         },
         Case {
