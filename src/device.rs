@@ -314,12 +314,27 @@ impl<B: Backend> Device<B> {
         self.fig
     }
 
-    /// `plot.new()`: advances to the next figure (starting a new "page"
-    /// after the last one) and recomputes the figure/plot regions from the
-    /// current margins. A new page clears the device to `par("bg")`.
+    /// `plot.new()`: moves to the next figure and sets up its figure and
+    /// plot regions. Follow it with [`Device::plot_window`] before drawing.
     ///
-    /// The backends hold a single page, so "a new page" is emulated by
-    /// painting the background over whatever was drawn before.
+    /// - **Which figure:** the next one in the order set by
+    ///   [`Device::mfrow`], [`Device::mfcol`], [`Device::layout`] or
+    ///   [`Device::mfg`] (one figure per page by default). After the last
+    ///   figure, it wraps to figure 1 on a new page. The first call always
+    ///   starts page one. After [`Device::fig`], the next call starts a
+    ///   new page unless `set_new(true)` comes first.
+    /// - **`par(new = TRUE)`:** after [`Device::set_new`]`(true)` it stays
+    ///   in the current figure and draws over it. The flag is not cleared
+    ///   here; any drawing clears it, as in R.
+    /// - **Regions:** figure and plot regions are computed now from
+    ///   `par.mar`/`oma` (in lines, so `par.cex`, `mex` and `ps` count
+    ///   too), `par.pty` and `par.plt`. Changing these afterwards has no
+    ///   effect until the next call.
+    /// - **New page:** what happens depends on the backend. PDF starts
+    ///   a new page in the file, SVG discards the previous page, and PNG
+    ///   paints over it. The page is then filled with `par.bg`, unless
+    ///   that is fully transparent, which it is by default on PDF (as R's
+    ///   `pdf()`).
     pub fn plot_new(&mut self) {
         let mut new_page = false;
         if !self.hold_figure || !self.used {
@@ -343,9 +358,28 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// `plot.window(xlim, ylim, log)`: sets up the user-coordinate system.
-    /// Applies R's default `xaxs = yaxs = "r"` 4%-range-expansion (see
-    /// `GScale()` in `graphics.c`) unless the axis style is `"i"`.
+    /// `plot.window(xlim, ylim, log)`: sets up the user coordinates of the
+    /// current plot region. Call it after [`Device::plot_new`] and before
+    /// drawing; for a fixed aspect ratio use [`Device::plot_window_asp`].
+    ///
+    /// - `xlim`/`ylim` are in data units, also on a log axis, and may be
+    ///   decreasing (a reversed axis).
+    /// - `xlog`/`ylog` make that axis log10 (R's `log = "x"`/`"y"`/`"xy"`).
+    ///   [`Device::usr`] is then in log10 units on that axis, as R's
+    ///   `par("usr")` is.
+    /// - Each range goes through R's `GScale()` (`graphics.c`):
+    ///   - With `par(xaxs/yaxs) = "r"` (the default), 4% is added at each
+    ///     end; with `"i"` the limits are used as given.
+    ///   - A zero-width range is widened: to -1..1 around 0, otherwise by
+    ///     40% of the value either side.
+    ///   - Non-finite limits are replaced by huge finite ones. On a log
+    ///     axis, a limit <= 0 gives a lower end of about 1e-307, where R
+    ///     warns "nonfinite axis limits"; this function doesn't warn or
+    ///     panic.
+    /// - Sets `par.xaxp`/`par.yaxp` (the default tick range and count,
+    ///   R's `GAxisPars()`) from the new range and `par.lab`. Later calls
+    ///   to `axis()` without `at` read them. Changing `par.lab` afterwards
+    ///   doesn't change them, as in R.
     pub fn plot_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), xlog: bool, ylog: bool) {
         self.xlog = xlog;
         self.ylog = ylog;
