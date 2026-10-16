@@ -241,7 +241,7 @@ impl<B: Backend> Device<B> {
 
         // The axis line's position across the axis, and which way is
         // "outward" (away from the plot region).
-        let lh = self.line_height();
+        let lh = self.line_height_inches();
         let outward = if side <= 2 { -1.0 } else { 1.0 };
         let axis_base = match pos {
             Some(p) => {
@@ -253,7 +253,7 @@ impl<B: Backend> Device<B> {
             }
             None => {
                 let edge = if opts.outer {
-                    let omi = self.par.omi();
+                    let omi = self.omi();
                     match side {
                         1 => omi.bottom,
                         2 => omi.left,

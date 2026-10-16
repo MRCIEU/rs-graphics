@@ -33,13 +33,17 @@ impl Color {
     pub const WHITE: Color = Color::rgb(255, 255, 255);
 
     /// Parse a color specification the way R's graphics code would:
-    /// `"NA"`/`"transparent"`/empty => `None`; `"#rgb"`, `"#rrggbb"`,
+    /// `"NA"`/empty => `None`; `"transparent"` => white with alpha 0 (R's
+    /// `#FFFFFF00`); `"#rgb"`, `"#rrggbb"`,
     /// `"#rrggbbaa"` hex forms; or one of R's 657 built-in named colors
     /// (case-insensitive, matching the `colors()` database).
     pub fn parse(spec: &str) -> Option<Color> {
         let s = spec.trim();
-        if s.is_empty() || s.eq_ignore_ascii_case("NA") || s.eq_ignore_ascii_case("transparent") {
+        if s.is_empty() || s.eq_ignore_ascii_case("NA") {
             return None;
+        }
+        if s.eq_ignore_ascii_case("transparent") {
+            return Some(Color::rgba(255, 255, 255, 0));
         }
         if let Some(hex) = s.strip_prefix('#') {
             return Self::parse_hex(hex);
@@ -127,8 +131,10 @@ pub enum ColorSpec {
 }
 
 impl ColorSpec {
+    /// The colour to draw with, or `None` for nothing: `NA`, index 0, and
+    /// fully transparent colours (R's devices skip those).
     pub fn resolve(self, palette: &[Color]) -> Option<Color> {
-        match self {
+        let c = match self {
             ColorSpec::None => None,
             ColorSpec::Color(c) => Some(c),
             ColorSpec::Index(0) => None,
@@ -140,7 +146,8 @@ impl ColorSpec {
                 let idx = ((i - 1).rem_euclid(n)) as usize;
                 Some(palette[idx])
             }
-        }
+        };
+        c.filter(|c| c.a > 0)
     }
 }
 
@@ -198,7 +205,12 @@ mod tests {
     #[test]
     fn na_and_transparent() {
         assert_eq!(Color::parse("NA"), None);
-        assert_eq!(Color::parse("transparent"), None);
+        assert_eq!(Color::parse("transparent"), Some(Color::rgba(255, 255, 255, 0)));
+        // Neither draws anything.
+        for spec in ["NA", "transparent", "#FF000000"] {
+            assert_eq!(ColorSpec::from(spec).resolve(&DEFAULT_PALETTE), None, "{spec}");
+        }
+        assert!(ColorSpec::from("#FF000001").resolve(&DEFAULT_PALETTE).is_some());
     }
 
     #[test]

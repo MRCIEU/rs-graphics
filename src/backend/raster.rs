@@ -755,7 +755,7 @@ impl RasterBackend {
         };
         let dash = stroke
             .lty
-            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Round)
+            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
             .and_then(|pts| {
                 let px: Vec<f32> = pts.iter().map(|d| (d / 72.0 * dpi) as f32).collect();
                 tiny_skia::StrokeDash::new(px, 0.0)

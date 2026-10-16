@@ -78,7 +78,7 @@ fn plot_region_and_usr_match_r() {
         pin[1]
     );
 
-    let computed_mai = dev.par.mai();
+    let computed_mai = dev.mai();
     let r_mai = [mai[0], mai[1], mai[2], mai[3]]; // bottom, left, top, right
     assert!((computed_mai.bottom - r_mai[0]).abs() < 1e-6);
     assert!((computed_mai.left - r_mai[1]).abs() < 1e-6);

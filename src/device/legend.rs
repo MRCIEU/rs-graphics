@@ -299,10 +299,10 @@ impl<B: Backend> Device<B> {
         };
 
         // One character cell: `xyinch(par("cin"))` scaled by the effective
-        // cex. For R's pdf device `cin = (0.9, 1.2) * ps / 72`.
+        // cex. For R's pdf device `cin = (0.9, 1.2) * startps / 72`.
         let cex_eff = cex * self.par.cex;
-        let cin_x = 0.9 * self.par.ps / 72.0;
-        let cin_y = 1.2 * self.par.ps / 72.0;
+        let cin_x = 0.9 * self.start_ps / 72.0;
+        let cin_y = 1.2 * self.start_ps / 72.0;
         let xc = cex_eff * cin_x;
         let yc = cex_eff * cin_y;
 

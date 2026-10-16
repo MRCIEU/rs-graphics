@@ -108,7 +108,7 @@ impl<B: Backend> Device<B> {
 
         // Position along the side, in device inches.
         let along = if opts.outer {
-            let omi = self.par.omi();
+            let omi = self.omi();
             let f = opts.at.unwrap_or_else(|| default_at_fraction(adj, side, las));
             if horizontal_side {
                 omi.left + f * (self.width_in - omi.left - omi.right)
@@ -157,7 +157,7 @@ impl<B: Backend> Device<B> {
         };
 
         // Position across the side.
-        let lh = self.line_height();
+        let lh = self.line_height_inches();
         let across = if opts.outer {
             let oma = self.par.oma;
             match side {

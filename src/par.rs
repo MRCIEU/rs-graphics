@@ -133,10 +133,13 @@ pub struct Par {
 
     pub pch: i32,
 
-    /// Base point size, in big points (`par(ps)`). Default `12`.
+    /// Base point size, in big points (`par(ps)`). Default `12`. Its value
+    /// at `Device::new` is the device's starting size (R's
+    /// `pdf(pointsize = )`), from which margin lines and symbols are
+    /// sized; changing it later only changes text size, as in R.
     pub ps: f64,
     /// `par(cex)`, i.e. R's `cexbase`. Also scales the margin "line"
-    /// unit (see [`Par::line_height_inches`]).
+    /// unit (see [`Device::line_height_inches`](crate::device::Device::line_height_inches)).
     pub cex: f64,
     /// `par(mex)`: margin-line expansion factor (a multiple of `cex`).
     pub mex: f64,
@@ -243,37 +246,6 @@ impl Default for Par {
 }
 
 impl Par {
-    /// The height (in inches) of "one line" of margin text: `mex * cex *
-    /// cra[1] * ipr[1]`, where `cra[1] * ipr[1] = 1.2 * ps / 72` for a
-    /// device whose native raster unit is points (`pdf`/`postscript`'s
-    /// convention). This is the unit `mar`/`oma`/`mgp`/`tcl` are measured
-    /// in - see `yNDCPerLine` in `mapNDC2Dev()`.
-    pub fn line_height_inches(&self) -> f64 {
-        self.mex * self.cex * 1.2 * self.ps / 72.0
-    }
-
-    /// Margins in inches: bottom, left, top, right.
-    pub fn mai(&self) -> Sides<f64> {
-        let lh = self.line_height_inches();
-        Sides::new(
-            self.mar.bottom * lh,
-            self.mar.left * lh,
-            self.mar.top * lh,
-            self.mar.right * lh,
-        )
-    }
-
-    /// Outer margins in inches.
-    pub fn omi(&self) -> Sides<f64> {
-        let lh = self.line_height_inches();
-        Sides::new(
-            self.oma.bottom * lh,
-            self.oma.left * lh,
-            self.oma.top * lh,
-            self.oma.right * lh,
-        )
-    }
-
     pub fn resolve_color(&self, spec: ColorSpec) -> Option<Color> {
         spec.resolve(&self.palette)
     }

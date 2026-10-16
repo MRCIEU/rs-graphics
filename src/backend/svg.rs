@@ -208,7 +208,7 @@ fn push_stroke_attrs(out: &mut String, stroke: &Stroke) {
     }
     if let Some(dashes) = stroke
         .lty
-        .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Round)
+        .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
     {
         out.push_str(" stroke-dasharray=\"");
         for (i, &d) in dashes.iter().enumerate() {
@@ -263,6 +263,8 @@ impl Backend for SvgBackend {
         self.body.clear();
         self.pending = None;
         self.group_style = None;
+        // Their `<g>`s went with the old body.
+        self.clip_stack.clear();
     }
 
     fn push_clip(&mut self, rect: Rect) {
@@ -412,6 +414,18 @@ mod tests {
         let start = svg.find("viewBox").unwrap();
         let lines: Vec<&str> = svg[start..].lines().skip(1).collect();
         lines[..lines.len() - 1].to_vec() // drop `</svg>`
+    }
+
+    /// Clips open when a page is discarded don't leave a stray `</g>`.
+    #[test]
+    fn new_page_drops_open_clips() {
+        let mut b = SvgBackend::new(1.0, 1.0);
+        b.push_clip(Rect::new(0.0, 0.0, 1.0, 1.0));
+        b.new_page();
+        b.pop_clip();
+        b.draw_circle(Point::new(0.5, 0.5), 0.1, Some(Color::rgb(255, 0, 0)), None);
+        let svg = b.finish();
+        assert_eq!(svg.matches("<g").count(), svg.matches("</g>").count(), "{svg}");
     }
 
     /// Runs of same-style shapes share a `<g>`; a shape whose style differs

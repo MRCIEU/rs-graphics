@@ -43,7 +43,8 @@ pub struct PchGeometry {
     pub lines: Vec<((f64, f64), (f64, f64))>,
 }
 
-/// `size_inches` for `GESymbol`, given `par(ps) * cex`. See module docs.
+/// `size_inches` for `GESymbol`, given the device's starting point size
+/// (`cra`, not the current `par(ps)`) and `cex`. See module docs.
 pub fn symbol_size_inches(pointsize: f64, cex: f64) -> f64 {
     pointsize * cex / 120.0
 }

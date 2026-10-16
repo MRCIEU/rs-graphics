@@ -15,7 +15,7 @@ use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
-use crate::par::{AxisStyle, Par, Pty};
+use crate::par::{AxisStyle, Par, Pty, Sides};
 use crate::pch;
 use crate::pretty::{axis_pars, create_at_vector};
 
@@ -64,6 +64,9 @@ pub struct Device<B: Backend> {
     hold_figure: bool,
     /// Whether anything has been plotted yet (R's `gpptr(dd)->state`).
     used: bool,
+    /// `par.ps` when the device was created: R's `startps`, which sets the
+    /// device's character size `cra` (`1.2 * startps` points high).
+    start_ps: f64,
 }
 
 /// Where drawing is clipped to: R's `xpd = FALSE` (plot region), `TRUE`
@@ -99,6 +102,7 @@ impl<B: Backend> Device<B> {
             par.bg = backend.default_bg();
         }
         let (width_in, height_in) = backend.size_inches();
+        let par_ps = par.ps;
         let mut dev = Device {
             backend,
             par,
@@ -118,6 +122,7 @@ impl<B: Backend> Device<B> {
             fig_nic: None,
             hold_figure: false,
             used: false,
+            start_ps: par_ps,
         };
         dev.recompute_layout();
         dev
@@ -146,7 +151,7 @@ impl<B: Backend> Device<B> {
     fn recompute_layout(&mut self) {
         // Inner region: the device minus the outer margins; figures are
         // fractions (NIC) of it.
-        let omi = self.par.omi();
+        let omi = self.omi();
         let inner = Rect::new(
             omi.left,
             omi.bottom,
@@ -174,7 +179,7 @@ impl<B: Backend> Device<B> {
             // `mapPlotRegion()`: the figure less `mar`, made square about
             // its centre for `pty = "s"`.
             None => {
-                let mai = self.par.mai();
+                let mai = self.mai();
                 let (mut x0, mut x1) = (self.fig.x0 + mai.left, self.fig.x1 - mai.right);
                 let (mut y0, mut y1) = (self.fig.y0 + mai.bottom, self.fig.y1 - mai.top);
                 if self.par.pty == Pty::Square {
@@ -562,8 +567,33 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    fn line_height(&self) -> f64 {
-        self.par.line_height_inches()
+    /// The device's starting point size (R's `startps`): `par.ps` as
+    /// passed to [`Device::new`]. Margin lines, plotting symbols and
+    /// `par("cin")` are sized from it, as from R's `cra`; changing
+    /// `par.ps` later only changes text size.
+    pub fn start_ps(&self) -> f64 {
+        self.start_ps
+    }
+
+    /// The height in inches of one margin line, the unit of `mar`, `oma`,
+    /// `mgp` and `tcl`: `mex * cex * 1.2 * startps / 72` (R's
+    /// `yNDCPerLine`, from `cra[1]`, in `mapNDC2Dev()`).
+    pub fn line_height_inches(&self) -> f64 {
+        self.par.mex * self.par.cex * 1.2 * self.start_ps / 72.0
+    }
+
+    /// `par("mai")`: `par.mar` in inches (bottom, left, top, right).
+    pub fn mai(&self) -> Sides<f64> {
+        let lh = self.line_height_inches();
+        let m = self.par.mar;
+        Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)
+    }
+
+    /// `par("omi")`: `par.oma` in inches (bottom, left, top, right).
+    pub fn omi(&self) -> Sides<f64> {
+        let lh = self.line_height_inches();
+        let m = self.par.oma;
+        Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)
     }
 
     /// Font size in points for `par(ps) * par(cex) * cex`, after any
@@ -643,7 +673,7 @@ impl<B: Backend> Device<B> {
     /// per-point `cex` (R multiplies it by `cexbase`, i.e. `par(cex)`).
     fn draw_pch(&mut self, pch: i32, p: Point, cex: f64, col: Color, bg: Option<Color>) {
         let cex = self.par.cex * cex;
-        let size = pch::symbol_size_inches(self.par.ps, cex);
+        let size = pch::symbol_size_inches(self.start_ps, cex);
         if let Some(geom) = pch::pch_geometry(pch, p.x, p.y, size) {
             let stroke = Stroke::simple(col, self.par.lwd);
             for shape in &geom.outline_only {
@@ -737,7 +767,7 @@ impl<B: Backend> Device<B> {
 
     /// The lines of `plot(type = "b")` (and `"c"`): each segment between
     /// consecutive points, shortened at both ends by half a character
-    /// height (`0.5 * par(cex) * 1.2 * ps / 72` inches) so the points stand
+    /// height (`0.5 * par(cex) * 1.2 * startps / 72` inches) so the points stand
     /// clear, and left out when shorter than twice that. A port of
     /// `C_plotXY`'s `case 'b'`.
     pub fn broken_lines(&mut self, xs: &[f64], ys: &[f64], style: LineStyle) {
@@ -745,7 +775,7 @@ impl<B: Backend> Device<B> {
             return;
         };
         let stroke = self.stroke_of(col, style.lwd, style.lty);
-        let d = 0.5 * self.par.cex * 1.2 * self.par.ps / 72.0;
+        let d = 0.5 * self.par.cex * 1.2 * self.start_ps / 72.0;
         self.push_clip_for(self.par.xpd);
         let mut old: Option<Point> = None;
         for (&x, &y) in xs.iter().zip(ys) {
@@ -920,17 +950,21 @@ impl<B: Backend> Device<B> {
     // Text
     // ---------------------------------------------------------------
 
-    /// Width/height (inches) of `text` in font `font` at `par(ps) * cex`
-    /// points (after the backend's font-size rounding; `par(cex)` is not
-    /// applied). The height is the font's nominal `Ascender - Descender`,
-    /// not R's `strheight()` (see [`afm::str_height_inches`]).
+    /// `(strwidth(text, "inches", cex, font), strheight(...))`: R's
+    /// `GEStrWidth`/`GEStrHeight` at `par(ps) * par(cex) * cex` points
+    /// (after the backend's font-size rounding). The width is that of the
+    /// widest line; the height is the ascent of "M" plus one line height
+    /// (`1.2 * ps / 72` inches, times the cex) per `\n`.
     pub fn text_metrics(&self, text: &str, font: i32, cex: f64) -> (f64, f64) {
         let face = self.par.font_face(font);
-        let size = self.backend.effective_font_size(self.par.ps * cex);
-        (
-            afm::str_width_inches(text, face, size, 1.0),
-            afm::str_height_inches(face, size, 1.0),
-        )
+        let size = self.font_size_pt(cex);
+        let width = text
+            .split('\n')
+            .map(|line| afm::str_width_inches(line, face, size, 1.0))
+            .fold(0.0, f64::max);
+        let newlines = text.matches('\n').count() as f64;
+        let line = 1.2 * self.par.ps * self.par.cex * cex / 72.0;
+        (width, newlines * line + afm::m_height_inches(face, size, 1.0))
     }
 
     /// `text(x, y, labels, adj=, srt=, col=, cex=, font=)` in user
@@ -1118,7 +1152,7 @@ impl<B: Backend> Device<B> {
     ) {
         let saved_xpd = self.par.xpd;
         self.par.xpd = true;
-        let lh = self.line_height();
+        let lh = self.line_height_inches();
         // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
         // text is baseline-anchored (yadj = 0) and `GMtext` nudges the line
         // by `yLineBias` (0.2 on pdf/png/svg devices) - `1 - bias` on side 1,

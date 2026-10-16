@@ -148,7 +148,7 @@ impl PdfBackend {
         }
         let dash = stroke
             .lty
-            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Round)
+            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
             .unwrap_or_default();
         if self.last_line.dash.as_ref() != Some(&dash) {
             self.content.push('[');

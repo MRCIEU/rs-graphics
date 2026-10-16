@@ -253,6 +253,12 @@ against a real R installation by shelling out to `Rscript`:
   `radius`, `par(xaxs = "i")`) vs. an uncompressed R `pdf()`.
 - `tests/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
+- `tests/text_metrics_matches_r.rs` - `Device::text_metrics` vs. R's
+  `strwidth()`/`strheight()`: `cex`, `font`, multi-line text, `par(ps)`
+  and a 2x2 `mfrow`.
+- `tests/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
+  `legend()` spacing come from the device's starting point size, not a
+  later `par(ps)`, as R's `cra`.
 - `tests/pch_matches_r.rs` - every `pch = 0:25` plus character symbols,
   for several `col`/`bg`/`cex`/`lwd`/`par(cex)` combinations: each painted
   path's bounding box, fill/stroke operator, colours, line width and cap,

@@ -22,14 +22,18 @@ pub enum LineType {
 }
 
 impl LineType {
-    /// Parse the way R's `par(lty=)` does: small integers `0..=6`, the
-    /// named strings (`"solid"`, `"dashed"`, ...), or a literal hex-digit
-    /// string like `"42"` / `"1343"` (each hex digit 1-9 or A-F is a
-    /// segment length in `lwd` units; R also accepts this literal form).
+    /// Parse an `lty` string as R's `par(lty=)` does: a name (`"solid"`,
+    /// `"dashed"`, ...) or 2, 4, 6 or 8 hex digits (1-9, A-F; no zeros),
+    /// each a segment length in `lwd` units, e.g. `"42"` or `"1343"`. One
+    /// extra form: a single digit is R's numeric code (`"2"` =
+    /// [`LineType::from_code`]`(2)`), which R rejects as a string. `None`
+    /// for anything R rejects.
     pub fn parse(spec: &str) -> Option<LineType> {
         let s = spec.trim();
-        if let Ok(n) = s.parse::<i32>() {
-            return Some(Self::from_code(n));
+        if s.len() == 1 {
+            if let Some(n) = s.chars().next().and_then(|c| c.to_digit(10)) {
+                return Some(Self::from_code(n as i32));
+            }
         }
         match s.to_ascii_lowercase().as_str() {
             "blank" => Some(LineType::Blank),
@@ -44,7 +48,10 @@ impl LineType {
     }
 
     fn from_hex_literal(s: &str) -> Option<LineType> {
-        if s.is_empty() || s.len() > 8 || !s.chars().all(|c| c.is_ascii_hexdigit()) {
+        // R: "must be length 2, 4, 6 or 8", "zeroes are not allowed".
+        if !matches!(s.len(), 2 | 4 | 6 | 8)
+            || !s.chars().all(|c| c.is_ascii_hexdigit() && c != '0')
+        {
             return None;
         }
         // Cache literal patterns as owned data isn't possible for a
@@ -103,33 +110,36 @@ impl LineType {
 
     /// Dash pattern lengths in points, given `lwd` (R's line-width unit;
     /// `1 lwd` renders as `1/96 inch` on most devices, i.e. `0.75` points).
-    /// With `round_cap`, "on" segments are one `lwd` shorter and "off"
-    /// segments one `lwd` longer, as `PostScriptSetLineTexture()` in
-    /// `devPS.c` does for every cap but butt. `None` for blank and solid.
-    pub fn dash_lengths_pt(&self, lwd: f64, round_cap: bool) -> Option<Vec<f64>> {
+    /// Unless `butt_cap`, "on" segments are one `lwd` shorter and "off"
+    /// segments one `lwd` longer, as `PDFSetLineTexture()` in `devPS.c`
+    /// does for round and square caps. Lengths below 0 become 0. `None`
+    /// for blank and solid, and when every length is <= 0.01pt (R then
+    /// writes an empty, i.e. solid, dash array).
+    pub fn dash_lengths_pt(&self, lwd: f64, butt_cap: bool) -> Option<Vec<f64>> {
         match self {
             LineType::Blank => None,
             LineType::Pattern(p) if p.is_empty() => None,
             LineType::Pattern(p) => {
                 let base_lwd = lwd * 0.75; // matches devPS.c's `newlwd * 0.75`
-                let a = if round_cap { 1.0 } else { 0.0 };
+                let a = if butt_cap { 0.0 } else { 1.0 };
                 let nlty = p.len();
-                Some(
-                    p.iter()
-                        .enumerate()
-                        .map(|(i, &seg)| {
-                            let seg = seg as f64;
-                            base_lwd
-                                * if i % 2 == 1 {
-                                    seg + a
-                                } else if nlty == 1 && seg == 1.0 {
-                                    1.0
-                                } else {
-                                    seg - a
-                                }
-                        })
-                        .collect(),
-                )
+                let dash: Vec<f64> = p
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &seg)| {
+                        let seg = seg as f64;
+                        let d = base_lwd
+                            * if i % 2 == 1 {
+                                seg + a
+                            } else if nlty == 1 && seg == 1.0 {
+                                1.0
+                            } else {
+                                seg - a
+                            };
+                        d.max(0.0)
+                    })
+                    .collect();
+                dash.iter().any(|&d| d > 0.01).then_some(dash)
             }
         }
     }
@@ -146,12 +156,23 @@ mod tests {
     }
 
     #[test]
+    fn hex_strings_follow_r() {
+        assert_eq!(LineType::parse("42"), Some(LineType::Pattern(&[4, 2])));
+        assert_eq!(LineType::parse("44"), Some(LineType::from_code(2)));
+        assert_eq!(LineType::parse("4F2A"), Some(LineType::Pattern(&[4, 15, 2, 10])));
+        // R: "must be length 2, 4, 6 or 8" / "zeroes are not allowed".
+        for bad in ["123", "10", "123456789", "4G", ""] {
+            assert_eq!(LineType::parse(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
     fn blank_has_no_dash_pattern() {
-        assert_eq!(LineType::Blank.dash_lengths_pt(1.0, true), None);
+        assert_eq!(LineType::Blank.dash_lengths_pt(1.0, false), None);
     }
 
     #[test]
     fn solid_has_no_dash_pattern() {
-        assert_eq!(LineType::from_code(1).dash_lengths_pt(1.0, true), None);
+        assert_eq!(LineType::from_code(1).dash_lengths_pt(1.0, false), None);
     }
 }

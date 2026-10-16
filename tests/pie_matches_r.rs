@@ -66,7 +66,8 @@ struct Case {
     r_args: &'static str,
     exact_axes: bool,
     clockwise: bool,
-    init_angle_deg: f64,
+    /// `None`: R's default (90 when clockwise, else 0).
+    init_angle_deg: Option<f64>,
     radius: f64,
 }
 
@@ -78,7 +79,7 @@ fn cases() -> Vec<Case> {
         r_args: "",
         exact_axes: false,
         clockwise: false,
-        init_angle_deg: 0.0,
+        init_angle_deg: None,
         radius: 0.8,
     };
     vec![
@@ -102,7 +103,6 @@ fn cases() -> Vec<Case> {
             name: "clockwise_radius",
             r_args: ", clockwise = TRUE, radius = 1",
             clockwise: true,
-            init_angle_deg: 90.0,
             radius: 1.0,
             ..base
         },
@@ -112,7 +112,7 @@ fn cases() -> Vec<Case> {
             height: 5.0,
             r_args: ", init.angle = 45",
             exact_axes: true,
-            init_angle_deg: 45.0,
+            init_angle_deg: Some(45.0),
             ..base
         },
     ]

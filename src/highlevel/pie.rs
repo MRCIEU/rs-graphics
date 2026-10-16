@@ -35,9 +35,9 @@ pub struct PieOptions<'a> {
     /// default is `200`.
     pub edges: usize,
     pub clockwise: bool,
-    /// Starting angle in degrees (R's `init.angle`). Default `0` even when
-    /// `clockwise` (R's default is then `90`).
-    pub init_angle_deg: f64,
+    /// Starting angle in degrees (R's `init.angle`). `None`: R's default,
+    /// 90 (12 o'clock) when `clockwise`, else 0 (3 o'clock).
+    pub init_angle_deg: Option<f64>,
 }
 
 impl<'a> Default for PieOptions<'a> {
@@ -50,7 +50,7 @@ impl<'a> Default for PieOptions<'a> {
             main: None,
             edges: 200,
             clockwise: false,
-            init_angle_deg: 0.0,
+            init_angle_deg: None,
         }
     }
 }
@@ -84,7 +84,10 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
     dev.plot_window_asp(xlim, ylim, 1.0);
 
     let twopi = if opts.clockwise { -2.0 * PI } else { 2.0 * PI };
-    let init = opts.init_angle_deg.to_radians();
+    let init = opts
+        .init_angle_deg
+        .unwrap_or(if opts.clockwise { 90.0 } else { 0.0 })
+        .to_radians();
     let t2xy = |t: f64| -> (f64, f64) {
         let tp = twopi * t + init;
         (opts.radius * tp.cos(), opts.radius * tp.sin())

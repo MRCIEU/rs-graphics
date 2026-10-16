@@ -1,10 +1,11 @@
 //! Cross-checks `abline()` with vectors of `h`/`v` and recycled `col`/
 //! `lty`/`lwd`, and `coef =`, against a real R `pdf()` device's uncompressed output: every
 //! stroked path in drawing order (vertices, colour, width, dash pattern),
-//! on linear and log axes. Skipped if `Rscript` isn't available.
+//! on linear and log axes, and dashes with square and butt line ends. Skipped if `Rscript` isn't available.
 
 use std::process::Command;
 
+use rs_graphics::backend::LineEnd;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AblineOptions, Device};
@@ -93,6 +94,29 @@ fn cases() -> Vec<Case> {
                 d.abline_coef(&[my - slope * mx, slope], red, 1.0, LineType::from_code(1));
                 let black = ColorSpec::Index(1);
                 d.abline_coef(&[2.0, -0.3, 99.0], black, 1.0, LineType::from_code(2));
+            },
+        },
+        Case {
+            name: "line_ends",
+            r: "par(lend = 'square'); abline(h = c(2, 4), lty = c(2, 3), lwd = c(1, 3))\n\
+                par(lend = 'butt'); abline(h = c(6, 8), lty = c('dotdash', '42'), lwd = 2)",
+            log: "",
+            lims: ((0.0, 10.0), (0.0, 10.0)),
+            draw: |d| {
+                d.par.lend = LineEnd::Square;
+                d.abline_with(&AblineOptions {
+                    h: vec![2.0, 4.0],
+                    lty: vec![LineType::from_code(2), LineType::from_code(3)],
+                    lwd: vec![1.0, 3.0],
+                    ..Default::default()
+                });
+                d.par.lend = LineEnd::Butt;
+                d.abline_with(&AblineOptions {
+                    h: vec![6.0, 8.0],
+                    lty: vec![LineType::from_code(4), LineType::parse("42").unwrap()],
+                    lwd: vec![2.0],
+                    ..Default::default()
+                });
             },
         },
         Case {
