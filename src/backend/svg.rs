@@ -9,6 +9,7 @@
 
 use std::fmt::Write as _;
 
+use super::numfmt::{push_hex, push_trimmed};
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
@@ -52,86 +53,112 @@ impl SvgBackend {
             out,
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"
         );
-        let _ = writeln!(
-            out,
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}in\" height=\"{}in\" viewBox=\"0 0 {} {}\">",
-            fmt_num(self.width_in),
-            fmt_num(self.height_in),
-            fmt_num(self.width_pt()),
-            fmt_num(self.height_pt())
-        );
+        out.push_str("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"");
+        push_trimmed(&mut out, self.width_in);
+        out.push_str("in\" height=\"");
+        push_trimmed(&mut out, self.height_in);
+        out.push_str("in\" viewBox=\"0 0 ");
+        push_trimmed(&mut out, self.width_pt());
+        out.push(' ');
+        push_trimmed(&mut out, self.height_pt());
+        out.push_str("\">\n");
         out.push_str(&self.body);
         out.push_str("</svg>\n");
         out
     }
 
-    fn stroke_attrs(&self, out: &mut String, stroke: &Stroke) {
-        let _ = write!(
-            out,
-            " stroke=\"{}\" stroke-width=\"{}\"",
-            stroke.color.to_hex(),
-            fmt_num(stroke.width_pt())
-        );
-        if stroke.color.a != 255 {
-            let _ = write!(
-                out,
-                " stroke-opacity=\"{}\"",
-                fmt_num(stroke.color.a as f64 / 255.0)
-            );
-        }
-        let cap = match stroke.lend {
-            LineEnd::Round => "round",
-            LineEnd::Butt => "butt",
-            LineEnd::Square => "square",
-        };
-        let join = match stroke.ljoin {
-            LineJoin::Round => "round",
-            LineJoin::Mitre => "miter",
-            LineJoin::Bevel => "bevel",
-        };
-        let _ = write!(out, " stroke-linecap=\"{cap}\" stroke-linejoin=\"{join}\"");
-        if matches!(stroke.ljoin, LineJoin::Mitre) {
-            let _ = write!(out, " stroke-miterlimit=\"{}\"", fmt_num(stroke.lmitre));
-        }
-        if let Some(dashes) = stroke
-            .lty
-            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Round)
-        {
-            let list = dashes
-                .iter()
-                .map(|d| fmt_num(*d))
-                .collect::<Vec<_>>()
-                .join(",");
-            let _ = write!(out, " stroke-dasharray=\"{list}\"");
-        }
-    }
-
-    fn fill_attr(out: &mut String, fill: Option<Color>) {
-        match fill {
-            Some(c) => {
-                let _ = write!(out, " fill=\"{}\"", c.to_hex());
-                if c.a != 255 {
-                    let _ = write!(out, " fill-opacity=\"{}\"", fmt_num(c.a as f64 / 255.0));
-                }
+    /// Append `<tag points="x,y x,y ..."`.
+    fn push_points(&mut self, tag: &str, points: &[Point]) {
+        let height_in = self.height_in;
+        let out = &mut self.body;
+        out.push('<');
+        out.push_str(tag);
+        out.push_str(" points=\"");
+        for (i, p) in points.iter().enumerate() {
+            if i > 0 {
+                out.push(' ');
             }
-            None => out.push_str(" fill=\"none\""),
+            push_trimmed(out, p.x * 72.0);
+            out.push(',');
+            push_trimmed(out, (height_in - p.y) * 72.0);
         }
-    }
-
-    fn border_attrs(&self, out: &mut String, stroke: Option<&Stroke>) {
-        match stroke {
-            Some(s) if !matches!(s.lty, LineType::Blank) => self.stroke_attrs(out, s),
-            _ => out.push_str(" stroke=\"none\""),
-        }
+        out.push('"');
     }
 }
 
-fn fmt_num(v: f64) -> String {
-    if v.fract() == 0.0 && v.abs() < 1e15 {
-        format!("{}", v as i64)
-    } else {
-        let s = format!("{v:.4}");
-        s.trim_end_matches('0').trim_end_matches('.').to_string()
+/// Append ` name="v"`.
+fn push_attr(out: &mut String, name: &str, v: f64) {
+    out.push(' ');
+    out.push_str(name);
+    out.push_str("=\"");
+    push_trimmed(out, v);
+    out.push('"');
+}
+
+/// Append ` name="#rrggbb"`.
+fn push_color_attr(out: &mut String, name: &str, c: Color) {
+    out.push(' ');
+    out.push_str(name);
+    out.push_str("=\"");
+    push_hex(out, c);
+    out.push('"');
+}
+
+fn push_stroke_attrs(out: &mut String, stroke: &Stroke) {
+    push_color_attr(out, "stroke", stroke.color);
+    push_attr(out, "stroke-width", stroke.width_pt());
+    if stroke.color.a != 255 {
+        push_attr(out, "stroke-opacity", stroke.color.a as f64 / 255.0);
+    }
+    let cap = match stroke.lend {
+        LineEnd::Round => "round",
+        LineEnd::Butt => "butt",
+        LineEnd::Square => "square",
+    };
+    let join = match stroke.ljoin {
+        LineJoin::Round => "round",
+        LineJoin::Mitre => "miter",
+        LineJoin::Bevel => "bevel",
+    };
+    out.push_str(" stroke-linecap=\"");
+    out.push_str(cap);
+    out.push_str("\" stroke-linejoin=\"");
+    out.push_str(join);
+    out.push('"');
+    if matches!(stroke.ljoin, LineJoin::Mitre) {
+        push_attr(out, "stroke-miterlimit", stroke.lmitre);
+    }
+    if let Some(dashes) = stroke
+        .lty
+        .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Round)
+    {
+        out.push_str(" stroke-dasharray=\"");
+        for (i, &d) in dashes.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            push_trimmed(out, d);
+        }
+        out.push('"');
+    }
+}
+
+fn push_fill_attrs(out: &mut String, fill: Option<Color>) {
+    match fill {
+        Some(c) => {
+            push_color_attr(out, "fill", c);
+            if c.a != 255 {
+                push_attr(out, "fill-opacity", c.a as f64 / 255.0);
+            }
+        }
+        None => out.push_str(" fill=\"none\""),
+    }
+}
+
+fn push_border_attrs(out: &mut String, stroke: Option<&Stroke>) {
+    match stroke {
+        Some(s) if !matches!(s.lty, LineType::Blank) => push_stroke_attrs(out, s),
+        _ => out.push_str(" stroke=\"none\""),
     }
 }
 
@@ -161,15 +188,14 @@ impl Backend for SvgBackend {
         let (x0, y0) = self.to_pt(Point::new(rect.x0, rect.y1));
         let w = rect.width() * 72.0;
         let h = rect.height() * 72.0;
-        let _ = writeln!(
-            self.body,
-            "<clipPath id=\"clip{id}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"/></clipPath>",
-            fmt_num(x0),
-            fmt_num(y0),
-            fmt_num(w),
-            fmt_num(h)
-        );
-        let _ = writeln!(self.body, "<g clip-path=\"url(#clip{id})\">");
+        let out = &mut self.body;
+        let _ = write!(out, "<clipPath id=\"clip{id}\"><rect");
+        push_attr(out, "x", x0);
+        push_attr(out, "y", y0);
+        push_attr(out, "width", w);
+        push_attr(out, "height", h);
+        let _ = writeln!(out, "/></clipPath>");
+        let _ = writeln!(out, "<g clip-path=\"url(#clip{id})\">");
     }
 
     fn pop_clip(&mut self) {
@@ -184,69 +210,51 @@ impl Backend for SvgBackend {
         }
         let (x1, y1) = self.to_pt(p0);
         let (x2, y2) = self.to_pt(p1);
-        let mut attrs = String::new();
-        self.stroke_attrs(&mut attrs, stroke);
-        let _ = writeln!(
-            self.body,
-            "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"{attrs}/>",
-            fmt_num(x1),
-            fmt_num(y1),
-            fmt_num(x2),
-            fmt_num(y2)
-        );
+        let out = &mut self.body;
+        out.push_str("<line");
+        push_attr(out, "x1", x1);
+        push_attr(out, "y1", y1);
+        push_attr(out, "x2", x2);
+        push_attr(out, "y2", y2);
+        push_stroke_attrs(out, stroke);
+        out.push_str("/>\n");
     }
 
     fn draw_polyline(&mut self, points: &[Point], stroke: &Stroke) {
         if matches!(stroke.lty, LineType::Blank) || points.len() < 2 {
             return;
         }
-        let pts = points
-            .iter()
-            .map(|p| {
-                let (x, y) = self.to_pt(*p);
-                format!("{},{}", fmt_num(x), fmt_num(y))
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
-        let mut attrs = String::new();
-        attrs.push_str(" fill=\"none\"");
-        self.stroke_attrs(&mut attrs, stroke);
-        let _ = writeln!(self.body, "<polyline points=\"{pts}\"{attrs}/>");
+        self.push_points("polyline", points);
+        let out = &mut self.body;
+        out.push_str(" fill=\"none\"");
+        push_stroke_attrs(out, stroke);
+        out.push_str("/>\n");
     }
 
     fn draw_polygon(&mut self, points: &[Point], fill: Option<Color>, stroke: Option<&Stroke>) {
         if points.len() < 2 {
             return;
         }
-        let pts = points
-            .iter()
-            .map(|p| {
-                let (x, y) = self.to_pt(*p);
-                format!("{},{}", fmt_num(x), fmt_num(y))
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
-        let mut attrs = String::new();
-        Self::fill_attr(&mut attrs, fill);
-        self.border_attrs(&mut attrs, stroke);
-        let _ = writeln!(self.body, "<polygon points=\"{pts}\"{attrs}/>");
+        self.push_points("polygon", points);
+        let out = &mut self.body;
+        push_fill_attrs(out, fill);
+        push_border_attrs(out, stroke);
+        out.push_str("/>\n");
     }
 
     fn draw_rect(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
         let (x0, y0) = self.to_pt(Point::new(rect.x0, rect.y1));
         let w = rect.width() * 72.0;
         let h = rect.height() * 72.0;
-        let mut attrs = String::new();
-        Self::fill_attr(&mut attrs, fill);
-        self.border_attrs(&mut attrs, stroke);
-        let _ = writeln!(
-            self.body,
-            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"{attrs}/>",
-            fmt_num(x0),
-            fmt_num(y0),
-            fmt_num(w),
-            fmt_num(h)
-        );
+        let out = &mut self.body;
+        out.push_str("<rect");
+        push_attr(out, "x", x0);
+        push_attr(out, "y", y0);
+        push_attr(out, "width", w);
+        push_attr(out, "height", h);
+        push_fill_attrs(out, fill);
+        push_border_attrs(out, stroke);
+        out.push_str("/>\n");
     }
 
     fn draw_circle(
@@ -257,17 +265,14 @@ impl Backend for SvgBackend {
         stroke: Option<&Stroke>,
     ) {
         let (cx, cy) = self.to_pt(center);
-        let r = radius * 72.0;
-        let mut attrs = String::new();
-        Self::fill_attr(&mut attrs, fill);
-        self.border_attrs(&mut attrs, stroke);
-        let _ = writeln!(
-            self.body,
-            "<circle cx=\"{}\" cy=\"{}\" r=\"{}\"{attrs}/>",
-            fmt_num(cx),
-            fmt_num(cy),
-            fmt_num(r)
-        );
+        let out = &mut self.body;
+        out.push_str("<circle");
+        push_attr(out, "cx", cx);
+        push_attr(out, "cy", cy);
+        push_attr(out, "r", radius * 72.0);
+        push_fill_attrs(out, fill);
+        push_border_attrs(out, stroke);
+        out.push_str("/>\n");
     }
 
     fn draw_text(&mut self, origin: Point, text: &str, style: &TextStyle) {
@@ -283,24 +288,25 @@ impl Backend for SvgBackend {
             crate::afm::FontFace::Bold | crate::afm::FontFace::BoldItalic => "bold",
             _ => "normal",
         };
-        let mut transform = String::new();
+        let out = &mut self.body;
+        out.push_str("<text");
+        push_attr(out, "x", x);
+        push_attr(out, "y", y);
+        out.push_str(" text-anchor=\"start\" font-family=\"Helvetica, Arial, sans-serif\"");
+        push_attr(out, "font-size", style.size_pt);
+        let _ = write!(out, " font-style=\"{style_str}\" font-weight=\"{weight}\"");
+        push_color_attr(out, "fill", style.color);
         if style.rotation_deg != 0.0 {
-            let _ = write!(
-                transform,
-                " transform=\"rotate({} {} {})\"",
-                fmt_num(-style.rotation_deg),
-                fmt_num(x),
-                fmt_num(y)
-            );
+            out.push_str(" transform=\"rotate(");
+            push_trimmed(out, -style.rotation_deg);
+            out.push(' ');
+            push_trimmed(out, x);
+            out.push(' ');
+            push_trimmed(out, y);
+            out.push_str(")\"");
         }
-        let _ = writeln!(
-            self.body,
-            "<text x=\"{}\" y=\"{}\" text-anchor=\"start\" font-family=\"Helvetica, Arial, sans-serif\" font-size=\"{}\" font-style=\"{style_str}\" font-weight=\"{weight}\" fill=\"{}\"{transform}>{}</text>",
-            fmt_num(x),
-            fmt_num(y),
-            fmt_num(style.size_pt),
-            style.color.to_hex(),
-            escape_xml(text)
-        );
+        out.push('>');
+        out.push_str(&escape_xml(text));
+        out.push_str("</text>\n");
     }
 }
