@@ -4,10 +4,11 @@
 //! Supported: a plain vector ([`barplot`], R's `vectorInput` case) and a
 //! matrix ([`barplot_matrix`]) drawn either stacked or `beside`, vertical or
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
-//! `gray.colors(nrow)`), `names.arg`, `legend.text`, `xlim`/`ylim`.
+//! `gray.colors(nrow)`), `names.arg`, `legend.text`, `xlim`/`ylim`, and log
+//! axes (`xlog`/`ylog`).
 //!
-//! Not supported: log axes, hatched fills (`density`/`angle`), `offset`,
-//! `orderH`, `add`, `args.legend`.
+//! Not supported: hatched fills (`density`/`angle`), `offset`, `orderH`,
+//! `add`, `args.legend`.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
@@ -43,6 +44,11 @@ pub struct BarplotOptions<'a> {
     pub legend_text: Option<Vec<String>>,
     pub xlim: Option<(f64, f64)>,
     pub ylim: Option<(f64, f64)>,
+    /// `log = "x"` / `"y"`. On a log value axis bars start at the lower
+    /// limit given (`ylim`, or `xlim` if `horiz`), else at 0.9 times the
+    /// smallest height, as in R.
+    pub xlog: bool,
+    pub ylog: bool,
     pub main: Option<&'a str>,
     pub sub: Option<&'a str>,
     pub xlab: Option<&'a str>,
@@ -63,6 +69,8 @@ impl<'a> Default for BarplotOptions<'a> {
             legend_text: None,
             xlim: None,
             ylim: None,
+            xlog: false,
+            ylog: false,
             main: None,
             sub: None,
             xlab: None,
@@ -173,29 +181,60 @@ fn barplot_impl<B: Backend>(
         w_l[k] = w_m[k] - width_v[k] / 2.0;
     }
 
+    // --- log scale in the data direction: where bars start ---
+    let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
+    let rectbase = if log_dat {
+        let min_h = columns
+            .iter()
+            .flatten()
+            .copied()
+            .filter(|h| !h.is_nan())
+            .fold(f64::INFINITY, f64::min);
+        assert!(
+            min_h > 0.0,
+            "barplot: log scale error: at least one 'height + offset' value <= 0"
+        );
+        for (log, lim, name) in [(opts.xlog, opts.xlim, "xlim"), (opts.ylog, opts.ylim, "ylim")] {
+            if let (true, Some(l)) = (log, lim) {
+                assert!(l.0.min(l.1) > 0.0, "barplot: log scale error: '{name}' <= 0");
+            }
+        }
+        match (horiz, opts.ylim, opts.xlim) {
+            (false, Some(l), _) if opts.ylog => l.0,
+            (true, _, Some(l)) if opts.xlog => l.0,
+            _ => 0.9 * min_h,
+        }
+    } else {
+        0.0
+    };
+
     // --- bars: (position index, base, top, colour index) ---
     let mut bars: Vec<(usize, f64, f64, usize)> = Vec::new();
     let mut extent_lo = f64::INFINITY;
     let mut extent_hi = f64::NEG_INFINITY;
     let mut note = |h: f64| {
-        // `range(rAdj, height)` with `rAdj = -0.01 * height`.
-        extent_lo = extent_lo.min(-0.01 * h).min(h);
-        extent_hi = extent_hi.max(-0.01 * h).max(h);
+        // `range(rAdj, height)` with `rAdj = 0.9 * height` on a log value
+        // axis, else `-0.01 * height`.
+        let adj = if log_dat { 0.9 * h } else { -0.01 * h };
+        extent_lo = extent_lo.min(adj).min(h);
+        extent_hi = extent_hi.max(adj).max(h);
     };
     if beside {
         for (j, col) in columns.iter().enumerate() {
             for (i, &h) in col.iter().enumerate() {
                 let k = j * nr + i;
-                bars.push((k, 0.0, h, k));
+                bars.push((k, rectbase, h, k));
                 note(h);
             }
         }
     } else {
-        note(0.0);
+        // `rbind(rectbase, apply(height, 2, cumsum))`: the first segment
+        // starts at `rectbase`, the sums themselves start from 0.
+        note(rectbase);
         for (j, col) in columns.iter().enumerate() {
             let mut acc = 0.0;
             for (i, &h) in col.iter().enumerate() {
-                let base = acc;
+                let base = if i == 0 { rectbase } else { acc };
                 acc += h;
                 bars.push((j, base, acc, i));
                 note(acc);
@@ -229,7 +268,7 @@ fn barplot_impl<B: Backend>(
         dev.par.yaxs = AxisStyle::Exact;
     }
     dev.plot_new();
-    dev.plot_window(xlim, ylim, false, false);
+    dev.plot_window(xlim, ylim, opts.xlog, opts.ylog);
     dev.par.xaxs = saved_xaxs;
     dev.par.yaxs = saved_yaxs;
 
@@ -299,16 +338,20 @@ fn barplot_impl<B: Backend>(
         if (horiz && beside) || (!horiz && !beside) {
             entries.reverse();
         }
+        // 0.1 inch in from the top-right corner of the plot region. (On a
+        // log axis R passes the log10 `par("usr")` values to `legend()` as
+        // data, which puts the legend near the bottom; we don't copy that.)
         let (ux0, ux1, uy0, uy1) = dev.usr();
         let plt = dev.plot_region();
-        let dx = 0.1 * (ux1 - ux0) / plt.width();
-        let dy = 0.1 * (uy1 - uy0) / plt.height();
+        let data = |v: f64, log: bool| if log { 10f64.powf(v) } else { v };
+        let x = data(ux1 - 0.1 * (ux1 - ux0) / plt.width(), opts.xlog);
+        let y = data(uy1 - 0.1 * (uy1 - uy0) / plt.height(), opts.ylog);
         let lopts = LegendOptions {
             xjust: Some(1.0),
             yjust: Some(1.0),
             ..LegendOptions::default()
         };
-        dev.legend_with(LegendPos::Xy(ux1 - dx, uy1 - dy), &entries, &lopts);
+        dev.legend_with(LegendPos::Xy(x, y), &entries, &lopts);
     }
 
     if dev.par.ann {

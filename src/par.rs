@@ -116,6 +116,10 @@ pub struct Par {
     /// Margin line positions for axis title/labels/line, `c(3, 1, 0)` by
     /// default.
     pub mgp: [f64; 3],
+    /// `par(lab)`: the approximate number of tick intervals on the x and y
+    /// axes for default ticks (the third value, label length, is unused,
+    /// as in R). `c(5, 5, 7)` by default.
+    pub lab: [i32; 3],
     pub lheight: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
@@ -168,6 +172,7 @@ impl Default for Par {
             las: 0,
             tcl: -0.5,
             mgp: [3.0, 1.0, 0.0],
+            lab: [5, 5, 7],
             lheight: 1.0,
             adj: 0.5,
             xpd: false,

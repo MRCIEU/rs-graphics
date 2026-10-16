@@ -286,27 +286,11 @@ impl<B: Backend> Device<B> {
     pub fn plot_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), xlog: bool, ylog: bool) {
         self.xlog = xlog;
         self.ylog = ylog;
-        let (x0, x1) = if xlog {
-            (xlim.0.log10(), xlim.1.log10())
-        } else {
-            xlim
-        };
-        let (y0, y1) = if ylog {
-            (ylim.0.log10(), ylim.1.log10())
-        } else {
-            ylim
-        };
-        let (ux0, ux1) = Self::expand_range(x0, x1, self.par.xaxs);
-        let (uy0, uy1) = Self::expand_range(y0, y1, self.par.yaxs);
+        let (ux0, ux1) = Self::gscale(xlim.0, xlim.1, self.par.xaxs, xlog);
+        let (uy0, uy1) = Self::gscale(ylim.0, ylim.1, self.par.yaxs, ylog);
         self.usr = (ux0, ux1, uy0, uy1);
     }
 
-    /// The default `xaxs = "r"` / `yaxs = "r"` range expansion (4% of the
-    /// range on each side), matching `GScale()`'s `case 'r'` branch.
-    /// `"i"` (exact) applies no expansion. This intentionally skips
-    /// `GScale`'s extra edge-case handling for near-zero/non-finite
-    /// ranges - see the crate README for the fidelity tradeoffs made
-    /// here.
     /// `plot.window(xlim, ylim, asp = asp)` on linear axes: widens
     /// whichever range is needed so one x unit is `asp` y units long on
     /// the page (centred on the given limits), *then* applies
@@ -343,34 +327,89 @@ impl<B: Backend> Device<B> {
         );
     }
 
-    fn expand_range(min: f64, max: f64, style: AxisStyle) -> (f64, f64) {
-        match style {
-            AxisStyle::Exact => (min, max),
-            AxisStyle::Regular => {
-                let temp = if min.abs().max(max.abs()) > 100.0 {
-                    0.04 * max - 0.04 * min
-                } else {
-                    0.04 * (max - min)
-                };
-                (min - temp, max + temp)
+    /// `GScale()` (`graphics.c`): the `usr` range (log10 units on a log
+    /// axis) for data limits `min..max` (which may be decreasing). Non-finite
+    /// limits are replaced by huge ones (on a log axis, limits <= 0 give
+    /// about 1e-307, as R does after warning "nonfinite axis limits"), a
+    /// zero-width range is widened (to -1..1 around 0, else by 40% of the
+    /// value), and `xaxs = "r"` adds 4% at each end.
+    fn gscale(min: f64, max: f64, style: AxisStyle, log: bool) -> (f64, f64) {
+        const EPS_FAC_1: f64 = 16.0;
+        let (mut min, mut max) = if log { (min.log10(), max.log10()) } else { (min, max) };
+        let fix = |v: f64| {
+            if v.is_finite() {
+                v
+            } else if log {
+                if v < 0.0 { -320.0 } else { 308.254715559 }
+            } else {
+                0.45 * if v < 0.0 { -f64::MAX } else { f64::MAX }
+            }
+        };
+        min = fix(min);
+        max = fix(max);
+        let mut temp = min.abs().max(max.abs());
+        if temp == 0.0 {
+            min = -1.0;
+            max = 1.0;
+        } else {
+            let mut tf = if temp > 1.0 {
+                (temp * f64::EPSILON) * EPS_FAC_1
+            } else {
+                (temp * EPS_FAC_1) * f64::EPSILON
+            };
+            if tf == 0.0 {
+                tf = f64::MIN_POSITIVE;
+            }
+            if (max - min).abs() < tf {
+                temp *= if min == max { 0.4 } else { 1e-2 };
+                min -= temp;
+                max += temp;
             }
         }
+        if style == AxisStyle::Regular {
+            let d = if temp > 100.0 {
+                0.04 * max - 0.04 * min
+            } else {
+                0.04 * (max - min)
+            };
+            let clamp = |v: f64| {
+                if v.is_finite() { v } else if v < 0.0 { -f64::MAX } else { f64::MAX }
+            };
+            if log {
+                min -= d;
+                max += d;
+            } else {
+                min = clamp(min - d);
+                max = clamp(max + d);
+            }
+        }
+        if log {
+            // Keep 10^min above 0 and 10^max finite.
+            if 10f64.powf(min) == 0.0 {
+                min = (1.01 * f64::MIN_POSITIVE).log10();
+            }
+            if max >= 308.25035 {
+                max = (0.99 * f64::MAX).log10();
+            }
+        }
+        (min, max)
     }
 
     /// Default tick locations R's `axis()` would pick for `side` when no
     /// `at=` is given, in data units: `pretty()` on the current `usr` range
-    /// for that axis, with `n = 5` (R's `par("lab")[1:2]` default), or R's
-    /// log-axis rules (see [`log_axis_ticks`]) on a log axis.
+    /// for that axis, aiming for `par("lab")[1]` (x) or `[2]` (y)
+    /// intervals, or R's log-axis rules (see [`log_axis_ticks`]) on a log
+    /// axis.
     pub fn default_ticks(&self, side: Side) -> Vec<f64> {
-        let (lo, hi, log) = if side == 1 || side == 3 {
-            (self.usr.0, self.usr.1, self.xlog)
+        let (lo, hi, log, n) = if side == 1 || side == 3 {
+            (self.usr.0, self.usr.1, self.xlog, self.par.lab[0])
         } else {
-            (self.usr.2, self.usr.3, self.ylog)
+            (self.usr.2, self.usr.3, self.ylog, self.par.lab[1])
         };
         if log {
-            log_axis_ticks(lo.min(hi), lo.max(hi), 5)
+            log_axis_ticks(lo.min(hi), lo.max(hi), n)
         } else {
-            pretty_ticks(lo.min(hi), lo.max(hi), 5)
+            pretty_ticks(lo.min(hi), lo.max(hi), n)
         }
     }
 
@@ -382,10 +421,34 @@ impl<B: Backend> Device<B> {
     pub fn user_to_inches(&self, x: f64, y: f64) -> Point {
         let ux = if self.xlog { x.log10() } else { x };
         let uy = if self.ylog { y.log10() } else { y };
+        self.usr_to_inches(ux, uy)
+    }
+
+    /// Map a point in `usr` units (log10 on a log axis) to device inches.
+    fn usr_to_inches(&self, ux: f64, uy: f64) -> Point {
         let (x0, x1, y0, y1) = self.usr;
         let px = self.plt.x0 + (ux - x0) / (x1 - x0) * self.plt.width();
         let py = self.plt.y0 + (uy - y0) / (y1 - y0) * self.plt.height();
         Point::new(px, py)
+    }
+
+    /// R's `getxlimits()`/`getylimits()` in `usr` units: the `usr` range
+    /// with `par(xpd = FALSE)`, else the figure region's extent along the
+    /// axis.
+    fn xpd_limits(&self, x_axis: bool) -> (f64, f64) {
+        let (u0, u1, p0, p1, f0, f1) = if x_axis {
+            let (u0, u1, ..) = self.usr;
+            (u0, u1, self.plt.x0, self.plt.x1, self.fig.x0, self.fig.x1)
+        } else {
+            let (.., u0, u1) = self.usr;
+            (u0, u1, self.plt.y0, self.plt.y1, self.fig.y0, self.fig.y1)
+        };
+        if self.par.xpd {
+            let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
+            (to_usr(f0), to_usr(f1))
+        } else {
+            (u0, u1)
+        }
     }
 
     fn line_height(&self) -> f64 {
@@ -626,8 +689,12 @@ impl<B: Backend> Device<B> {
         self.push_clip_for(self.par.xpd);
         let p0 = self.user_to_inches(x0, y0);
         let p1 = self.user_to_inches(x1, y1);
-        self.backend
-            .draw_rect(Rect::new(p0.x, p0.y, p1.x, p1.y), fill_c, stroke.as_ref());
+        // R skips rectangles with a non-finite corner, e.g. at 0 on a log
+        // axis.
+        if [p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
+            self.backend
+                .draw_rect(Rect::new(p0.x, p0.y, p1.x, p1.y), fill_c, stroke.as_ref());
+        }
         self.pop_clip();
     }
 
@@ -672,7 +739,14 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// `abline(a=, b=)` / `abline(h=)` / `abline(v=)`.
+    /// `abline(a=, b=)` / `abline(h=)` / `abline(v=)`, a port of `C_abline`
+    /// with R's default `untf = FALSE`. `h`/`v` are data values. On log
+    /// axes the `a`/`b` line is straight on the page: `log10(y) = a + b *
+    /// log10(x)` on a log-log plot, `y = a + b * log10(x)` with a log x
+    /// axis only, and so on (see [`Device::abline_untf`] for `y = a + b *
+    /// x` instead). Lines span the plot region, or the figure region with
+    /// `par(xpd = TRUE)`, and are clipped to it.
+    #[allow(clippy::too_many_arguments)]
     pub fn abline(
         &mut self,
         a: Option<f64>,
@@ -687,42 +761,89 @@ impl<B: Backend> Device<B> {
             return;
         };
         let stroke = self.stroke_of(color, lwd, lty);
-        self.push_clip_for(false); // abline always clips to the plot region
-        let (x0, x1, y0, y1) = self.usr;
+        self.push_clip_for(self.par.xpd);
+        let (x0, x1) = self.xpd_limits(true);
+        let (y0, y1) = self.xpd_limits(false);
+        if let (Some(a), Some(b)) = (a, b) {
+            // In `usr` units the line is `a + b * x` whether or not either
+            // axis is logarithmic.
+            let from = self.usr_to_inches(x0, a + b * x0);
+            let to = self.usr_to_inches(x1, a + b * x1);
+            self.draw_line_if_finite(from, to, &stroke);
+        }
         if let Some(h) = h {
-            let p0 = self.user_to_inches(
-                if self.xlog { 10f64.powf(x0) } else { x0 },
-                if self.ylog { 10f64.powf(h) } else { h },
-            );
-            let p1 = self.user_to_inches(
-                if self.xlog { 10f64.powf(x1) } else { x1 },
-                if self.ylog { 10f64.powf(h) } else { h },
-            );
-            self.backend.draw_line(p0, p1, &stroke);
+            let h = if self.ylog { h.log10() } else { h };
+            let (from, to) = (self.usr_to_inches(x0, h), self.usr_to_inches(x1, h));
+            self.draw_line_if_finite(from, to, &stroke);
         }
         if let Some(v) = v {
-            let p0 = self.user_to_inches(
-                if self.xlog { 10f64.powf(v) } else { v },
-                if self.ylog { 10f64.powf(y0) } else { y0 },
-            );
-            let p1 = self.user_to_inches(
-                if self.xlog { 10f64.powf(v) } else { v },
-                if self.ylog { 10f64.powf(y1) } else { y1 },
-            );
-            self.backend.draw_line(p0, p1, &stroke);
-        }
-        if let (Some(a), Some(b)) = (a, b) {
-            // Evaluate y = a + b*x at the two ends of the (possibly log)
-            // user x-range, in the *original* (non-log) data space.
-            let ux0 = if self.xlog { 10f64.powf(x0) } else { x0 };
-            let ux1 = if self.xlog { 10f64.powf(x1) } else { x1 };
-            let uy0 = a + b * ux0;
-            let uy1 = a + b * ux1;
-            let p0 = self.user_to_inches(ux0, uy0);
-            let p1 = self.user_to_inches(ux1, uy1);
-            self.backend.draw_line(p0, p1, &stroke);
+            let v = if self.xlog { v.log10() } else { v };
+            let (from, to) = (self.usr_to_inches(v, y0), self.usr_to_inches(v, y1));
+            self.draw_line_if_finite(from, to, &stroke);
         }
         self.pop_clip();
+    }
+
+    /// `abline(a, b, untf = TRUE)`: the line `y = a + b * x` in data
+    /// units, which is curved on a log axis (drawn through 101 points,
+    /// equally spaced in `log10(x)` on a log x axis, and dropping the ends
+    /// where `x` or `y` is <= 0 on a log axis). Without log axes, the same
+    /// as [`Device::abline`].
+    pub fn abline_untf(&mut self, a: f64, b: f64, col: ColorSpec, lwd: f64, lty: LineType) {
+        if !self.xlog && !self.ylog {
+            self.abline(Some(a), Some(b), None, None, col, lwd, lty);
+            return;
+        }
+        let Some(color) = self.resolve(col) else {
+            return;
+        };
+        const NS: usize = 100;
+        let stroke = self.stroke_of(color, lwd, lty);
+        let (l0, l1) = self.xpd_limits(true);
+        let data = |v: f64| if self.xlog { 10f64.powf(v) } else { v };
+        let (mut x0, x1) = (data(l0), data(l1));
+        let mut xx = vec![0.0; NS + 1];
+        if self.xlog {
+            x0 = x0.max(1.01 * (x1 / f64::MAX));
+            let f = (x1 / x0).powf(1.0 / NS as f64);
+            xx[0] = x0;
+            for i in 1..NS {
+                xx[i] = xx[i - 1] * f;
+            }
+        } else {
+            let step = (x1 - x0) / NS as f64;
+            for (i, x) in xx.iter_mut().enumerate().take(NS) {
+                *x = x0 + i as f64 * step;
+            }
+        }
+        xx[NS] = x1;
+        let yy: Vec<f64> = xx.iter().map(|&x| a + x * b).collect();
+        // Drop leading and trailing values <= 0 on log axes.
+        let positive = |i: usize| (!self.xlog || xx[i] > 0.0) && (!self.ylog || yy[i] > 0.0);
+        let (mut start, mut stop) = (0, NS);
+        while start <= NS && !positive(start) {
+            start += 1;
+        }
+        while stop > 0 && !positive(stop) {
+            stop -= 1;
+        }
+        if start > stop {
+            return;
+        }
+        let pts: Vec<Point> = (start..=stop)
+            .map(|i| self.user_to_inches(xx[i], yy[i]))
+            .collect();
+        self.push_clip_for(self.par.xpd);
+        if pts.iter().all(|p| p.x.is_finite() && p.y.is_finite()) {
+            self.backend.draw_polyline(&pts, &stroke);
+        }
+        self.pop_clip();
+    }
+
+    fn draw_line_if_finite(&mut self, from: Point, to: Point, stroke: &Stroke) {
+        if [from.x, from.y, to.x, to.y].iter().all(|v| v.is_finite()) {
+            self.backend.draw_line(from, to, stroke);
+        }
     }
 
     // ---------------------------------------------------------------
@@ -930,34 +1051,7 @@ impl<B: Backend> Device<B> {
         // text is baseline-anchored (yadj = 0) and `GMtext` nudges the line
         // by `yLineBias` (0.2 on pdf/png/svg devices) - `1 - bias` on side 1,
         // `bias` on sides 2/3.
-        if let Some(xlab) = xlab {
-            let y = self.plt.y0 - (self.par.mgp[0] + (1.0 - Y_LINE_BIAS)) * lh;
-            let x = (self.plt.x0 + self.plt.x1) / 2.0;
-            self.text_gc_at(
-                Point::new(x, y),
-                xlab,
-                0.5,
-                0.0,
-                0.0,
-                ColorSpec::Color(self.par.col_lab),
-                self.par.cex_lab,
-                self.par.font_lab,
-            );
-        }
-        if let Some(ylab) = ylab {
-            let x = self.plt.x0 - (self.par.mgp[0] + Y_LINE_BIAS) * lh;
-            let y = (self.plt.y0 + self.plt.y1) / 2.0;
-            self.text_gc_at(
-                Point::new(x, y),
-                ylab,
-                0.5,
-                0.0,
-                90.0,
-                ColorSpec::Color(self.par.col_lab),
-                self.par.cex_lab,
-                self.par.font_lab,
-            );
-        }
+        // In `C_title`'s order: main, sub, xlab, ylab.
         if let Some(main) = main {
             // `vpos = 0.5 * mar[2]`, `adjy = 0.5` (finite, so `GEText`
             // uses `yc * height(M)`, not exact ink centring).
@@ -986,6 +1080,34 @@ impl<B: Backend> Device<B> {
                 ColorSpec::Color(self.par.col_sub),
                 self.par.cex_sub,
                 self.par.font_sub,
+            );
+        }
+        if let Some(xlab) = xlab {
+            let y = self.plt.y0 - (self.par.mgp[0] + (1.0 - Y_LINE_BIAS)) * lh;
+            let x = (self.plt.x0 + self.plt.x1) / 2.0;
+            self.text_gc_at(
+                Point::new(x, y),
+                xlab,
+                0.5,
+                0.0,
+                0.0,
+                ColorSpec::Color(self.par.col_lab),
+                self.par.cex_lab,
+                self.par.font_lab,
+            );
+        }
+        if let Some(ylab) = ylab {
+            let x = self.plt.x0 - (self.par.mgp[0] + Y_LINE_BIAS) * lh;
+            let y = (self.plt.y0 + self.plt.y1) / 2.0;
+            self.text_gc_at(
+                Point::new(x, y),
+                ylab,
+                0.5,
+                0.0,
+                90.0,
+                ColorSpec::Color(self.par.col_lab),
+                self.par.cex_lab,
+                self.par.font_lab,
             );
         }
         self.par.xpd = saved_xpd;

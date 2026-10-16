@@ -20,8 +20,10 @@ crate's test suite (see [Testing](#testing) below).
   with R's exact default values.
 - Coordinate systems and clipping (`src/device.rs`): `plot.new()`/
   `plot.window()` equivalents, user/device coordinate transforms, log
-  axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, and
-  `at`/`pos` in data units), and R's `xpd`-style clip regions (plot region, figure region,
+  axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, `at`/
+  `pos`/`abline(h=, v=)` in data units, `abline(a, b)` straight on the
+  page or curved with `abline_untf`, and `xlog`/`ylog` for `plot()`,
+  `hist()` and `barplot()`), `par(lab=)`, and R's `xpd`-style clip regions (plot region, figure region,
   or the whole device for outer-margin text).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
@@ -96,7 +98,7 @@ To keep this a tractable "core functionality" port, the following R
 `image()`/raster images, `symbols()`, `smoothScatter()`,
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, and
 interactive input (`identify()`/`locator()`). `barplot()` doesn't
-support log axes, `density`/`angle` hatching, `offset`, or `add`, and
+support `density`/`angle` hatching, `offset`, or `add`, and
 `boxplot()` doesn't support `notch`/`varwidth`. These would all be
 reasonable follow-ups but are left for future work.
 
@@ -256,6 +258,11 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
   segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
   axis.
+- `tests/log_plots_matches_r.rs` - `abline()` on log-log and log-x plots
+  (`h`/`v`, `a`/`b`, `untf`, `xpd = TRUE`), `hist()` with `log = "x"`/`"y"`,
+  `barplot()` on log axes (vector, stacked with legend, horizontal beside
+  with `xlim`), and `par(lab)` on linear and log axes: every painted path
+  and text item in order.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 

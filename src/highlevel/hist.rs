@@ -67,6 +67,10 @@ pub struct HistOptions<'a> {
     pub xlab: Option<&'a str>,
     pub ylab: Option<&'a str>,
     pub axes: bool,
+    /// `log = "x"` / `"y"`. As in R, a log y axis still takes its range
+    /// from 0, which R "corrects" to about 1e-307 (with a warning).
+    pub xlog: bool,
+    pub ylog: bool,
 }
 
 impl<'a> Default for HistOptions<'a> {
@@ -80,6 +84,8 @@ impl<'a> Default for HistOptions<'a> {
             xlab: None,
             ylab: None,
             axes: true,
+            xlog: false,
+            ylog: false,
         }
     }
 }
@@ -134,8 +140,37 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
     };
     let ymax = heights.iter().cloned().fold(0.0_f64, f64::max);
 
+    // `plot.histogram()`: window, title, axes, then the bars.
     dev.plot_new();
-    dev.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), false, false);
+    dev.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), opts.xlog, opts.ylog);
+
+    if dev.par.ann {
+        let ylab = opts
+            .ylab
+            .unwrap_or(if opts.freq { "Frequency" } else { "Density" });
+        dev.title(
+            Some(opts.main.unwrap_or("Histogram of x")),
+            None,
+            Some(opts.xlab.unwrap_or("x")),
+            Some(ylab),
+        );
+    }
+
+    if opts.axes {
+        let fg = ColorSpec::Color(dev.par.fg);
+        let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
+        dev.axis(1, None, None, fg, cex_axis, font_axis, las);
+        // `yt[yt %% 1 == 0]` for counts: whole numbers only.
+        let yticks = if opts.freq {
+            dev.default_ticks(2)
+                .into_iter()
+                .filter(|v| v % 1.0 == 0.0)
+                .collect()
+        } else {
+            dev.default_ticks(2)
+        };
+        dev.axis(2, Some(yticks), None, fg, cex_axis, font_axis, las);
+    }
 
     for i in 0..heights.len() {
         dev.rect(
@@ -147,35 +182,6 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
             opts.border,
             dev.par.lwd,
             LineType::Pattern(&[]),
-        );
-    }
-
-    if opts.axes {
-        let fg = ColorSpec::Color(dev.par.fg);
-        let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
-        dev.axis(1, None, None, fg, cex_axis, font_axis, las);
-        // R removes non-integer y ticks when plotting frequencies.
-        let yticks = if opts.freq {
-            dev.default_ticks(2)
-                .into_iter()
-                .filter(|v| (v.fract()).abs() < 1e-9)
-                .collect()
-        } else {
-            dev.default_ticks(2)
-        };
-        // R's `plot.histogram()` draws axes but no `box()`.
-        dev.axis(2, Some(yticks), None, fg, cex_axis, font_axis, las);
-    }
-
-    if dev.par.ann {
-        let ylab = opts
-            .ylab
-            .unwrap_or(if opts.freq { "Frequency" } else { "Density" });
-        dev.title(
-            Some(opts.main.unwrap_or("Histogram of x")),
-            None,
-            Some(opts.xlab.unwrap_or("x")),
-            Some(ylab),
         );
     }
 

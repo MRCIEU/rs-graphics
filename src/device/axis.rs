@@ -195,17 +195,7 @@ impl<B: Backend> Device<B> {
         } else {
             (self.usr.2, self.usr.3)
         };
-        let (left, right) = if self.par.xpd {
-            let (p0, p1, f0, f1) = if x_axis {
-                (self.plt.x0, self.plt.x1, self.fig.x0, self.fig.x1)
-            } else {
-                (self.plt.y0, self.plt.y1, self.fig.y0, self.fig.y1)
-            };
-            let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
-            (to_usr(f0), to_usr(f1))
-        } else {
-            (u0, u1)
-        };
+        let (left, right) = self.xpd_limits(x_axis);
         let (left, right) = (left.min(right), left.max(right));
         let eps = if right == left {
             0.5 * FLT_EPSILON
