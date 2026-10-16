@@ -72,7 +72,7 @@ fn svg_backend_produces_well_formed_output() {
 
 #[test]
 fn pdf_backend_produces_well_formed_output() {
-    let mut backend = PdfBackend::new(6.0, 4.0);
+    let mut backend = PdfBackend::new(6.0, 4.0).with_compression(false);
     exercise(&mut backend);
     let bytes = backend.finish();
     assert!(bytes.starts_with(b"%PDF-1.4"));
@@ -81,6 +81,46 @@ fn pdf_backend_produces_well_formed_output() {
     assert!(text.contains("/Type /Catalog"));
     assert!(text.contains("BT"));
     assert!(text.contains("Tj"));
+}
+
+/// The bytes of the (only) content stream of `pdf`, and its dictionary.
+fn content_stream(pdf: &[u8]) -> (String, &[u8]) {
+    let find = |needle: &[u8], from: usize| {
+        from + pdf[from..]
+            .windows(needle.len())
+            .position(|w| w == needle)
+            .expect("found")
+    };
+    let dict_start = find(b"4 0 obj\n", 0) + 8;
+    let data_start = find(b"stream\n", dict_start) + 7;
+    let dict = String::from_utf8_lossy(&pdf[dict_start..data_start]).into_owned();
+    let len_at = dict.find("/Length ").expect("a /Length") + 8;
+    let len: usize = dict[len_at..]
+        .split(|c: char| !c.is_ascii_digit())
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    (dict, &pdf[data_start..data_start + len])
+}
+
+#[test]
+fn pdf_backend_compresses_content_by_default() {
+    let mut plain = PdfBackend::new(6.0, 4.0).with_compression(false);
+    let mut compressed = PdfBackend::new(6.0, 4.0);
+    exercise(&mut plain);
+    exercise(&mut compressed);
+    let (plain, compressed) = (plain.finish(), compressed.finish());
+    assert!(compressed.len() < plain.len());
+    let text = String::from_utf8_lossy(&compressed);
+    assert!(text.contains("%%EOF") && text.contains("endstream"));
+
+    let (dict, data) = content_stream(&compressed);
+    assert!(dict.contains("/Filter /FlateDecode"), "{dict}");
+    let inflated = miniz_oxide::inflate::decompress_to_vec_zlib(data).expect("valid zlib data");
+    let (plain_dict, plain_data) = content_stream(&plain);
+    assert!(!plain_dict.contains("/Filter"));
+    assert_eq!(inflated, plain_data);
 }
 
 #[test]

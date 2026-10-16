@@ -264,7 +264,7 @@ fn legend_layout_matches_r() {
         let path = dir.join(format!("rs_graphics_legend_{}.pdf", c.name));
         let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
 
-        let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+        let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), Par::default());
         let opts = PlotOptions {
             pch: 19,
             xlab: Some("x"),

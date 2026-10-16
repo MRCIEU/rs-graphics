@@ -59,7 +59,7 @@ fn plot_region_and_usr_match_r() {
 
     let mut par = Par::default();
     par.ps = ps;
-    let backend = PdfBackend::new(width, height);
+    let backend = PdfBackend::new(width, height).with_compression(false);
     let mut dev = Device::new(backend, par);
     dev.plot_new();
     dev.plot_window(xlim, ylim, false, false);

@@ -9,6 +9,9 @@
 //! from the bottom-left, y-up", matching this crate's internal `Backend`
 //! convention exactly (see `backend/mod.rs`), so this backend applies no
 //! coordinate flip - only a inches-to-points scale (`1 in = 72 pt`).
+//!
+//! Like R's `pdf()` (`compress = TRUE`), the page's content stream is
+//! Flate-compressed by default; see [`PdfBackend::with_compression`].
 
 use std::fmt::Write as _;
 
@@ -25,6 +28,7 @@ pub struct PdfBackend {
     clip_depth: u32,
     last_fill: Option<Color>,
     last_stroke_color: Option<Color>,
+    compress: bool,
 }
 
 impl PdfBackend {
@@ -36,7 +40,17 @@ impl PdfBackend {
             clip_depth: 0,
             last_fill: None,
             last_stroke_color: None,
+            compress: true,
         }
+    }
+
+    /// Whether to Flate-compress the content stream (default `true`), like
+    /// R's `pdf(compress = )`. Uncompressed output is much larger but its
+    /// drawing operators can be read as text, as the tests comparing it
+    /// with R's `pdf(compress = FALSE)` do.
+    pub fn with_compression(mut self, compress: bool) -> Self {
+        self.compress = compress;
+        self
     }
 
     fn pt(&self, p: Point) -> (f64, f64) {
@@ -230,31 +244,46 @@ impl PdfBackend {
         let w_pt = self.width_in * 72.0;
         let h_pt = self.height_in * 72.0;
 
-        let mut objects: Vec<String> = Vec::new();
+        let mut objects: Vec<Vec<u8>> = Vec::new();
         // 1: Catalog, 2: Pages, 3: Page, 4: Contents, 5-8: Fonts.
-        objects.push("<< /Type /Catalog /Pages 2 0 R >>".to_string());
-        objects.push("<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string());
-        objects.push(format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w_pt:.3} {h_pt:.3}] \
-             /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R >> >> \
-             /Contents 4 0 R >>"
-        ));
-        let stream = &self.content;
-        objects.push(format!(
-            "<< /Length {} >>\nstream\n{}endstream",
-            stream.as_bytes().len(),
-            stream
-        ));
+        objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
+        objects.push(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec());
+        objects.push(
+            format!(
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w_pt:.3} {h_pt:.3}] \
+                 /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R >> >> \
+                 /Contents 4 0 R >>"
+            )
+            .into_bytes(),
+        );
+        let (stream, filter) = if self.compress {
+            let data = zlib_compress(self.content.as_bytes(), DEFLATE_LEVEL);
+            (data, " /Filter /FlateDecode")
+        } else {
+            (self.content.into_bytes(), "")
+        };
+        let mut contents = format!("<< /Length {}{filter} >>\nstream\n", stream.len()).into_bytes();
+        contents.extend_from_slice(&stream);
+        // Flate data may not end in a newline; a separator added before
+        // `endstream` isn't counted in `/Length`.
+        if stream.last() != Some(&b'\n') {
+            contents.push(b'\n');
+        }
+        contents.extend_from_slice(b"endstream");
+        objects.push(contents);
         for face in [
             FontFace::Plain,
             FontFace::Bold,
             FontFace::Italic,
             FontFace::BoldItalic,
         ] {
-            objects.push(format!(
-                "<< /Type /Font /Subtype /Type1 /BaseFont /{} /Encoding /WinAnsiEncoding >>",
-                Self::base_font_name(face)
-            ));
+            objects.push(
+                format!(
+                    "<< /Type /Font /Subtype /Type1 /BaseFont /{} /Encoding /WinAnsiEncoding >>",
+                    Self::base_font_name(face)
+                )
+                .into_bytes(),
+            );
         }
 
         let mut out = Vec::new();
@@ -264,7 +293,7 @@ impl PdfBackend {
             offsets.push(out.len());
             let header = format!("{} 0 obj\n", i + 1);
             out.extend_from_slice(header.as_bytes());
-            out.extend_from_slice(obj.as_bytes());
+            out.extend_from_slice(obj);
             out.extend_from_slice(b"\nendobj\n");
         }
         let xref_offset = out.len();
@@ -280,6 +309,93 @@ impl PdfBackend {
         );
         out
     }
+}
+
+/// Deflate level for compressed content streams.
+const DEFLATE_LEVEL: u8 = 2;
+
+/// Content is deflated in pieces of this many bytes, on separate threads.
+const DEFLATE_CHUNK: usize = 1 << 22;
+
+/// zlib-compress `data`. Like `pigz`, pieces of [`DEFLATE_CHUNK`] bytes are
+/// deflated on separate threads, each but the last ending in a sync flush
+/// (an empty stored block, so it ends on a byte boundary and isn't final),
+/// so their raw deflate streams concatenate into one. Matches cost only the
+/// back-references across piece boundaries, a negligible size difference.
+fn zlib_compress(data: &[u8], level: u8) -> Vec<u8> {
+    use miniz_oxide::deflate::core::{
+        compress, create_comp_flags_from_zip_params, CompressorOxide, TDEFLFlush, TDEFLStatus,
+    };
+    let threads = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .min(data.len().div_ceil(DEFLATE_CHUNK));
+    if threads <= 1 {
+        return miniz_oxide::deflate::compress_to_vec_zlib(data, level);
+    }
+    let pieces: Vec<&[u8]> = data.chunks(DEFLATE_CHUNK).collect();
+    let deflate = |piece: &[u8], last: bool| -> Vec<u8> {
+        // Negative window bits: raw deflate, no zlib header or checksum.
+        let flags = create_comp_flags_from_zip_params(level.into(), -15, 0);
+        let mut compressor = CompressorOxide::new(flags);
+        let flush = if last {
+            TDEFLFlush::Finish
+        } else {
+            TDEFLFlush::Sync
+        };
+        let mut out = vec![0; piece.len() / 2 + 1024];
+        let (mut input, mut out_pos) = (piece, 0);
+        loop {
+            let (status, n_in, n_out) = compress(&mut compressor, input, &mut out[out_pos..], flush);
+            input = &input[n_in..];
+            out_pos += n_out;
+            match status {
+                TDEFLStatus::Done => break,
+                // As with zlib, a flush is complete once all input is taken
+                // and output space is left over.
+                TDEFLStatus::Okay if input.is_empty() && out_pos < out.len() && !last => break,
+                TDEFLStatus::Okay => {
+                    if out.len() - out_pos < 1024 {
+                        out.resize(out.len() * 2, 0);
+                    }
+                }
+                _ => panic!("deflate failed: {status:?}"),
+            }
+        }
+        out.truncate(out_pos);
+        out
+    };
+    let per_thread = pieces.len().div_ceil(threads);
+    let n = pieces.len();
+    let (deflated, adler) = std::thread::scope(|s| {
+        let handles: Vec<_> = pieces
+            .chunks(per_thread)
+            .enumerate()
+            .map(|(t, group)| {
+                s.spawn(move || {
+                    group
+                        .iter()
+                        .enumerate()
+                        .map(|(k, piece)| deflate(piece, t * per_thread + k == n - 1))
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        let adler = adler2::adler32_slice(data);
+        let deflated: Vec<Vec<u8>> = handles
+            .into_iter()
+            .flat_map(|h| h.join().expect("deflate thread panicked"))
+            .collect();
+        (deflated, adler)
+    });
+    // zlib header: deflate with a 32K window, no preset dictionary; the
+    // level bits are only informative. (0x789C % 31 == 0, as required.)
+    let mut out = vec![0x78, 0x9C];
+    out.reserve(deflated.iter().map(Vec::len).sum::<usize>() + 4);
+    for piece in &deflated {
+        out.extend_from_slice(piece);
+    }
+    out.extend_from_slice(&adler.to_be_bytes());
+    out
 }
 
 impl Backend for PdfBackend {
@@ -395,6 +511,21 @@ impl Backend for PdfBackend {
 mod tests {
     use super::*;
     use crate::backend::svg::SvgBackend;
+
+    #[test]
+    fn zlib_compress_in_pieces_round_trips() {
+        // Drawing-operator-like text, several pieces long, ending mid-piece,
+        // on a piece boundary, and one byte past it.
+        let line = b"123.456 78.900 2.700 0 360 re f\n";
+        let text: Vec<u8> = line.iter().copied().cycle().take(3 * DEFLATE_CHUNK + 12345).collect();
+        for len in [text.len(), 2 * DEFLATE_CHUNK, 2 * DEFLATE_CHUNK + 1, 100] {
+            let data = &text[..len];
+            let z = zlib_compress(data, DEFLATE_LEVEL);
+            assert!(z.len() < data.len());
+            let back = miniz_oxide::inflate::decompress_to_vec_zlib(&z).expect("valid zlib");
+            assert!(back == data, "length {len}");
+        }
+    }
 
     #[test]
     fn pdf_rounds_font_size_like_r_but_svg_does_not() {

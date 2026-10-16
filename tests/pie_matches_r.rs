@@ -164,7 +164,7 @@ fn pie_matches_r() {
             par.xaxs = AxisStyle::Exact;
             par.yaxs = AxisStyle::Exact;
         }
-        let mut dev = Device::new(PdfBackend::new(c.width, c.height), par);
+        let mut dev = Device::new(PdfBackend::new(c.width, c.height).with_compression(false), par);
         let opts = PieOptions {
             labels: Some(LABELS.iter().map(|s| s.to_string()).collect()),
             main: Some("pie()"),

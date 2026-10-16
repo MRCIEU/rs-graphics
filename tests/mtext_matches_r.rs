@@ -141,7 +141,7 @@ fn mtext_placement_matches_r() {
         oma: Sides::new(2.0, 3.0, 4.0, 1.5),
         ..Par::default()
     };
-    let mut dev = Device::new(PdfBackend::new(8.0, 6.0), par);
+    let mut dev = Device::new(PdfBackend::new(8.0, 6.0).with_compression(false), par);
     dev.mfrow(2, 2);
     dev.plot_new();
     dev.plot_window((0.0, 10.0), (0.0, 5.0), false, false);

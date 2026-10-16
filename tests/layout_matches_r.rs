@@ -309,7 +309,7 @@ fn layout_matches_r() {
         let path = dir.join(format!("rs_graphics_layout_{}.pdf", c.name));
         let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
 
-        let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+        let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), Par::default());
         (c.run)(&mut dev);
         let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

@@ -123,7 +123,7 @@ fn latin1_text_matches_r() {
         mar: Sides::new(0.0, 0.0, 0.0, 0.0),
         ..Par::default()
     };
-    let mut dev = Device::new(PdfBackend::new(6.0, 6.0), par);
+    let mut dev = Device::new(PdfBackend::new(6.0, 6.0).with_compression(false), par);
     dev.plot_new();
     dev.plot_window((0.0, 10.0), (0.0, 16.0), false, false);
     let black = ColorSpec::Color(Color::BLACK);

@@ -112,7 +112,7 @@ fn draw_ours(c: &Case) -> String {
     let mut par = Par::default();
     par.mar = Sides::new(0.0, 0.0, 0.0, 0.0);
     par.cex = c.par_cex;
-    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), par);
+    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.plot_new();
     dev.plot_window((0.0, 8.0), (0.0, 6.0), false, false);
     let col = ColorSpec::Color(Color::parse(c.col).unwrap());

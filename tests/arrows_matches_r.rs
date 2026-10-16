@@ -104,7 +104,7 @@ fn arrows_match_r() {
     );
     let r_pdf = String::from_utf8_lossy(&std::fs::read(&pdf_path).unwrap()).into_owned();
 
-    let mut dev = Device::new(PdfBackend::new(7.0, 5.0), Par::default());
+    let mut dev = Device::new(PdfBackend::new(7.0, 5.0).with_compression(false), Par::default());
     dev.plot_new();
     dev.plot_window((0.0, 10.0), (0.0, 10.0), false, false);
     let style = LineStyle::new(ColorSpec::Color(Color::BLACK), 1.0, LineType::Pattern(&[]));

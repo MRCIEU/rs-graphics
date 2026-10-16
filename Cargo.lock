@@ -136,6 +136,8 @@ name = "rs-graphics"
 version = "0.1.0"
 dependencies = [
  "ab_glyph",
+ "adler2",
+ "miniz_oxide 0.8.9",
  "tiny-skia",
 ]
 

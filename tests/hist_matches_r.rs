@@ -72,7 +72,7 @@ fn breaks_and_counts_match_r_sturges() {
     for data in datasets {
         let (expected_breaks, expected_counts) = r_hist(data);
 
-        let backend = PdfBackend::new(6.0, 4.0);
+        let backend = PdfBackend::new(6.0, 4.0).with_compression(false);
         let mut dev = Device::new(backend, Par::default());
         let result = hist(&mut dev, data, &HistOptions::default());
 

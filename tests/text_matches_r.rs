@@ -91,7 +91,7 @@ fn text_placement_matches_r() {
 
     let mut par = Par::default();
     par.mar = Sides::new(0.0, 0.0, 0.0, 0.0);
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), par);
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), par);
     dev.plot_new();
     dev.plot_window((0.0, 10.0), (0.0, 11.0), false, false);
     let black = ColorSpec::Color(Color::BLACK);
