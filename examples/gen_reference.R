@@ -139,4 +139,15 @@ save_all("pch", 7, 6, function() {
   title(main = 'pch: col = "blue", bg = "red", cex = 2')
 })
 
+# Three pages in one PDF (the scatter, hist and boxplot plots above).
+pdf(file.path("reference_output", "multipage.pdf"), width = 6, height = 4)
+plot(1:25, read_vec("scatter_y"), pch = 19, col = "#2297E6", main = "plot(): scatter",
+     xlab = "x", ylab = "y")
+x <- read_vec("hist_x")
+hist(x, main = "hist(): approximately normal data")
+boxplot(read_vec("boxplot_ctrl"), read_vec("boxplot_treatA"), read_vec("boxplot_treatB"),
+        names = c("Ctrl", "Treat A", "Treat B"), main = "boxplot()", ylab = "value")
+invisible(dev.off())
+cat("wrote reference_output/multipage.pdf (3 pages)\n")
+
 cat("\nReference gallery complete. See reference_output/ for comparison.\n")

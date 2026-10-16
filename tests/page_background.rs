@@ -1,7 +1,7 @@
 //! The page background follows the device, as R's `par("bg")` does: none
 //! on PDF (R's `pdf()` is transparent) unless `with_background` is used,
-//! white on SVG and the canvas colour on PNG; and starting a new page on
-//! PDF/SVG discards the previous one.
+//! white on SVG and the canvas colour on PNG; and a new page is a new PDF
+//! page but replaces the SVG one.
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::backend::raster::RasterBackend;
@@ -64,13 +64,16 @@ fn two_pages<B: Backend>(backend: B) -> B {
 }
 
 #[test]
-fn a_new_page_discards_the_old_one() {
+fn a_new_page_is_a_second_pdf_page_and_replaces_the_svg_one() {
     let pdf = two_pages(PdfBackend::new(6.0, 4.0).with_compression(false)).finish();
     let pdf = String::from_utf8_lossy(&pdf);
-    // Palette 2 (#DF536B) is gone, palette 4 (#2297E6) is there.
-    assert!(!pdf.contains("0.8745 0.3255 0.4196"), "{pdf}");
-    assert!(pdf.contains("0.1333 0.5922 0.9020 RG"), "{pdf}");
+    assert!(pdf.contains("/Count 2"), "{pdf}");
+    // Palette 2 (#DF536B) on page one, palette 4 (#2297E6) on page two.
+    let first = pdf.find("0.8745 0.3255 0.4196 RG").expect("page one's mark");
+    let second = pdf.find("0.1333 0.5922 0.9020 RG").expect("page two's mark");
+    assert!(first < pdf.find("5 0 obj").unwrap() && second > pdf.find("6 0 obj").unwrap());
 
+    // SVG holds one page: the first is discarded.
     let svg = two_pages(SvgBackend::new(6.0, 4.0)).finish().to_uppercase();
     assert!(!svg.contains("#DF536B"));
     assert!(svg.contains("#2297E6"));

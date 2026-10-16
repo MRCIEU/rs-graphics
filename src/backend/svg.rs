@@ -259,7 +259,7 @@ impl Backend for SvgBackend {
         (self.width_in, self.height_in)
     }
 
-    fn clear_page(&mut self) {
+    fn new_page(&mut self) {
         self.body.clear();
         self.pending = None;
         self.group_style = None;

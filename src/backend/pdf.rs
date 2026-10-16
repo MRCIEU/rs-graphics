@@ -1,4 +1,4 @@
-//! Minimal hand-rolled single-page PDF writer, using the 4 standard
+//! Minimal hand-rolled PDF writer, using the 4 standard
 //! Type1 Helvetica faces (`Helvetica`, `-Bold`, `-Oblique`,
 //! `-BoldOblique`) that every PDF viewer/renderer bundles - so, like R's
 //! own `pdf()` device default, no font embedding is needed at all, and
@@ -10,7 +10,10 @@
 //! convention exactly (see `backend/mod.rs`), so this backend applies no
 //! coordinate flip - only a inches-to-points scale (`1 in = 72 pt`).
 //!
-//! Like R's `pdf()` (`compress = TRUE`), the page's content stream is
+//! Like R's `pdf()`, each new page the device starts (each `plot_new()`
+//! on a one-figure page, a multi-figure page wrapping round, `fig()`
+//! without `set_new(true)`) is a new PDF page, sharing the font objects.
+//! Like R's `pdf()` (`compress = TRUE`), each page's content stream is
 //! Flate-compressed by default; see [`PdfBackend::with_compression`].
 
 use std::fmt::Write as _;
@@ -33,6 +36,10 @@ pub struct PdfBackend {
     last_line: LineState,
     compress: bool,
     background: Color,
+    /// Finished pages' content streams; `content` is the current page.
+    pages: Vec<String>,
+    /// Whether a page has been started (by the first `new_page()`).
+    started: bool,
 }
 
 /// The line-style parameters last written to the content stream (`None`:
@@ -58,6 +65,8 @@ impl PdfBackend {
             last_line: LineState::default(),
             compress: true,
             background: Color::TRANSPARENT,
+            pages: Vec::new(),
+            started: false,
         }
     }
 
@@ -251,33 +260,50 @@ impl PdfBackend {
         let w_pt = self.width_in * 72.0;
         let h_pt = self.height_in * 72.0;
 
+        let mut pages = self.pages;
+        pages.push(self.content);
+        let n_pages = pages.len();
+
+        // 1: Catalog, 2: Pages, then a Page and its Contents per page
+        // (3 and 4 for one page), then the four fonts.
+        let font0 = 3 + 2 * n_pages;
         let mut objects: Vec<Vec<u8>> = Vec::new();
-        // 1: Catalog, 2: Pages, 3: Page, 4: Contents, 5-8: Fonts.
         objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
-        objects.push(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec());
+        let kids: Vec<String> = (0..n_pages).map(|i| format!("{} 0 R", 3 + 2 * i)).collect();
         objects.push(
-            format!(
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w_pt:.3} {h_pt:.3}] \
-                 /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R >> >> \
-                 /Contents 4 0 R >>"
-            )
-            .into_bytes(),
+            format!("<< /Type /Pages /Kids [{}] /Count {n_pages} >>", kids.join(" ")).into_bytes(),
         );
-        let (stream, filter) = if self.compress {
-            let data = zlib_compress(self.content.as_bytes(), DEFLATE_LEVEL);
-            (data, " /Filter /FlateDecode")
-        } else {
-            (self.content.into_bytes(), "")
-        };
-        let mut contents = format!("<< /Length {}{filter} >>\nstream\n", stream.len()).into_bytes();
-        contents.extend_from_slice(&stream);
-        // Flate data may not end in a newline; a separator added before
-        // `endstream` isn't counted in `/Length`.
-        if stream.last() != Some(&b'\n') {
-            contents.push(b'\n');
+        for (i, content) in pages.into_iter().enumerate() {
+            objects.push(
+                format!(
+                    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w_pt:.3} {h_pt:.3}] \
+                     /Resources << /Font << /F1 {} 0 R /F2 {} 0 R /F3 {} 0 R /F4 {} 0 R >> >> \
+                     /Contents {} 0 R >>",
+                    font0,
+                    font0 + 1,
+                    font0 + 2,
+                    font0 + 3,
+                    4 + 2 * i
+                )
+                .into_bytes(),
+            );
+            let (stream, filter) = if self.compress {
+                let data = zlib_compress(content.as_bytes(), DEFLATE_LEVEL);
+                (data, " /Filter /FlateDecode")
+            } else {
+                (content.into_bytes(), "")
+            };
+            let mut contents =
+                format!("<< /Length {}{filter} >>\nstream\n", stream.len()).into_bytes();
+            contents.extend_from_slice(&stream);
+            // Flate data may not end in a newline; a separator added before
+            // `endstream` isn't counted in `/Length`.
+            if stream.last() != Some(&b'\n') {
+                contents.push(b'\n');
+            }
+            contents.extend_from_slice(b"endstream");
+            objects.push(contents);
         }
-        contents.extend_from_slice(b"endstream");
-        objects.push(contents);
         for face in [
             FontFace::Plain,
             FontFace::Bold,
@@ -336,8 +362,12 @@ impl Backend for PdfBackend {
         self.background
     }
 
-    fn clear_page(&mut self) {
-        self.content.clear();
+    fn new_page(&mut self) {
+        let page = std::mem::take(&mut self.content);
+        if self.started {
+            self.pages.push(page);
+        }
+        self.started = true;
         self.forget_state();
     }
 

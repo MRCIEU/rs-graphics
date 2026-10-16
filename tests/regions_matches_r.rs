@@ -300,7 +300,9 @@ fn fig_without_new_starts_a_new_page() {
     dev.fig([0.5, 1.0, 0.5, 1.0]);
     pl(&mut dev, 3, "second");
     let out = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-    assert!(!out.contains("(first)") && out.contains("(second)"));
+    // Two pages: "first" on page one, "second" on page two.
+    assert!(out.contains("/Count 2"), "{out}");
+    assert!(out.find("(first)").unwrap() < out.find("(second)").unwrap());
 }
 
 #[test]

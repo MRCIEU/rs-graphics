@@ -332,7 +332,7 @@ impl<B: Backend> Device<B> {
         self.used = true;
         self.recompute_layout();
         if new_page {
-            self.backend.clear_page();
+            self.backend.new_page();
             if self.par.bg.a > 0 {
                 self.backend.draw_rect(
                     Rect::new(0.0, 0.0, self.width_in, self.height_in),

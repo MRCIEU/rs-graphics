@@ -168,11 +168,12 @@ A few fidelity-relevant decisions worth calling out:
   there, with a tolerance-based test instead of an exact-match one).
   Likewise `barplot()`'s legend on a log value axis goes in the top-right
   corner as intended, not where R's use of log10 `par("usr")` puts it.
-- **One page per backend.** Backends hold a single page, so moving to a
-  "new page" in a multi-panel sequence (the figure counter wrapping
-  round) discards what was drawn before (PDF, SVG) or paints the
-  background over it (PNG), rather than starting a fresh page as R's
-  multi-page devices do.
+- **Pages.** PDF output has one page per R page, as R's `pdf()` does: a
+  new page starts at each `plot_new()` on a one-figure page, when a
+  multi-figure page wraps round, and after `fig()` without
+  `set_new(true)`. SVG and PNG hold a single page, so a new page
+  replaces the old one (SVG) or is painted over it (PNG); R would write
+  numbered files (`png("plot%03d.png")`), which isn't implemented.
 - **Page background.** As in R, `par("bg")` starts as the device's
   background: transparent for PDF (R's `pdf()`; set one with
   `PdfBackend::with_background`, like `pdf(bg = )`), white for SVG, and
@@ -198,6 +199,7 @@ A few fidelity-relevant decisions worth calling out:
 ```sh
 cargo run --example gallery
 # -> gallery_output/{plot_scatter,plot_line,plot_log,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,boxplot_horizontal,pie,multipanel,pch}.{svg,pdf,png}
+#    and gallery_output/multipage.pdf (3 pages)
 ```
 
 `examples/gen_reference.R` produces the real-R equivalent of the same
@@ -295,6 +297,10 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/regions_matches_r.rs` - `par(pty = "s")` on wide and tall
   pages, `par(plt=)` (also over `pty`), and `par(fig=)` with `new = TRUE`,
   `oma` and after `mfrow`: every painted path and text item in order.
+- `tests/multipage_matches_r.rs` - page count and each page's paths
+  and text for separate plots, a wrapping `mfrow` and `fig` with and
+  without `new = TRUE`, plus compressed pages inflating to the
+  uncompressed ones.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 

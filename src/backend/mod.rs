@@ -194,8 +194,9 @@ pub trait Backend {
         Color::WHITE
     }
 
-    /// Start a new page by discarding everything drawn so far, where the
-    /// backend can (PDF, SVG). Elsewhere it does nothing, and the new
+    /// Start a new page. The PDF backend keeps the finished page and starts
+    /// another (one PDF page per R page); SVG, which holds a single page,
+    /// discards what was drawn; elsewhere this does nothing, and the new
     /// page's background is painted over the old one instead.
-    fn clear_page(&mut self) {}
+    fn new_page(&mut self) {}
 }

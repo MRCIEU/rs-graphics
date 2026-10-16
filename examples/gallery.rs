@@ -352,6 +352,14 @@ fn draw_multipanel<B: Backend>(dev: &mut Device<B>) {
     draw_barplot(dev);
 }
 
+/// Three pages in one PDF: each `plot_new()` on a one-figure page starts
+/// a new page, as with R's `pdf()`. (SVG and PNG hold one page.)
+fn draw_multipage<B: Backend>(dev: &mut Device<B>) {
+    draw_scatter(dev);
+    draw_hist(dev);
+    draw_boxplot(dev);
+}
+
 fn main() {
     fs::create_dir_all("gallery_output").expect("create gallery_output/");
 
@@ -369,6 +377,10 @@ fn main() {
     save_gallery_plot!("pie", 6.0, 6.0, draw_pie);
     save_gallery_plot!("multipanel", 8.0, 6.0, draw_multipanel);
     save_gallery_plot!("pch", 7.0, 6.0, draw_pch);
+
+    let pdf = render::<PdfBackend>(6.0, 4.0, draw_multipage);
+    fs::write("gallery_output/multipage.pdf", pdf.finish()).expect("write pdf");
+    println!("wrote gallery_output/multipage.pdf (3 pages)");
 
     println!("\nGallery complete. See gallery_output/ for SVG/PDF/PNG output.");
 }
