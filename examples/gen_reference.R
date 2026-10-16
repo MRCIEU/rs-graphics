@@ -43,6 +43,13 @@ save_all("plot_line", 6, 4, function() {
   plot(x, y, type = "l", col = "#DF536B", lwd = 2, main = "plot(): line", xlab = "x", ylab = "sin(x)")
 })
 
+save_all("plot_log", 6, 4, function() {
+  x <- 10^((0:15) / 5)
+  y <- 2 * x^1.5
+  plot(x, y, type = "b", pch = 19, col = "#2297E6", log = "xy", main = 'plot(): log = "xy"',
+       xlab = "x", ylab = "2 * x^1.5")
+})
+
 save_all("legend", 6, 4, function() {
   x <- seq(0, 10, by = 0.25)
   plot(x, sin(x), type = "l", col = "#DF536B", lwd = 2, ylim = c(-1, 1.6),

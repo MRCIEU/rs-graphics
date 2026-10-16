@@ -12,10 +12,9 @@ use crate::lty::LineType;
 use super::data_range;
 
 /// `plot(..., type = )`. Only the core types are implemented: `"p"`
-/// (points, the default), `"l"` (lines), `"b"`/`"o"` (both - R
-/// distinguishes these by leaving a gap around each point for `"b"` vs.
-/// drawing the line straight through for `"o"`; we don't replicate the
-/// gap logic, so both draw the line then the points on top) and `"n"`
+/// (points, the default), `"l"` (lines), `"b"` (both: points, with the
+/// lines between them stopping short of each point), `"o"` (overplotted:
+/// the line drawn straight through, points on top) and `"n"`
 /// (set up the axes/window but plot nothing, so points/lines can be added
 /// afterwards).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -111,7 +110,11 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
     match opts.type_ {
         PlotType::Points => dev.points(x, y, opts.pch, opts.col, opts.bg, opts.cex),
         PlotType::Lines => dev.lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty)),
-        PlotType::Both | PlotType::Overplotted => {
+        PlotType::Both => {
+            dev.broken_lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));
+            dev.points(x, y, opts.pch, opts.col, opts.bg, opts.cex);
+        }
+        PlotType::Overplotted => {
             dev.lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));
             dev.points(x, y, opts.pch, opts.col, opts.bg, opts.cex);
         }

@@ -119,6 +119,24 @@ fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
     plot(dev, &x, &y, &opts);
 }
 
+fn draw_log<B: Backend>(dev: &mut Device<B>) {
+    let x: Vec<f64> = (0..=15).map(|i| 10f64.powf(i as f64 / 5.0)).collect();
+    let y: Vec<f64> = x.iter().map(|&v| 2.0 * v.powf(1.5)).collect();
+
+    let opts = PlotOptions {
+        type_: rs_graphics::highlevel::PlotType::Both,
+        pch: 19,
+        col: ColorSpec::Index(4),
+        xlog: true,
+        ylog: true,
+        main: Some("plot(): log = \"xy\""),
+        xlab: Some("x"),
+        ylab: Some("2 * x^1.5"),
+        ..PlotOptions::default()
+    };
+    plot(dev, &x, &y, &opts);
+}
+
 fn draw_legend<B: Backend>(dev: &mut Device<B>) {
     let x: Vec<f64> = (0..=40).map(|i| i as f64 * 0.25).collect();
     let sin: Vec<f64> = x.iter().map(|&v| v.sin()).collect();
@@ -282,6 +300,7 @@ fn main() {
 
     save_gallery_plot!("plot_scatter", 6.0, 4.0, draw_scatter);
     save_gallery_plot!("plot_line", 6.0, 4.0, draw_lineplot);
+    save_gallery_plot!("plot_log", 6.0, 4.0, draw_log);
     save_gallery_plot!("legend", 6.0, 4.0, draw_legend);
     save_gallery_plot!("hist", 6.0, 4.0, draw_hist);
     save_gallery_plot!("barplot", 6.0, 4.0, draw_barplot);

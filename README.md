@@ -179,7 +179,7 @@ A few fidelity-relevant decisions worth calling out:
 
 ```sh
 cargo run --example gallery
-# -> gallery_output/{plot_scatter,plot_line,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,pie,multipanel}.{svg,pdf,png}
+# -> gallery_output/{plot_scatter,plot_line,plot_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,pie,multipanel,pch}.{svg,pdf,png}
 ```
 
 `examples/gen_reference.R` produces the real-R equivalent of the same
@@ -253,6 +253,9 @@ against a real R installation by shelling out to `Rscript`:
   linear small range, a reversed axis with `at` in data units), with
   non-positive values dropped: label strings and origins, axis and tick
   segments, and the number of points drawn.
+- `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
+  segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
+  axis.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 

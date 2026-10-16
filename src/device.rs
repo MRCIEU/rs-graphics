@@ -561,6 +561,36 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
+    /// The lines of `plot(type = "b")` (and `"c"`): each segment between
+    /// consecutive points, shortened at both ends by half a character
+    /// height (`0.5 * par(cex) * 1.2 * ps / 72` inches) so the points stand
+    /// clear, and left out when shorter than that. A port of `C_plotXY`'s
+    /// `case 'b'`.
+    pub fn broken_lines(&mut self, xs: &[f64], ys: &[f64], style: LineStyle) {
+        let Some(col) = self.resolve(style.col) else {
+            return;
+        };
+        let stroke = self.stroke_of(col, style.lwd, style.lty);
+        let d = 0.5 * self.par.cex * 1.2 * self.par.ps / 72.0;
+        self.push_clip_for(self.par.xpd);
+        let mut old: Option<Point> = None;
+        for (&x, &y) in xs.iter().zip(ys) {
+            let p = self.user_to_inches(x, y);
+            let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
+            if let (Some(a), Some(b)) = (old, p) {
+                let len = (b.x - a.x).hypot(b.y - a.y);
+                if d < 0.5 * len {
+                    let f = d / len;
+                    let from = Point::new(a.x + f * (b.x - a.x), a.y + f * (b.y - a.y));
+                    let to = Point::new(b.x + f * (a.x - b.x), b.y + f * (a.y - b.y));
+                    self.backend.draw_line(from, to, &stroke);
+                }
+            }
+            old = p;
+        }
+        self.pop_clip();
+    }
+
     /// `segments(x0, y0, x1, y1, ...)`.
     pub fn segments(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], style: LineStyle) {
         let Some(col) = self.resolve(style.col) else {
