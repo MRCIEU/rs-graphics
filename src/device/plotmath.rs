@@ -702,7 +702,7 @@ impl<'d, B: Backend> Math<'d, B> {
             let p1 = self.converted();
             self.move_up(-height);
             let lwd = self.dev.par.lwd.min(1.0);
-            let stroke = self.dev.stroke_of(self.col, lwd, LineType::Pattern(&[]));
+            let stroke = self.dev.stroke_of(self.col, lwd, LineType::SOLID);
             self.dev.push_clip_region(self.clip);
             self.dev.backend.draw_line(p0, p1, &stroke);
             self.dev.pop_clip();

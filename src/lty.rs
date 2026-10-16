@@ -22,6 +22,21 @@ pub enum LineType {
 }
 
 impl LineType {
+    /// `lty = 0` / `"blank"`: nothing drawn.
+    pub const BLANK: LineType = LineType::Blank;
+    /// `lty = 1` / `"solid"` (the default).
+    pub const SOLID: LineType = LineType::Pattern(&[]);
+    /// `lty = 2` / `"dashed"`.
+    pub const DASHED: LineType = LineType::Pattern(&[4, 4]);
+    /// `lty = 3` / `"dotted"`.
+    pub const DOTTED: LineType = LineType::Pattern(&[1, 3]);
+    /// `lty = 4` / `"dotdash"`.
+    pub const DOTDASH: LineType = LineType::Pattern(&[1, 3, 4, 3]);
+    /// `lty = 5` / `"longdash"`.
+    pub const LONGDASH: LineType = LineType::Pattern(&[7, 3]);
+    /// `lty = 6` / `"twodash"`.
+    pub const TWODASH: LineType = LineType::Pattern(&[2, 2, 6, 2]);
+
     /// Parse an `lty` string as R's `par(lty=)` does: a name (`"solid"`,
     /// `"dashed"`, ...) or 2, 4, 6 or 8 hex digits (1-9, A-F; no zeros),
     /// each a segment length in `lwd` units, e.g. `"42"` or `"1343"`. One
@@ -36,13 +51,13 @@ impl LineType {
             }
         }
         match s.to_ascii_lowercase().as_str() {
-            "blank" => Some(LineType::Blank),
-            "solid" => Some(LineType::Pattern(&[])),
-            "dashed" => Some(LineType::Pattern(&[4, 4])),
-            "dotted" => Some(LineType::Pattern(&[1, 3])),
-            "dotdash" => Some(LineType::Pattern(&[1, 3, 4, 3])),
-            "longdash" => Some(LineType::Pattern(&[7, 3])),
-            "twodash" => Some(LineType::Pattern(&[2, 2, 6, 2])),
+            "blank" => Some(LineType::BLANK),
+            "solid" => Some(LineType::SOLID),
+            "dashed" => Some(LineType::DASHED),
+            "dotted" => Some(LineType::DOTTED),
+            "dotdash" => Some(LineType::DOTDASH),
+            "longdash" => Some(LineType::LONGDASH),
+            "twodash" => Some(LineType::TWODASH),
             _ => Self::from_hex_literal(s),
         }
     }
@@ -71,13 +86,13 @@ impl LineType {
     /// encoding used for literal/custom patterns.
     pub fn from_code(code: i32) -> LineType {
         match code {
-            0 => LineType::Blank,
-            1 => LineType::Pattern(&[]),
-            2 => LineType::Pattern(&[4, 4]),
-            3 => LineType::Pattern(&[1, 3]),
-            4 => LineType::Pattern(&[1, 3, 4, 3]),
-            5 => LineType::Pattern(&[7, 3]),
-            6 => LineType::Pattern(&[2, 2, 6, 2]),
+            0 => LineType::BLANK,
+            1 => LineType::SOLID,
+            2 => LineType::DASHED,
+            3 => LineType::DOTTED,
+            4 => LineType::DOTDASH,
+            5 => LineType::LONGDASH,
+            6 => LineType::TWODASH,
             _ => LineType::from_packed_nibbles(code),
         }
     }
@@ -115,6 +130,7 @@ impl LineType {
     /// does for round and square caps. Lengths below 0 become 0. `None`
     /// for blank and solid, and when every length is <= 0.01pt (R then
     /// writes an empty, i.e. solid, dash array).
+    #[doc(hidden)]
     pub fn dash_lengths_pt(&self, lwd: f64, butt_cap: bool) -> Option<Vec<f64>> {
         match self {
             LineType::Blank => None,
@@ -145,6 +161,22 @@ impl LineType {
     }
 }
 
+impl Default for LineType {
+    /// [`LineType::SOLID`], R's default `par(lty)`.
+    fn default() -> Self {
+        LineType::SOLID
+    }
+}
+
+impl From<i32> for LineType {
+    /// R's numeric `lty` codes, as [`LineType::from_code`].
+    fn from(code: i32) -> Self {
+        LineType::from_code(code)
+    }
+}
+
+crate::error::from_str_via_parse!(LineType, "line type");
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,6 +185,26 @@ mod tests {
     fn named_and_numeric_agree() {
         assert_eq!(LineType::parse("dashed"), Some(LineType::from_code(2)));
         assert_eq!(LineType::parse("2"), Some(LineType::from_code(2)));
+    }
+
+    #[test]
+    fn named_consts_are_rs_codes() {
+        let named = [
+            LineType::BLANK,
+            LineType::SOLID,
+            LineType::DASHED,
+            LineType::DOTTED,
+            LineType::DOTDASH,
+            LineType::LONGDASH,
+            LineType::TWODASH,
+        ];
+        for (code, lty) in named.into_iter().enumerate() {
+            assert_eq!(LineType::from(code as i32), lty);
+        }
+        assert_eq!(LineType::default(), LineType::SOLID);
+        assert_eq!("dotdash".parse::<LineType>(), Ok(LineType::DOTDASH));
+        let err = "wavy".parse::<LineType>().unwrap_err();
+        assert_eq!(err.to_string(), "invalid line type: \"wavy\"");
     }
 
     #[test]

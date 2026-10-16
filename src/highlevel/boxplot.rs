@@ -256,7 +256,7 @@ pub fn boxplot<B: Backend>(
         let wntch = notch_frac * half;
         let lend = std::mem::replace(&mut dev.par.lend, LineEnd::Butt);
         let (mx, my) = xy(&[x - wntch, x + wntch], &[s.median, s.median]);
-        let median = LineStyle::new(border, 3.0 * lwd, LineType::Pattern(&[]));
+        let median = LineStyle::new(border, 3.0 * lwd, LineType::SOLID);
         dev.segments(&mx[..1], &my[..1], &mx[1..], &my[1..], median);
         dev.par.lend = lend;
         // Whiskers run from their ends to the hinges (which matters for
@@ -271,10 +271,10 @@ pub fn boxplot<B: Backend>(
         let cap = half * 0.5;
         for &(w, _) in &ends {
             let (sx, sy) = xy(&[x - cap, x + cap], &[w, w]);
-            let solid = LineStyle::new(border, lwd, LineType::Pattern(&[]));
+            let solid = LineStyle::new(border, lwd, LineType::SOLID);
             dev.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], solid);
         }
-        dev.polygon(&bx, &by, ColorSpec::None, border, lwd, LineType::Pattern(&[]));
+        dev.polygon(&bx, &by, ColorSpec::None, border, lwd, LineType::SOLID);
         if !s.outliers.is_empty() {
             let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
             let (ox, oy) = xy(&pos, &s.outliers);
@@ -316,7 +316,7 @@ pub fn boxplot<B: Backend>(
     }
 
     if opts.axes {
-        dev.box_plot(fg, dev.par.lwd, LineType::Pattern(&[]));
+        dev.box_plot(fg, dev.par.lwd, LineType::SOLID);
     }
 
     stats

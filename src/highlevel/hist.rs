@@ -194,7 +194,7 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
             opts.col,
             opts.border,
             dev.par.lwd,
-            LineType::Pattern(&[]),
+            LineType::SOLID,
         );
     }
 

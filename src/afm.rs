@@ -125,7 +125,7 @@ const LATIN1_UPPER_NAMES: [&str; 96] = [
 /// Character widths and kerning pairs (in 1/1000 em units, the AFM
 /// convention) for a single font face, indexed by Latin-1 code point
 /// (ASCII and 0xA0..=0xFF; other characters get the space width).
-pub struct FontMetrics {
+pub(crate) struct FontMetrics {
     widths: [u16; 256],
     /// Per-glyph bounding-box `ury` (AFM `B llx lly urx ury`), in 1/1000
     /// em units; `PostScriptMetricInfo()` reports this as the glyph's

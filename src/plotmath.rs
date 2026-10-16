@@ -82,6 +82,15 @@ impl Expression {
     }
 }
 
+impl std::str::FromStr for Expression {
+    type Err = ParseError;
+
+    /// As [`Expression::parse`].
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Expression::parse(s)
+    }
+}
+
 /// Why [`Expression::parse`] failed.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParseError {

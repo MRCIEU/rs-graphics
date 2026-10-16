@@ -32,17 +32,23 @@ pub enum PlotType {
 }
 
 impl PlotType {
-    pub fn parse(s: &str) -> PlotType {
+    /// R's `type =` letters `"p"`, `"l"`, `"b"`, `"c"`, `"o"` and `"n"`.
+    /// `None` for anything else, including R's `"h"`, `"s"` and `"S"`,
+    /// which aren't implemented.
+    pub fn parse(s: &str) -> Option<PlotType> {
         match s {
-            "l" => PlotType::Lines,
-            "b" => PlotType::Both,
-            "c" => PlotType::BrokenLines,
-            "o" => PlotType::Overplotted,
-            "n" => PlotType::None,
-            _ => PlotType::Points,
+            "p" => Some(PlotType::Points),
+            "l" => Some(PlotType::Lines),
+            "b" => Some(PlotType::Both),
+            "c" => Some(PlotType::BrokenLines),
+            "o" => Some(PlotType::Overplotted),
+            "n" => Some(PlotType::None),
+            _ => None,
         }
     }
 }
+
+crate::error::from_str_via_parse!(PlotType, "plot type");
 
 /// Options for [`plot`], covering the subset of `plot.default`'s
 /// arguments this crate implements.
@@ -90,7 +96,7 @@ impl Default for PlotOptions {
             col: ColorSpec::Index(1),
             bg: ColorSpec::None,
             lwd: 1.0,
-            lty: LineType::Pattern(&[]),
+            lty: LineType::SOLID,
             cex: 1.0,
             xlim: None,
             ylim: None,
@@ -168,7 +174,7 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
         };
         axis(dev, 1, opts.xaxt, opts.xaxp);
         axis(dev, 2, opts.yaxt, opts.yaxp);
-        dev.box_plot(fg, lwd, LineType::Pattern(&[]));
+        dev.box_plot(fg, lwd, LineType::SOLID);
     }
 
     if dev.par.ann {

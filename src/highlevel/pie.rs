@@ -128,7 +128,7 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
             Some(cols) if !cols.is_empty() => cols[i % cols.len()],
             _ => ColorSpec::Color(Color::parse(DEFAULT_COLORS[i % DEFAULT_COLORS.len()]).unwrap()),
         };
-        dev.polygon(&xs, &ys, col, opts.border, lwd, LineType::Pattern(&[]));
+        dev.polygon(&xs, &ys, col, opts.border, lwd, LineType::SOLID);
 
         let mid = 0.5 * (cum[i] + cum[i + 1]);
         let (px, py) = t2xy(mid);
@@ -137,11 +137,7 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
             dev.lines(
                 &[px, 1.05 * px],
                 &[py, 1.05 * py],
-                crate::device::LineStyle::new(
-                    ColorSpec::Color(dev.par.col),
-                    lwd,
-                    LineType::Pattern(&[]),
-                ),
+                crate::device::LineStyle::new(ColorSpec::Color(dev.par.col), lwd, LineType::SOLID),
             );
             let hadj = if px < 0.0 { 1.0 } else { 0.0 };
             let (saved_xpd, col_lab, font) = (dev.par.xpd, dev.par.col, dev.par.font);

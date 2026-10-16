@@ -7,23 +7,7 @@
 //! Run with `cargo run --example gallery`; output lands in
 //! `gallery_output/` (relative to the crate root).
 
-use std::fs;
-
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::backend::raster::RasterBackend;
-use rs_graphics::backend::svg::SvgBackend;
-use rs_graphics::backend::Backend;
-use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::{
-    Device, LegendEntry, LegendKeyword, LegendOptions, LegendPos, LineStyle,
-};
-use rs_graphics::highlevel::{barplot, barplot_matrix, boxplot, hist, pie, plot};
-use rs_graphics::highlevel::{
-    BarplotOptions, BoxplotOptions, HistOptions, PieOptions, PlotOptions,
-};
-use rs_graphics::layout::Layout;
-use rs_graphics::lty::LineType;
-use rs_graphics::par::{Par, Sides};
+use rs_graphics::prelude::*;
 
 /// Parses one of the `examples/data/*.txt` files (one number per line).
 ///
@@ -38,54 +22,15 @@ fn parse_data(text: &str) -> Vec<f64> {
         .collect()
 }
 
-/// Lets [`render`] construct any of the three backends generically from
-/// just a page size.
-trait NewBackend: Backend + Sized {
-    fn create(width_in: f64, height_in: f64) -> Self;
-}
-
-impl NewBackend for SvgBackend {
-    fn create(width_in: f64, height_in: f64) -> Self {
-        SvgBackend::new(width_in, height_in)
+/// Renders `draw` to `gallery_output/<name>.{svg,pdf,png}`.
+fn save_gallery_plot(name: &str, width_in: f64, height_in: f64, draw: fn(&mut Device<AnyBackend>)) {
+    for ext in ["svg", "pdf", "png"] {
+        let path = format!("gallery_output/{name}.{ext}");
+        let mut dev = Device::for_path(&path, width_in, height_in, 300.0).expect("known format");
+        draw(&mut dev);
+        dev.save(&path).expect("write gallery file");
     }
-}
-
-impl NewBackend for PdfBackend {
-    fn create(width_in: f64, height_in: f64) -> Self {
-        PdfBackend::new(width_in, height_in)
-    }
-}
-
-impl NewBackend for RasterBackend {
-    fn create(width_in: f64, height_in: f64) -> Self {
-        RasterBackend::new(width_in, height_in, 300.0, Color::WHITE)
-    }
-}
-
-fn render<B: NewBackend>(width_in: f64, height_in: f64, draw: fn(&mut Device<B>)) -> B {
-    let backend = B::create(width_in, height_in);
-    let mut dev = Device::new(backend, Par::default());
-    draw(&mut dev);
-    dev.into_backend()
-}
-
-/// Renders `draw` to all three backends and writes
-/// `gallery_output/<name>.{svg,pdf,png}`. `draw` must be a bare `fn`
-/// item (not a closure), so it can be instantiated once per backend
-/// type via [`render`].
-macro_rules! save_gallery_plot {
-    ($name:expr, $w:expr, $h:expr, $draw:ident) => {{
-        let svg = render::<SvgBackend>($w, $h, $draw);
-        fs::write(format!("gallery_output/{}.svg", $name), svg.finish()).expect("write svg");
-
-        let pdf = render::<PdfBackend>($w, $h, $draw);
-        fs::write(format!("gallery_output/{}.pdf", $name), pdf.finish()).expect("write pdf");
-
-        let png = render::<RasterBackend>($w, $h, $draw);
-        fs::write(format!("gallery_output/{}.png", $name), png.finish()).expect("write png");
-
-        println!("wrote gallery_output/{}.[svg|pdf|png]", $name);
-    }};
+    println!("wrote gallery_output/{name}.[svg|pdf|png]");
 }
 
 fn draw_scatter<B: Backend>(dev: &mut Device<B>) {
@@ -155,10 +100,10 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         ..PlotOptions::default()
     };
     plot(dev, &x, &y, &opts);
-    let grey = ColorSpec::Color(Color::parse("grey").unwrap());
-    let dashed = LineType::from_code(2);
+    let grey = ColorSpec::from("grey");
+    let dashed = LineType::DASHED;
     dev.abline(None, None, Some(1000.0), Some(10.0), grey, 1.0, dashed);
-    let solid = LineType::from_code(1);
+    let solid = LineType::SOLID;
     dev.abline(Some(2f64.log10()), Some(1.5), None, None, ColorSpec::Index(2), 2.0, solid);
     dev.abline_untf(2000.0, 20.0, ColorSpec::Index(3), 2.0, solid);
     let entries = vec![
@@ -192,11 +137,11 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
     dev.lines(
         &x,
         &cos,
-        LineStyle::new(ColorSpec::Index(4), 2.0, LineType::from_code(2)),
+        LineStyle::new(ColorSpec::Index(4), 2.0, LineType::DASHED),
     );
     let entries = vec![
-        LegendEntry::line("sin(x)", ColorSpec::Index(2), 2.0, LineType::from_code(1)),
-        LegendEntry::line("cos(x)", ColorSpec::Index(4), 2.0, LineType::from_code(2)),
+        LegendEntry::line("sin(x)", ColorSpec::Index(2), 2.0, LineType::SOLID),
+        LegendEntry::line("cos(x)", ColorSpec::Index(4), 2.0, LineType::DASHED),
     ];
     let o = LegendOptions {
         title: Some("Functions".into()),
@@ -327,8 +272,8 @@ fn draw_pch<B: Backend>(dev: &mut Device<B>) {
     dev.par.mar = Sides::new(0.5, 0.5, 2.5, 0.5);
     dev.plot_new();
     dev.plot_window((0.5, 7.5), (-0.2, 5.4), false, false);
-    let blue = ColorSpec::Color(Color::parse("blue").unwrap());
-    let red = ColorSpec::Color(Color::parse("red").unwrap());
+    let blue = ColorSpec::from("blue");
+    let red = ColorSpec::from("red");
     let black = ColorSpec::Color(Color::BLACK);
     for pch in 0..26 {
         let (x, y) = ((pch % 7) as f64 + 1.0, 5.0 - (pch / 7) as f64);
@@ -361,25 +306,26 @@ fn draw_multipage<B: Backend>(dev: &mut Device<B>) {
 }
 
 fn main() {
-    fs::create_dir_all("gallery_output").expect("create gallery_output/");
+    std::fs::create_dir_all("gallery_output").expect("create gallery_output/");
 
-    save_gallery_plot!("plot_scatter", 6.0, 4.0, draw_scatter);
-    save_gallery_plot!("plot_line", 6.0, 4.0, draw_lineplot);
-    save_gallery_plot!("plot_log", 6.0, 4.0, draw_log);
-    save_gallery_plot!("abline_log", 6.0, 4.0, draw_abline_log);
-    save_gallery_plot!("legend", 6.0, 4.0, draw_legend);
-    save_gallery_plot!("hist", 6.0, 4.0, draw_hist);
-    save_gallery_plot!("barplot", 6.0, 4.0, draw_barplot);
-    save_gallery_plot!("barplot_stacked", 6.0, 4.0, draw_barplot_stacked);
-    save_gallery_plot!("barplot_beside", 6.0, 4.0, draw_barplot_beside);
-    save_gallery_plot!("boxplot", 6.0, 4.0, draw_boxplot);
-    save_gallery_plot!("boxplot_horizontal", 6.0, 4.0, draw_boxplot_horizontal);
-    save_gallery_plot!("pie", 6.0, 6.0, draw_pie);
-    save_gallery_plot!("multipanel", 8.0, 6.0, draw_multipanel);
-    save_gallery_plot!("pch", 7.0, 6.0, draw_pch);
+    save_gallery_plot("plot_scatter", 6.0, 4.0, draw_scatter);
+    save_gallery_plot("plot_line", 6.0, 4.0, draw_lineplot);
+    save_gallery_plot("plot_log", 6.0, 4.0, draw_log);
+    save_gallery_plot("abline_log", 6.0, 4.0, draw_abline_log);
+    save_gallery_plot("legend", 6.0, 4.0, draw_legend);
+    save_gallery_plot("hist", 6.0, 4.0, draw_hist);
+    save_gallery_plot("barplot", 6.0, 4.0, draw_barplot);
+    save_gallery_plot("barplot_stacked", 6.0, 4.0, draw_barplot_stacked);
+    save_gallery_plot("barplot_beside", 6.0, 4.0, draw_barplot_beside);
+    save_gallery_plot("boxplot", 6.0, 4.0, draw_boxplot);
+    save_gallery_plot("boxplot_horizontal", 6.0, 4.0, draw_boxplot_horizontal);
+    save_gallery_plot("pie", 6.0, 6.0, draw_pie);
+    save_gallery_plot("multipanel", 8.0, 6.0, draw_multipanel);
+    save_gallery_plot("pch", 7.0, 6.0, draw_pch);
 
-    let pdf = render::<PdfBackend>(6.0, 4.0, draw_multipage);
-    fs::write("gallery_output/multipage.pdf", pdf.finish()).expect("write pdf");
+    let mut dev = Device::pdf(6.0, 4.0);
+    draw_multipage(&mut dev);
+    dev.save("gallery_output/multipage.pdf").expect("write pdf");
     println!("wrote gallery_output/multipage.pdf (3 pages)");
 
     println!("\nGallery complete. See gallery_output/ for SVG/PDF/PNG output.");

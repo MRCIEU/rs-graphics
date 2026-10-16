@@ -1222,6 +1222,10 @@ fn to_sk_color(c: Color) -> tiny_skia::Color {
 }
 
 impl Backend for RasterBackend {
+    fn into_bytes(self) -> Vec<u8> {
+        self.finish()
+    }
+
     fn size_inches(&self) -> (f64, f64) {
         (self.width_in, self.height_in)
     }

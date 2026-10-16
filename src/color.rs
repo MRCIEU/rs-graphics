@@ -174,6 +174,21 @@ impl From<&str> for ColorSpec {
     }
 }
 
+impl From<String> for ColorSpec {
+    /// As `From<&str>`: a colour name or hex string; unparseable input
+    /// gives `ColorSpec::None` (draw nothing).
+    fn from(s: String) -> Self {
+        ColorSpec::from(s.as_str())
+    }
+}
+
+impl From<&String> for ColorSpec {
+    /// As `From<&str>`.
+    fn from(s: &String) -> Self {
+        ColorSpec::from(s.as_str())
+    }
+}
+
 impl From<Option<Color>> for ColorSpec {
     fn from(c: Option<Color>) -> Self {
         match c {
@@ -182,6 +197,8 @@ impl From<Option<Color>> for ColorSpec {
         }
     }
 }
+
+crate::error::from_str_via_parse!(Color, "colour");
 
 #[cfg(test)]
 mod tests {
@@ -219,5 +236,15 @@ mod tests {
     fn palette_recycles() {
         let spec = ColorSpec::Index(9);
         assert_eq!(spec.resolve(&DEFAULT_PALETTE), Some(DEFAULT_PALETTE[0]));
+    }
+
+    #[test]
+    fn from_str_and_string_conversions() {
+        assert_eq!("red".parse::<Color>(), Ok(Color::rgb(255, 0, 0)));
+        assert!("notacolour".parse::<Color>().is_err());
+        let name = String::from("blue");
+        let blue = ColorSpec::Color(Color::rgb(0, 0, 255));
+        assert_eq!(ColorSpec::from(&name), blue);
+        assert_eq!(ColorSpec::from(name), blue);
     }
 }

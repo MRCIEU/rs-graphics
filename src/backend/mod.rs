@@ -1,6 +1,7 @@
 //! The `Backend` trait: a minimal drawing surface that the higher-level
 //! graphics engine (`crate::device`) renders onto. Implemented for SVG
-//! (`svg.rs`), PDF (`pdf.rs`), and PNG rasterization (`raster.rs`).
+//! (`svg.rs`), PDF (`pdf.rs`), and PNG rasterization (`raster.rs`), and
+//! [`AnyBackend`], which wraps any of the three behind one type.
 //!
 //! # Coordinate convention
 //! All coordinates passed to a `Backend` are in **inches**, origin at the
@@ -19,11 +20,14 @@
 //! The one per-device quirk is the point size itself: see
 //! [`Backend::effective_font_size`].
 
+mod any;
 mod compress;
 mod numfmt;
 pub mod pdf;
 pub mod raster;
 pub mod svg;
+
+pub use any::{AnyBackend, Format};
 
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
@@ -48,6 +52,8 @@ impl LineEnd {
     }
 }
 
+crate::error::from_str_via_parse!(LineEnd, "line end");
+
 /// Join style for strokes (`par(ljoin=)`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineJoin {
@@ -66,6 +72,8 @@ impl LineJoin {
         }
     }
 }
+
+crate::error::from_str_via_parse!(LineJoin, "line join");
 
 /// Everything needed to stroke a path, mirroring R's graphics context
 /// (`R_GE_gcontext`) stroke-relevant fields.
@@ -86,7 +94,7 @@ impl Stroke {
         Stroke {
             color,
             lwd,
-            lty: LineType::Pattern(&[]),
+            lty: LineType::SOLID,
             lend: LineEnd::Round,
             ljoin: LineJoin::Round,
             lmitre: 10.0,
@@ -200,4 +208,11 @@ pub trait Backend {
     /// discards what was drawn; elsewhere this does nothing, and the new
     /// page's background is painted over the old one instead.
     fn new_page(&mut self) {}
+
+    /// The finished file: PDF or PNG bytes, or the SVG document as UTF-8.
+    /// The same as each backend's own `finish()`, but available to code
+    /// generic over `B: Backend`.
+    fn into_bytes(self) -> Vec<u8>
+    where
+        Self: Sized;
 }

@@ -84,6 +84,8 @@ impl LegendKeyword {
     }
 }
 
+crate::error::from_str_via_parse!(LegendKeyword, "legend position");
+
 /// One row (key + label) of a legend.
 #[derive(Clone, Debug)]
 pub struct LegendEntry {

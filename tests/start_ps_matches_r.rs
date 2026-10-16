@@ -45,7 +45,7 @@ fn draw_ours(start: f64, ps: f64) -> String {
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.par.ps = ps;
     let opts = PlotOptions {
-        type_: PlotType::parse("b"),
+        type_: PlotType::Both,
         xlab: Some("x".into()),
         ylab: Some("y".into()),
         ..PlotOptions::default()

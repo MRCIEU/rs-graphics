@@ -110,7 +110,7 @@ impl Default for AxisOptions {
             pos: None,
             outer: false,
             font: None,
-            lty: LineType::Pattern(&[]),
+            lty: LineType::SOLID,
             lwd: 1.0,
             lwd_ticks: None,
             col: None,

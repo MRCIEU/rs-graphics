@@ -12,6 +12,47 @@ sizing, symbol geometry, dash patterns, ...) rather than reimplementing
 pieces are cross-checked directly against a real R installation in this
 crate's test suite (see [Testing](#testing) below).
 
+## Usage
+
+```rust
+use rs_graphics::prelude::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let x = [1.0, 2.0, 3.0, 4.0, 5.0];
+    let y = [2.1, 3.9, 6.2, 7.8, 10.1];
+
+    // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); dev.off()
+    let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
+    plot(&mut dev, &x, &y, &PlotOptions {
+        pch: 19,
+        col: "steelblue".into(),
+        main: Some(Label::math("y == beta[0] + beta[1] * x")),
+        xlab: Some("x".into()),
+        ylab: Some("y".into()),
+        ..PlotOptions::default()
+    });
+    dev.abline(None, None, Some(6.0), None, "grey".into(), 1.0, LineType::DASHED);
+    dev.save("scatter.pdf")?;
+    Ok(())
+}
+```
+
+- `rs_graphics::prelude::*` imports the device, its options types,
+  `Par`, colours, line types, labels, layouts, the high-level plots and
+  the backends.
+- `Device::for_path` picks PDF, SVG or PNG from the file extension (the
+  dpi is used for PNG); `Device::pdf(w, h)`, `Device::svg(w, h)` and
+  `Device::png(w, h, dpi)` choose one directly. These start from R's
+  default `par()`; use `Device::new(backend, Par { ps: 10.0,
+  ..Par::default() })` for other starting parameters (like R's
+  `pointsize`). `dev.finish()` returns the file's bytes, `dev.save(path)`
+  writes them.
+- Change graphical parameters with `dev.par.<name> = ...` (R's `par()`),
+  and multi-panel arrangements with `dev.mfrow(2, 2)` / `dev.layout(...)`.
+- Colours are `ColorSpec`s: `"red".into()`, `"#FF000080".into()`, a
+  palette index `ColorSpec::Index(2)`, or `ColorSpec::None`. Line types:
+  `LineType::SOLID`, `DASHED`, ... or `"42".parse()?`.
+
 ## What's implemented
 
 **Graphics engine** (`src/`):
@@ -76,8 +117,10 @@ crate's test suite (see [Testing](#testing) below).
   `mapFigureRegion()`/`mapPlotRegion()`.
 - R's built-in plotting characters `pch = 0..25` (`src/pch.rs`) plus
   character symbols (`pch = "."`, `"a"`, ...), line
-  types `lty` (`src/lty.rs`), the R4 default color palette and all 657
-  named colors (`src/color.rs`, `src/named_colors.rs`), and the exact
+  types `lty` (`src/lty.rs`; `LineType::SOLID`, `DASHED`, ... for R's
+  codes 0-6), the R4 default color palette and all 657
+  named colors (`src/color.rs`, `src/named_colors.rs`; `"red".into()`
+  gives a `ColorSpec`), and the exact
   `pretty()`/`GEPretty()` axis tick-placement algorithms - both of
   which R uses, with **different constants** (`src/pretty.rs`).
 - Text layout (`src/afm.rs`): Helvetica and Symbol AFM metrics (the same tables

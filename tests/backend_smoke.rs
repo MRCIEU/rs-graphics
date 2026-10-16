@@ -1,7 +1,8 @@
 //! Exercises each backend directly (bypassing `Device`) with a handful of
 //! primitives, to catch runtime panics/obviously wrong output early. Also
 //! checks PDF compression, `.svgz` output, the PNG `pHYs` chunk, and that
-//! PNG output doesn't depend on the thread count.
+//! PNG output doesn't depend on the thread count, and that `AnyBackend`
+//! and the `Device` output helpers give the wrapped backend's bytes.
 
 use rs_graphics::afm::FontFace;
 use rs_graphics::backend::pdf::PdfBackend;
@@ -207,4 +208,109 @@ fn raster_output_is_independent_of_thread_count() {
         max_diff <= 32,
         "1 vs 2 threads: max channel difference {max_diff}"
     );
+}
+
+/// Two pages through `Device`: text (PDF's size rounding), a legend box
+/// (the default background), a new page and tiny `pch = "."` points
+/// (PNG's device unit).
+fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
+    use rs_graphics::prelude::*;
+    let x = [1.0, 2.5, 4.0];
+    let opts = PlotOptions {
+        pch: 21,
+        cex: 1.3,
+        main: Some(Label::math("alpha^2")),
+        ..PlotOptions::default()
+    };
+    plot(dev, &x, &x, &opts);
+    let entries = [LegendEntry::point("a", "red".into(), 46)];
+    dev.legend_with(
+        LegendPos::Keyword(LegendKeyword::TopLeft),
+        &entries,
+        &LegendOptions::default(),
+    );
+    // `pch = "."` small enough that its one-device-unit minimum applies.
+    let dots = PlotOptions {
+        pch: 46,
+        cex: 0.5,
+        ..PlotOptions::default()
+    };
+    plot(dev, &x, &[3.0, 1.0, 2.0], &dots);
+}
+
+#[test]
+fn any_backend_output_is_the_wrapped_backends() {
+    use rs_graphics::backend::{AnyBackend, Format};
+    use rs_graphics::device::Device;
+    use rs_graphics::par::Par;
+    let render = |b: AnyBackend| {
+        let mut dev = Device::new(b, Par::default());
+        draw_two_pages(&mut dev);
+        dev.finish()
+    };
+    let mut pdf = Device::pdf(5.0, 4.0);
+    draw_two_pages(&mut pdf);
+    assert_eq!(
+        render(AnyBackend::new(Format::Pdf, 5.0, 4.0, 72.0)),
+        pdf.finish()
+    );
+
+    let mut svg = Device::svg(5.0, 4.0);
+    draw_two_pages(&mut svg);
+    let svg = svg.into_backend().finish();
+    assert_eq!(
+        render(AnyBackend::new(Format::Svg, 5.0, 4.0, 72.0)),
+        svg.into_bytes()
+    );
+
+    // Not 72 dpi, where a pixel is the default device unit (1/72 in).
+    let mut png = Device::png(5.0, 4.0, 150.0);
+    draw_two_pages(&mut png);
+    assert_eq!(
+        render(AnyBackend::new(Format::Png, 5.0, 4.0, 150.0)),
+        png.finish()
+    );
+
+    let bg = Color::rgb(255, 255, 224);
+    let custom = || PdfBackend::new(5.0, 4.0).with_background(bg);
+    let mut direct = Device::new(custom(), Par::default());
+    draw_two_pages(&mut direct);
+    assert_eq!(render(AnyBackend::from(custom())), direct.finish());
+}
+
+#[test]
+fn format_follows_the_file_extension() {
+    use rs_graphics::backend::{AnyBackend, Format};
+    assert_eq!(Format::from_path("a/b/plot.pdf"), Some(Format::Pdf));
+    assert_eq!(Format::from_path("plot.SVG"), Some(Format::Svg));
+    assert_eq!(Format::from_path("plot.v2.png"), Some(Format::Png));
+    assert_eq!(Format::from_path("plot.jpg"), None);
+    assert_eq!(Format::from_path("plot"), None);
+    assert_eq!("Png".parse::<Format>(), Ok(Format::Png));
+    let err = AnyBackend::for_path("plot.jpg", 1.0, 1.0, 72.0)
+        .err()
+        .unwrap();
+    assert_eq!(err.value, "plot.jpg");
+    assert_eq!(
+        AnyBackend::for_path("x.svg", 1.0, 1.0, 72.0)
+            .unwrap()
+            .format(),
+        Format::Svg
+    );
+}
+
+#[test]
+fn device_save_writes_the_finished_file() {
+    use rs_graphics::device::Device;
+    let dir = std::env::temp_dir().join("rs_graphics_device_save");
+    std::fs::create_dir_all(&dir).unwrap();
+    for name in ["out.pdf", "out.svg", "out.png"] {
+        let path = dir.join(name);
+        let mut a = Device::for_path(&path, 4.0, 3.0, 72.0).unwrap();
+        let mut b = Device::for_path(&path, 4.0, 3.0, 72.0).unwrap();
+        draw_two_pages(&mut a);
+        draw_two_pages(&mut b);
+        a.save(&path).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b.finish(), "{name}");
+    }
 }

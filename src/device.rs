@@ -10,8 +10,14 @@
 //! of `GE*` engine calls.
 
 use crate::afm::{self};
-use crate::backend::{Backend, Stroke, TextStyle};
+use std::path::Path;
+
+use crate::backend::pdf::PdfBackend;
+use crate::backend::raster::RasterBackend;
+use crate::backend::svg::SvgBackend;
+use crate::backend::{AnyBackend, Backend, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
+use crate::error::ParseValueError;
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
@@ -104,6 +110,51 @@ impl LineStyle {
     }
 }
 
+/// Shortcuts for a device with R's default `par()`. Use [`Device::new`]
+/// to start from other parameters: in particular `par.ps`, R's
+/// `pointsize`, sizes symbols and margin lines from creation on.
+impl Device<PdfBackend> {
+    /// R's `pdf(width = , height = )`: a PDF page `width_in` x
+    /// `height_in` inches.
+    pub fn pdf(width_in: f64, height_in: f64) -> Self {
+        Device::new(PdfBackend::new(width_in, height_in), Par::default())
+    }
+}
+
+impl Device<SvgBackend> {
+    /// R's `svg(width = , height = )`.
+    pub fn svg(width_in: f64, height_in: f64) -> Self {
+        Device::new(SvgBackend::new(width_in, height_in), Par::default())
+    }
+}
+
+impl Device<RasterBackend> {
+    /// A PNG of `width_in` x `height_in` inches at `dpi` (R's `png(width,
+    /// height, units = "in", res = dpi)`), on white.
+    pub fn png(width_in: f64, height_in: f64, dpi: f64) -> Self {
+        Device::new(
+            RasterBackend::new(width_in, height_in, dpi, Color::WHITE),
+            Par::default(),
+        )
+    }
+}
+
+impl Device<AnyBackend> {
+    /// A device whose format follows `path`'s extension (`.pdf`, `.svg`
+    /// or `.png`; `dpi` is used for PNG only), for
+    /// [`save`](Device::save) to the same path. Fails for other
+    /// extensions.
+    pub fn for_path(
+        path: impl AsRef<Path>,
+        width_in: f64,
+        height_in: f64,
+        dpi: f64,
+    ) -> Result<Self, ParseValueError> {
+        let backend = AnyBackend::for_path(path, width_in, height_in, dpi)?;
+        Ok(Device::new(backend, Par::default()))
+    }
+}
+
 impl<B: Backend> Device<B> {
     /// A device drawing onto `backend` with graphical parameters `par`. If
     /// `par.bg` is left at its default (white), it starts as the backend's
@@ -139,8 +190,21 @@ impl<B: Backend> Device<B> {
         dev
     }
 
+    /// The backend, to finish it with its own `finish()` or set options.
     pub fn into_backend(self) -> B {
         self.backend
+    }
+
+    /// The finished file's bytes (PDF, PNG, or SVG as UTF-8).
+    pub fn finish(self) -> Vec<u8> {
+        self.backend.into_bytes()
+    }
+
+    /// Writes the finished file to `path` (R's `dev.off()`). The format is
+    /// the backend's, whatever `path`'s extension; see
+    /// [`Device::for_path`] to choose the backend from the path.
+    pub fn save(self, path: impl AsRef<Path>) -> std::io::Result<()> {
+        std::fs::write(path, self.finish())
     }
 
     pub fn width_in(&self) -> f64 {

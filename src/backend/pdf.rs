@@ -366,6 +366,10 @@ impl PdfBackend {
 }
 
 impl Backend for PdfBackend {
+    fn into_bytes(self) -> Vec<u8> {
+        self.finish()
+    }
+
     fn size_inches(&self) -> (f64, f64) {
         (self.width_in, self.height_in)
     }

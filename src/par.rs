@@ -36,6 +36,18 @@ impl<T: Copy> Sides<T> {
     }
 }
 
+impl<T> From<[T; 4]> for Sides<T> {
+    /// `[bottom, left, top, right]`, R's order for `mar = c(...)`.
+    fn from([bottom, left, top, right]: [T; 4]) -> Self {
+        Sides {
+            bottom,
+            left,
+            top,
+            right,
+        }
+    }
+}
+
 /// Axis style (`par(xaxs=)`/`par(yaxs=)`). Only `"r"` (the default, 4%
 /// range expansion) and `"i"` (exact, no expansion) are implemented; R's
 /// `"s"`/`"e"`/`"d"` styles are treated as `"r"` (matching R's own
@@ -49,13 +61,19 @@ pub enum AxisStyle {
 }
 
 impl AxisStyle {
-    pub fn parse(s: &str) -> AxisStyle {
+    /// R's `xaxs`/`yaxs` values: `"i"` is [`AxisStyle::Exact`]; `"r"`,
+    /// `"s"`, `"e"` and `"d"` are [`AxisStyle::Regular`]. `None` for
+    /// anything else (R: "invalid 'xaxs' value").
+    pub fn parse(s: &str) -> Option<AxisStyle> {
         match s {
-            "i" => AxisStyle::Exact,
-            _ => AxisStyle::Regular,
+            "i" => Some(AxisStyle::Exact),
+            "r" | "s" | "e" | "d" => Some(AxisStyle::Regular),
+            _ => None,
         }
     }
 }
+
+crate::error::from_str_via_parse!(AxisStyle, "axis style");
 
 /// `par(pty)`: the shape of the plot region when it comes from `mar`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -67,13 +85,18 @@ pub enum Pty {
 }
 
 impl Pty {
-    pub fn parse(s: &str) -> Pty {
+    /// `"m"` or `"s"`; `None` for anything else (R: "invalid value
+    /// specified for graphical parameter \"pty\"").
+    pub fn parse(s: &str) -> Option<Pty> {
         match s {
-            "s" => Pty::Square,
-            _ => Pty::Maximal,
+            "m" => Some(Pty::Maximal),
+            "s" => Some(Pty::Square),
+            _ => None,
         }
     }
 }
+
+crate::error::from_str_via_parse!(Pty, "pty");
 
 /// `par(xaxt/yaxt)`: whether `axis()` draws on that axis. R's `"s"`, `"l"`
 /// and `"t"` all mean [`AxisType::Standard`]; `"n"` suppresses the axis
@@ -85,13 +108,18 @@ pub enum AxisType {
 }
 
 impl AxisType {
-    pub fn parse(s: &str) -> AxisType {
+    /// `"n"` is [`AxisType::None`]; `"s"`, `"l"` and `"t"` are
+    /// [`AxisType::Standard`]. `None` for anything else.
+    pub fn parse(s: &str) -> Option<AxisType> {
         match s {
-            "n" => AxisType::None,
-            _ => AxisType::Standard,
+            "n" => Some(AxisType::None),
+            "s" | "l" | "t" => Some(AxisType::Standard),
+            _ => None,
         }
     }
 }
+
+crate::error::from_str_via_parse!(AxisType, "axis type");
 
 /// The graphics parameter set (`par()`), restricted to what this crate
 /// implements. Field names match R's own where practical.
@@ -208,7 +236,7 @@ impl Default for Par {
             palette: DEFAULT_PALETTE.to_vec(),
 
             lwd: 1.0,
-            lty: LineType::Pattern(&[]),
+            lty: LineType::SOLID,
             lend: LineEnd::Round,
             ljoin: LineJoin::Round,
             lmitre: 10.0,
@@ -259,5 +287,29 @@ impl Par {
 
     pub fn font_face(&self, code: i32) -> FontFace {
         FontFace::from_r_font_code(code)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sides_from_array_is_bottom_left_top_right() {
+        assert_eq!(
+            Sides::from([5.1, 4.1, 4.1, 2.1]),
+            Sides::new(5.1, 4.1, 4.1, 2.1)
+        );
+    }
+
+    #[test]
+    fn par_enums_reject_what_r_rejects() {
+        assert_eq!(AxisStyle::parse("i"), Some(AxisStyle::Exact));
+        assert_eq!(AxisStyle::parse("d"), Some(AxisStyle::Regular));
+        assert_eq!(AxisStyle::parse("x"), None);
+        assert_eq!(Pty::parse("m"), Some(Pty::Maximal));
+        assert_eq!(Pty::parse("q"), None);
+        assert_eq!("t".parse::<AxisType>(), Ok(AxisType::Standard));
+        assert!("y".parse::<AxisType>().is_err());
     }
 }

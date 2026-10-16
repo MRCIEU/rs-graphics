@@ -290,7 +290,7 @@ fn barplot_impl<B: Backend>(
                 fill,
                 opts.border,
                 lwd,
-                LineType::Pattern(&[]),
+                LineType::SOLID,
             );
         } else {
             dev.rect(
@@ -301,7 +301,7 @@ fn barplot_impl<B: Backend>(
                 fill,
                 opts.border,
                 lwd,
-                LineType::Pattern(&[]),
+                LineType::SOLID,
             );
         }
     }
