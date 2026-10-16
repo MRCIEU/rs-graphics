@@ -260,15 +260,9 @@ impl LegendLayout {
 }
 
 impl<B: Backend> Device<B> {
-    /// `legend(x, y, ...)` with R's defaults: the point becomes the top-left
-    /// corner of the legend box.
-    pub fn legend(&mut self, x: f64, y: f64, entries: &[LegendEntry]) {
-        self.legend_with(LegendPos::Xy(x, y), entries, &LegendOptions::default());
-    }
-
     /// `legend(pos, ...)`: see the module docs. Returns the box geometry, or
     /// `None` if `entries` is empty (R errors there).
-    pub fn legend_with(
+    pub fn legend(
         &mut self,
         pos: LegendPos,
         entries: &[LegendEntry],
@@ -472,7 +466,6 @@ impl<B: Backend> Device<B> {
         }
 
         if has_pch {
-            let saved_lwd = self.par.lwd;
             for i in 0..n {
                 let e = &entries[i];
                 if !e.has_pch() {
@@ -488,10 +481,16 @@ impl<B: Backend> Device<B> {
                 };
                 let pt_cex = e.pt_cex.unwrap_or(cex);
                 let bg = self.resolve(e.pt_bg);
-                self.par.lwd = e.pt_lwd.or(e.lwd).unwrap_or(saved_lwd);
-                self.draw_pch(e.pch.unwrap_or(0), Point::new(x1, yt[i]), pt_cex, col, bg);
+                let lwd = e.pt_lwd.or(e.lwd).unwrap_or(self.par.lwd);
+                self.draw_pch(
+                    e.pch.unwrap_or(0),
+                    Point::new(x1, yt[i]),
+                    pt_cex,
+                    col,
+                    bg,
+                    lwd,
+                );
             }
-            self.par.lwd = saved_lwd;
         }
         self.pop_clip();
 

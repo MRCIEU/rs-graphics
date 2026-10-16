@@ -6,7 +6,7 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
-use crate::device::{AxisOptions, Device, LineStyle, TitleOptions};
+use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions};
 use crate::lty::LineType;
 use crate::par::AxisType;
 use crate::plotmath::Label;
@@ -55,12 +55,16 @@ crate::error::from_str_via_parse!(PlotType, "plot type");
 #[derive(Clone, Debug)]
 pub struct PlotOptions {
     pub type_: PlotType,
-    pub pch: i32,
-    pub col: ColorSpec,
-    pub bg: ColorSpec,
-    pub lwd: f64,
-    pub lty: LineType,
-    pub cex: f64,
+    /// Symbols, colours, fills, sizes and widths as for
+    /// [`Device::points`]: recycled per point, empty for the default
+    /// (`par()`; no fill; size 1).
+    pub pch: Vec<i32>,
+    pub col: Vec<ColorSpec>,
+    pub bg: Vec<ColorSpec>,
+    pub lwd: Vec<f64>,
+    /// `None`: `par(lty)`.
+    pub lty: Option<LineType>,
+    pub cex: Vec<f64>,
     /// Defaults to the finite data range, like R's `plot.window(xlim =
     /// range(x))` (positive values only on a log axis).
     pub xlim: Option<(f64, f64)>,
@@ -92,12 +96,12 @@ impl Default for PlotOptions {
     fn default() -> Self {
         PlotOptions {
             type_: PlotType::Points,
-            pch: 1,
-            col: ColorSpec::Index(1),
-            bg: ColorSpec::None,
-            lwd: 1.0,
-            lty: LineType::SOLID,
-            cex: 1.0,
+            pch: Vec::new(),
+            col: Vec::new(),
+            bg: Vec::new(),
+            lwd: Vec::new(),
+            lty: None,
+            cex: Vec::new(),
             xlim: None,
             ylim: None,
             xlog: false,
@@ -132,33 +136,29 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
     let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
 
     dev.plot_new();
-    dev.plot_window(xlim, ylim, opts.xlog, opts.ylog);
+    let window = PlotWindowOptions {
+        xlog: opts.xlog,
+        ylog: opts.ylog,
+        ..PlotWindowOptions::default()
+    };
+    dev.plot_window(xlim, ylim, &window);
 
-    match opts.type_ {
-        PlotType::Points => dev.points(x, y, opts.pch, opts.col, opts.bg, opts.cex),
-        PlotType::Lines => dev.lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty)),
-        PlotType::Both => {
-            dev.broken_lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));
-            dev.points(x, y, opts.pch, opts.col, opts.bg, opts.cex);
-        }
-        PlotType::BrokenLines => {
-            dev.broken_lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));
-        }
-        PlotType::Overplotted => {
-            dev.lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));
-            dev.points(x, y, opts.pch, opts.col, opts.bg, opts.cex);
-        }
-        PlotType::None => {}
-    }
+    // `plot.xy(xy, type, ...)`.
+    let xy = XyOptions {
+        type_: Some(opts.type_),
+        pch: opts.pch.clone(),
+        col: opts.col.clone(),
+        bg: opts.bg.clone(),
+        cex: opts.cex.clone(),
+        lwd: opts.lwd.clone(),
+        lty: opts.lty,
+        xpd: None,
+    };
+    dev.points(x, y, &xy);
 
     if opts.axes {
         let fg = ColorSpec::Color(dev.par.fg);
-        let (cex_axis, font_axis, las, lwd) = (
-            dev.par.cex_axis,
-            dev.par.font_axis,
-            dev.par.las,
-            dev.par.lwd,
-        );
+        let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
         let axis = |dev: &mut Device<B>, side, axt, axp| {
             let o = AxisOptions {
                 col: Some(fg),
@@ -170,15 +170,15 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
                 axp,
                 ..AxisOptions::default()
             };
-            dev.axis_with(side, &o);
+            dev.axis(side, &o);
         };
         axis(dev, 1, opts.xaxt, opts.xaxp);
         axis(dev, 2, opts.yaxt, opts.yaxp);
-        dev.box_plot(fg, lwd, LineType::SOLID);
+        dev.box_(&BoxOptions::default());
     }
 
     if dev.par.ann {
-        dev.title_with(&TitleOptions {
+        dev.title(&TitleOptions {
             main: opts.main.clone(),
             sub: opts.sub.clone(),
             xlab: opts.xlab.clone(),

@@ -12,6 +12,7 @@ use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AxisOptions, Device, MtextOptions};
 use rs_graphics::highlevel::{plot, PlotOptions, PlotType};
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -84,11 +85,11 @@ fn cases() -> Vec<Case> {
                 let opts = PlotOptions {
                     type_: PlotType::Lines,
                     axes: false,
-                    col: ColorSpec::Color(Color::parse("red").unwrap()),
+                    col: vec![ColorSpec::Color(Color::parse("red").unwrap())],
                     ..PlotOptions::default()
                 };
                 plot(d, &xs(), &roots(), &opts);
-                d.axis_with(4, &AxisOptions::default());
+                d.axis(4, &AxisOptions::default());
                 let o = MtextOptions { side: 4, line: 3.0, ..Default::default() };
                 d.mtext("sqrt", &o);
             },
@@ -122,8 +123,8 @@ fn cases() -> Vec<Case> {
                 d.set_new(true);
                 d.plot_new();
                 d.plot_new();
-                d.plot_window((0.0, 20.0), (0.0, 1.0), false, false);
-                d.axis_with(3, &AxisOptions::default());
+                d.plot_window((0.0, 20.0), (0.0, 1.0), &PlotWindowOptions::default());
+                d.axis(3, &AxisOptions::default());
                 pl(d, &xs(), Some("B"), true);
             },
         },
@@ -138,7 +139,15 @@ fn cases() -> Vec<Case> {
                 pl(d, &squares(), Some("A"), true);
                 d.set_new(true);
                 let black = ColorSpec::Index(1);
-                d.points(&[5.0], &[50.0], 19, black, ColorSpec::None, 1.0);
+                d.points(
+                    &[5.0],
+                    &[50.0],
+                    &XyOptions {
+                        pch: vec![19],
+                        col: vec![black],
+                        ..XyOptions::default()
+                    },
+                );
                 assert!(!d.is_new());
                 pl(d, &falling(), Some("B"), true);
             },

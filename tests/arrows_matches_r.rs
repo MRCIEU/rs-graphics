@@ -8,9 +8,9 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::{Device, LineStyle};
-use rs_graphics::lty::LineType;
+use rs_graphics::device::Device;
 use rs_graphics::par::Par;
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -106,10 +106,16 @@ fn arrows_match_r() {
 
     let mut dev = Device::new(PdfBackend::new(7.0, 5.0).with_compression(false), Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 10.0), false, false);
-    let style = LineStyle::new(ColorSpec::Color(Color::BLACK), 1.0, LineType::Pattern(&[]));
+    dev.plot_window((0.0, 10.0), (0.0, 10.0), &PlotWindowOptions::default());
     for &(x0, y0, x1, y1, length, angle, code) in CALLS {
-        dev.arrows(x0, y0, x1, y1, length, angle, code, style);
+        let opts = ArrowsOptions {
+            length,
+            angle,
+            code,
+            col: vec![ColorSpec::Color(Color::BLACK)],
+            ..ArrowsOptions::default()
+        };
+        dev.arrows(x0, y0, x1, y1, &opts);
     }
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

@@ -12,14 +12,19 @@
 //! // R: pdf("scatter.pdf", 7, 7); plot(x, y, main = ...); dev.off()
 //! let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
 //! plot(&mut dev, &x, &y, &PlotOptions {
-//!     pch: 19,
-//!     col: "steelblue".into(),
+//!     pch: vec![19],
+//!     col: vec!["steelblue".into()],
 //!     main: Some(Label::math("y == beta[0] + beta[1] * x")),
 //!     xlab: Some("x".into()),
 //!     ylab: Some("y".into()),
 //!     ..PlotOptions::default()
 //! });
-//! dev.abline(None, None, Some(6.0), None, "grey".into(), 1.0, LineType::DASHED);
+//! dev.abline(&AblineOptions {
+//!     h: vec![6.0],
+//!     col: vec!["grey".into()],
+//!     lty: vec![LineType::DASHED],
+//!     ..AblineOptions::default()
+//! });
 //! dev.save("scatter.pdf")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```

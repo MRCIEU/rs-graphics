@@ -4,8 +4,9 @@ use std::f64::consts::PI;
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
-use crate::device::{Device, TitleOptions};
-use crate::lty::LineType;
+use crate::device::{
+    Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
+};
 use crate::plotmath::Label;
 
 /// R's default pie slice color cycle (used when `col` isn't given).
@@ -83,7 +84,11 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
     } else {
         ((-1.0, 1.0), (-(h / w), h / w))
     };
-    dev.plot_window_asp(xlim, ylim, 1.0);
+    let window = PlotWindowOptions {
+        asp: Some(1.0),
+        ..PlotWindowOptions::default()
+    };
+    dev.plot_window(xlim, ylim, &window);
 
     let twopi = if opts.clockwise { -2.0 * PI } else { 2.0 * PI };
     let init = opts
@@ -105,7 +110,6 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
         cum.push(acc / total);
     }
 
-    let lwd = dev.par.lwd;
     for i in 0..nx {
         let dxi = cum[i + 1] - cum[i];
         let n = (2usize).max((opts.edges as f64 * dxi).floor() as usize);
@@ -128,37 +132,31 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
             Some(cols) if !cols.is_empty() => cols[i % cols.len()],
             _ => ColorSpec::Color(Color::parse(DEFAULT_COLORS[i % DEFAULT_COLORS.len()]).unwrap()),
         };
-        dev.polygon(&xs, &ys, col, opts.border, lwd, LineType::SOLID);
+        let slice = PolygonOptions {
+            col: vec![col],
+            border: vec![opts.border],
+            ..PolygonOptions::default()
+        };
+        dev.polygon(&xs, &ys, &slice);
 
         let mid = 0.5 * (cum[i] + cum[i + 1]);
         let (px, py) = t2xy(mid);
         let label = &labels[i];
         if !label.is_empty() {
-            dev.lines(
-                &[px, 1.05 * px],
-                &[py, 1.05 * py],
-                crate::device::LineStyle::new(ColorSpec::Color(dev.par.col), lwd, LineType::SOLID),
-            );
-            let hadj = if px < 0.0 { 1.0 } else { 0.0 };
-            let (saved_xpd, col_lab, font) = (dev.par.xpd, dev.par.col, dev.par.font);
-            dev.par.xpd = true;
-            dev.text(
-                1.1 * px,
-                1.1 * py,
-                label,
-                hadj,
-                None,
-                0.0,
-                ColorSpec::Color(col_lab),
-                1.0,
-                font,
-            );
-            dev.par.xpd = saved_xpd;
+            dev.lines(&[px, 1.05 * px], &[py, 1.05 * py], &XyOptions::default());
+            // `text(1.1 * P$x, 1.1 * P$y, labels[i], xpd = TRUE, adj =
+            // ifelse(P$x < 0, 1, 0))`.
+            let at = TextOptions {
+                adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
+                xpd: Some(true),
+                ..TextOptions::default()
+            };
+            dev.text(&[1.1 * px], &[1.1 * py], &[label.as_str()], &at);
         }
     }
 
     if let Some(main) = &opts.main {
-        dev.title_with(&TitleOptions {
+        dev.title(&TitleOptions {
             main: Some(main.clone()),
             ..TitleOptions::default()
         });

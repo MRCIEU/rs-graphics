@@ -5,7 +5,10 @@
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
-use crate::device::{Device, LineStyle, TitleOptions};
+use crate::device::{
+    AxisOptions, BoxOptions, Device, PlotWindowOptions, PolygonOptions, SegmentsOptions,
+    TitleOptions, XyOptions,
+};
 use crate::lty::LineType;
 use crate::plotmath::Label;
 
@@ -203,10 +206,11 @@ pub fn boxplot<B: Backend>(
         .collect();
 
     dev.plot_new();
+    let window = PlotWindowOptions::default();
     if opts.horizontal {
-        dev.plot_window(ylim, xlim, false, false);
+        dev.plot_window(ylim, xlim, &window);
     } else {
-        dev.plot_window(xlim, ylim, false, false);
+        dev.plot_window(xlim, ylim, &window);
     }
 
     // `bxp()`'s `xypolygon`/`xysegments`/`xypoints`: (position, value) in,
@@ -249,15 +253,28 @@ pub fn boxplot<B: Backend>(
             )
         };
         let (bx, by) = xy(&box_pos, &box_val);
-        dev.polygon(&bx, &by, fill, ColorSpec::None, lwd, LineType::Blank);
+        let box_fill = PolygonOptions {
+            col: vec![fill],
+            border: vec![ColorSpec::None],
+            lty: vec![LineType::BLANK],
+            lwd: Some(lwd),
+            ..PolygonOptions::default()
+        };
+        dev.polygon(&bx, &by, &box_fill);
         // medlwd = 3 * par(lwd), with `lend = 1` (butt), "to avoid
         // overlap": round ends would reach past the box sides. With a
         // notch it spans only the notch.
         let wntch = notch_frac * half;
         let lend = std::mem::replace(&mut dev.par.lend, LineEnd::Butt);
         let (mx, my) = xy(&[x - wntch, x + wntch], &[s.median, s.median]);
-        let median = LineStyle::new(border, 3.0 * lwd, LineType::SOLID);
-        dev.segments(&mx[..1], &my[..1], &mx[1..], &my[1..], median);
+        let line = |lwd: f64, lty: LineType| SegmentsOptions {
+            col: vec![border],
+            lty: vec![lty],
+            lwd: vec![lwd],
+            ..SegmentsOptions::default()
+        };
+        let median = line(3.0 * lwd, LineType::SOLID);
+        dev.segments(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
         dev.par.lend = lend;
         // Whiskers run from their ends to the hinges (which matters for
         // where the dashes fall); whisklty = "dashed". Then the staples
@@ -265,49 +282,56 @@ pub fn boxplot<B: Backend>(
         let ends = [(s.lower_whisker, s.q1), (s.upper_whisker, s.q3)];
         for &(w, h) in &ends {
             let (sx, sy) = xy(&[x, x], &[w, h]);
-            let dashed = LineStyle::new(border, lwd, LineType::from_code(2));
-            dev.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], dashed);
+            let dashed = line(lwd, LineType::DASHED);
+            dev.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &dashed);
         }
         let cap = half * 0.5;
         for &(w, _) in &ends {
             let (sx, sy) = xy(&[x - cap, x + cap], &[w, w]);
-            let solid = LineStyle::new(border, lwd, LineType::SOLID);
-            dev.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], solid);
+            let solid = line(lwd, LineType::SOLID);
+            dev.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &solid);
         }
-        dev.polygon(&bx, &by, ColorSpec::None, border, lwd, LineType::SOLID);
+        let box_border = PolygonOptions {
+            col: vec![ColorSpec::None],
+            border: vec![border],
+            lty: vec![LineType::SOLID],
+            lwd: Some(lwd),
+            ..PolygonOptions::default()
+        };
+        dev.polygon(&bx, &by, &box_border);
         if !s.outliers.is_empty() {
             let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
             let (ox, oy) = xy(&pos, &s.outliers);
-            dev.points(&ox, &oy, 1, border, ColorSpec::None, 1.0);
+            let outliers = XyOptions {
+                pch: vec![1],
+                col: vec![border],
+                ..XyOptions::default()
+            };
+            dev.points(&ox, &oy, &outliers);
         }
     }
 
     // `bxp()`: names on side 1 (2 if horizontal), values on side 2 (1),
     // then the title, then the frame.
     let (name_side, value_side) = if opts.horizontal { (2, 1) } else { (1, 2) };
-    let fg = ColorSpec::Color(dev.par.fg);
-    let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
     if opts.axes {
         if n > 1 {
             let labels = opts
                 .names
                 .clone()
                 .unwrap_or_else(|| (1..=n).map(|i| i.to_string()).collect());
-            dev.axis(
-                name_side,
-                Some(at.clone()),
-                Some(labels),
-                fg,
-                cex_axis,
-                font_axis,
-                las,
-            );
+            let names = AxisOptions {
+                at: Some(at.clone()),
+                labels: Some(labels.into_iter().map(|l| Some(Label::from(l))).collect()),
+                ..AxisOptions::default()
+            };
+            dev.axis(name_side, &names);
         }
-        dev.axis(value_side, None, None, fg, cex_axis, font_axis, las);
+        dev.axis(value_side, &AxisOptions::default());
     }
 
     if dev.par.ann {
-        dev.title_with(&TitleOptions {
+        dev.title(&TitleOptions {
             main: opts.main.clone(),
             sub: opts.sub.clone(),
             xlab: opts.xlab.clone(),
@@ -316,7 +340,7 @@ pub fn boxplot<B: Backend>(
     }
 
     if opts.axes {
-        dev.box_plot(fg, dev.par.lwd, LineType::SOLID);
+        dev.box_(&BoxOptions::default());
     }
 
     stats

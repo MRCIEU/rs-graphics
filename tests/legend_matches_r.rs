@@ -108,7 +108,7 @@ fn cases() -> Vec<Case> {
                     title: Some("Key".into()),
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
             },
         },
         Case {
@@ -124,7 +124,7 @@ fn cases() -> Vec<Case> {
                     inset: (0.05, 0.05),
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Keyword(LegendKeyword::BottomLeft), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::BottomLeft), &e, &o);
             },
         },
         Case {
@@ -141,7 +141,7 @@ fn cases() -> Vec<Case> {
                     bty_box: false,
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Keyword(LegendKeyword::Center), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::Center), &e, &o);
             },
         },
         Case {
@@ -156,7 +156,7 @@ fn cases() -> Vec<Case> {
                     horiz: true,
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Keyword(LegendKeyword::Top), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::Top), &e, &o);
             },
         },
         Case {
@@ -175,7 +175,7 @@ fn cases() -> Vec<Case> {
                     title: Some("T".into()),
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Xy(5.0, 20.0), &e, &o);
+                d.legend(LegendPos::Xy(5.0, 20.0), &e, &o);
             },
         },
         Case {
@@ -186,7 +186,7 @@ fn cases() -> Vec<Case> {
                     LegendEntry::point("a", black(), 1),
                     LegendEntry::point("b", black(), 2),
                 ];
-                d.legend_with(
+                d.legend(
                     LegendPos::Corners(5.0, 10.0, 15.0, 20.0),
                     &e,
                     &LegendOptions::default(),
@@ -206,7 +206,7 @@ fn cases() -> Vec<Case> {
                     title: Some("A rather long legend title".into()),
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Keyword(LegendKeyword::Right), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::Right), &e, &o);
             },
         },
         Case {
@@ -223,7 +223,7 @@ fn cases() -> Vec<Case> {
                     title: Some("Key".into()),
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
             },
         },
         Case {
@@ -238,7 +238,7 @@ fn cases() -> Vec<Case> {
                     text_width: Some(2.0),
                     ..Default::default()
                 };
-                d.legend_with(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o);
             },
         },
     ]
@@ -283,7 +283,7 @@ fn legend_layout_matches_r() {
 
         let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), Par::default());
         let opts = PlotOptions {
-            pch: 19,
+            pch: vec![19],
             xlab: Some("x".into()),
             ylab: Some("y".into()),
             ..PlotOptions::default()

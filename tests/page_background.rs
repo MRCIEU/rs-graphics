@@ -10,6 +10,7 @@ use rs_graphics::backend::Backend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::Par;
+use rs_graphics::prelude::*;
 
 /// A full-page rectangle at 6 x 4 inches.
 const PAGE_RE: &str = "0.000 0.000 432.000 288.000 re";
@@ -55,11 +56,27 @@ fn svg_and_png_pages_are_filled() {
 fn two_pages<B: Backend>(backend: B) -> B {
     let mut dev = Device::new(backend, Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0), false, false);
-    dev.points(&[0.5], &[0.5], 0, ColorSpec::Index(2), ColorSpec::None, 1.0);
+    dev.plot_window((0.0, 1.0), (0.0, 1.0), &PlotWindowOptions::default());
+    dev.points(
+        &[0.5],
+        &[0.5],
+        &XyOptions {
+            pch: vec![0],
+            col: vec![ColorSpec::Index(2)],
+            ..XyOptions::default()
+        },
+    );
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0), false, false);
-    dev.points(&[0.5], &[0.5], 0, ColorSpec::Index(4), ColorSpec::None, 1.0);
+    dev.plot_window((0.0, 1.0), (0.0, 1.0), &PlotWindowOptions::default());
+    dev.points(
+        &[0.5],
+        &[0.5],
+        &XyOptions {
+            pch: vec![0],
+            col: vec![ColorSpec::Index(4)],
+            ..XyOptions::default()
+        },
+    );
     dev.into_backend()
 }
 

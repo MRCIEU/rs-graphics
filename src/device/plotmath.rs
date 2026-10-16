@@ -138,7 +138,7 @@ impl<B: Backend> Device<B> {
     }
 
     /// Draws text (`GEText`) or an expression (`GEMathText`, in the plain
-    /// font) at `anchor`. `xc`/`yc` align text as in [`Device::text_at`]
+    /// font) at `anchor`. `xc`/`yc` align text as in `text_at_clipped`
     /// and an expression's bounding box; `yc = None` is R's `NA`. `cex` is
     /// multiplied by `par(cex)`.
     #[allow(clippy::too_many_arguments)]

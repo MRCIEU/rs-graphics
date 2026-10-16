@@ -128,7 +128,7 @@ fn draw_ours(c: &Case) -> String {
             at: Some(at.to_vec()),
             ..Default::default()
         };
-        dev.axis_with(3, &o);
+        dev.axis(3, &o);
     }
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }

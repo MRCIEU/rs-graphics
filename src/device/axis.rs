@@ -146,7 +146,7 @@ impl<B: Backend> Device<B> {
     /// # Panics
     /// If `labels` is given without `at`, or their lengths differ (R's
     /// errors).
-    pub fn axis_with(&mut self, side: Side, opts: &AxisOptions) {
+    pub fn axis(&mut self, side: Side, opts: &AxisOptions) {
         let x_axis = side == 1 || side == 3;
         let las = opts.las.unwrap_or(self.par.las);
         let perpendicular = if x_axis {

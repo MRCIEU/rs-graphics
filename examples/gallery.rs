@@ -38,8 +38,8 @@ fn draw_scatter<B: Backend>(dev: &mut Device<B>) {
     let y = parse_data(include_str!("data/scatter_y.txt"));
 
     let opts = PlotOptions {
-        pch: 19,
-        col: ColorSpec::Index(4),
+        pch: vec![19],
+        col: vec![ColorSpec::Index(4)],
         main: Some("plot(): scatter".into()),
         xlab: Some("x".into()),
         ylab: Some("y".into()),
@@ -54,8 +54,8 @@ fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
 
     let opts = PlotOptions {
         type_: rs_graphics::highlevel::PlotType::Lines,
-        col: ColorSpec::Index(2),
-        lwd: 2.0,
+        col: vec![ColorSpec::Index(2)],
+        lwd: vec![2.0],
         main: Some("plot(): line".into()),
         xlab: Some("x".into()),
         ylab: Some("sin(x)".into()),
@@ -70,8 +70,8 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
 
     let opts = PlotOptions {
         type_: rs_graphics::highlevel::PlotType::Both,
-        pch: 19,
-        col: ColorSpec::Index(4),
+        pch: vec![19],
+        col: vec![ColorSpec::Index(4)],
         xlog: true,
         ylog: true,
         main: Some("plot(): log = \"xy\"".into()),
@@ -91,7 +91,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .collect();
 
     let opts = PlotOptions {
-        pch: 19,
+        pch: vec![19],
         xlog: true,
         ylog: true,
         main: Some("abline() on log axes".into()),
@@ -102,10 +102,30 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
     plot(dev, &x, &y, &opts);
     let grey = ColorSpec::from("grey");
     let dashed = LineType::DASHED;
-    dev.abline(None, None, Some(1000.0), Some(10.0), grey, 1.0, dashed);
+    dev.abline(&AblineOptions {
+        h: vec![1000.0],
+        v: vec![10.0],
+        col: vec![grey],
+        lwd: vec![1.0],
+        lty: vec![dashed],
+        ..AblineOptions::default()
+    });
     let solid = LineType::SOLID;
-    dev.abline(Some(2f64.log10()), Some(1.5), None, None, ColorSpec::Index(2), 2.0, solid);
-    dev.abline_untf(2000.0, 20.0, ColorSpec::Index(3), 2.0, solid);
+    dev.abline(&AblineOptions {
+        coef: Some((2f64.log10(), 1.5)),
+        col: vec![ColorSpec::Index(2)],
+        lwd: vec![2.0],
+        lty: vec![solid],
+        ..AblineOptions::default()
+    });
+    dev.abline(&AblineOptions {
+        coef: Some((2000.0, 20.0)),
+        untf: true,
+        col: vec![ColorSpec::Index(3)],
+        lwd: vec![2.0],
+        lty: vec![solid],
+        ..AblineOptions::default()
+    });
     let entries = vec![
         LegendEntry::line("abline(log10(2), 1.5)", ColorSpec::Index(2), 2.0, solid),
         LegendEntry::line("abline(2000, 20, untf = TRUE)", ColorSpec::Index(3), 2.0, solid),
@@ -115,7 +135,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         bg: Some(ColorSpec::Color(Color::WHITE)),
         ..LegendOptions::default()
     };
-    dev.legend_with(LegendPos::Keyword(LegendKeyword::TopLeft), &entries, &o);
+    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries, &o);
 }
 
 fn draw_legend<B: Backend>(dev: &mut Device<B>) {
@@ -125,8 +145,8 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
 
     let opts = PlotOptions {
         type_: rs_graphics::highlevel::PlotType::Lines,
-        col: ColorSpec::Index(2),
-        lwd: 2.0,
+        col: vec![ColorSpec::Index(2)],
+        lwd: vec![2.0],
         ylim: Some((-1.0, 1.6)),
         main: Some("legend(\"topright\")".into()),
         xlab: Some("x".into()),
@@ -137,7 +157,12 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
     dev.lines(
         &x,
         &cos,
-        LineStyle::new(ColorSpec::Index(4), 2.0, LineType::DASHED),
+        &XyOptions {
+            col: vec![ColorSpec::Index(4)],
+            lwd: vec![2.0],
+            lty: Some(LineType::DASHED),
+            ..XyOptions::default()
+        },
     );
     let entries = vec![
         LegendEntry::line("sin(x)", ColorSpec::Index(2), 2.0, LineType::SOLID),
@@ -147,7 +172,7 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         title: Some("Functions".into()),
         ..LegendOptions::default()
     };
-    dev.legend_with(LegendPos::Keyword(LegendKeyword::TopRight), &entries, &o);
+    dev.legend(LegendPos::Keyword(LegendKeyword::TopRight), &entries, &o);
 }
 
 fn draw_hist<B: Backend>(dev: &mut Device<B>) {
@@ -271,22 +296,67 @@ fn draw_pie<B: Backend>(dev: &mut Device<B>) {
 fn draw_pch<B: Backend>(dev: &mut Device<B>) {
     dev.par.mar = Sides::new(0.5, 0.5, 2.5, 0.5);
     dev.plot_new();
-    dev.plot_window((0.5, 7.5), (-0.2, 5.4), false, false);
+    dev.plot_window((0.5, 7.5), (-0.2, 5.4), &PlotWindowOptions::default());
     let blue = ColorSpec::from("blue");
     let red = ColorSpec::from("red");
     let black = ColorSpec::Color(Color::BLACK);
     for pch in 0..26 {
         let (x, y) = ((pch % 7) as f64 + 1.0, 5.0 - (pch / 7) as f64);
-        dev.points(&[x], &[y], pch, blue, red, 2.0);
-        dev.text(x, y - 0.45, pch.to_string(), 0.5, None, 0.0, black, 0.8, 1);
+        dev.points(
+            &[x],
+            &[y],
+            &XyOptions {
+                pch: vec![pch],
+                col: vec![blue],
+                bg: vec![red],
+                cex: vec![2.0],
+                ..XyOptions::default()
+            },
+        );
+        dev.text(
+            &[x],
+            &[y - 0.45],
+            &[pch.to_string()],
+            &TextOptions {
+                adj: Some(0.5),
+                col: vec![black],
+                cex: vec![0.8],
+                font: vec![1],
+                ..TextOptions::default()
+            },
+        );
     }
     for (i, ch) in [".", "a", "M", "+", "*", "#", "o"].iter().enumerate() {
         let x = i as f64 + 1.0;
         let pch = ch.chars().next().unwrap() as i32;
-        dev.points(&[x], &[0.6], pch, blue, red, 2.0);
-        dev.text(x, 0.15, format!("\"{ch}\""), 0.5, None, 0.0, black, 0.8, 1);
+        dev.points(
+            &[x],
+            &[0.6],
+            &XyOptions {
+                pch: vec![pch],
+                col: vec![blue],
+                bg: vec![red],
+                cex: vec![2.0],
+                ..XyOptions::default()
+            },
+        );
+        dev.text(
+            &[x],
+            &[0.15],
+            &[format!("\"{ch}\"")],
+            &TextOptions {
+                adj: Some(0.5),
+                col: vec![black],
+                cex: vec![0.8],
+                font: vec![1],
+                ..TextOptions::default()
+            },
+        );
     }
-    dev.title(Some("pch: col = \"blue\", bg = \"red\", cex = 2"), None, None, None);
+    dev.title(&TitleOptions {
+        main: Some("pch: col = \"blue\", bg = \"red\", cex = 2".into()),
+        ..TitleOptions::default()
+    });
 }
 
 /// `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))`: one wide panel above two.

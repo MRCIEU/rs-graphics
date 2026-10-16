@@ -13,6 +13,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -114,7 +115,7 @@ fn draw_ours(c: &Case) -> String {
     par.cex = c.par_cex;
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 8.0), (0.0, 6.0), false, false);
+    dev.plot_window((0.0, 8.0), (0.0, 6.0), &PlotWindowOptions::default());
     let col = ColorSpec::Color(Color::parse(c.col).unwrap());
     let bg = c
         .bg
@@ -122,12 +123,31 @@ fn draw_ours(c: &Case) -> String {
     dev.par.lwd = c.lwd;
     for pch in 0..26 {
         let (x, y) = pch_pos(pch);
-        dev.points(&[x], &[y], pch as i32, col, bg, c.cex);
+        dev.points(
+            &[x],
+            &[y],
+            &XyOptions {
+                pch: vec![pch as i32],
+                col: vec![col],
+                bg: vec![bg],
+                cex: vec![c.cex],
+                ..XyOptions::default()
+            },
+        );
     }
     dev.par.lwd = 1.0;
     for (i, &ch) in CHARS.iter().enumerate() {
         let (x, y) = char_pos(i);
-        dev.points(&[x], &[y], ch as i32, col, ColorSpec::None, c.cex);
+        dev.points(
+            &[x],
+            &[y],
+            &XyOptions {
+                pch: vec![ch as i32],
+                col: vec![col],
+                cex: vec![c.cex],
+                ..XyOptions::default()
+            },
+        );
     }
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }

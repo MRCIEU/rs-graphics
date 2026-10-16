@@ -10,6 +10,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::ColorSpec;
 use rs_graphics::device::{Device, MtextOptions};
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -144,7 +145,7 @@ fn mtext_placement_matches_r() {
     let mut dev = Device::new(PdfBackend::new(8.0, 6.0).with_compression(false), par);
     dev.mfrow(2, 2);
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 5.0), false, false);
+    dev.plot_window((0.0, 10.0), (0.0, 5.0), &PlotWindowOptions::default());
     for c in &cases {
         dev.par.las = c.las;
         dev.mtext(

@@ -24,14 +24,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); dev.off()
     let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
     plot(&mut dev, &x, &y, &PlotOptions {
-        pch: 19,
-        col: "steelblue".into(),
+        pch: vec![19],
+        col: vec!["steelblue".into()],
         main: Some(Label::math("y == beta[0] + beta[1] * x")),
         xlab: Some("x".into()),
         ylab: Some("y".into()),
         ..PlotOptions::default()
     });
-    dev.abline(None, None, Some(6.0), None, "grey".into(), 1.0, LineType::DASHED);
+    dev.abline(&AblineOptions {
+        h: vec![6.0],
+        col: vec!["grey".into()],
+        lty: vec![LineType::DASHED],
+        ..AblineOptions::default()
+    });
     dev.save("scatter.pdf")?;
     Ok(())
 }
@@ -47,6 +52,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   ..Par::default() })` for other starting parameters (like R's
   `pointsize`). `dev.finish()` returns the file's bytes, `dev.save(path)`
   writes them.
+- Each R function is one method taking its data and an options struct,
+  e.g. `dev.axis(1, &AxisOptions { las: Some(1), ..AxisOptions::default() })`
+  or `dev.text(&x, &y, &["a", "b"], &TextOptions::default())`. Unset
+  fields are R's defaults, mostly the current `par()` values. Arguments
+  R recycles per element (`points(x, y, col = groups)`) are `Vec`s,
+  recycled the same way; `xpd: Some(true)` is R's inline `xpd = TRUE`.
 - Change graphical parameters with `dev.par.<name> = ...` (R's `par()`),
   and multi-panel arrangements with `dev.mfrow(2, 2)` / `dev.layout(...)`.
 - Colours are `ColorSpec`s: `"red".into()`, `"#FF000080".into()`, a
@@ -64,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   0..1 user coordinates), user/device coordinate transforms, log
   axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, `at`/
   `pos`/`abline(h=, v=)` in data units, `abline(a, b)` straight on the
-  page or curved with `abline_untf`, and `xlog`/`ylog` for `plot()`,
+  page or curved with `AblineOptions::untf`, and `xlog`/`ylog` for `plot()`,
   `hist()` and `barplot()`), `par(lab=)`, `par(xaxp=/yaxp=)` (set by
   `plot_window()` as R's `GAxisPars()`, read by `axis()` via
   `CreateAtVector()`, overridable inline), and R's `xpd`-style clip regions (plot region, figure region,
@@ -76,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   covers all four sides of the figure and outer (`oma`) margins with
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
-  gives error-bar caps). `axis()` (`Device::axis_with` + `AxisOptions`,
+  gives error-bar caps). `axis()` (`Device::axis` + `AxisOptions`,
   `src/device/axis.rs`) takes R's `line`/`pos`/`outer`, `tick`/`labels`
   (`None` entries are `NA`: tick drawn, label skipped; labels may be
   plotmath expressions, `Label::math("10^5")`),
@@ -92,16 +103,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   R's `font = 5`; PDF uses the standard `/Symbol` font, SVG/PNG its
   Unicode equivalents), operators, relations, spacing, `paste()`,
   `list()`, parentheses and `group()`, font styles, and generic `f(x)`.
-  Used by `axis()` (labels), `title_with()` (`TitleOptions`), `mtext()`,
-  `text()`/`text_at()` and `legend()` (entry labels and title), each
+  Used by `axis()` (labels), `title()` (`TitleOptions`), `mtext()`,
+  `text()` and `legend()` (entry labels and title), each
   placed as R's `GMMathText`/`GMathText` do; `legend()` sizes rows and
   columns by the expressions' boxes. The high-level plots' titles
   (`main`/`sub`/`xlab`/`ylab` in `PlotOptions`, `HistOptions`,
-  `BarplotOptions`, `BoxplotOptions`, `PieOptions`) are `Label`s too;
-  only the plain-string `title()` wrapper is text-only. Accents, fractions, `sqrt`, big
+  `BarplotOptions`, `BoxplotOptions`, `PieOptions`) are `Label`s too.
+  Accents, fractions, `sqrt`, big
   operators and `bgroup` are rejected as not yet supported.
   `legend()`
-  (`Device::legend_with`, `src/device/legend.rs`) is a port of R's layout
+  (`Device::legend`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
   filled boxes and merged point+line keys.
 - Multi-panel layouts (`src/layout.rs`, `Device::{mfrow, mfcol, layout,

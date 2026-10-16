@@ -195,7 +195,7 @@ impl<B: Backend> Device<B> {
         let col = opts.col.unwrap_or(ColorSpec::Color(self.par.col));
         let font = opts.font.unwrap_or(self.par.font);
         // R sets the text size from `cex` alone (`C_mtext`: "we ignore any
-        // shrinking produced by mfrow / mfcol specs"), whereas `text_at`
+        // shrinking produced by mfrow / mfcol specs"), whereas `text()`
         // multiplies by `par(cex)`.
         let cex = opts.cex.unwrap_or(1.0) / self.par.cex;
         // Text in the outer margins doesn't count as drawing on the plot,

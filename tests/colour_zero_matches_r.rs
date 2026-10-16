@@ -9,9 +9,10 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::{Device, LineStyle};
+use rs_graphics::device::Device;
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -54,13 +55,50 @@ fn draw_ours(c: &Case) -> String {
     if let Some(bg) = c.par_bg {
         d.par.bg = Color::parse(bg).unwrap();
     }
-    d.plot_window((0.0, 1.0), (0.0, 1.0), false, false);
+    d.plot_window((0.0, 1.0), (0.0, 1.0), &PlotWindowOptions::default());
     let zero = ColorSpec::Index(0);
-    d.points(&[0.5], &[0.5], 19, zero, ColorSpec::None, 1.0);
+    d.points(
+        &[0.5],
+        &[0.5],
+        &XyOptions {
+            pch: vec![19],
+            col: vec![zero],
+            ..XyOptions::default()
+        },
+    );
     let solid = LineType::from_code(1);
-    d.rect(0.1, 0.1, 0.3, 0.3, zero, ColorSpec::Index(2), 1.0, solid);
-    d.text(0.7, 0.7, "z", 0.5, None, 0.0, zero, 1.0, 1);
-    d.segments(&[0.0], &[1.0], &[1.0], &[0.0], LineStyle::new(zero, 3.0, solid));
+    d.rect(
+        &[0.1],
+        &[0.1],
+        &[0.3],
+        &[0.3],
+        &RectOptions {
+            col: vec![zero],
+            border: vec![ColorSpec::Index(2)],
+            lwd: vec![1.0],
+            lty: vec![solid],
+            ..RectOptions::default()
+        },
+    );
+    d.text(
+        &[0.7],
+        &[0.7],
+        &["z"],
+        &TextOptions {
+            adj: Some(0.5),
+            col: vec![zero],
+            cex: vec![1.0],
+            font: vec![1],
+            ..TextOptions::default()
+        },
+    );
+    let line = SegmentsOptions {
+        col: vec![zero],
+        lty: vec![solid],
+        lwd: vec![3.0],
+        ..SegmentsOptions::default()
+    };
+    d.segments(&[0.0], &[1.0], &[1.0], &[0.0], &line);
     String::from_utf8_lossy(&d.into_backend().finish()).into_owned()
 }
 

@@ -3,8 +3,13 @@
 //! (`points`, `lines`, `segments`, `rect`, `polygon`, `text`, `box`,
 //! `abline`, `axis`, `title`, `mtext`, `legend`, `arrows`).
 //!
-//! `axis()`, `abline()`, `legend()` and `mtext()` live in child modules;
-//! everything else is here. Nearly every high-level plot (`plot()`,
+//! Each R function is one method taking its data and an options struct
+//! (`dev.axis(1, &AxisOptions { .. })`), whose unset fields are R's
+//! defaults, mostly the `par()` values. `points()`, `lines()`,
+//! `segments()`, `arrows()`, `rect()`, `polygon()`, `text()`, `box()` and
+//! `plot.window()` are in `primitives.rs`; `axis()`, `abline()`,
+//! `legend()` and `mtext()` in their own child modules; the page,
+//! layout, coordinate and clipping state, `plot.new()` and `title()` here. Nearly every high-level plot (`plot()`,
 //! `hist()`, `barplot()`, ...) is built purely out of these primitives,
 //! mirroring how R's own `graphics.c` centers everything around a handful
 //! of `GE*` engine calls.
@@ -31,10 +36,15 @@ mod axis;
 mod legend;
 mod mtext;
 mod plotmath;
+mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
 pub use legend::{LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
 pub use mtext::MtextOptions;
+pub use primitives::{
+    ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
+    SegmentsOptions, TextOptions, XyOptions,
+};
 
 /// Which axis/box side, in R's `side` convention: `1` = bottom, `2` =
 /// left, `3` = top, `4` = right.
@@ -86,28 +96,13 @@ enum Clip {
     Device,
 }
 
-/// The labels of [`Device::title_with`]; `None` draws nothing.
+/// The labels of [`Device::title`]; `None` draws nothing.
 #[derive(Clone, Debug, Default)]
 pub struct TitleOptions {
     pub main: Option<Label>,
     pub sub: Option<Label>,
     pub xlab: Option<Label>,
     pub ylab: Option<Label>,
-}
-
-/// A resolved style bundle for a stroked primitive; kept small so
-/// call-sites can build one inline.
-#[derive(Clone, Copy, Debug)]
-pub struct LineStyle {
-    pub col: ColorSpec,
-    pub lwd: f64,
-    pub lty: LineType,
-}
-
-impl LineStyle {
-    pub fn new(col: ColorSpec, lwd: f64, lty: LineType) -> Self {
-        LineStyle { col, lwd, lty }
-    }
 }
 
 /// Shortcuts for a device with R's default `par()`. Use [`Device::new`]
@@ -399,7 +394,7 @@ impl<B: Backend> Device<B> {
     /// plot regions.
     ///
     /// - **Coordinates:** like R, it leaves linear user coordinates of
-    ///   0..1 on both axes (`plot_window((0, 1), (0, 1), false, false)`:
+    ///   0..1 on both axes (as `plot_window((0, 1), (0, 1), ..)`:
     ///   -0.04..1.04 with the default `xaxs = yaxs = "r"`) and their
     ///   default ticks, so you can draw straight away. Call
     ///   [`Device::plot_window`] next for other limits or log axes.
@@ -443,32 +438,13 @@ impl<B: Backend> Device<B> {
             }
         }
         // `C_plot_new`: linear axes, `GScale(0, 1)` on both.
-        self.plot_window((0.0, 1.0), (0.0, 1.0), false, false);
+        self.set_window((0.0, 1.0), (0.0, 1.0), false, false);
     }
 
-    /// `plot.window(xlim, ylim, log)`: sets up the user coordinates of the
-    /// current plot region. Call it after [`Device::plot_new`] and before
-    /// drawing; for a fixed aspect ratio use [`Device::plot_window_asp`].
-    ///
-    /// - `xlim`/`ylim` are in data units, also on a log axis, and may be
-    ///   decreasing (a reversed axis).
-    /// - `xlog`/`ylog` make that axis log10 (R's `log = "x"`/`"y"`/`"xy"`).
-    ///   [`Device::usr`] is then in log10 units on that axis, as R's
-    ///   `par("usr")` is.
-    /// - Each range goes through R's `GScale()` (`graphics.c`):
-    ///   - With `par(xaxs/yaxs) = "r"` (the default), 4% is added at each
-    ///     end; with `"i"` the limits are used as given.
-    ///   - A zero-width range is widened: to -1..1 around 0, otherwise by
-    ///     40% of the value either side.
-    ///   - Non-finite limits are replaced by huge finite ones. On a log
-    ///     axis, a limit <= 0 gives a lower end of about 1e-307, where R
-    ///     warns "nonfinite axis limits"; this function doesn't warn or
-    ///     panic.
-    /// - Sets `par.xaxp`/`par.yaxp` (the default tick range and count,
-    ///   R's `GAxisPars()`) from the new range and `par.lab`. Later calls
-    ///   to `axis()` without `at` read them. Changing `par.lab` afterwards
-    ///   doesn't change them, as in R.
-    pub fn plot_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), xlog: bool, ylog: bool) {
+    /// The user coordinates for limits `xlim`/`ylim` (data units) on
+    /// linear or log axes, through `GScale()`, and `par.xaxp`/`yaxp`; see
+    /// [`Device::plot_window`].
+    fn set_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), xlog: bool, ylog: bool) {
         self.xlog = xlog;
         self.ylog = ylog;
         let (ux0, ux1) = Self::gscale(xlim.0, xlim.1, self.par.xaxs, xlog);
@@ -476,42 +452,6 @@ impl<B: Backend> Device<B> {
         self.usr = (ux0, ux1, uy0, uy1);
         self.par.xaxp = axis_pars(ux0, ux1, self.par.lab[0], xlog);
         self.par.yaxp = axis_pars(uy0, uy1, self.par.lab[1], ylog);
-    }
-
-    /// `plot.window(xlim, ylim, asp = asp)` on linear axes: widens
-    /// whichever range is needed so one x unit is `asp` y units long on
-    /// the page (centred on the given limits), *then* applies
-    /// `par(xaxs/yaxs)` as usual. Port of `C_plot_window`'s `asp` branch.
-    pub fn plot_window_asp(&mut self, xlim: (f64, f64), ylim: (f64, f64), asp: f64) {
-        if !(asp.is_finite() && asp > 0.0) {
-            self.plot_window(xlim, ylim, false, false);
-            return;
-        }
-        let (pin1, pin2) = (self.plt.width(), self.plt.height());
-        let xdelta = (xlim.1 - xlim.0).abs() / asp;
-        let ydelta = (ylim.1 - ylim.0).abs();
-        let (mut xadd, mut yadd) = if xdelta == 0.0 && ydelta == 0.0 {
-            let a = if xlim.0 == 0.0 { 1.0 } else { 0.4 } * asp;
-            (a * asp, a)
-        } else {
-            let scale = (pin1 / xdelta).min(pin2 / ydelta);
-            (
-                0.5 * (pin1 / scale - xdelta) * asp,
-                0.5 * (pin2 / scale - ydelta),
-            )
-        };
-        if xlim.1 < xlim.0 {
-            xadd = -xadd;
-        }
-        if ylim.1 < ylim.0 {
-            yadd = -yadd;
-        }
-        self.plot_window(
-            (xlim.0 - xadd, xlim.1 + xadd),
-            (ylim.0 - yadd, ylim.1 + yadd),
-            false,
-            false,
-        );
     }
 
     /// `GScale()` (`graphics.c`): the `usr` range (log10 units on a log
@@ -719,38 +659,13 @@ impl<B: Backend> Device<B> {
         self.par.resolve_color(spec)
     }
 
-    /// `points(x, y, pch=, col=, bg=, cex=)`.
-    pub fn points(
-        &mut self,
-        xs: &[f64],
-        ys: &[f64],
-        pch: i32,
-        col: ColorSpec,
-        bg: ColorSpec,
-        cex: f64,
-    ) {
-        let Some(col) = self.resolve(col) else { return };
-        let bg = self.resolve(bg);
-        self.push_clip_for(self.par.xpd);
-        for (&x, &y) in xs.iter().zip(ys) {
-            // Checked after conversion, like R, so values <= 0 on a log
-            // axis are skipped too.
-            let p = self.user_to_inches(x, y);
-            if !p.x.is_finite() || !p.y.is_finite() {
-                continue;
-            }
-            self.draw_pch(pch, p, cex, col, bg);
-        }
-        self.pop_clip();
-    }
-
     /// One symbol, as `GSymbol()`/`GESymbol()` draw it. `cex` is the
     /// per-point `cex` (R multiplies it by `cexbase`, i.e. `par(cex)`).
-    fn draw_pch(&mut self, pch: i32, p: Point, cex: f64, col: Color, bg: Option<Color>) {
+    fn draw_pch(&mut self, pch: i32, p: Point, cex: f64, col: Color, bg: Option<Color>, lwd: f64) {
         let cex = self.par.cex * cex;
         let size = pch::symbol_size_inches(self.start_ps, cex);
         if let Some(geom) = pch::pch_geometry(pch, p.x, p.y, size) {
-            let stroke = Stroke::simple(col, self.par.lwd);
+            let stroke = Stroke::simple(col, lwd);
             for shape in &geom.outline_only {
                 self.paint_shape(shape, None, Some(&stroke));
             }
@@ -813,15 +728,22 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// `lines(x, y, ...)`: connects points with a polyline, breaking into
-    /// separate segments at non-finite (`NA`) coordinates, and at values
-    /// <= 0 on a log axis, matching R.
-    pub fn lines(&mut self, xs: &[f64], ys: &[f64], style: LineStyle) {
-        let Some(col) = self.resolve(style.col) else {
+    /// `lines()`: a polyline, broken into separate pieces at non-finite
+    /// (`NA`) coordinates, and at values <= 0 on a log axis, matching R.
+    fn polyline_xy(
+        &mut self,
+        xs: &[f64],
+        ys: &[f64],
+        col: ColorSpec,
+        lwd: f64,
+        lty: LineType,
+        clip: Clip,
+    ) {
+        let Some(col) = self.resolve(col) else {
             return;
         };
-        let stroke = self.stroke_of(col, style.lwd, style.lty);
-        self.push_clip_for(self.par.xpd);
+        let stroke = self.stroke_of(col, lwd, lty);
+        self.push_clip_region(clip);
         let mut run: Vec<Point> = Vec::new();
         for (&x, &y) in xs.iter().zip(ys) {
             let p = self.user_to_inches(x, y);
@@ -845,13 +767,21 @@ impl<B: Backend> Device<B> {
     /// height (`0.5 * par(cex) * 1.2 * startps / 72` inches) so the points stand
     /// clear, and left out when shorter than twice that. A port of
     /// `C_plotXY`'s `case 'b'`.
-    pub fn broken_lines(&mut self, xs: &[f64], ys: &[f64], style: LineStyle) {
-        let Some(col) = self.resolve(style.col) else {
+    fn broken_lines_xy(
+        &mut self,
+        xs: &[f64],
+        ys: &[f64],
+        col: ColorSpec,
+        lwd: f64,
+        lty: LineType,
+        clip: Clip,
+    ) {
+        let Some(col) = self.resolve(col) else {
             return;
         };
-        let stroke = self.stroke_of(col, style.lwd, style.lty);
+        let stroke = self.stroke_of(col, lwd, lty);
         let d = 0.5 * self.par.cex * 1.2 * self.start_ps / 72.0;
-        self.push_clip_for(self.par.xpd);
+        self.push_clip_region(clip);
         let mut old: Option<Point> = None;
         for (&x, &y) in xs.iter().zip(ys) {
             let p = self.user_to_inches(x, y);
@@ -870,83 +800,11 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `segments(x0, y0, x1, y1, ...)`, in data units. As `C_segments`, a
-    /// segment is skipped when an end is non-finite after conversion: an
-    /// `NaN`/infinite value, or a value <= 0 on a log axis. Unlike R, the
-    /// four slices aren't recycled; the shortest sets the count.
-    pub fn segments(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], style: LineStyle) {
-        let Some(col) = self.resolve(style.col) else {
-            return;
-        };
-        let stroke = self.stroke_of(col, style.lwd, style.lty);
-        self.push_clip_for(self.par.xpd);
-        for i in 0..x0.len().min(y0.len()).min(x1.len()).min(y1.len()) {
-            // Tested after conversion, as `C_segments`: values <= 0 on a
-            // log axis are skipped too.
-            let p0 = self.user_to_inches(x0[i], y0[i]);
-            let p1 = self.user_to_inches(x1[i], y1[i]);
-            if [p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
-                self.backend.draw_line(p0, p1, &stroke);
-            }
-        }
-        self.pop_clip();
-    }
-
-    /// `rect(xleft, ybottom, xright, ytop, ...)` in user coordinates.
-    pub fn rect(
-        &mut self,
-        x0: f64,
-        y0: f64,
-        x1: f64,
-        y1: f64,
-        fill: ColorSpec,
-        border: ColorSpec,
-        lwd: f64,
-        lty: LineType,
-    ) {
-        let fill_c = self.resolve(fill);
-        let border_c = self.resolve(border);
-        let stroke = border_c.map(|c| self.stroke_of(c, lwd, lty));
-        self.push_clip_for(self.par.xpd);
-        let p0 = self.user_to_inches(x0, y0);
-        let p1 = self.user_to_inches(x1, y1);
-        // R skips rectangles with a non-finite corner, e.g. at 0 on a log
-        // axis.
-        if [p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
-            self.backend
-                .draw_rect(Rect::new(p0.x, p0.y, p1.x, p1.y), fill_c, stroke.as_ref());
-        }
-        self.pop_clip();
-    }
-
     /// `rect()` variant taking a rectangle already in device inches. Not
     /// clipped.
     pub fn rect_inches(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
         self.dirty();
         self.backend.draw_rect(rect, fill, stroke);
-    }
-
-    /// `polygon(x, y, ...)`.
-    pub fn polygon(
-        &mut self,
-        xs: &[f64],
-        ys: &[f64],
-        fill: ColorSpec,
-        border: ColorSpec,
-        lwd: f64,
-        lty: LineType,
-    ) {
-        let fill_c = self.resolve(fill);
-        let border_c = self.resolve(border);
-        let stroke = border_c.map(|c| self.stroke_of(c, lwd, lty));
-        self.push_clip_for(self.par.xpd);
-        let pts: Vec<Point> = xs
-            .iter()
-            .zip(ys)
-            .map(|(&x, &y)| self.user_to_inches(x, y))
-            .collect();
-        self.backend.draw_polygon(&pts, fill_c, stroke.as_ref());
-        self.pop_clip();
     }
 
     fn stroke_of(&self, color: Color, lwd: f64, lty: LineType) -> Stroke {
@@ -958,61 +816,6 @@ impl<B: Backend> Device<B> {
             ljoin: self.par.ljoin,
             lmitre: self.par.lmitre,
         }
-    }
-
-    /// `abline(a, b)` / `abline(h = )` / `abline(v = )` with one colour,
-    /// width and line type for all. See [`Device::abline_with`] (R's
-    /// `C_abline`) for vectors of `h`/`v`, recycled styles and how lines
-    /// behave on log axes.
-    #[allow(clippy::too_many_arguments)]
-    pub fn abline(
-        &mut self,
-        a: Option<f64>,
-        b: Option<f64>,
-        h: Option<f64>,
-        v: Option<f64>,
-        col: ColorSpec,
-        lwd: f64,
-        lty: LineType,
-    ) {
-        self.abline_with(&AblineOptions {
-            coef: a.zip(b),
-            h: h.into_iter().collect(),
-            v: v.into_iter().collect(),
-            col: vec![col],
-            lty: vec![lty],
-            lwd: vec![lwd],
-            ..AblineOptions::default()
-        });
-    }
-
-    /// `abline(coef = coef)`: the line with intercept `coef[0]` and slope
-    /// `coef[1]`, e.g. a fitted regression's coefficients. Like R, values
-    /// after the first two are ignored.
-    ///
-    /// # Panics
-    /// If `coef` has fewer than two values, or they aren't finite (R: "'a'
-    /// and 'b' must be finite").
-    pub fn abline_coef(&mut self, coef: &[f64], col: ColorSpec, lwd: f64, lty: LineType) {
-        assert!(
-            coef.len() >= 2 && coef[0].is_finite() && coef[1].is_finite(),
-            "abline: 'a' and 'b' must be finite"
-        );
-        self.abline(Some(coef[0]), Some(coef[1]), None, None, col, lwd, lty);
-    }
-
-    /// `abline(a, b, untf = TRUE)`: the line `y = a + b * x` in data units,
-    /// curved on a log axis. Without log axes, the same as
-    /// [`Device::abline`].
-    pub fn abline_untf(&mut self, a: f64, b: f64, col: ColorSpec, lwd: f64, lty: LineType) {
-        self.abline_with(&AblineOptions {
-            coef: Some((a, b)),
-            untf: true,
-            col: vec![col],
-            lty: vec![lty],
-            lwd: vec![lwd],
-            ..AblineOptions::default()
-        });
     }
 
     fn draw_line_if_finite(&mut self, from: Point, to: Point, stroke: &Stroke) {
@@ -1042,54 +845,12 @@ impl<B: Backend> Device<B> {
         (width, newlines * line + afm::m_height_inches(face, size, 1.0))
     }
 
-    /// `text(x, y, labels, adj=, srt=, col=, cex=, font=)` in user
-    /// coordinates. `vadj = None` is R's `NA` vertical adjustment, which
-    /// `text()` uses unless `adj` has two elements (so it is the default).
-    /// `label` is text (`"a"`) or a plotmath expression
-    /// (`Label::math("alpha^2")`), aligned on its bounding box (`NA`:
-    /// centred), in the plain font.
-    #[allow(clippy::too_many_arguments)]
-    pub fn text(
-        &mut self,
-        x: f64,
-        y: f64,
-        label: impl Into<Label>,
-        hadj: f64,
-        vadj: Option<f64>,
-        rotation_deg: f64,
-        col: ColorSpec,
-        cex: f64,
-        font: i32,
-    ) {
-        let p = self.user_to_inches(x, y);
-        self.text_at(p, label, hadj, vadj, rotation_deg, col, cex, font);
-    }
-
-    /// As [`Device::text`] but the anchor is already in device inches.
-    /// Placement follows `GEText()`: horizontally `hadj` of the string's
-    /// width; vertically, a finite `vadj` puts the baseline `vadj *
-    /// height("M")` below the anchor, while `None` (`NA`) centres the ink
+    /// Draws one line of text at `anchor` (device inches), clipped to
+    /// `clip`. Placement follows `GEText()`: horizontally `hadj` of the
+    /// string's width; vertically, a finite `vadj` puts the baseline
+    /// `vadj * height("M")` below the anchor, while `None` (`NA`) centres the ink
     /// of the string's glyphs on it (baseline at `anchor - (ury + lly) / 2`
     /// of the glyph bounding boxes).
-    /// Expressions are placed as in [`Device::text`].
-    #[allow(clippy::too_many_arguments)]
-    pub fn text_at(
-        &mut self,
-        anchor: Point,
-        label: impl Into<Label>,
-        hadj: f64,
-        vadj: Option<f64>,
-        rotation_deg: f64,
-        col: ColorSpec,
-        cex: f64,
-        font: i32,
-    ) {
-        let clip = if self.par.xpd { Clip::Figure } else { Clip::Plot };
-        let label = label.into();
-        self.draw_label(clip, anchor, &label, hadj, vadj, rotation_deg, col, cex, font);
-    }
-
-    /// [`Device::text_at`] clipped to `clip` instead of the `par(xpd)` region.
     #[allow(clippy::too_many_arguments)]
     fn text_at_clipped(
         &mut self,
@@ -1140,96 +901,13 @@ impl<B: Backend> Device<B> {
     // box() / axis() / title()
     // ---------------------------------------------------------------
 
-    /// `box(which = "plot", col=, lwd=, lty=)`.
-    pub fn box_plot(&mut self, col: ColorSpec, lwd: f64, lty: LineType) {
-        let Some(color) = self.resolve(col) else {
-            return;
-        };
-        let stroke = self.stroke_of(color, lwd, lty);
-        self.dirty();
-        self.backend.draw_rect(self.plt, None, Some(&stroke));
-    }
-
-    /// `axis(side, at=, labels=, col=, cex.axis=, font=, las=)`: `col` is
-    /// used for the line, ticks and labels. `at`/`labels` default to R's
-    /// automatic ticks and labels. See [`Device::axis_with`] for the other
-    /// arguments.
-    #[allow(clippy::too_many_arguments)]
-    pub fn axis(
-        &mut self,
-        side: Side,
-        at: Option<Vec<f64>>,
-        labels: Option<Vec<String>>,
-        col: ColorSpec,
-        cex_axis: f64,
-        font_axis: i32,
-        las: i32,
-    ) {
-        let opts = AxisOptions {
-            at,
-            labels: labels.map(|l| l.into_iter().map(|t| Some(Label::Text(t))).collect()),
-            col: Some(col),
-            col_axis: Some(col),
-            cex_axis: Some(cex_axis),
-            font: Some(font_axis),
-            las: Some(las),
-            ..AxisOptions::default()
-        };
-        self.axis_with(side, &opts);
-    }
-
-    /// As [`Device::axis`] but draws only the tick labels - no axis line
-    /// or tick marks - like R's `axis(..., tick = FALSE)` (`barplot()`
-    /// uses `lty = 0`, which looks the same, for its category names).
-    #[allow(clippy::too_many_arguments)]
-    pub fn axis_labels(
-        &mut self,
-        side: Side,
-        at: Option<Vec<f64>>,
-        labels: Option<Vec<String>>,
-        col: ColorSpec,
-        cex_axis: f64,
-        font_axis: i32,
-        las: i32,
-    ) {
-        let opts = AxisOptions {
-            at,
-            labels: labels.map(|l| l.into_iter().map(|t| Some(Label::Text(t))).collect()),
-            tick: false,
-            col: Some(col),
-            col_axis: Some(col),
-            cex_axis: Some(cex_axis),
-            font: Some(font_axis),
-            las: Some(las),
-            ..AxisOptions::default()
-        };
-        self.axis_with(side, &opts);
-    }
-
-    /// `title(main=, sub=, xlab=, ylab=)` with text labels; see
-    /// [`Device::title_with`] for expressions.
-    pub fn title(
-        &mut self,
-        main: Option<&str>,
-        sub: Option<&str>,
-        xlab: Option<&str>,
-        ylab: Option<&str>,
-    ) {
-        self.title_with(&TitleOptions {
-            main: main.map(Label::from),
-            sub: sub.map(Label::from),
-            xlab: xlab.map(Label::from),
-            ylab: ylab.map(Label::from),
-        });
-    }
-
     /// `title(main=, sub=, xlab=, ylab=)`, each text or a plotmath
     /// expression, drawn in `C_title`'s order (main, sub, xlab, ylab) with
     /// `par(cex.main/col.main/font.main)` etc. Text is placed by `GMtext()`
     /// (baseline on the line, nudged by `yLineBias`); expressions by
     /// `GMathText()` (`main`: box centred on its line) and `GMMathText()`
     /// (the others: box bottom on the nudged line).
-    pub fn title_with(&mut self, opts: &TitleOptions) {
+    pub fn title(&mut self, opts: &TitleOptions) {
         let saved_xpd = self.par.xpd;
         self.par.xpd = true;
         let lh = self.line_height_inches();
@@ -1297,63 +975,6 @@ impl<B: Backend> Device<B> {
             );
         }
         self.par.xpd = saved_xpd;
-    }
-
-    /// `arrows(x0, y0, x1, y1, length, angle, code, col =, lwd =, lty =)`,
-    /// a port of `C_arrows` / `GArrow()`: each segment is drawn with open
-    /// heads - two lines of `length` inches at `angle` degrees to the shaft -
-    /// at its start (`code = 1`), end (`2`, R's default) or both ends (`3`).
-    /// `angle = 90` gives flat caps, as for error bars. R's defaults are
-    /// `length = 0.25`, `angle = 30`, `code = 2`.
-    ///
-    /// As in R, segments with a non-finite coordinate are skipped, and the
-    /// heads of a segment shorter than 1/1000 inch are not drawn (R also
-    /// warns). Clipped according to `par(xpd)`.
-    #[allow(clippy::too_many_arguments)]
-    pub fn arrows(
-        &mut self,
-        x0: &[f64],
-        y0: &[f64],
-        x1: &[f64],
-        y1: &[f64],
-        length: f64,
-        angle: f64,
-        code: u8,
-        style: LineStyle,
-    ) {
-        let Some(color) = self.resolve(style.col) else {
-            return;
-        };
-        let stroke = self.stroke_of(color, style.lwd, style.lty);
-        let angle = angle.to_radians();
-        self.push_clip_for(self.par.xpd);
-        for i in 0..x0.len().min(y0.len()).min(x1.len()).min(y1.len()) {
-            if ![x0[i], y0[i], x1[i], y1[i]].iter().all(|v| v.is_finite()) {
-                continue;
-            }
-            let from = self.user_to_inches(x0[i], y0[i]);
-            let to = self.user_to_inches(x1[i], y1[i]);
-            self.backend.draw_line(from, to, &stroke);
-            if code & 3 == 0 || length == 0.0 || (from.x - to.x).hypot(from.y - to.y) < 1e-3 {
-                continue;
-            }
-            // A head at `tip`, opening back along the shaft towards `tail`.
-            let mut head = |tip: Point, tail: Point| {
-                let rot = (tail.y - tip.y).atan2(tail.x - tip.x);
-                let barb = |a: f64| {
-                    Point::new(tip.x + length * (rot + a).cos(), tip.y + length * (rot + a).sin())
-                };
-                self.backend
-                    .draw_polyline(&[barb(angle), tip, barb(-angle)], &stroke);
-            };
-            if code & 1 != 0 {
-                head(from, to);
-            }
-            if code & 2 != 0 {
-                head(to, from);
-            }
-        }
-        self.pop_clip();
     }
 
     pub fn backend_mut(&mut self) -> &mut B {

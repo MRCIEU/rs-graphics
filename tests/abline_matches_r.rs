@@ -11,6 +11,7 @@ use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AblineOptions, Device};
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -48,7 +49,7 @@ fn cases() -> Vec<Case> {
             log: "",
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
-                d.abline_with(&AblineOptions {
+                d.abline(&AblineOptions {
                     h: vec![2.0, 5.0, 8.0],
                     v: vec![3.0, 7.0],
                     col: col(&["red", "blue"]),
@@ -65,7 +66,7 @@ fn cases() -> Vec<Case> {
             log: "",
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
-                d.abline_with(&AblineOptions {
+                d.abline(&AblineOptions {
                     coef: Some((1.0, 0.5)),
                     h: vec![4.0, 6.0],
                     v: vec![9.0],
@@ -91,9 +92,19 @@ fn cases() -> Vec<Case> {
                 let sxx: f64 = x.iter().map(|a| (a - mx) * (a - mx)).sum();
                 let slope = sxy / sxx;
                 let red = col(&["red"])[0];
-                d.abline_coef(&[my - slope * mx, slope], red, 1.0, LineType::from_code(1));
-                let black = ColorSpec::Index(1);
-                d.abline_coef(&[2.0, -0.3, 99.0], black, 1.0, LineType::from_code(2));
+                let fit = AblineOptions {
+                    coef: Some((my - slope * mx, slope)),
+                    col: vec![red],
+                    ..AblineOptions::default()
+                };
+                d.abline(&fit);
+                // R ignores coef values after the first two.
+                let first_two = AblineOptions {
+                    coef: Some((2.0, -0.3)),
+                    lty: vec![LineType::DASHED],
+                    ..AblineOptions::default()
+                };
+                d.abline(&first_two);
             },
         },
         Case {
@@ -104,14 +115,14 @@ fn cases() -> Vec<Case> {
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
                 d.par.lend = LineEnd::Square;
-                d.abline_with(&AblineOptions {
+                d.abline(&AblineOptions {
                     h: vec![2.0, 4.0],
                     lty: vec![LineType::from_code(2), LineType::from_code(3)],
                     lwd: vec![1.0, 3.0],
                     ..Default::default()
                 });
                 d.par.lend = LineEnd::Butt;
-                d.abline_with(&AblineOptions {
+                d.abline(&AblineOptions {
                     h: vec![6.0, 8.0],
                     lty: vec![LineType::from_code(4), LineType::parse("42").unwrap()],
                     lwd: vec![2.0],
@@ -130,12 +141,12 @@ fn cases() -> Vec<Case> {
                 d.par.col = Color::parse("grey40").unwrap();
                 d.par.lty = LineType::from_code(2);
                 d.par.lwd = 2.0;
-                d.abline_with(&AblineOptions {
+                d.abline(&AblineOptions {
                     h: vec![1.0, 10.0, 100.0],
                     v: vec![2.0, 20.0],
                     ..Default::default()
                 });
-                d.abline_with(&AblineOptions {
+                d.abline(&AblineOptions {
                     coef: Some((1.0, 1.0)),
                     untf: true,
                     h: vec![50.0],
@@ -268,7 +279,15 @@ fn abline_matches_r() {
         );
         dev.plot_new();
         let (xl, yl) = c.lims;
-        dev.plot_window(xl, yl, c.log.contains('x'), c.log.contains('y'));
+        dev.plot_window(
+            xl,
+            yl,
+            &PlotWindowOptions {
+                xlog: c.log.contains('x'),
+                ylog: c.log.contains('y'),
+                ..PlotWindowOptions::default()
+            },
+        );
         (c.draw)(&mut dev);
         let ours = interpret(&String::from_utf8_lossy(&dev.into_backend().finish()));
         let name = c.name;
@@ -288,9 +307,12 @@ fn abline_matches_r() {
 
 #[test]
 #[should_panic(expected = "'a' and 'b' must be finite")]
-fn abline_coef_needs_two_values() {
+fn abline_coef_must_be_finite() {
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0), false, false);
-    dev.abline_coef(&[1.0], ColorSpec::Index(1), 1.0, LineType::from_code(1));
+    dev.plot_window((0.0, 1.0), (0.0, 1.0), &PlotWindowOptions::default());
+    dev.abline(&AblineOptions {
+        coef: Some((f64::NAN, 1.0)),
+        ..AblineOptions::default()
+    });
 }

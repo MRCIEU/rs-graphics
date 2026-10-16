@@ -12,6 +12,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -125,12 +126,24 @@ fn latin1_text_matches_r() {
     };
     let mut dev = Device::new(PdfBackend::new(6.0, 6.0).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 16.0), false, false);
+    dev.plot_window((0.0, 10.0), (0.0, 16.0), &PlotWindowOptions::default());
     let black = ColorSpec::Color(Color::BLACK);
     for (i, label) in LABELS.iter().enumerate() {
         for (j, adj) in [0.0, 0.5, 1.0].iter().enumerate() {
             let y = (3 * i + j + 1) as f64;
-            dev.text(5.0, y, label, *adj, Some(0.0), 0.0, black, 1.0, 1 + (i % 2) as i32);
+            dev.text(
+                &[5.0],
+                &[y],
+                &[label],
+                &TextOptions {
+                    adj: Some(*adj),
+                    vadj: Some(0.0),
+                    col: vec![black],
+                    cex: vec![1.0],
+                    font: vec![1 + (i % 2) as i32],
+                    ..TextOptions::default()
+                },
+            );
         }
     }
     let ours = dev.into_backend().finish();

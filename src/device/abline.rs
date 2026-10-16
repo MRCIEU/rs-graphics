@@ -35,7 +35,18 @@ pub struct AblineOptions {
 
 impl<B: Backend> Device<B> {
     /// `abline(a, b, h, v, untf, col, lty, lwd)`; see [`AblineOptions`].
-    pub fn abline_with(&mut self, opts: &AblineOptions) {
+    /// For R's `abline(coef = )` or `abline(reg = )`, pass the intercept
+    /// and slope as `coef`.
+    ///
+    /// # Panics
+    /// If `coef` has a non-finite value (R: "'a' and 'b' must be finite").
+    pub fn abline(&mut self, opts: &AblineOptions) {
+        if let Some((a, b)) = opts.coef {
+            assert!(
+                a.is_finite() && b.is_finite(),
+                "abline: 'a' and 'b' must be finite"
+            );
+        }
         let mut nlines = 0;
         // The style of the `n`th line: `col`, `lty` and `lwd` recycled.
         let style = |dev: &Self, n: usize| {

@@ -14,13 +14,14 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::{Device, LineStyle};
+use rs_graphics::device::Device;
 use rs_graphics::highlevel::{
     barplot, barplot_matrix, boxplot, hist, plot, BarplotOptions, BoxplotOptions, HistOptions,
     PlotOptions,
 };
 use rs_graphics::lty::LineType;
 use rs_graphics::par::{AxisType, Par};
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -65,14 +66,27 @@ fn cases() -> Vec<Case> {
                          c(10, 50, 100, 20, 0, 9, 80), c(5, 20, 0.5, 30, 30, 9, 0), col = 'red')",
             draw: |d| {
                 d.plot_new();
-                d.plot_window((1.0, 100.0), (1.0, 100.0), true, true);
+                d.plot_window(
+                    (1.0, 100.0),
+                    (1.0, 100.0),
+                    &PlotWindowOptions {
+                        xlog: true,
+                        ylog: true,
+                        ..PlotWindowOptions::default()
+                    },
+                );
                 let nan = f64::NAN;
                 d.segments(
                     &[1.0, 0.0, 10.0, -5.0, 2.0, nan, 3.0],
                     &[1.0, 10.0, 50.0, 5.0, 3.0, 5.0, 2.0],
                     &[10.0, 50.0, 100.0, 20.0, 0.0, 9.0, 80.0],
                     &[5.0, 20.0, 0.5, 30.0, 30.0, 9.0, 0.0],
-                    LineStyle::new(red(), 1.0, solid()),
+                    &SegmentsOptions {
+                        col: vec![red()],
+                        lty: vec![solid()],
+                        lwd: vec![1.0],
+                        ..SegmentsOptions::default()
+                    },
                 );
             },
         },
@@ -92,12 +106,50 @@ fn cases() -> Vec<Case> {
                 };
                 plot(d, &[1.0, 1000.0], &[1.0, 1e4], &opts);
                 let black = ColorSpec::Index(1);
-                d.abline(None, None, Some(10.0), None, black, 1.0, solid());
-                d.abline(None, None, None, Some(100.0), red(), 1.0, solid());
-                d.abline(Some(0.0), Some(1.0), None, None, black, 1.0, solid());
-                d.abline_untf(5.0, 2.0, black, 1.0, LineType::from_code(2));
-                d.abline(None, None, Some(-1.0), None, black, 1.0, solid());
-                d.abline_untf(-50.0, 3.0, red(), 1.0, solid());
+                d.abline(&AblineOptions {
+                    h: vec![10.0],
+                    col: vec![black],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
+                d.abline(&AblineOptions {
+                    v: vec![100.0],
+                    col: vec![red()],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
+                d.abline(&AblineOptions {
+                    coef: Some((0.0, 1.0)),
+                    col: vec![black],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
+                d.abline(&AblineOptions {
+                    coef: Some((5.0, 2.0)),
+                    untf: true,
+                    col: vec![black],
+                    lwd: vec![1.0],
+                    lty: vec![LineType::from_code(2)],
+                    ..AblineOptions::default()
+                });
+                d.abline(&AblineOptions {
+                    h: vec![-1.0],
+                    col: vec![black],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
+                d.abline(&AblineOptions {
+                    coef: Some((-50.0, 3.0)),
+                    untf: true,
+                    col: vec![red()],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
             },
         },
         Case {
@@ -114,10 +166,30 @@ fn cases() -> Vec<Case> {
                 };
                 plot(d, &[1.0, 1000.0], &[0.0, 10.0], &opts);
                 let black = ColorSpec::Index(1);
-                d.abline(Some(1.0), Some(2.0), None, None, black, 1.0, solid());
-                d.abline_untf(1.0, 0.01, black, 1.0, solid());
+                d.abline(&AblineOptions {
+                    coef: Some((1.0, 2.0)),
+                    col: vec![black],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
+                d.abline(&AblineOptions {
+                    coef: Some((1.0, 0.01)),
+                    untf: true,
+                    col: vec![black],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
                 d.par.xpd = true;
-                d.abline(None, None, Some(5.0), Some(10.0), red(), 1.0, solid());
+                d.abline(&AblineOptions {
+                    h: vec![5.0],
+                    v: vec![10.0],
+                    col: vec![red()],
+                    lwd: vec![1.0],
+                    lty: vec![solid()],
+                    ..AblineOptions::default()
+                });
             },
         },
         Case {
@@ -205,7 +277,23 @@ fn cases() -> Vec<Case> {
                 plot(d, &x, &x, &o);
                 let fg = ColorSpec::Index(1);
                 let labels = ["a", "b", "c"].map(String::from).to_vec();
-                d.axis(1, Some(vec![2.0, 5.0, 8.0]), Some(labels), fg, 1.0, 1, 0);
+                d.axis(
+                    1,
+                    &AxisOptions {
+                        at: Some(vec![2.0, 5.0, 8.0]),
+                        labels: Some(labels).map(|v| {
+                            v.into_iter()
+                                .map(|t| Some(rs_graphics::plotmath::Label::from(t)))
+                                .collect()
+                        }),
+                        col: Some(fg),
+                        col_axis: Some(fg),
+                        cex_axis: Some(1.0),
+                        font: Some(1),
+                        las: Some(0),
+                        ..AxisOptions::default()
+                    },
+                );
             },
         },
         Case {
@@ -238,8 +326,28 @@ fn cases() -> Vec<Case> {
                 let o = PlotOptions { xlog: true, ylog: true, axes: false, ..Default::default() };
                 plot(d, &[1.0, 1e6], &[1.0, 50.0], &o);
                 let fg = ColorSpec::Index(1);
-                d.axis(3, None, None, fg, 1.0, 1, 0);
-                d.axis(4, None, None, fg, 1.0, 1, 0);
+                d.axis(
+                    3,
+                    &AxisOptions {
+                        col: Some(fg),
+                        col_axis: Some(fg),
+                        cex_axis: Some(1.0),
+                        font: Some(1),
+                        las: Some(0),
+                        ..AxisOptions::default()
+                    },
+                );
+                d.axis(
+                    4,
+                    &AxisOptions {
+                        col: Some(fg),
+                        col_axis: Some(fg),
+                        cex_axis: Some(1.0),
+                        font: Some(1),
+                        las: Some(0),
+                        ..AxisOptions::default()
+                    },
+                );
             },
         },
     ]

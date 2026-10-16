@@ -15,6 +15,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::Par;
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -80,9 +81,29 @@ fn zero_ticks_match_r() {
     let black = ColorSpec::Color(Color::BLACK);
     for &(xlim, ylim) in RANGES {
         dev.plot_new();
-        dev.plot_window(xlim, ylim, false, false);
-        dev.axis(1, None, None, black, 1.0, 1, 0);
-        dev.axis(2, None, None, black, 1.0, 1, 0);
+        dev.plot_window(xlim, ylim, &PlotWindowOptions::default());
+        dev.axis(
+            1,
+            &AxisOptions {
+                col: Some(black),
+                col_axis: Some(black),
+                cex_axis: Some(1.0),
+                font: Some(1),
+                las: Some(0),
+                ..AxisOptions::default()
+            },
+        );
+        dev.axis(
+            2,
+            &AxisOptions {
+                col: Some(black),
+                col_axis: Some(black),
+                cex_axis: Some(1.0),
+                font: Some(1),
+                las: Some(0),
+                ..AxisOptions::default()
+            },
+        );
     }
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

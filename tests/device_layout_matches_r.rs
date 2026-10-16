@@ -7,6 +7,7 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::par::Par;
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -62,7 +63,7 @@ fn plot_region_and_usr_match_r() {
     let backend = PdfBackend::new(width, height).with_compression(false);
     let mut dev = Device::new(backend, par);
     dev.plot_new();
-    dev.plot_window(xlim, ylim, false, false);
+    dev.plot_window(xlim, ylim, &PlotWindowOptions::default());
 
     let plt = dev.plot_region();
     assert!(

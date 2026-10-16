@@ -11,6 +11,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::highlevel::{plot, PlotOptions};
 use rs_graphics::par::Par;
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -75,7 +76,15 @@ fn axp_values_match_r() {
         };
         let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), par);
         dev.plot_new();
-        dev.plot_window(*xlim, *ylim, log.contains('x'), log.contains('y'));
+        dev.plot_window(
+            *xlim,
+            *ylim,
+            &PlotWindowOptions {
+                xlog: log.contains('x'),
+                ylog: log.contains('y'),
+                ..PlotWindowOptions::default()
+            },
+        );
         let ours: Vec<f64> = dev.par.xaxp.iter().chain(&dev.par.yaxp).copied().collect();
         let ok = ours
             .iter()
@@ -100,15 +109,22 @@ fn cases() -> Vec<Case> {
                 axis(1); axis(2); axis(3, xaxp = c(2, 8, 3)); axis(4, yaxp = c(1, 100, 3))",
             draw: |d| {
                 d.plot_new();
-                d.plot_window((0.0, 10.0), (1.0, 1000.0), false, true);
+                d.plot_window(
+                    (0.0, 10.0),
+                    (1.0, 1000.0),
+                    &PlotWindowOptions {
+                        ylog: true,
+                        ..PlotWindowOptions::default()
+                    },
+                );
                 d.par.xaxp = [0.0, 10.0, 2.0];
                 d.par.yaxp = [1.0, 1000.0, 2.0];
-                d.axis_with(1, &AxisOptions::default());
-                d.axis_with(2, &AxisOptions::default());
+                d.axis(1, &AxisOptions::default());
+                d.axis(2, &AxisOptions::default());
                 let o = AxisOptions { axp: Some([2.0, 8.0, 3.0]), ..Default::default() };
-                d.axis_with(3, &o);
+                d.axis(3, &o);
                 let o = AxisOptions { axp: Some([1.0, 100.0, 3.0]), ..Default::default() };
-                d.axis_with(4, &o);
+                d.axis(4, &o);
             },
         },
         Case {

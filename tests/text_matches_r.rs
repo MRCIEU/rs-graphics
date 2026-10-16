@@ -10,6 +10,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -93,10 +94,23 @@ fn text_placement_matches_r() {
     par.mar = Sides::new(0.0, 0.0, 0.0, 0.0);
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 11.0), false, false);
+    dev.plot_window((0.0, 10.0), (0.0, 11.0), &PlotWindowOptions::default());
     let black = ColorSpec::Color(Color::BLACK);
     for (i, &(label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
-        dev.text(5.0, (i + 1) as f64, label, h, v, srt, black, cex, font);
+        dev.text(
+            &[5.0],
+            &[(i + 1) as f64],
+            &[label],
+            &TextOptions {
+                adj: Some(h),
+                vadj: v,
+                srt: srt,
+                col: vec![black],
+                cex: vec![cex],
+                font: vec![font],
+                ..TextOptions::default()
+            },
+        );
     }
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

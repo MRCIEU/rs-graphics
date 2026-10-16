@@ -7,8 +7,7 @@
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
-use crate::device::{Device, TitleOptions};
-use crate::lty::LineType;
+use crate::device::{AxisOptions, Device, PlotWindowOptions, RectOptions, TitleOptions};
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
@@ -153,14 +152,19 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
     // bars.
     if !opts.add {
         dev.plot_new();
-        dev.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), opts.xlog, opts.ylog);
+        let window = PlotWindowOptions {
+            xlog: opts.xlog,
+            ylog: opts.ylog,
+            ..PlotWindowOptions::default()
+        };
+        dev.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), &window);
 
         if dev.par.ann {
             let or = |l: &Option<Label>, default: &str| {
                 Some(l.clone().unwrap_or_else(|| Label::from(default)))
             };
             let ylab = if opts.freq { "Frequency" } else { "Density" };
-            dev.title_with(&TitleOptions {
+            dev.title(&TitleOptions {
                 main: or(&opts.main, "Histogram of x"),
                 sub: None,
                 xlab: or(&opts.xlab, "x"),
@@ -169,9 +173,7 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
         }
 
         if opts.axes {
-            let fg = ColorSpec::Color(dev.par.fg);
-            let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
-            dev.axis(1, None, None, fg, cex_axis, font_axis, las);
+            dev.axis(1, &AxisOptions::default());
             // `yt[yt %% 1 == 0]` for counts: whole numbers only.
             let yticks = if opts.freq {
                 dev.default_ticks(2)
@@ -181,22 +183,21 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
             } else {
                 dev.default_ticks(2)
             };
-            dev.axis(2, Some(yticks), None, fg, cex_axis, font_axis, las);
+            let y_axis = AxisOptions {
+                at: Some(yticks),
+                ..AxisOptions::default()
+            };
+            dev.axis(2, &y_axis);
         }
     }
 
-    for i in 0..heights.len() {
-        dev.rect(
-            breaks[i],
-            0.0,
-            breaks[i + 1],
-            heights[i],
-            opts.col,
-            opts.border,
-            dev.par.lwd,
-            LineType::SOLID,
-        );
-    }
+    // `rect(breaks[-nB], 0, breaks[-1L], y, col = col, border = border)`.
+    let bars = RectOptions {
+        col: vec![opts.col],
+        border: vec![opts.border],
+        ..RectOptions::default()
+    };
+    dev.rect(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
 
     HistResult {
         breaks,

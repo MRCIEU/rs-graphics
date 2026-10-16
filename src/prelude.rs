@@ -13,8 +13,9 @@ pub use crate::backend::svg::SvgBackend;
 pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec};
 pub use crate::device::{
-    AblineOptions, AxisOptions, Device, LegendEntry, LegendKeyword, LegendOptions, LegendPos,
-    LineStyle, MtextOptions, TitleOptions,
+    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, LegendEntry,
+    LegendKeyword, LegendOptions, LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions,
+    RectOptions, SegmentsOptions, TextOptions, TitleOptions, XyOptions,
 };
 pub use crate::highlevel::{
     BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions, PlotOptions,

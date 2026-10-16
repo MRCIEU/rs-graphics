@@ -12,8 +12,10 @@
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
-use crate::device::{Device, LegendEntry, LegendOptions, LegendPos, TitleOptions};
-use crate::lty::LineType;
+use crate::device::{
+    AxisOptions, Device, LegendEntry, LegendOptions, LegendPos, PlotWindowOptions, RectOptions,
+    TitleOptions,
+};
 use crate::par::AxisStyle;
 use crate::plotmath::Label;
 
@@ -270,7 +272,12 @@ fn barplot_impl<B: Backend>(
         dev.par.yaxs = AxisStyle::Exact;
     }
     dev.plot_new();
-    dev.plot_window(xlim, ylim, opts.xlog, opts.ylog);
+    let window = PlotWindowOptions {
+        xlog: opts.xlog,
+        ylog: opts.ylog,
+        ..PlotWindowOptions::default()
+    };
+    dev.plot_window(xlim, ylim, &window);
     dev.par.xaxs = saved_xaxs;
     dev.par.yaxs = saved_yaxs;
 
@@ -278,31 +285,16 @@ fn barplot_impl<B: Backend>(
     let saved_xpd = dev.par.xpd;
     dev.par.xpd = true;
 
-    let lwd = dev.par.lwd;
     for &(k, base, top, ci) in &bars {
-        let fill = colors[ci % colors.len()];
+        let style = RectOptions {
+            col: vec![colors[ci % colors.len()]],
+            border: vec![opts.border],
+            ..RectOptions::default()
+        };
         if horiz {
-            dev.rect(
-                base,
-                w_l[k],
-                top,
-                w_r[k],
-                fill,
-                opts.border,
-                lwd,
-                LineType::SOLID,
-            );
+            dev.rect(&[base], &[w_l[k]], &[top], &[w_r[k]], &style);
         } else {
-            dev.rect(
-                w_l[k],
-                base,
-                w_r[k],
-                top,
-                fill,
-                opts.border,
-                lwd,
-                LineType::SOLID,
-            );
+            dev.rect(&[w_l[k]], &[base], &[w_r[k]], &[top], &style);
         }
     }
 
@@ -317,18 +309,14 @@ fn barplot_impl<B: Backend>(
         } else {
             panic!("barplot: incorrect number of names");
         };
-        let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
-        let fg = ColorSpec::Color(dev.par.fg);
         // `axis(side, at = at, labels = names.arg, lty = 0)`: names only.
-        dev.axis_labels(
-            if horiz { 2 } else { 1 },
-            Some(at),
-            Some(names.clone()),
-            fg,
-            cex_axis,
-            font_axis,
-            las,
-        );
+        let names = AxisOptions {
+            at: Some(at),
+            labels: Some(names.iter().map(|n| Some(Label::from(n))).collect()),
+            tick: false,
+            ..AxisOptions::default()
+        };
+        dev.axis(if horiz { 2 } else { 1 }, &names);
     }
 
     if let Some(labels) = &opts.legend_text {
@@ -353,11 +341,11 @@ fn barplot_impl<B: Backend>(
             yjust: Some(1.0),
             ..LegendOptions::default()
         };
-        dev.legend_with(LegendPos::Xy(x, y), &entries, &lopts);
+        dev.legend(LegendPos::Xy(x, y), &entries, &lopts);
     }
 
     if dev.par.ann {
-        dev.title_with(&TitleOptions {
+        dev.title(&TitleOptions {
             main: opts.main.clone(),
             sub: opts.sub.clone(),
             xlab: opts.xlab.clone(),
@@ -366,17 +354,7 @@ fn barplot_impl<B: Backend>(
     }
 
     if opts.axes {
-        let fg = ColorSpec::Color(dev.par.fg);
-        let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
-        dev.axis(
-            if horiz { 1 } else { 2 },
-            None,
-            None,
-            fg,
-            cex_axis,
-            font_axis,
-            las,
-        );
+        dev.axis(if horiz { 1 } else { 2 }, &AxisOptions::default());
     }
 
     dev.par.xpd = saved_xpd;

@@ -16,6 +16,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::par::Par;
 use rs_graphics::plotmath::Label;
+use rs_graphics::prelude::*;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -273,14 +274,14 @@ fn plotmath_axis_labels_match_r() {
     par.mar = rs_graphics::par::Sides::new(5.0, 6.0, 5.0, 6.0);
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 6.0), (0.0, 6.0), false, false);
+    dev.plot_window((0.0, 6.0), (0.0, 6.0), &PlotWindowOptions::default());
     for c in CASES {
         let opts = AxisOptions {
             at: Some((1..=c.exprs.len()).map(|i| i as f64).collect()),
             labels: Some(c.exprs.iter().map(|e| Some(Label::math(e))).collect()),
             ..(c.opts)()
         };
-        dev.axis_with(c.side, &opts);
+        dev.axis(c.side, &opts);
     }
     // Byte for byte: R writes Symbol codes above 127 as raw bytes.
     let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
@@ -350,7 +351,7 @@ fn consecutive_digits_are_all_plain() {
         labels: Some(vec![Some(Label::math("bolditalic(x12)"))]),
         ..AxisOptions::default()
     };
-    dev.axis_with(1, &opts);
+    dev.axis(1, &opts);
     let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
     let fonts: Vec<(String, Vec<u8>)> = extract(&latin1(&dev.into_backend().finish()))
         .0
@@ -422,8 +423,8 @@ fn plotmath_title_mtext_text_legend_match_r() {
     };
     let mut d = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     d.plot_new();
-    d.plot_window((0.0, 10.0), (0.0, 10.0), false, false);
-    d.title_with(&TitleOptions {
+    d.plot_window((0.0, 10.0), (0.0, 10.0), &PlotWindowOptions::default());
+    d.title(&TitleOptions {
         main: Some(Label::math("Main ~ alpha^2")),
         sub: Some(Label::math("sub[i]")),
         xlab: Some(Label::math("x[1] + x[2]")),
@@ -460,38 +461,43 @@ fn plotmath_title_mtext_text_legend_match_r() {
     d.par.las = 0;
     let black = ColorSpec::Index(1);
     d.text(
-        2.0,
-        8.0,
-        Label::math("x^2 + y^2 == r^2"),
-        0.5,
-        None,
-        0.0,
-        black,
-        1.0,
-        1,
+        &[2.0],
+        &[8.0],
+        &[Label::math("x^2 + y^2 == r^2")],
+        &TextOptions {
+            adj: Some(0.5),
+            col: vec![black],
+            cex: vec![1.0],
+            font: vec![1],
+            ..TextOptions::default()
+        },
     );
     d.text(
-        7.0,
-        3.0,
-        Label::math("alpha %+-% beta"),
-        0.0,
-        Some(1.0),
-        30.0,
-        black,
-        1.5,
-        1,
+        &[7.0],
+        &[3.0],
+        &[Label::math("alpha %+-% beta")],
+        &TextOptions {
+            adj: Some(0.0),
+            vadj: Some(1.0),
+            srt: 30.0,
+            col: vec![black],
+            cex: vec![1.5],
+            font: vec![1],
+            ..TextOptions::default()
+        },
     );
     let red = ColorSpec::Color(Color::parse("red").unwrap());
     d.text(
-        5.0,
-        2.0,
-        Label::math("paste(\"P = \", 0.05)"),
-        0.5,
-        None,
-        0.0,
-        red,
-        1.0,
-        1,
+        &[5.0],
+        &[2.0],
+        &[Label::math("paste(\"P = \", 0.05)")],
+        &TextOptions {
+            adj: Some(0.5),
+            col: vec![red],
+            cex: vec![1.0],
+            font: vec![1],
+            ..TextOptions::default()
+        },
     );
     let entries: Vec<LegendEntry> = ["alpha", "beta^2", "x[i]^(y^2)"]
         .iter()
@@ -509,7 +515,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
         title: Some(Label::math("Sigma[j]")),
         ..LegendOptions::default()
     };
-    d.legend_with(LegendPos::Keyword(LegendKeyword::TopRight), &entries, &opts);
+    d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &entries, &opts);
 
     let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
     let ours = extract(&latin1(&d.into_backend().finish()));
