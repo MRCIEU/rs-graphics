@@ -284,7 +284,8 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
   segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
   axis, and `type = "c"` (the same lines, no points).
-- `tests/log_plots_matches_r.rs` - `abline()` on log-log and log-x plots
+- `tests/log_plots_matches_r.rs` - `segments()` with ends <= 0 or `NA` on
+  log axes, `abline()` on log-log and log-x plots
   (`h`/`v`, `a`/`b`, `untf`, `xpd = TRUE`), `hist()` with `log = "x"`/`"y"`,
   `barplot()` on log axes (vector, stacked with legend, horizontal beside
   with `xlim`), and `par(lab)` on linear and log axes: every painted path

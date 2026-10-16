@@ -1,5 +1,5 @@
-//! Cross-checks `abline()`, `hist()` (incl. `add = TRUE`) and `barplot()`
-//! on log axes, `par(lab)`, `plot(xaxt = "n")` and a horizontal
+//! Cross-checks `abline()`, `segments()`, `hist()` (incl. `add = TRUE`)
+//! and `barplot()` on log axes, `par(lab)`, `plot(xaxt = "n")` and a horizontal
 //! `boxplot()` with axes, against a real R `pdf()` device's uncompressed
 //! output: every painted path in drawing order (operator and vertices,
 //! `re` expanded to its corners) and every text item in order (origin and
@@ -14,7 +14,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::Device;
+use rs_graphics::device::{Device, LineStyle};
 use rs_graphics::highlevel::{
     barplot, barplot_matrix, boxplot, hist, plot, BarplotOptions, BoxplotOptions, HistOptions,
     PlotOptions,
@@ -58,6 +58,24 @@ fn red() -> ColorSpec {
 
 fn cases() -> Vec<Case> {
     vec![
+        Case {
+            name: "segments_log",
+            r: "plot.new(); plot.window(c(1, 100), c(1, 100), log = 'xy')\n\
+                segments(c(1, 0, 10, -5, 2, NA, 3), c(1, 10, 50, 5, 3, 5, 2), \
+                         c(10, 50, 100, 20, 0, 9, 80), c(5, 20, 0.5, 30, 30, 9, 0), col = 'red')",
+            draw: |d| {
+                d.plot_new();
+                d.plot_window((1.0, 100.0), (1.0, 100.0), true, true);
+                let nan = f64::NAN;
+                d.segments(
+                    &[1.0, 0.0, 10.0, -5.0, 2.0, nan, 3.0],
+                    &[1.0, 10.0, 50.0, 5.0, 3.0, 5.0, 2.0],
+                    &[10.0, 50.0, 100.0, 20.0, 0.0, 9.0, 80.0],
+                    &[5.0, 20.0, 0.5, 30.0, 30.0, 9.0, 0.0],
+                    LineStyle::new(red(), 1.0, solid()),
+                );
+            },
+        },
         Case {
             name: "abline_loglog",
             r: "plot(c(1, 1000), c(1, 1e4), log = 'xy', xlab = 'x', ylab = 'y')\n\

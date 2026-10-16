@@ -765,7 +765,10 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `segments(x0, y0, x1, y1, ...)`.
+    /// `segments(x0, y0, x1, y1, ...)`, in data units. As `C_segments`, a
+    /// segment is skipped when an end is non-finite after conversion: an
+    /// `NaN`/infinite value, or a value <= 0 on a log axis. Unlike R, the
+    /// four slices aren't recycled; the shortest sets the count.
     pub fn segments(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], style: LineStyle) {
         let Some(col) = self.resolve(style.col) else {
             return;
@@ -773,9 +776,11 @@ impl<B: Backend> Device<B> {
         let stroke = self.stroke_of(col, style.lwd, style.lty);
         self.push_clip_for(self.par.xpd);
         for i in 0..x0.len().min(y0.len()).min(x1.len()).min(y1.len()) {
-            if [x0[i], y0[i], x1[i], y1[i]].iter().all(|v| v.is_finite()) {
-                let p0 = self.user_to_inches(x0[i], y0[i]);
-                let p1 = self.user_to_inches(x1[i], y1[i]);
+            // Tested after conversion, as `C_segments`: values <= 0 on a
+            // log axis are skipped too.
+            let p0 = self.user_to_inches(x0[i], y0[i]);
+            let p1 = self.user_to_inches(x1[i], y1[i]);
+            if [p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
                 self.backend.draw_line(p0, p1, &stroke);
             }
         }
