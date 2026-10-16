@@ -1,5 +1,5 @@
-//! Cross-checks `abline()`, `hist()` and `barplot()` on log axes, and
-//! `par(lab)`, against a real R `pdf()` device's uncompressed output: every
+//! Cross-checks `abline()`, `hist()` (incl. `add = TRUE`) and `barplot()`
+//! on log axes, and `par(lab)`, against a real R `pdf()` device's uncompressed output: every
 //! painted path in drawing order (operator and vertices, `re` expanded to
 //! its corners) and every text item in order (origin and string). Skipped
 //! if `Rscript` isn't available.
@@ -114,6 +114,23 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 let o = HistOptions { ylog: true, main: Some("Histogram of hx"), xlab: Some("hx"), ylab: Some("n"), ..Default::default() };
                 hist(d, &hist_data(), &o);
+            },
+        },
+        Case {
+            name: "hist_add",
+            r: "hist(hx, log = 'x', ylab = 'n')\n\
+                hist(hx * 1.05, add = TRUE, col = 'pink', border = 'red')",
+            draw: |d| {
+                let o = HistOptions { xlog: true, main: Some("Histogram of hx"), xlab: Some("hx"), ylab: Some("n"), ..Default::default() };
+                hist(d, &hist_data(), &o);
+                let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
+                let o = HistOptions {
+                    add: true,
+                    col: ColorSpec::Color(Color::parse("pink").unwrap()),
+                    border: red(),
+                    ..Default::default()
+                };
+                hist(d, &more, &o);
             },
         },
         Case {

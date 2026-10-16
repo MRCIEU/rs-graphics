@@ -28,20 +28,30 @@ const Y: [f64; 9] = [1.0, 3.0, 3.1, 2.0, 8.0, 5.0, 6.0, 30.0, 12.0];
 
 struct Case {
     name: &'static str,
+    /// `"b"` or `"c"` (the same lines, no points).
+    type_: &'static str,
     cex: f64,
     ylog: bool,
 }
 
-const CASES: [Case; 2] = [
+const CASES: [Case; 3] = [
     Case {
         name: "plain",
+        type_: "b",
         cex: 1.0,
         ylog: false,
     },
     Case {
         name: "cex_log",
+        type_: "b",
         cex: 1.5,
         ylog: true,
+    },
+    Case {
+        name: "type_c",
+        type_: "c",
+        cex: 1.0,
+        ylog: false,
     },
 ];
 
@@ -56,9 +66,10 @@ fn r_script(c: &Case, path: &str) -> String {
     format!(
         "pdf(file = '{path}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
          par(cex = {cex})\n\
-         plot({x}, {y}, type = 'b', log = '{log}', axes = FALSE, ann = FALSE)\n\
+         plot({x}, {y}, type = '{t}', log = '{log}', axes = FALSE, ann = FALSE)\n\
          invisible(dev.off())\n",
         cex = c.cex,
+        t = c.type_,
         x = v(&X),
         y = v(&Y),
         log = if c.ylog { "y" } else { "" },
@@ -72,7 +83,7 @@ fn draw_ours(c: &Case) -> String {
     };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     let opts = PlotOptions {
-        type_: PlotType::Both,
+        type_: PlotType::parse(c.type_),
         ylog: c.ylog,
         axes: false,
         ..PlotOptions::default()
@@ -143,6 +154,7 @@ fn type_b_matches_r() {
         let name = c.name;
         assert_eq!(our_curves, r_curves, "{name}: points drawn");
         assert!(!r_segs.is_empty(), "{name}: no segments from R");
+        assert_eq!(r_curves == 0, c.type_ == "c", "{name}: points only for type b");
         assert_eq!(
             our_segs.len(),
             r_segs.len(),

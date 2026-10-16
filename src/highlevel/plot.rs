@@ -13,8 +13,9 @@ use super::data_range;
 
 /// `plot(..., type = )`. Only the core types are implemented: `"p"`
 /// (points, the default), `"l"` (lines), `"b"` (both: points, with the
-/// lines between them stopping short of each point), `"o"` (overplotted:
-/// the line drawn straight through, points on top) and `"n"`
+/// lines between them stopping short of each point), `"c"` (those broken
+/// lines alone), `"o"` (overplotted: the line drawn straight through,
+/// points on top) and `"n"`
 /// (set up the axes/window but plot nothing, so points/lines can be added
 /// afterwards).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,6 +23,8 @@ pub enum PlotType {
     Points,
     Lines,
     Both,
+    /// `"c"`: the lines of `"b"` without the points.
+    BrokenLines,
     Overplotted,
     None,
 }
@@ -31,6 +34,7 @@ impl PlotType {
         match s {
             "l" => PlotType::Lines,
             "b" => PlotType::Both,
+            "c" => PlotType::BrokenLines,
             "o" => PlotType::Overplotted,
             "n" => PlotType::None,
             _ => PlotType::Points,
@@ -113,6 +117,9 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
         PlotType::Both => {
             dev.broken_lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));
             dev.points(x, y, opts.pch, opts.col, opts.bg, opts.cex);
+        }
+        PlotType::BrokenLines => {
+            dev.broken_lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));
         }
         PlotType::Overplotted => {
             dev.lines(x, y, LineStyle::new(opts.col, opts.lwd, opts.lty));

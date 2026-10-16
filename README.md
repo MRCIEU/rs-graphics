@@ -61,8 +61,9 @@ crate's test suite (see [Testing](#testing) below).
 
 **High-level plots** (`src/highlevel/`), each a fairly direct port of
 the corresponding `*.default` R function:
-- `plot()` - scatter/line plots (`type = "p"/"l"/"b"/"o"/"n"`).
-- `hist()` - histograms, including R's Sturges'-rule default binning.
+- `plot()` - scatter/line plots (`type = "p"/"l"/"b"/"c"/"o"/"n"`).
+- `hist()` - histograms, including R's Sturges'-rule default binning and
+  `add = TRUE`.
 - `barplot()` - vectors and matrices (stacked or `beside`), vertical or
   `horiz`, with `legend.text`, `space`, `width`, `xlim`/`ylim`.
 - `boxplot()` - Tukey boxplots (via `fivenum()`, not `quantile()` -
@@ -262,7 +263,7 @@ against a real R installation by shelling out to `Rscript`:
   segments, and the number of points drawn.
 - `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
   segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
-  axis.
+  axis, and `type = "c"` (the same lines, no points).
 - `tests/log_plots_matches_r.rs` - `abline()` on log-log and log-x plots
   (`h`/`v`, `a`/`b`, `untf`, `xpd = TRUE`), `hist()` with `log = "x"`/`"y"`,
   `barplot()` on log axes (vector, stacked with legend, horizontal beside
