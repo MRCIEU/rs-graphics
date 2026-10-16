@@ -1,7 +1,7 @@
 //! `boxplot(x, ...)`, ported from `boxplot.default`/`bxp`/`boxplot.stats`
-//! in `r-source/src/library/graphics/R/boxplot.R`, restricted to a list
-//! of numeric groups drawn as vertical boxes at `x = 1, 2, ..., n` (no
-//! `horizontal`, `notch`, or `varwidth` support).
+//! in `r-source/src/library/graphics/R/boxplot.R`, for a list of numeric
+//! groups drawn at positions `1, 2, ..., n`, vertical or `horizontal`, with
+//! `notch` and `varwidth`.
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
@@ -34,12 +34,17 @@ pub struct BoxStats {
     pub q3: f64,
     pub upper_whisker: f64,
     pub outliers: Vec<f64>,
+    /// The number of non-`NaN` values (`boxplot.stats()$n`).
+    pub n: usize,
+    /// The notch: `median -/+ 1.58 * IQR / sqrt(n)` (`boxplot.stats()$conf`).
+    pub conf: (f64, f64),
 }
 
 /// `boxplot.stats(x, coef)`: five-number summary + whiskers extended to
 /// the most extreme non-outlying data point, +/- `coef * IQR` beyond the
 /// hinges defining an outlier.
 pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
+    let n = x.iter().filter(|v| !v.is_nan()).count();
     let mut sorted: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     if sorted.is_empty() {
@@ -50,6 +55,8 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
             q3: f64::NAN,
             upper_whisker: f64::NAN,
             outliers: Vec::new(),
+            n,
+            conf: (f64::NAN, f64::NAN),
         };
     }
     let five = fivenum(&sorted);
@@ -75,6 +82,7 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
             hi = non_out.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         }
     }
+    let half_notch = 1.58 * iqr / (n as f64).sqrt();
     BoxStats {
         lower_whisker: lo,
         q1: five[1],
@@ -82,6 +90,8 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
         q3: five[3],
         upper_whisker: hi,
         outliers,
+        n,
+        conf: (five[2] - half_notch, five[2] + half_notch),
     }
 }
 
@@ -102,6 +112,13 @@ pub struct BoxplotOptions<'a> {
     pub xlab: Option<&'a str>,
     pub ylab: Option<&'a str>,
     pub axes: bool,
+    /// Notched boxes: the box narrows to half its width at the median,
+    /// between [`BoxStats::conf`]'s limits (R's `notch.frac = 0.5`).
+    pub notch: bool,
+    /// Box widths proportional to the square root of the group size.
+    pub varwidth: bool,
+    /// Horizontal boxes: group names on side 2, values on side 1.
+    pub horizontal: bool,
 }
 
 impl<'a> Default for BoxplotOptions<'a> {
@@ -116,6 +133,9 @@ impl<'a> Default for BoxplotOptions<'a> {
             xlab: None,
             ylab: None,
             axes: true,
+            notch: false,
+            varwidth: false,
+            horizontal: false,
         }
     }
 }
@@ -149,90 +169,130 @@ pub fn boxplot<B: Backend>(
             }
         }
     }
+    if opts.notch {
+        for s in &stats {
+            for v in [s.conf.0, s.conf.1] {
+                if v.is_finite() {
+                    ylo = ylo.min(v);
+                    yhi = yhi.max(v);
+                }
+            }
+        }
+    }
     let ylim = if ylo <= yhi { (ylo, yhi) } else { (0.0, 1.0) };
 
     // R's default `boxwex = 0.8 * quantile(diff(sort(at)), 0.10)`; since
-    // `at = 1:n` the gaps are all `1`, so this always reduces to `0.8`
-    // except for the single-box case, which uses `0.5 * boxwex` instead.
-    let box_width = if n <= 1 { 0.4 } else { 0.8 };
-    let half = box_width / 2.0;
-    let cap_half = half * 0.5; // staplewex = 0.5
+    // `at = 1:n` the gaps are all `1`, so this is always `0.8`. Widths are
+    // halved for a single box, or scaled by `sqrt(n / max(n))` for
+    // `varwidth`.
+    let boxwex = 0.8;
+    let max_n = stats.iter().map(|s| s.n).max().unwrap_or(0) as f64;
+    let widths: Vec<f64> = stats
+        .iter()
+        .map(|s| {
+            if opts.varwidth {
+                boxwex * (s.n as f64 / max_n).sqrt()
+            } else if n == 1 {
+                0.5 * boxwex
+            } else {
+                boxwex
+            }
+        })
+        .collect();
 
     dev.plot_new();
-    dev.plot_window(xlim, ylim, false, false);
+    if opts.horizontal {
+        dev.plot_window(ylim, xlim, false, false);
+    } else {
+        dev.plot_window(xlim, ylim, false, false);
+    }
 
+    // `bxp()`'s `xypolygon`/`xysegments`/`xypoints`: (position, value) in,
+    // swapped for horizontal boxes.
+    let horiz = opts.horizontal;
+    let xy = |pos: &[f64], val: &[f64]| {
+        if horiz {
+            (val.to_vec(), pos.to_vec())
+        } else {
+            (pos.to_vec(), val.to_vec())
+        }
+    };
     let lwd = dev.par.lwd;
     let border = opts.border;
     let fill = opts.col;
+    let notch_frac = if opts.notch { 0.5 } else { 1.0 };
     for (i, s) in stats.iter().enumerate() {
         let x = at[i];
+        let half = widths[i] / 2.0;
+        let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
+        if five.iter().any(|v| v.is_nan()) {
+            continue;
+        }
         // In `bxp()`'s order: box fill, median, whiskers, staples, then the
         // box border on top, then outliers.
-        let box_xs = [x - half, x + half, x + half, x - half];
-        let box_ys = [s.q1, s.q1, s.q3, s.q3];
-        let has_box = s.q1.is_finite() && s.q3.is_finite();
-        if has_box {
-            dev.polygon(&box_xs, &box_ys, fill, ColorSpec::None, lwd, LineType::Blank);
-        }
-        if s.median.is_finite() {
-            // medlwd = 3 * par(lwd), with `lend = 1` (butt), "to avoid
-            // overlap": round ends would reach past the box sides.
-            let lend = std::mem::replace(&mut dev.par.lend, LineEnd::Butt);
-            dev.segments(
-                &[x - half],
-                &[s.median],
-                &[x + half],
-                &[s.median],
-                LineStyle::new(border, 3.0 * lwd, LineType::Pattern(&[])),
-            );
-            dev.par.lend = lend;
-        }
+        let (box_pos, box_val): (Vec<f64>, Vec<f64>) = if opts.notch {
+            let (c0, c1) = s.conf;
+            let f = notch_frac;
+            (
+                [-1.0, 1.0, 1.0, f, 1.0, 1.0, -1.0, -1.0, -f, -1.0]
+                    .iter()
+                    .map(|w| x + half * w)
+                    .collect(),
+                vec![s.q1, s.q1, c0, s.median, c1, s.q3, s.q3, c1, s.median, c0],
+            )
+        } else {
+            (
+                vec![x - half, x + half, x + half, x - half],
+                vec![s.q1, s.q1, s.q3, s.q3],
+            )
+        };
+        let (bx, by) = xy(&box_pos, &box_val);
+        dev.polygon(&bx, &by, fill, ColorSpec::None, lwd, LineType::Blank);
+        // medlwd = 3 * par(lwd), with `lend = 1` (butt), "to avoid
+        // overlap": round ends would reach past the box sides. With a
+        // notch it spans only the notch.
+        let wntch = notch_frac * half;
+        let lend = std::mem::replace(&mut dev.par.lend, LineEnd::Butt);
+        let (mx, my) = xy(&[x - wntch, x + wntch], &[s.median, s.median]);
+        let median = LineStyle::new(border, 3.0 * lwd, LineType::Pattern(&[]));
+        dev.segments(&mx[..1], &my[..1], &mx[1..], &my[1..], median);
+        dev.par.lend = lend;
         // Whiskers run from their ends to the hinges (which matters for
-        // where the dashes fall); whisklty = "dashed". Then the staples.
+        // where the dashes fall); whisklty = "dashed". Then the staples
+        // (staplewex = 0.5).
         let ends = [(s.lower_whisker, s.q1), (s.upper_whisker, s.q3)];
-        let ends: Vec<(f64, f64)> = ends
-            .into_iter()
-            .filter(|(w, h)| w.is_finite() && h.is_finite())
-            .collect();
         for &(w, h) in &ends {
+            let (sx, sy) = xy(&[x, x], &[w, h]);
             let dashed = LineStyle::new(border, lwd, LineType::from_code(2));
-            dev.segments(&[x], &[w], &[x], &[h], dashed);
+            dev.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], dashed);
         }
+        let cap = half * 0.5;
         for &(w, _) in &ends {
+            let (sx, sy) = xy(&[x - cap, x + cap], &[w, w]);
             let solid = LineStyle::new(border, lwd, LineType::Pattern(&[]));
-            dev.segments(&[x - cap_half], &[w], &[x + cap_half], &[w], solid);
+            dev.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], solid);
         }
-        if has_box {
-            dev.polygon(
-                &box_xs,
-                &box_ys,
-                ColorSpec::None,
-                border,
-                lwd,
-                LineType::Pattern(&[]),
-            );
-        }
+        dev.polygon(&bx, &by, ColorSpec::None, border, lwd, LineType::Pattern(&[]));
         if !s.outliers.is_empty() {
-            let xs: Vec<f64> = s.outliers.iter().map(|_| x).collect();
-            dev.points(&xs, &s.outliers, 1, border, ColorSpec::None, 1.0);
+            let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
+            let (ox, oy) = xy(&pos, &s.outliers);
+            dev.points(&ox, &oy, 1, border, ColorSpec::None, 1.0);
         }
     }
 
+    // `bxp()`: names on side 1 (2 if horizontal), values on side 2 (1),
+    // then the title, then the frame.
+    let (name_side, value_side) = if opts.horizontal { (2, 1) } else { (1, 2) };
+    let fg = ColorSpec::Color(dev.par.fg);
+    let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
     if opts.axes {
-        let fg = ColorSpec::Color(dev.par.fg);
-        let (cex_axis, font_axis, las, lwd) = (
-            dev.par.cex_axis,
-            dev.par.font_axis,
-            dev.par.las,
-            dev.par.lwd,
-        );
         if n > 1 {
             let labels = opts
                 .names
                 .clone()
                 .unwrap_or_else(|| (1..=n).map(|i| i.to_string()).collect());
             dev.axis(
-                1,
+                name_side,
                 Some(at.clone()),
                 Some(labels),
                 fg,
@@ -241,12 +301,15 @@ pub fn boxplot<B: Backend>(
                 las,
             );
         }
-        dev.axis(2, None, None, fg, cex_axis, font_axis, las);
-        dev.box_plot(fg, lwd, LineType::Pattern(&[]));
+        dev.axis(value_side, None, None, fg, cex_axis, font_axis, las);
     }
 
     if dev.par.ann {
         dev.title(opts.main, opts.sub, opts.xlab, opts.ylab);
+    }
+
+    if opts.axes {
+        dev.box_plot(fg, dev.par.lwd, LineType::Pattern(&[]));
     }
 
     stats

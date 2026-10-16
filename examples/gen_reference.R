@@ -100,6 +100,14 @@ save_all("boxplot", 6, 4, function() {
           main = "boxplot()", ylab = "value")
 })
 
+save_all("boxplot_horizontal", 6, 4, function() {
+  ctrl <- read_vec("boxplot_ctrl")
+  treatA <- read_vec("boxplot_treatA")
+  treatB <- read_vec("boxplot_treatB")
+  boxplot(ctrl, treatA, treatB, names = c("Ctrl", "Treat A", "Treat B"), horizontal = TRUE,
+          main = "boxplot(horizontal = TRUE)", xlab = "value")
+})
+
 save_all("pie", 6, 6, function() {
   values <- c(18, 25, 12, 30, 15)
   labels <- c("Alpha", "Beta", "Gamma", "Delta", "Epsilon")

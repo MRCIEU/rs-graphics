@@ -1,8 +1,9 @@
 //! Cross-checks `abline()`, `hist()` (incl. `add = TRUE`) and `barplot()`
-//! on log axes, `par(lab)` and `plot(xaxt = "n")`, against a real R `pdf()` device's uncompressed output: every
-//! painted path in drawing order (operator and vertices, `re` expanded to
-//! its corners) and every text item in order (origin and string). Skipped
-//! if `Rscript` isn't available.
+//! on log axes, `par(lab)`, `plot(xaxt = "n")` and a horizontal
+//! `boxplot()` with axes, against a real R `pdf()` device's uncompressed
+//! output: every painted path in drawing order (operator and vertices,
+//! `re` expanded to its corners) and every text item in order (origin and
+//! string). Skipped if `Rscript` isn't available.
 //!
 //! `hist()` gets `ylab = "n"`: R's `pdf()` never applies the last kerning
 //! pair of each first character (`devPS.c`'s `KPend` is inclusive but
@@ -15,7 +16,8 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::{
-    barplot, barplot_matrix, hist, plot, BarplotOptions, HistOptions, PlotOptions,
+    barplot, barplot_matrix, boxplot, hist, plot, BarplotOptions, BoxplotOptions, HistOptions,
+    PlotOptions,
 };
 use rs_graphics::lty::LineType;
 use rs_graphics::par::{AxisType, Par};
@@ -186,6 +188,21 @@ fn cases() -> Vec<Case> {
                 let fg = ColorSpec::Index(1);
                 let labels = ["a", "b", "c"].map(String::from).to_vec();
                 d.axis(1, Some(vec![2.0, 5.0, 8.0]), Some(labels), fg, 1.0, 1, 0);
+            },
+        },
+        Case {
+            name: "boxplot_horizontal",
+            r: "boxplot(list(c(1, 2, 2.5, 3, 7), c(2, 3, 3.5, 4, 4.2, 5)), horizontal = TRUE, \
+                        names = c('a', 'b'), main = 'H', xlab = 'value')",
+            draw: |d| {
+                let o = BoxplotOptions {
+                    horizontal: true,
+                    names: Some(vec!["a".into(), "b".into()]),
+                    main: Some("H"),
+                    xlab: Some("value"),
+                    ..Default::default()
+                };
+                boxplot(d, &[vec![1.0, 2.0, 2.5, 3.0, 7.0], vec![2.0, 3.0, 3.5, 4.0, 4.2, 5.0]], &o);
             },
         },
         Case {

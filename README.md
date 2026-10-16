@@ -75,7 +75,8 @@ the corresponding `*.default` R function:
 - `barplot()` - vectors and matrices (stacked or `beside`), vertical or
   `horiz`, with `legend.text`, `space`, `width`, `xlim`/`ylim`.
 - `boxplot()` - Tukey boxplots (via `fivenum()`, not `quantile()` -
-  see [Design notes](#design-notes)), including the 1.5*IQR outlier rule.
+  see [Design notes](#design-notes)), including the 1.5*IQR outlier rule,
+  `notch`, `varwidth` and `horizontal`.
 - `pie()` - pie charts.
 
 **Backends** (`src/backend/`):
@@ -109,7 +110,7 @@ To keep this a tractable "core functionality" port, the following R
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, and
 interactive input (`identify()`/`locator()`). `barplot()` doesn't
 support `density`/`angle` hatching, `offset`, or `add`, and
-`boxplot()` doesn't support `notch`/`varwidth`. These would all be
+`boxplot()` doesn't support `at`/`width`/`add` or `pars`. These would all be
 reasonable follow-ups but are left for future work.
 
 ## Design notes
@@ -196,7 +197,7 @@ A few fidelity-relevant decisions worth calling out:
 
 ```sh
 cargo run --example gallery
-# -> gallery_output/{plot_scatter,plot_line,plot_log,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,pie,multipanel,pch}.{svg,pdf,png}
+# -> gallery_output/{plot_scatter,plot_line,plot_log,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,boxplot_horizontal,pie,multipanel,pch}.{svg,pdf,png}
 ```
 
 `examples/gen_reference.R` produces the real-R equivalent of the same
@@ -234,6 +235,9 @@ against a real R installation by shelling out to `Rscript`:
   FALSE)`.
 - `tests/boxplot_matches_r.rs` - box/whisker/outlier stats vs.
   `boxplot.stats()`.
+- `tests/boxplot_draw_matches_r.rs` - every painted path of `boxplot()`
+  in drawing order (vertices, fill/stroke, colours, width, cap, dashes),
+  incl. `notch`, `varwidth`, `horizontal` and all three together.
 - `tests/barplot_matches_r.rs` - bar rectangles and text origins vs. an
   uncompressed R `pdf()` for vector, stacked, `beside`, and `horiz`
   scenarios.

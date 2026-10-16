@@ -3,8 +3,8 @@
 //! order, with its vertices (so line direction, which sets where dashes
 //! fall, counts), fill/stroke, colours, line width, line cap and dash
 //! pattern. Curved paths (outlier circles) are compared by bounding box.
-//! Axes are off, so only the boxes themselves are compared. Skipped if
-//! `Rscript` isn't available.
+//! Covers `notch`, `varwidth` and `horizontal`. Axes are off, so only the
+//! boxes themselves are compared. Skipped if `Rscript` isn't available.
 
 use std::process::Command;
 
@@ -40,6 +40,9 @@ struct Case {
     col: &'static str,
     border: &'static str,
     lwd: f64,
+    notch: bool,
+    varwidth: bool,
+    horizontal: bool,
 }
 
 fn cases() -> Vec<Case> {
@@ -49,12 +52,54 @@ fn cases() -> Vec<Case> {
             col: "lightgray",
             border: "black",
             lwd: 1.0,
+            notch: false,
+            varwidth: false,
+            horizontal: false,
         },
         Case {
             name: "coloured_lwd2",
             col: "lightblue",
             border: "darkred",
             lwd: 2.0,
+            notch: false,
+            varwidth: false,
+            horizontal: false,
+        },
+        Case {
+            name: "notch",
+            col: "lightgray",
+            border: "black",
+            lwd: 1.0,
+            notch: true,
+            varwidth: false,
+            horizontal: false,
+        },
+        Case {
+            name: "varwidth",
+            col: "lightgray",
+            border: "black",
+            lwd: 1.0,
+            notch: false,
+            varwidth: true,
+            horizontal: false,
+        },
+        Case {
+            name: "horizontal",
+            col: "lightgray",
+            border: "black",
+            lwd: 1.0,
+            notch: false,
+            varwidth: false,
+            horizontal: true,
+        },
+        Case {
+            name: "all_three",
+            col: "lightblue",
+            border: "darkred",
+            lwd: 2.0,
+            notch: true,
+            varwidth: true,
+            horizontal: true,
         },
     ]
 }
@@ -70,12 +115,16 @@ fn r_script(c: &Case, path: &str) -> String {
     format!(
         "pdf(file = '{path}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
          par(lwd = {lwd})\n\
-         boxplot(list({groups}), col = '{col}', border = '{border}', axes = FALSE)\n\
+         suppressWarnings(boxplot(list({groups}), col = '{col}', border = '{border}', \
+                 axes = FALSE, notch = {notch}, varwidth = {varwidth}, horizontal = {horizontal}))\n\
          invisible(dev.off())\n",
         lwd = c.lwd,
         groups = groups.join(", "),
         col = c.col,
         border = c.border,
+        notch = if c.notch { "TRUE" } else { "FALSE" },
+        varwidth = if c.varwidth { "TRUE" } else { "FALSE" },
+        horizontal = if c.horizontal { "TRUE" } else { "FALSE" },
     )
 }
 
@@ -89,6 +138,9 @@ fn draw_ours(c: &Case) -> String {
         col: ColorSpec::Color(Color::parse(c.col).unwrap()),
         border: ColorSpec::Color(Color::parse(c.border).unwrap()),
         axes: false,
+        notch: c.notch,
+        varwidth: c.varwidth,
+        horizontal: c.horizontal,
         ..Default::default()
     };
     boxplot(&mut dev, &groups(), &opts);

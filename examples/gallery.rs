@@ -285,6 +285,27 @@ fn draw_boxplot<B: Backend>(dev: &mut Device<B>) {
     boxplot(dev, &groups, &opts);
 }
 
+fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
+    let groups = vec![
+        parse_data(include_str!("data/boxplot_ctrl.txt")),
+        parse_data(include_str!("data/boxplot_treatA.txt")),
+        parse_data(include_str!("data/boxplot_treatB.txt")),
+    ];
+    let names = vec!["Ctrl", "Treat A", "Treat B"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+    let opts = BoxplotOptions {
+        names: Some(names),
+        horizontal: true,
+        main: Some("boxplot(horizontal = TRUE)"),
+        xlab: Some("value"),
+        ..BoxplotOptions::default()
+    };
+    boxplot(dev, &groups, &opts);
+}
+
 fn draw_pie<B: Backend>(dev: &mut Device<B>) {
     let values = vec![18.0, 25.0, 12.0, 30.0, 15.0];
     let labels = vec!["Alpha", "Beta", "Gamma", "Delta", "Epsilon"]
@@ -344,6 +365,7 @@ fn main() {
     save_gallery_plot!("barplot_stacked", 6.0, 4.0, draw_barplot_stacked);
     save_gallery_plot!("barplot_beside", 6.0, 4.0, draw_barplot_beside);
     save_gallery_plot!("boxplot", 6.0, 4.0, draw_boxplot);
+    save_gallery_plot!("boxplot_horizontal", 6.0, 4.0, draw_boxplot_horizontal);
     save_gallery_plot!("pie", 6.0, 6.0, draw_pie);
     save_gallery_plot!("multipanel", 8.0, 6.0, draw_multipanel);
     save_gallery_plot!("pch", 7.0, 6.0, draw_pch);
