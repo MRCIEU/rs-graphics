@@ -259,6 +259,12 @@ impl Backend for SvgBackend {
         (self.width_in, self.height_in)
     }
 
+    fn clear_page(&mut self) {
+        self.body.clear();
+        self.pending = None;
+        self.group_style = None;
+    }
+
     fn push_clip(&mut self, rect: Rect) {
         self.flush_shapes();
         self.clip_stack.push(rect);

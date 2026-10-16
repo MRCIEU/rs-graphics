@@ -155,13 +155,18 @@ A few fidelity-relevant decisions worth calling out:
   a known off-by-one in `devPS.c`'s PostScript kerning-pair lookup
   table is intentionally not replicated in `src/afm.rs` (documented
   there, with a tolerance-based test instead of an exact-match one).
-  Similarly, `GScale()`'s extensive edge-case handling for near-zero/
-  infinite axis ranges isn't ported in full - only the common `xaxs =
-  "r"`/`"i"` 4%-expansion behavior is.
+  Likewise `barplot()`'s legend on a log value axis goes in the top-right
+  corner as intended, not where R's use of log10 `par("usr")` puts it.
 - **One page per backend.** Backends hold a single page, so moving to a
   "new page" in a multi-panel sequence (the figure counter wrapping
-  round) is emulated by repainting the background over earlier content,
-  rather than starting a fresh page as R's multi-page devices do.
+  round) discards what was drawn before (PDF, SVG) or paints the
+  background over it (PNG), rather than starting a fresh page as R's
+  multi-page devices do.
+- **Page background.** As in R, `par("bg")` starts as the device's
+  background: transparent for PDF (R's `pdf()`; set one with
+  `PdfBackend::with_background`, like `pdf(bg = )`), white for SVG, and
+  the canvas colour for PNG. New pages are filled with it, and `legend()`
+  boxes by default.
 - **Latin-1 text.** Strings may contain Latin-1 characters (`±`, `é`,
   `×`, ...): string widths use each glyph's AFM metrics looked up by its
   ISOLatin1 glyph name (as R's `pdf()` does via `ISOLatin1.enc`, not by the
@@ -263,6 +268,11 @@ against a real R installation by shelling out to `Rscript`:
   `barplot()` on log axes (vector, stacked with legend, horizontal beside
   with `xlim`), and `par(lab)` on linear and log axes: every painted path
   and text item in order.
+- `tests/abline_matches_r.rs` - `abline()` with vectors of `h`/`v` and
+  recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log axes): every
+  line's vertices, colour, width and dash pattern.
+- `tests/page_background.rs` (no R needed) - the device-dependent page
+  background and new pages discarding the old one.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 

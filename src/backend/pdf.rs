@@ -32,6 +32,7 @@ pub struct PdfBackend {
     last_stroke_color: Option<Color>,
     last_line: LineState,
     compress: bool,
+    background: Color,
 }
 
 /// The line-style parameters last written to the content stream (`None`:
@@ -56,7 +57,14 @@ impl PdfBackend {
             last_stroke_color: None,
             last_line: LineState::default(),
             compress: true,
+            background: Color::TRANSPARENT,
         }
+    }
+
+    /// The page background, like R's `pdf(bg = )`; transparent by default.
+    pub fn with_background(mut self, background: Color) -> Self {
+        self.background = background;
+        self
     }
 
     /// Whether to Flate-compress the content stream (default `true`), like
@@ -324,8 +332,13 @@ impl Backend for PdfBackend {
         (requested_pt + 0.5).floor()
     }
 
-    fn transparent_default_bg(&self) -> bool {
-        true
+    fn default_bg(&self) -> Color {
+        self.background
+    }
+
+    fn clear_page(&mut self) {
+        self.content.clear();
+        self.forget_state();
     }
 
     fn push_clip(&mut self, rect: Rect) {

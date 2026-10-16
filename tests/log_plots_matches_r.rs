@@ -269,14 +269,10 @@ fn extract(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
                     if std::mem::take(&mut curved) {
                         vertices.clear();
                     }
-                    // Our page background (R's `pdf()` has none).
-                    let page = [0.0, 0.0, PAGE_W * 72.0, 0.0, PAGE_W * 72.0, PAGE_H * 72.0];
-                    if !(t == "f" && vertices.starts_with(&page)) {
-                        painted.push(Painted {
-                            op: t.to_string(),
-                            vertices,
-                        });
-                    }
+                    painted.push(Painted {
+                        op: t.to_string(),
+                        vertices,
+                    });
                 }
                 _ => {}
             }

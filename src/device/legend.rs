@@ -177,9 +177,8 @@ impl LegendEntry {
 pub struct LegendOptions {
     /// `bty != "n"`: draw the surrounding box.
     pub bty_box: bool,
-    /// Box fill (`bg=`); `None` = `par("bg")`, except on devices whose
-    /// background is transparent by default (see
-    /// [`Backend::transparent_default_bg`]), where it is unfilled.
+    /// Box fill (`bg=`); `None` = `par("bg")` (transparent, so unfilled,
+    /// on PDF by default: see [`Backend::default_bg`]).
     pub bg: Option<ColorSpec>,
     pub cex: f64,
     /// `xjust` / `yjust`; `None` = R's default (0 / 1, or 0.5 for
@@ -415,12 +414,8 @@ impl<B: Backend> Device<B> {
         let lwd_box = self.par.lwd;
         self.push_clip_for(self.par.xpd);
         if opts.bty_box {
-            let bg_spec = match opts.bg {
-                Some(spec) => Some(spec),
-                None if self.backend.transparent_default_bg() => None,
-                None => Some(ColorSpec::Color(self.par.bg)),
-            };
-            let fill = bg_spec.and_then(|s| self.resolve(s));
+            let bg = opts.bg.unwrap_or(ColorSpec::Color(self.par.bg));
+            let fill = self.resolve(bg).filter(|c| c.a > 0);
             let stroke = self.stroke_of(self.par.fg, lwd_box, self.par.lty);
             self.backend
                 .draw_rect(Rect::new(left, top - h, left + w, top), fill, Some(&stroke));

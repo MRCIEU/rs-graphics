@@ -647,6 +647,7 @@ pub struct RasterBackend {
     clips: Vec<Vec<SkRect>>,
     clip_stack: Vec<SkRect>,
     clip_id: u32,
+    background: Color,
 }
 
 impl RasterBackend {
@@ -674,6 +675,7 @@ impl RasterBackend {
             clips: vec![Vec::new()],
             clip_stack: Vec::new(),
             clip_id: 0,
+            background,
         };
         let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
         backend.set_threads(threads, &canvas);
@@ -1219,6 +1221,10 @@ fn to_sk_color(c: Color) -> tiny_skia::Color {
 impl Backend for RasterBackend {
     fn size_inches(&self) -> (f64, f64) {
         (self.width_in, self.height_in)
+    }
+
+    fn default_bg(&self) -> Color {
+        self.background
     }
 
     fn device_unit_inches(&self) -> f64 {

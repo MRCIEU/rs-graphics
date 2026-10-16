@@ -185,11 +185,17 @@ pub trait Backend {
         requested_pt
     }
 
-    /// Whether R's counterpart device has a transparent `par("bg")` (R's
-    /// `pdf()` does; `png()`/`svg()` default to white). `legend()`'s box
-    /// fill defaults to `par("bg")`, so on such a device it is *not* filled
-    /// by default and plot content shows through.
-    fn transparent_default_bg(&self) -> bool {
-        false
+    /// The device's background colour, which `par("bg")` starts as: white
+    /// (R's `svg()`), the canvas colour for [`raster::RasterBackend`]
+    /// (R's `png(bg = )`), or transparent for [`pdf::PdfBackend`] unless
+    /// set with its `with_background` (R's `pdf(bg = )`). New pages are
+    /// filled with it, and `legend()` boxes by default.
+    fn default_bg(&self) -> Color {
+        Color::WHITE
     }
+
+    /// Start a new page by discarding everything drawn so far, where the
+    /// backend can (PDF, SVG). Elsewhere it does nothing, and the new
+    /// page's background is painted over the old one instead.
+    fn clear_page(&mut self) {}
 }

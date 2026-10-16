@@ -18,9 +18,11 @@ use crate::par::{AxisStyle, Par};
 use crate::pch;
 use crate::pretty::{log_axis_ticks, pretty_ticks};
 
+mod abline;
 mod axis;
 mod legend;
 mod mtext;
+pub use abline::AblineOptions;
 pub use axis::AxisOptions;
 pub use legend::{LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
 pub use mtext::MtextOptions;
@@ -84,7 +86,13 @@ impl LineStyle {
 }
 
 impl<B: Backend> Device<B> {
-    pub fn new(backend: B, par: Par) -> Self {
+    /// A device drawing onto `backend` with graphical parameters `par`. If
+    /// `par.bg` is left at its default (white), it starts as the backend's
+    /// background instead, as R's `par("bg")` does - transparent for PDF.
+    pub fn new(backend: B, mut par: Par) -> Self {
+        if par.bg == Par::default().bg {
+            par.bg = backend.default_bg();
+        }
         let (width_in, height_in) = backend.size_inches();
         let mut dev = Device {
             backend,
@@ -272,11 +280,14 @@ impl<B: Backend> Device<B> {
         self.used = true;
         self.recompute_layout();
         if new_page {
-            self.backend.draw_rect(
-                Rect::new(0.0, 0.0, self.width_in, self.height_in),
-                Some(self.par.bg),
-                None,
-            );
+            self.backend.clear_page();
+            if self.par.bg.a > 0 {
+                self.backend.draw_rect(
+                    Rect::new(0.0, 0.0, self.width_in, self.height_in),
+                    Some(self.par.bg),
+                    None,
+                );
+            }
         }
     }
 
@@ -739,13 +750,10 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// `abline(a=, b=)` / `abline(h=)` / `abline(v=)`, a port of `C_abline`
-    /// with R's default `untf = FALSE`. `h`/`v` are data values. On log
-    /// axes the `a`/`b` line is straight on the page: `log10(y) = a + b *
-    /// log10(x)` on a log-log plot, `y = a + b * log10(x)` with a log x
-    /// axis only, and so on (see [`Device::abline_untf`] for `y = a + b *
-    /// x` instead). Lines span the plot region, or the figure region with
-    /// `par(xpd = TRUE)`, and are clipped to it.
+    /// `abline(a, b)` / `abline(h = )` / `abline(v = )` with one colour,
+    /// width and line type for all. See [`Device::abline_with`] (R's
+    /// `C_abline`) for vectors of `h`/`v`, recycled styles and how lines
+    /// behave on log axes.
     #[allow(clippy::too_many_arguments)]
     pub fn abline(
         &mut self,
@@ -757,87 +765,29 @@ impl<B: Backend> Device<B> {
         lwd: f64,
         lty: LineType,
     ) {
-        let Some(color) = self.resolve(col) else {
-            return;
-        };
-        let stroke = self.stroke_of(color, lwd, lty);
-        self.push_clip_for(self.par.xpd);
-        let (x0, x1) = self.xpd_limits(true);
-        let (y0, y1) = self.xpd_limits(false);
-        if let (Some(a), Some(b)) = (a, b) {
-            // In `usr` units the line is `a + b * x` whether or not either
-            // axis is logarithmic.
-            let from = self.usr_to_inches(x0, a + b * x0);
-            let to = self.usr_to_inches(x1, a + b * x1);
-            self.draw_line_if_finite(from, to, &stroke);
-        }
-        if let Some(h) = h {
-            let h = if self.ylog { h.log10() } else { h };
-            let (from, to) = (self.usr_to_inches(x0, h), self.usr_to_inches(x1, h));
-            self.draw_line_if_finite(from, to, &stroke);
-        }
-        if let Some(v) = v {
-            let v = if self.xlog { v.log10() } else { v };
-            let (from, to) = (self.usr_to_inches(v, y0), self.usr_to_inches(v, y1));
-            self.draw_line_if_finite(from, to, &stroke);
-        }
-        self.pop_clip();
+        self.abline_with(&AblineOptions {
+            coef: a.zip(b),
+            h: h.into_iter().collect(),
+            v: v.into_iter().collect(),
+            col: vec![col],
+            lty: vec![lty],
+            lwd: vec![lwd],
+            ..AblineOptions::default()
+        });
     }
 
-    /// `abline(a, b, untf = TRUE)`: the line `y = a + b * x` in data
-    /// units, which is curved on a log axis (drawn through 101 points,
-    /// equally spaced in `log10(x)` on a log x axis, and dropping the ends
-    /// where `x` or `y` is <= 0 on a log axis). Without log axes, the same
-    /// as [`Device::abline`].
+    /// `abline(a, b, untf = TRUE)`: the line `y = a + b * x` in data units,
+    /// curved on a log axis. Without log axes, the same as
+    /// [`Device::abline`].
     pub fn abline_untf(&mut self, a: f64, b: f64, col: ColorSpec, lwd: f64, lty: LineType) {
-        if !self.xlog && !self.ylog {
-            self.abline(Some(a), Some(b), None, None, col, lwd, lty);
-            return;
-        }
-        let Some(color) = self.resolve(col) else {
-            return;
-        };
-        const NS: usize = 100;
-        let stroke = self.stroke_of(color, lwd, lty);
-        let (l0, l1) = self.xpd_limits(true);
-        let data = |v: f64| if self.xlog { 10f64.powf(v) } else { v };
-        let (mut x0, x1) = (data(l0), data(l1));
-        let mut xx = vec![0.0; NS + 1];
-        if self.xlog {
-            x0 = x0.max(1.01 * (x1 / f64::MAX));
-            let f = (x1 / x0).powf(1.0 / NS as f64);
-            xx[0] = x0;
-            for i in 1..NS {
-                xx[i] = xx[i - 1] * f;
-            }
-        } else {
-            let step = (x1 - x0) / NS as f64;
-            for (i, x) in xx.iter_mut().enumerate().take(NS) {
-                *x = x0 + i as f64 * step;
-            }
-        }
-        xx[NS] = x1;
-        let yy: Vec<f64> = xx.iter().map(|&x| a + x * b).collect();
-        // Drop leading and trailing values <= 0 on log axes.
-        let positive = |i: usize| (!self.xlog || xx[i] > 0.0) && (!self.ylog || yy[i] > 0.0);
-        let (mut start, mut stop) = (0, NS);
-        while start <= NS && !positive(start) {
-            start += 1;
-        }
-        while stop > 0 && !positive(stop) {
-            stop -= 1;
-        }
-        if start > stop {
-            return;
-        }
-        let pts: Vec<Point> = (start..=stop)
-            .map(|i| self.user_to_inches(xx[i], yy[i]))
-            .collect();
-        self.push_clip_for(self.par.xpd);
-        if pts.iter().all(|p| p.x.is_finite() && p.y.is_finite()) {
-            self.backend.draw_polyline(&pts, &stroke);
-        }
-        self.pop_clip();
+        self.abline_with(&AblineOptions {
+            coef: Some((a, b)),
+            untf: true,
+            col: vec![col],
+            lty: vec![lty],
+            lwd: vec![lwd],
+            ..AblineOptions::default()
+        });
     }
 
     fn draw_line_if_finite(&mut self, from: Point, to: Point, stroke: &Stroke) {
