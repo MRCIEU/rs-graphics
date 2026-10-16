@@ -63,11 +63,26 @@ fn svg_backend_produces_well_formed_output() {
     assert!(svg.contains("</svg>"));
     assert!(svg.contains("<text"));
     assert!(svg.contains("Hello, rust-plots!"));
-    // clip open/close should balance.
-    assert_eq!(
-        svg.matches("<g clip-path").count(),
-        svg.matches("</g>").count()
-    );
+    // Group (clip and same-style) open/close should balance.
+    assert_eq!(svg.matches("<g ").count(), svg.matches("</g>").count());
+}
+
+#[test]
+fn svgz_is_the_gzipped_svg() {
+    let mut plain = SvgBackend::new(6.0, 4.0);
+    let mut compressed = SvgBackend::new(6.0, 4.0);
+    exercise(&mut plain);
+    exercise(&mut compressed);
+    let (svg, svgz) = (plain.finish(), compressed.finish_svgz());
+    assert_eq!(&svgz[..3], &[0x1F, 0x8B, 8], "gzip magic and deflate");
+    assert!(svgz.len() < svg.len());
+    // Inflate the deflate data between the 10-byte header and the 8-byte
+    // trailer (CRC-32 and length).
+    let body = &svgz[10..svgz.len() - 8];
+    let inflated = miniz_oxide::inflate::decompress_to_vec(body).expect("valid deflate");
+    assert_eq!(inflated, svg.as_bytes());
+    let len = u32::from_le_bytes(svgz[svgz.len() - 4..].try_into().unwrap());
+    assert_eq!(len as usize, svg.len());
 }
 
 #[test]

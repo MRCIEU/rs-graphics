@@ -15,6 +15,7 @@
 
 use std::fmt::Write as _;
 
+use super::compress::{gzip_compress, DEFLATE_LEVEL};
 use super::numfmt::{push_hex, push_trimmed};
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::Color;
@@ -110,6 +111,15 @@ impl SvgBackend {
 
     fn height_pt(&self) -> f64 {
         self.height_in * 72.0
+    }
+
+    /// The SVG document, gzip-compressed as for a `.svgz` file: several
+    /// times smaller (about 15x for big scatter plots) and compressed on all
+    /// cores. Inkscape, Illustrator and the like open `.svgz` files, but
+    /// browsers only display them when served with `Content-Encoding: gzip`,
+    /// so [`SvgBackend::finish`]'s plain SVG is the default.
+    pub fn finish_svgz(self) -> Vec<u8> {
+        gzip_compress(self.finish().as_bytes(), DEFLATE_LEVEL)
     }
 
     /// Full SVG document as a `String`.

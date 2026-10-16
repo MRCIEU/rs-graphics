@@ -19,6 +19,7 @@
 //! The one per-device quirk is the point size itself: see
 //! [`Backend::effective_font_size`].
 
+mod compress;
 mod numfmt;
 pub mod pdf;
 pub mod raster;

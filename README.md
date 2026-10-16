@@ -65,6 +65,10 @@ the corresponding `*.default` R function:
   outlined paths). Consecutive shapes with the same fill/stroke style are
   wrapped in one `<g>` carrying it, so a big scatter plot doesn't repeat
   the style on every point (about a third of the size).
+  `SvgBackend::finish_svgz()` returns the document gzip-compressed (`.svgz`,
+  about 6x smaller again) instead of `finish()`'s plain SVG. It isn't the
+  default: browsers display `.svgz` only when served with
+  `Content-Encoding: gzip`, though Inkscape and Illustrator open it.
 - `pdf.rs` - hand-rolled single-page PDF writer, using the 4 standard
   Type1 Helvetica faces every PDF viewer bundles (no font embedding
   needed), matching R's own `pdf()` device's default font. Like R's
