@@ -315,8 +315,13 @@ impl<B: Backend> Device<B> {
     }
 
     /// `plot.new()`: moves to the next figure and sets up its figure and
-    /// plot regions. Follow it with [`Device::plot_window`] before drawing.
+    /// plot regions.
     ///
+    /// - **Coordinates:** like R, it leaves linear user coordinates of
+    ///   0..1 on both axes (`plot_window((0, 1), (0, 1), false, false)`:
+    ///   -0.04..1.04 with the default `xaxs = yaxs = "r"`) and their
+    ///   default ticks, so you can draw straight away. Call
+    ///   [`Device::plot_window`] next for other limits or log axes.
     /// - **Which figure:** the next one in the order set by
     ///   [`Device::mfrow`], [`Device::mfcol`], [`Device::layout`] or
     ///   [`Device::mfg`] (one figure per page by default). After the last
@@ -356,6 +361,8 @@ impl<B: Backend> Device<B> {
                 );
             }
         }
+        // `C_plot_new`: linear axes, `GScale(0, 1)` on both.
+        self.plot_window((0.0, 1.0), (0.0, 1.0), false, false);
     }
 
     /// `plot.window(xlim, ylim, log)`: sets up the user coordinates of the

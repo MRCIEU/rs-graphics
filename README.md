@@ -19,7 +19,8 @@ crate's test suite (see [Testing](#testing) below).
   styles, colors, line/point styles, fonts, `tcl`/`mgp`/`las`, etc.,
   with R's exact default values.
 - Coordinate systems and clipping (`src/device.rs`): `plot.new()`/
-  `plot.window()` equivalents, user/device coordinate transforms, log
+  `plot.window()` equivalents (`plot_new()` alone leaves R's default
+  0..1 user coordinates), user/device coordinate transforms, log
   axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, `at`/
   `pos`/`abline(h=, v=)` in data units, `abline(a, b)` straight on the
   page or curved with `abline_untf`, and `xlog`/`ylog` for `plot()`,
@@ -277,6 +278,9 @@ against a real R installation by shelling out to `Rscript`:
   linear small range, a reversed axis with `at` in data units), with
   non-positive values dropped: label strings and origins, axis and tick
   segments, and the number of points drawn.
+- `tests/plot_new_matches_r.rs` - the 0..1 user coordinates `plot.new()`
+  leaves without `plot.window()` (fresh, after a log plot, with `xaxs =
+  "i"`): lines, points and labels.
 - `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
   segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
   axis, and `type = "c"` (the same lines, no points).
