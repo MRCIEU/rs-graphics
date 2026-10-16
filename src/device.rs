@@ -14,7 +14,7 @@ use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
-use crate::par::{AxisStyle, Par};
+use crate::par::{AxisStyle, Par, Pty};
 use crate::pch;
 use crate::pretty::{axis_pars, create_at_vector};
 
@@ -53,6 +53,10 @@ pub struct Device<B: Backend> {
     arrangement: Arrangement,
     /// `par("mfg")`'s `currentFigure`, 1-based.
     current_figure: usize,
+    /// `par(fig)` (R's `defaultFigure = FALSE`): the figure region as
+    /// fractions `[x0, x1, y0, y1]` of the inner region, overriding the
+    /// arrangement until `mfrow`/`mfcol`/`layout` is called.
+    fig_nic: Option<[f64; 4]>,
     /// `par("new")`, set by [`Device::set_new`] and [`Device::mfg`]: the
     /// next `plot_new()` reuses the current figure instead of advancing.
     /// Cleared by drawing (see [`Device::dirty`]), not by `plot_new()`.
@@ -110,6 +114,7 @@ impl<B: Backend> Device<B> {
                 by_col: false,
             },
             current_figure: 1,
+            fig_nic: None,
             hold_figure: false,
             used: false,
         };
@@ -147,22 +152,68 @@ impl<B: Backend> Device<B> {
             self.width_in - omi.right,
             self.height_in - omi.top,
         );
-        let [fx0, fx1, fy0, fy1] =
+        let [fx0, fx1, fy0, fy1] = self.fig_nic.unwrap_or_else(|| {
             self.arrangement
-                .figure_region_nic(self.current_figure, inner.width(), inner.height());
+                .figure_region_nic(self.current_figure, inner.width(), inner.height())
+        });
         self.fig = Rect::new(
             inner.x0 + fx0 * inner.width(),
             inner.y0 + fy0 * inner.height(),
             inner.x0 + fx1 * inner.width(),
             inner.y0 + fy1 * inner.height(),
         );
-        let mai = self.par.mai();
-        self.plt = Rect::new(
-            self.fig.x0 + mai.left,
-            self.fig.y0 + mai.bottom,
-            self.fig.x1 - mai.right,
-            self.fig.y1 - mai.top,
+        self.plt = match self.par.plt {
+            // `par(plt)`: fractions of the figure region.
+            Some([px0, px1, py0, py1]) => Rect::new(
+                self.fig.x0 + px0 * self.fig.width(),
+                self.fig.y0 + py0 * self.fig.height(),
+                self.fig.x0 + px1 * self.fig.width(),
+                self.fig.y0 + py1 * self.fig.height(),
+            ),
+            // `mapPlotRegion()`: the figure less `mar`, made square about
+            // its centre for `pty = "s"`.
+            None => {
+                let mai = self.par.mai();
+                let (mut x0, mut x1) = (self.fig.x0 + mai.left, self.fig.x1 - mai.right);
+                let (mut y0, mut y1) = (self.fig.y0 + mai.bottom, self.fig.y1 - mai.top);
+                if self.par.pty == Pty::Square {
+                    let (w, h) = (x1 - x0, y1 - y0);
+                    if w > h {
+                        let c = 0.5 * (x0 + x1);
+                        (x0, x1) = (c - 0.5 * h, c + 0.5 * h);
+                    } else {
+                        let c = 0.5 * (y0 + y1);
+                        (y0, y1) = (c - 0.5 * w, c + 0.5 * w);
+                    }
+                }
+                Rect::new(x0, y0, x1, y1)
+            }
+        };
+    }
+
+    /// `par(fig = c(x0, x1, y0, y1))`: a single figure region, as fractions
+    /// of the inner region (the device less `par(oma)`), for placing plots
+    /// anywhere on the page. As in R, the next `plot_new()` starts a new
+    /// page unless [`Device::set_new`]`(true)` is called after this (to
+    /// add a plot to the current page), `par(cex)` is left as it is, and
+    /// `mfrow`/`mfcol`/`layout` cancel it.
+    ///
+    /// # Panics
+    /// Unless `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1` (R's error).
+    pub fn fig(&mut self, fig: [f64; 4]) {
+        let [x0, x1, y0, y1] = fig;
+        assert!(
+            0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0,
+            "invalid value specified for graphical parameter \"fig\""
         );
+        self.arrangement = Arrangement::Grid {
+            nrow: 1,
+            ncol: 1,
+            by_col: false,
+        };
+        self.current_figure = 1;
+        self.fig_nic = Some(fig);
+        self.recompute_layout();
     }
 
     /// `par(mfrow = c(nrow, ncol))`: a grid of figures filled row by row.
@@ -208,6 +259,7 @@ impl<B: Backend> Device<B> {
         // wraps round to figure 1 on a fresh page.
         self.current_figure = arrangement.last_figure();
         self.arrangement = arrangement;
+        self.fig_nic = None;
         self.hold_figure = false;
         self.recompute_layout();
     }

@@ -52,6 +52,10 @@ crate's test suite (see [Testing](#testing) below).
   heights, and `respect` (logical or matrix) - a port of `layoutRegions()`
   in `graphics.c`. `par(new = TRUE)` (`Device::set_new`) overlays the
   next plot on the current figure, e.g. for a second y axis.
+  `par(fig=)` (`Device::fig`) places a figure anywhere on the page,
+  `par(plt=)` (`Par::plt`) places the plot region within the figure, and
+  `par(pty = "s")` (`Par::pty`) makes it square - ports of
+  `mapFigureRegion()`/`mapPlotRegion()`.
 - R's built-in plotting characters `pch = 0..25` (`src/pch.rs`) plus
   character symbols (`pch = "."`, `"a"`, ...), line
   types `lty` (`src/lty.rs`), the R4 default color palette and all 657
@@ -97,7 +101,8 @@ the corresponding `*.default` R function:
 ## Out of scope
 
 To keep this a tractable "core functionality" port, the following R
-`graphics` features are **not implemented**: `split.screen()`/`par(fig=)`,
+`graphics` features are **not implemented**: `split.screen()`,
+`par(fin=)`/`par(pin=)`,
 `persp()`/3D plotting,
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
 `image()`/raster images, `symbols()`, `smoothScatter()`,
@@ -283,6 +288,9 @@ against a real R installation by shelling out to `Rscript`:
   `plot.window()` (linear, log with each tick rule, reversed, `par(lab)`),
   and the ticks drawn with `xaxp`/`yaxp` changed afterwards, inline in
   `axis()` and in `plot()`.
+- `tests/regions_matches_r.rs` - `par(pty = "s")` on wide and tall
+  pages, `par(plt=)` (also over `pty`), and `par(fig=)` with `new = TRUE`,
+  `oma` and after `mfrow`: every painted path and text item in order.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 

@@ -57,6 +57,24 @@ impl AxisStyle {
     }
 }
 
+/// `par(pty)`: the shape of the plot region when it comes from `mar`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Pty {
+    /// `"m"`: as large as the margins allow (the default).
+    Maximal,
+    /// `"s"`: square, the longer side shrunk about its centre.
+    Square,
+}
+
+impl Pty {
+    pub fn parse(s: &str) -> Pty {
+        match s {
+            "s" => Pty::Square,
+            _ => Pty::Maximal,
+        }
+    }
+}
+
 /// `par(xaxt/yaxt)`: whether `axis()` draws on that axis. R's `"s"`, `"l"`
 /// and `"t"` all mean [`AxisType::Standard`]; `"n"` suppresses the axis
 /// (`plot(x, y, xaxt = "n")` before a custom `axis(1, ...)`).
@@ -84,6 +102,14 @@ pub struct Par {
     pub mar: Sides<f64>,
     /// Outer margins in lines. Default `c(0, 0, 0, 0)`.
     pub oma: Sides<f64>,
+    /// `par(plt = c(x0, x1, y0, y1))`: the plot region as fractions of the
+    /// figure region, instead of the figure less `mar`. `None` (the default)
+    /// uses `mar` and `pty`. Unlike R, setting `mar` or `pty` doesn't reset
+    /// it: set it back to `None`. Applied at the next `plot_new()`.
+    pub plt: Option<[f64; 4]>,
+    /// `par(pty)`: [`Pty::Square`] makes the `mar`-based plot region
+    /// square. Applied at the next `plot_new()`.
+    pub pty: Pty,
     pub xaxs: AxisStyle,
     pub yaxs: AxisStyle,
     pub xlog: bool,
@@ -161,6 +187,8 @@ impl Default for Par {
         Par {
             mar: Sides::new(5.1, 4.1, 4.1, 2.1),
             oma: Sides::new(0.0, 0.0, 0.0, 0.0),
+            plt: None,
+            pty: Pty::Maximal,
             xaxs: AxisStyle::Regular,
             yaxs: AxisStyle::Regular,
             xlog: false,
