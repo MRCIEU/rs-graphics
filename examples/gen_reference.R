@@ -24,7 +24,7 @@ save_all <- function(name, width, height, draw) {
   dev.off()
 
   png(file.path("reference_output", paste0(name, ".png")), width = width, height = height,
-      units = "in", res = 150)
+      units = "in", res = 300)
   draw()
   dev.off()
 

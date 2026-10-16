@@ -16,6 +16,7 @@ tiny-skia = "0.11"
 ab_glyph = "0.2"
 miniz_oxide = "0.8"
 adler2 = "2"
+crc32fast = "1"
 
 [dev-dependencies]
 # used only by integration tests that shell out to Rscript for ground truth,

@@ -999,8 +999,31 @@ impl RasterBackend {
     /// Encode the current canvas as PNG bytes.
     pub fn finish(mut self) -> Vec<u8> {
         self.flush();
-        self.canvas().encode_png().expect("PNG encoding failed")
+        let png = self.canvas().encode_png().expect("PNG encoding failed");
+        with_resolution(png, self.dpi)
     }
+}
+
+/// Add a `pHYs` chunk recording `dpi` to `png` (tiny-skia writes none), so
+/// viewers show it at its physical size rather than assuming 72 dpi.
+fn with_resolution(png: Vec<u8>, dpi: f64) -> Vec<u8> {
+    // The 8-byte signature and the IHDR chunk (always first, 13 bytes of
+    // data) come first; `pHYs` must come before the image data.
+    const AFTER_IHDR: usize = 8 + 4 + 4 + 13 + 4;
+    let per_metre = (dpi / 0.0254).round() as u32;
+    let mut chunk = Vec::with_capacity(21);
+    chunk.extend_from_slice(&9u32.to_be_bytes());
+    chunk.extend_from_slice(b"pHYs");
+    chunk.extend_from_slice(&per_metre.to_be_bytes());
+    chunk.extend_from_slice(&per_metre.to_be_bytes());
+    chunk.push(1); // unit: metre
+    let crc = crc32fast::hash(&chunk[4..]);
+    chunk.extend_from_slice(&crc.to_be_bytes());
+    let mut out = Vec::with_capacity(png.len() + chunk.len());
+    out.extend_from_slice(&png[..AFTER_IHDR]);
+    out.extend_from_slice(&chunk);
+    out.extend_from_slice(&png[AFTER_IHDR..]);
+    out
 }
 
 /// The pixel bounds of command `c`'s ink if it is a hairline stroke, one

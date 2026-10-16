@@ -133,6 +133,10 @@ fn raster_backend_produces_valid_png_of_expected_size() {
         &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']
     );
 
+    // A pHYs chunk records 96 dpi (3780 pixels per metre) right after IHDR.
+    assert_eq!(&png_bytes[37..41], b"pHYs");
+    assert_eq!(&png_bytes[41..50], &[0, 0, 0x0E, 0xC4, 0, 0, 0x0E, 0xC4, 1]);
+
     let decoded = tiny_skia::Pixmap::decode_png(&png_bytes).expect("valid png");
     assert_eq!(decoded.width(), (6.0f64 * 96.0).round() as u32);
     assert_eq!(decoded.height(), (4.0f64 * 96.0).round() as u32);

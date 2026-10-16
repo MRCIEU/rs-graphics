@@ -58,7 +58,7 @@ impl NewBackend for PdfBackend {
 
 impl NewBackend for RasterBackend {
     fn create(width_in: f64, height_in: f64) -> Self {
-        RasterBackend::new(width_in, height_in, 150.0, Color::WHITE)
+        RasterBackend::new(width_in, height_in, 300.0, Color::WHITE)
     }
 }
 
