@@ -51,8 +51,12 @@ crate's test suite (see [Testing](#testing) below).
   R's `font = 5`; PDF uses the standard `/Symbol` font, SVG/PNG its
   Unicode equivalents), operators, relations, spacing, `paste()`,
   `list()`, parentheses and `group()`, font styles, and generic `f(x)`.
-  Used by `axis()` so far. Accents, fractions, `sqrt`, big operators and
-  `bgroup` are rejected as not yet supported.
+  Used by `axis()` (labels), `title_with()` (`TitleOptions`), `mtext()`,
+  `text()`/`text_at()` and `legend()` (entry labels and title), each
+  placed as R's `GMMathText`/`GMathText` do; `legend()` sizes rows and
+  columns by the expressions' boxes. (`title()` and the high-level
+  `PlotOptions` titles stay text-only.) Accents, fractions, `sqrt`, big
+  operators and `bgroup` are rejected as not yet supported.
   `legend()`
   (`Device::legend_with`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
@@ -120,8 +124,7 @@ To keep this a tractable "core functionality" port, the following R
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
 `image()`/raster images, `symbols()`, `smoothScatter()`,
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
-fonts, plotmath in `title()`/`mtext()`/`text()`/`legend()` and the
-plotmath constructs listed above, and interactive input
+fonts, the plotmath constructs listed above, and interactive input
 (`identify()`/`locator()`). `barplot()` doesn't
 support `density`/`angle` hatching, `offset`, or `add`, and
 `boxplot()` doesn't support `at`/`width`/`add` or `pars`. These would all be
@@ -272,8 +275,10 @@ against a real R installation by shelling out to `Rscript`:
   `pdf(bg = )`, the transparent default, and after `par(bg = )`): every
   painting operator and its colours.
 - `tests/plotmath_axis_matches_r.rs` - expression labels on all four
-  axis sides (rotation, `cex.axis`, `hadj`/`padj`, `las`): every text
-  item's font, size, origin and string, and the `/` stroke.
+  axis sides (rotation, `cex.axis`, `hadj`/`padj`, `las`), and in
+  `title()`, `mtext()` (inner, outer, perpendicular), `text()` (`adj`,
+  `srt`, `cex`, `col`) and `legend()` (labels incl. a tall one, title):
+  every text item's font, size, origin and string, and every stroke.
 - `tests/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
   `legend()` spacing come from the device's starting point size, not a
   later `par(ps)`, as R's `cra`.

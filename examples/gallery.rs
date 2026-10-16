@@ -333,13 +333,13 @@ fn draw_pch<B: Backend>(dev: &mut Device<B>) {
     for pch in 0..26 {
         let (x, y) = ((pch % 7) as f64 + 1.0, 5.0 - (pch / 7) as f64);
         dev.points(&[x], &[y], pch, blue, red, 2.0);
-        dev.text(x, y - 0.45, &pch.to_string(), 0.5, None, 0.0, black, 0.8, 1);
+        dev.text(x, y - 0.45, pch.to_string(), 0.5, None, 0.0, black, 0.8, 1);
     }
     for (i, ch) in [".", "a", "M", "+", "*", "#", "o"].iter().enumerate() {
         let x = i as f64 + 1.0;
         let pch = ch.chars().next().unwrap() as i32;
         dev.points(&[x], &[0.6], pch, blue, red, 2.0);
-        dev.text(x, 0.15, &format!("\"{ch}\""), 0.5, None, 0.0, black, 0.8, 1);
+        dev.text(x, 0.15, format!("\"{ch}\""), 0.5, None, 0.0, black, 0.8, 1);
     }
     dev.title(Some("pch: col = \"blue\", bg = \"red\", cex = 2"), None, None, None);
 }

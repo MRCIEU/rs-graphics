@@ -368,3 +368,199 @@ fn consecutive_digits_are_all_plain() {
         .collect();
     assert_eq!(fonts, want);
 }
+
+/// Expressions in `title()`, `mtext()` (inner, outer, perpendicular),
+/// `text()` (default and two-element `adj`, `srt`, `cex`, `col`) and
+/// `legend()` (labels, including a tall one, and title).
+#[test]
+fn plotmath_title_mtext_text_legend_match_r() {
+    if !rscript_available() {
+        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+        return;
+    }
+    let dir = std::env::temp_dir();
+    let r_pdf = dir.join("rs_graphics_plotmath_other.pdf");
+    let script = format!(
+        "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
+         par(mar = c(5, 6, 5, 6), oma = c(2, 0, 2, 0))\n\
+         plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+         title(main = expression(Main ~ alpha^2), sub = expression(sub[i]),\n\
+               xlab = expression(x[1] + x[2]), ylab = expression(-log[10](italic(p))))\n\
+         mtext(expression(beta^2), side = 3, line = 0.5, adj = 0)\n\
+         mtext(expression(Omega ~ infinity), side = 4, line = 1)\n\
+         mtext(expression(10^-5), side = 1, outer = TRUE, line = 0.5)\n\
+         par(las = 1); mtext(expression(gamma[k]), side = 2, line = 3, at = 8); par(las = 0)\n\
+         text(2, 8, expression(x^2 + y^2 == r^2))\n\
+         text(7, 3, expression(alpha %+-% beta), adj = c(0, 1), cex = 1.5, srt = 30)\n\
+         text(5, 2, expression(paste(\"P = \", 0.05)), col = 'red')\n\
+         legend('topright', legend = expression(alpha, beta^2, x[i]^(y^2)), title = expression(Sigma[j]), lty = 1:3)\n\
+         invisible(dev.off())\n",
+        r_pdf.display()
+    );
+    let script_path = dir.join("rs_graphics_plotmath_other.R");
+    std::fs::write(&script_path, script).unwrap();
+    let out = Command::new("Rscript")
+        .arg(&script_path)
+        .output()
+        .expect("run Rscript");
+    assert!(
+        out.status.success(),
+        "Rscript failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    use rs_graphics::color::{Color, ColorSpec};
+    use rs_graphics::device::{
+        LegendEntry, LegendKeyword, LegendOptions, LegendPos, MtextOptions, TitleOptions,
+    };
+    use rs_graphics::lty::LineType;
+    use rs_graphics::par::Sides;
+    let par = Par {
+        mar: Sides::new(5.0, 6.0, 5.0, 6.0),
+        oma: Sides::new(2.0, 0.0, 2.0, 0.0),
+        ..Par::default()
+    };
+    let mut d = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
+    d.plot_new();
+    d.plot_window((0.0, 10.0), (0.0, 10.0), false, false);
+    d.title_with(&TitleOptions {
+        main: Some(Label::math("Main ~ alpha^2")),
+        sub: Some(Label::math("sub[i]")),
+        xlab: Some(Label::math("x[1] + x[2]")),
+        ylab: Some(Label::math("-log[10](italic(p))")),
+    });
+    let mt = |side, line| MtextOptions {
+        side,
+        line,
+        ..MtextOptions::default()
+    };
+    d.mtext(
+        Label::math("beta^2"),
+        &MtextOptions {
+            adj: Some(0.0),
+            ..mt(3, 0.5)
+        },
+    );
+    d.mtext(Label::math("Omega ~ infinity"), &mt(4, 1.0));
+    d.mtext(
+        Label::math("10^-5"),
+        &MtextOptions {
+            outer: true,
+            ..mt(1, 0.5)
+        },
+    );
+    d.par.las = 1;
+    d.mtext(
+        Label::math("gamma[k]"),
+        &MtextOptions {
+            at: Some(8.0),
+            ..mt(2, 3.0)
+        },
+    );
+    d.par.las = 0;
+    let black = ColorSpec::Index(1);
+    d.text(
+        2.0,
+        8.0,
+        Label::math("x^2 + y^2 == r^2"),
+        0.5,
+        None,
+        0.0,
+        black,
+        1.0,
+        1,
+    );
+    d.text(
+        7.0,
+        3.0,
+        Label::math("alpha %+-% beta"),
+        0.0,
+        Some(1.0),
+        30.0,
+        black,
+        1.5,
+        1,
+    );
+    let red = ColorSpec::Color(Color::parse("red").unwrap());
+    d.text(
+        5.0,
+        2.0,
+        Label::math("paste(\"P = \", 0.05)"),
+        0.5,
+        None,
+        0.0,
+        red,
+        1.0,
+        1,
+    );
+    let entries: Vec<LegendEntry> = ["alpha", "beta^2", "x[i]^(y^2)"]
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            LegendEntry::line(
+                Label::math(e),
+                black,
+                1.0,
+                LineType::from_code(i as i32 + 1),
+            )
+        })
+        .collect();
+    let opts = LegendOptions {
+        title: Some(Label::math("Sigma[j]")),
+        ..LegendOptions::default()
+    };
+    d.legend_with(LegendPos::Keyword(LegendKeyword::TopRight), &entries, &opts);
+
+    let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
+    let ours = extract(&latin1(&d.into_backend().finish()));
+    let r = extract(&latin1(&std::fs::read(&r_pdf).unwrap()));
+    let show = |t: &[Text]| {
+        t.iter()
+            .map(|t| {
+                format!(
+                    "{} {:.2} ({:.2}, {:.2}) {:?}",
+                    t.font,
+                    t.size,
+                    t.x,
+                    t.y,
+                    String::from_utf8_lossy(&t.text)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert_eq!(
+        ours.0.len(),
+        r.0.len(),
+        "text count\nours:\n{}\nr:\n{}",
+        show(&ours.0),
+        show(&r.0)
+    );
+    for (a, b) in ours.0.iter().zip(&r.0) {
+        let ok = a.font == b.font
+            && (a.size - b.size).abs() < 0.01
+            && (a.x - b.x).abs() < 0.05
+            && (a.y - b.y).abs() < 0.05
+            && a.dir == b.dir
+            && a.text == b.text;
+        assert!(
+            ok,
+            "text differs:\n ours={a:?}\n r=   {b:?}\nours:\n{}\nr:\n{}",
+            show(&ours.0),
+            show(&r.0)
+        );
+    }
+    assert_eq!(
+        ours.1.len(),
+        r.1.len(),
+        "stroke count\nours={:?}\nr={:?}",
+        ours.1,
+        r.1
+    );
+    for (a, b) in ours.1.iter().zip(&r.1) {
+        assert!(
+            a.len() == b.len() && a.iter().zip(b).all(|(p, q)| (p - q).abs() < 0.05),
+            "stroke differs: ours={a:?} r={b:?}"
+        );
+    }
+}

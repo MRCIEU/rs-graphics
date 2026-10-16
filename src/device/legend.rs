@@ -9,7 +9,9 @@
 //! which gives identical results for non-reversed axes. Reversed axes
 //! (`xlim = c(hi, lo)`) are not handled.
 //!
-//! Not implemented: `density`/`angle` hatched fills, expression labels,
+//! Labels and the title may be plotmath expressions (`Label::math`).
+//!
+//! Not implemented: `density`/`angle` hatched fills,
 //! per-entry `cex`/`x.intersp`/`seg.len` recycling (these are scalars on
 //! [`LegendOptions`]), `text.width = NA`, and `adj`.
 //!
@@ -17,13 +19,14 @@
 //! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and
 //! `text(cex = )` both multiply by `par("cex")`, i.e. `cexbase`).
 
-use crate::afm;
 use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
 
-use super::Device;
+use crate::plotmath::Label;
+
+use super::{Clip, Device};
 
 /// Where to put a legend: R's `legend(x, y)` forms.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,7 +87,8 @@ impl LegendKeyword {
 /// One row (key + label) of a legend.
 #[derive(Clone, Debug)]
 pub struct LegendEntry {
-    pub label: String,
+    /// Text or a plotmath expression (`Label::math(...)`).
+    pub label: Label,
     /// Colour of the point/line symbol.
     pub col: ColorSpec,
     pub pch: Option<i32>,
@@ -105,7 +109,7 @@ pub struct LegendEntry {
 }
 
 impl LegendEntry {
-    fn base(label: impl Into<String>, col: ColorSpec) -> Self {
+    fn base(label: impl Into<Label>, col: ColorSpec) -> Self {
         LegendEntry {
             label: label.into(),
             col,
@@ -120,7 +124,7 @@ impl LegendEntry {
     }
 
     /// `legend(..., pch = pch, col = col)`.
-    pub fn point(label: impl Into<String>, col: ColorSpec, pch: i32) -> Self {
+    pub fn point(label: impl Into<Label>, col: ColorSpec, pch: i32) -> Self {
         LegendEntry {
             pch: Some(pch),
             ..Self::base(label, col)
@@ -128,7 +132,7 @@ impl LegendEntry {
     }
 
     /// `legend(..., lty = lty, lwd = lwd, col = col)`.
-    pub fn line(label: impl Into<String>, col: ColorSpec, lwd: f64, lty: LineType) -> Self {
+    pub fn line(label: impl Into<Label>, col: ColorSpec, lwd: f64, lty: LineType) -> Self {
         LegendEntry {
             lty: Some(lty),
             lwd: Some(lwd),
@@ -137,7 +141,7 @@ impl LegendEntry {
     }
 
     /// `legend(..., fill = fill)`: a filled box key.
-    pub fn filled(label: impl Into<String>, fill: ColorSpec) -> Self {
+    pub fn filled(label: impl Into<Label>, fill: ColorSpec) -> Self {
         LegendEntry {
             fill: Some(fill),
             ..Self::base(label, ColorSpec::None)
@@ -194,7 +198,8 @@ pub struct LegendOptions {
     pub merge: Option<bool>,
     pub ncol: usize,
     pub horiz: bool,
-    pub title: Option<String>,
+    /// Text or a plotmath expression.
+    pub title: Option<Label>,
     /// `title.cex`; `None` = `cex`.
     pub title_cex: Option<f64>,
     /// `inset` as fractions of the plot region, `(x, y)`, for keyword
@@ -306,29 +311,36 @@ impl<B: Backend> Device<B> {
         let yc = cex_eff * cin_y;
 
         let font = opts.text_font.unwrap_or(self.par.font);
-        let face = self.par.font_face(font);
-        let size_pt = self.font_size_pt(cex);
-        let str_w = |s: &str| afm::str_width_inches(s, face, size_pt, 1.0);
-        let str_h = afm::m_height_inches(face, size_pt, 1.0);
-
         let (ux0, ux1, _, _) = self.usr;
         let inches_per_user_x = plt.width() / (ux1 - ux0).abs();
         let text_w = match opts.text_width {
             Some(tw) => tw.abs() * inches_per_user_x,
-            None => entries.iter().map(|e| str_w(&e.label)).fold(0.0, f64::max),
+            None => entries
+                .iter()
+                .map(|e| self.label_width(&e.label, font, cex))
+                .fold(0.0, f64::max),
         };
 
-        // Row heights.
+        // Row heights: at least a character cell, or the tallest label
+        // (an expression can be taller).
         let yextra = yc * (opts.y_intersp - 1.0);
-        let ymax = yc.max(str_h);
+        let ymax = entries
+            .iter()
+            .map(|e| self.label_height(&e.label, font, cex))
+            .fold(yc, f64::max);
         let ychar = yextra + ymax;
 
         // Title.
-        let title = opts.title.as_deref().filter(|t| !t.is_empty());
+        let title = opts
+            .title
+            .as_ref()
+            .filter(|t| !matches!(t, Label::Text(s) if s.is_empty()));
         let tcex = opts.title_cex.unwrap_or(cex);
-        let title_size_pt = self.font_size_pt(tcex);
         let title_unit_h = tcex * self.par.cex * cin_y;
-        let ymaxtitle = title_unit_h.max(afm::m_height_inches(face, title_size_pt, 1.0));
+        let ymaxtitle = match title {
+            Some(t) => title_unit_h.max(self.label_height(t, font, tcex)),
+            None => title_unit_h,
+        };
         let ychartitle = yextra + ymaxtitle;
         let title_extra_h = if title.is_some() { ychartitle } else { 0.0 };
 
@@ -367,8 +379,7 @@ impl<B: Backend> Device<B> {
                 let mut w_ = ncol as f64 * w0 + 0.5 * xc;
                 let mut xextra_ = 0.0;
                 if let Some(t) = title {
-                    let tw = afm::str_width_inches(t, face, title_size_pt, 1.0)
-                        + 0.5 * tcex * self.par.cex * cin_x;
+                    let tw = self.label_width(t, font, tcex) + 0.5 * tcex * self.par.cex * cin_x;
                     if tw > w_ {
                         xextra_ = (tw - w_) / 2.0;
                         w_ = tw;
@@ -483,25 +494,25 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
 
         let text_col = opts.text_col.unwrap_or(ColorSpec::Color(self.par.col));
+        // `text(adj = c(title.adj, 0))` and `text(adj = c(0, 0.5))`.
+        let clip = if self.par.xpd {
+            Clip::Figure
+        } else {
+            Clip::Plot
+        };
         if let Some(t) = title {
-            self.text_gc_at(
-                Point::new(left + w * 0.5, top - ymaxtitle),
-                t,
-                0.5,
-                0.0,
-                0.0,
-                text_col,
-                tcex,
-                font,
-            );
+            let anchor = Point::new(left + w * 0.5, top - ymaxtitle);
+            self.draw_label(clip, anchor, t, 0.5, Some(0.0), 0.0, text_col, tcex, font);
         }
         for i in 0..n {
-            let x = xt[i] + opts.x_intersp * xc;
-            self.text_gc_at(
-                Point::new(x, yt[i]),
-                &entries[i].label,
+            let anchor = Point::new(xt[i] + opts.x_intersp * xc, yt[i]);
+            let label = &entries[i].label;
+            self.draw_label(
+                clip,
+                anchor,
+                label,
                 0.0,
-                0.5,
+                Some(0.5),
                 0.0,
                 text_col,
                 cex,

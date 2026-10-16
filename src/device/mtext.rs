@@ -13,6 +13,8 @@ use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::geometry::Point;
 
+use crate::plotmath::Label;
+
 use super::{Clip, Device, Side, Y_LINE_BIAS};
 
 /// The arguments of R's `mtext()` other than `text`, with R's defaults.
@@ -89,17 +91,16 @@ fn default_at_fraction(adj: f64, side: Side, las: i32) -> f64 {
         3 => !horizontal_side,
         _ => true,
     };
-    if parallel {
-        adj
-    } else {
-        0.5
-    }
+    if parallel { adj } else { 0.5 }
 }
 
 impl<B: Backend> Device<B> {
     /// `mtext(text, side, line, outer, at, adj, padj, cex, col, font)`, with
-    /// rotation from `par(las)`; see [`MtextOptions`].
-    pub fn mtext(&mut self, text: &str, opts: &MtextOptions) {
+    /// rotation from `par(las)`; see [`MtextOptions`]. `text` is text or a
+    /// plotmath expression (`Label::math(...)`), placed by `GMMathText()`
+    /// (its bounding box aligned by `adj`/`padj`, in the plain font).
+    pub fn mtext(&mut self, text: impl Into<Label>, opts: &MtextOptions) {
+        let text = text.into();
         let side = opts.side;
         let las = self.par.las;
         let adj = opts.adj.unwrap_or_else(|| default_adj(side, las));
@@ -109,7 +110,9 @@ impl<B: Backend> Device<B> {
         // Position along the side, in device inches.
         let along = if opts.outer {
             let omi = self.omi();
-            let f = opts.at.unwrap_or_else(|| default_at_fraction(adj, side, las));
+            let f = opts
+                .at
+                .unwrap_or_else(|| default_at_fraction(adj, side, las));
             if horizontal_side {
                 omi.left + f * (self.width_in - omi.left - omi.right)
             } else {
@@ -145,7 +148,11 @@ impl<B: Backend> Device<B> {
         } else {
             !(las == 1 || las == 2)
         };
-        let rotation = if parallel_text == horizontal_side { 0.0 } else { 90.0 };
+        let rotation = if parallel_text == horizontal_side {
+            0.0
+        } else {
+            90.0
+        };
         let bias = match side {
             1 | 4 => 1.0 - Y_LINE_BIAS,
             _ => Y_LINE_BIAS,
@@ -180,7 +187,11 @@ impl<B: Backend> Device<B> {
         } else {
             Point::new(across, along)
         };
-        let clip = if opts.outer { Clip::Device } else { Clip::Figure };
+        let clip = if opts.outer {
+            Clip::Device
+        } else {
+            Clip::Figure
+        };
         let col = opts.col.unwrap_or(ColorSpec::Color(self.par.col));
         let font = opts.font.unwrap_or(self.par.font);
         // R sets the text size from `cex` alone (`C_mtext`: "we ignore any
@@ -190,7 +201,17 @@ impl<B: Backend> Device<B> {
         // Text in the outer margins doesn't count as drawing on the plot,
         // so leaves `par(new)` as it was.
         let new = self.hold_figure;
-        self.text_at_clipped(clip, anchor, text, adj, Some(padj), rotation, col, cex, font);
+        self.draw_label(
+            clip,
+            anchor,
+            &text,
+            adj,
+            Some(padj),
+            rotation,
+            col,
+            cex,
+            font,
+        );
         if opts.outer {
             self.hold_figure = new;
         }

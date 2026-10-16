@@ -1,9 +1,9 @@
 //! Mathematical annotation (R's plotmath, `?plotmath`): expressions
 //! written in R syntax, such as `"10^5"`, `"alpha[i]"` or
 //! `"-log[10](italic(p))"`, parsed into the call tree R's parser would
-//! build. [`Label`] is a text or expression label; `axis()` draws
-//! expression labels with the layout rules of `plotmath.c`
-//! (`src/device/plotmath.rs`).
+//! build. [`Label`] is a text or expression label; `axis()`, `title()`,
+//! `mtext()`, `text()` and `legend()` draw expression labels with the
+//! layout rules of `plotmath.c` (`src/device/plotmath.rs`).
 //!
 //! Supported: numbers, names (Greek letters such as `alpha`/`Omega` and
 //! `infinity`, `degree`, `minute`, `second`, `partialdiff`, `nabla`,
@@ -127,6 +127,18 @@ impl From<&str> for Label {
 impl From<String> for Label {
     fn from(s: String) -> Self {
         Label::Text(s)
+    }
+}
+
+impl From<&&str> for Label {
+    fn from(s: &&str) -> Self {
+        Label::Text(s.to_string())
+    }
+}
+
+impl From<&String> for Label {
+    fn from(s: &String) -> Self {
+        Label::Text(s.clone())
     }
 }
 

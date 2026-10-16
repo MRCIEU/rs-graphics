@@ -7,10 +7,10 @@
 
 use crate::afm::{self, FontFace};
 use crate::backend::{Backend, TextStyle};
-use crate::color::Color;
+use crate::color::{Color, ColorSpec};
 use crate::geometry::Point;
 use crate::lty::LineType;
-use crate::plotmath::{Expr, Expression};
+use crate::plotmath::{Expr, Expression, Label};
 
 use super::{Clip, Device};
 
@@ -101,6 +101,73 @@ struct Math<'d, B: Backend> {
 }
 
 impl<B: Backend> Device<B> {
+    /// `GEExpressionMetric`: `(ascent, descent, width)` in inches of `expr`
+    /// at total text expansion `cex` (`ps * cex` points).
+    pub(super) fn expression_metrics(&mut self, expr: &Expression, cex: f64) -> (f64, f64, f64) {
+        let mut m = Math::new(self, cex, Color::BLACK, Clip::Device);
+        let bbox = m.element(&expr.root, false);
+        (bbox.height, bbox.depth, bbox.width)
+    }
+
+    /// `strwidth(label, "inches", cex = cex, font = font)`, single-line
+    /// text or an expression; `cex` is multiplied by `par(cex)`, as in
+    /// [`Device::text`].
+    pub(super) fn label_width(&mut self, label: &Label, font: i32, cex: f64) -> f64 {
+        match label {
+            Label::Text(t) => {
+                let face = self.par.font_face(font);
+                afm::str_width_inches(t, face, self.font_size_pt(cex), 1.0)
+            }
+            Label::Math(e) => self.expression_metrics(e, self.par.cex * cex).2,
+        }
+    }
+
+    /// `strheight(label, "inches", cex = cex, font = font)`: the height of
+    /// "M" for single-line text, height + depth for an expression.
+    pub(super) fn label_height(&mut self, label: &Label, font: i32, cex: f64) -> f64 {
+        match label {
+            Label::Text(_) => {
+                let face = self.par.font_face(font);
+                afm::m_height_inches(face, self.font_size_pt(cex), 1.0)
+            }
+            Label::Math(e) => {
+                let (h, d, _) = self.expression_metrics(e, self.par.cex * cex);
+                h + d
+            }
+        }
+    }
+
+    /// Draws text (`GEText`) or an expression (`GEMathText`, in the plain
+    /// font) at `anchor`. `xc`/`yc` align text as in [`Device::text_at`]
+    /// and an expression's bounding box; `yc = None` is R's `NA`. `cex` is
+    /// multiplied by `par(cex)`.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn draw_label(
+        &mut self,
+        clip: Clip,
+        anchor: Point,
+        label: &Label,
+        xc: f64,
+        yc: Option<f64>,
+        rotation_deg: f64,
+        col: ColorSpec,
+        cex: f64,
+        font: i32,
+    ) {
+        match label {
+            Label::Text(t) => {
+                self.text_at_clipped(clip, anchor, t, xc, yc, rotation_deg, col, cex, font)
+            }
+            Label::Math(e) => {
+                if let Some(col) = self.resolve(col) {
+                    let yc = yc.unwrap_or(f64::NAN);
+                    let cex = self.par.cex * cex;
+                    self.math_text(anchor, e, xc, yc, rotation_deg, col, cex, clip);
+                }
+            }
+        }
+    }
+
     /// `GEMathText`: draws `expr` with its bounding box aligned to
     /// `anchor` by `xc` (horizontal, fraction of the width) and `yc`
     /// (vertical, fraction of height + depth from the bottom); `NaN` is
@@ -118,20 +185,7 @@ impl<B: Backend> Device<B> {
         cex: f64,
         clip: Clip,
     ) {
-        let mut m = Math {
-            dev: self,
-            base_cex: cex,
-            style: Style::D,
-            cex,
-            font: PLAIN,
-            reference: Point::new(0.0, 0.0),
-            current: Point::new(0.0, 0.0),
-            angle: 0.0,
-            cos: 1.0,
-            sin: 0.0,
-            col,
-            clip,
-        };
+        let mut m = Math::new(self, cex, col, clip);
         let bbox = m.element(&expr.root, false);
         m.reference = anchor;
         let xc = if xc.is_finite() { xc } else { 0.5 };
@@ -249,7 +303,26 @@ const S_ELLIPSIS: char = '\u{BC}';
 const A_HAT: char = '^';
 const A_TILDE: char = '~';
 
-impl<B: Backend> Math<'_, B> {
+impl<'d, B: Backend> Math<'d, B> {
+    /// A context in display style and the plain font, as `GEMathText`
+    /// starts.
+    fn new(dev: &'d mut Device<B>, cex: f64, col: Color, clip: Clip) -> Self {
+        Math {
+            dev,
+            base_cex: cex,
+            style: Style::D,
+            cex,
+            font: PLAIN,
+            reference: Point::new(0.0, 0.0),
+            current: Point::new(0.0, 0.0),
+            angle: 0.0,
+            cos: 1.0,
+            sin: 0.0,
+            col,
+            clip,
+        }
+    }
+
     // --- fonts, sizes and metrics -------------------------------------
 
     fn face(&self) -> FontFace {

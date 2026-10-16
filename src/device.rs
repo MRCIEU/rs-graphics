@@ -80,6 +80,15 @@ enum Clip {
     Device,
 }
 
+/// The labels of [`Device::title_with`]; `None` draws nothing.
+#[derive(Clone, Debug, Default)]
+pub struct TitleOptions {
+    pub main: Option<Label>,
+    pub sub: Option<Label>,
+    pub xlab: Option<Label>,
+    pub ylab: Option<Label>,
+}
+
 /// A resolved style bundle for a stroked primitive; kept small so
 /// call-sites can build one inline.
 #[derive(Clone, Copy, Debug)]
@@ -972,12 +981,15 @@ impl<B: Backend> Device<B> {
     /// `text(x, y, labels, adj=, srt=, col=, cex=, font=)` in user
     /// coordinates. `vadj = None` is R's `NA` vertical adjustment, which
     /// `text()` uses unless `adj` has two elements (so it is the default).
+    /// `label` is text (`"a"`) or a plotmath expression
+    /// (`Label::math("alpha^2")`), aligned on its bounding box (`NA`:
+    /// centred), in the plain font.
     #[allow(clippy::too_many_arguments)]
     pub fn text(
         &mut self,
         x: f64,
         y: f64,
-        label: &str,
+        label: impl Into<Label>,
         hadj: f64,
         vadj: Option<f64>,
         rotation_deg: f64,
@@ -995,11 +1007,12 @@ impl<B: Backend> Device<B> {
     /// height("M")` below the anchor, while `None` (`NA`) centres the ink
     /// of the string's glyphs on it (baseline at `anchor - (ury + lly) / 2`
     /// of the glyph bounding boxes).
+    /// Expressions are placed as in [`Device::text`].
     #[allow(clippy::too_many_arguments)]
     pub fn text_at(
         &mut self,
         anchor: Point,
-        label: &str,
+        label: impl Into<Label>,
         hadj: f64,
         vadj: Option<f64>,
         rotation_deg: f64,
@@ -1008,7 +1021,8 @@ impl<B: Backend> Device<B> {
         font: i32,
     ) {
         let clip = if self.par.xpd { Clip::Figure } else { Clip::Plot };
-        self.text_at_clipped(clip, anchor, label, hadj, vadj, rotation_deg, col, cex, font);
+        let label = label.into();
+        self.draw_label(clip, anchor, &label, hadj, vadj, rotation_deg, col, cex, font);
     }
 
     /// [`Device::text_at`] clipped to `clip` instead of the `par(xpd)` region.
@@ -1057,22 +1071,6 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// [`Device::text_at`] with a finite vertical adjustment `yc`, as
-    /// `title()`/`mtext()`/`axis()`/`legend()` use.
-    #[allow(clippy::too_many_arguments)]
-    fn text_gc_at(
-        &mut self,
-        anchor: Point,
-        label: &str,
-        xc: f64,
-        yc: f64,
-        rotation_deg: f64,
-        col: ColorSpec,
-        cex: f64,
-        font: i32,
-    ) {
-        self.text_at(anchor, label, xc, Some(yc), rotation_deg, col, cex, font);
-    }
 
     // ---------------------------------------------------------------
     // box() / axis() / title()
@@ -1144,7 +1142,8 @@ impl<B: Backend> Device<B> {
         self.axis_with(side, &opts);
     }
 
-    /// `title(main=, sub=, xlab=, ylab=)`.
+    /// `title(main=, sub=, xlab=, ylab=)` with text labels; see
+    /// [`Device::title_with`] for expressions.
     pub fn title(
         &mut self,
         main: Option<&str>,
@@ -1152,66 +1151,81 @@ impl<B: Backend> Device<B> {
         xlab: Option<&str>,
         ylab: Option<&str>,
     ) {
+        self.title_with(&TitleOptions {
+            main: main.map(Label::from),
+            sub: sub.map(Label::from),
+            xlab: xlab.map(Label::from),
+            ylab: ylab.map(Label::from),
+        });
+    }
+
+    /// `title(main=, sub=, xlab=, ylab=)`, each text or a plotmath
+    /// expression, drawn in `C_title`'s order (main, sub, xlab, ylab) with
+    /// `par(cex.main/col.main/font.main)` etc. Text is placed by `GMtext()`
+    /// (baseline on the line, nudged by `yLineBias`); expressions by
+    /// `GMathText()` (`main`: box centred on its line) and `GMMathText()`
+    /// (the others: box bottom on the nudged line).
+    pub fn title_with(&mut self, opts: &TitleOptions) {
         let saved_xpd = self.par.xpd;
         self.par.xpd = true;
         let lh = self.line_height_inches();
+        let x_mid = (self.plt.x0 + self.plt.x1) / 2.0;
+        let y_mid = (self.plt.y0 + self.plt.y1) / 2.0;
         // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
-        // text is baseline-anchored (yadj = 0) and `GMtext` nudges the line
-        // by `yLineBias` (0.2 on pdf/png/svg devices) - `1 - bias` on side 1,
-        // `bias` on sides 2/3.
-        // In `C_title`'s order: main, sub, xlab, ylab.
-        if let Some(main) = main {
+        // `GMtext` nudges the line by `yLineBias` (0.2 on pdf/png/svg
+        // devices) - `1 - bias` on side 1, `bias` on sides 2/3.
+        if let Some(main) = &opts.main {
             // `vpos = 0.5 * mar[2]`, `adjy = 0.5` (finite, so `GEText`
             // uses `yc * height(M)`, not exact ink centring).
             let y = self.plt.y1 + 0.5 * self.par.mar.top * lh;
-            let x = (self.plt.x0 + self.plt.x1) / 2.0;
-            self.text_gc_at(
-                Point::new(x, y),
+            self.draw_label(
+                Clip::Figure,
+                Point::new(x_mid, y),
                 main,
                 0.5,
-                0.5,
+                Some(0.5),
                 0.0,
                 ColorSpec::Color(self.par.col_main),
                 self.par.cex_main,
                 self.par.font_main,
             );
         }
-        if let Some(sub) = sub {
+        if let Some(sub) = &opts.sub {
             let y = self.plt.y0 - (self.par.mgp[0] + 1.0 + (1.0 - Y_LINE_BIAS)) * lh;
-            let x = (self.plt.x0 + self.plt.x1) / 2.0;
-            self.text_gc_at(
-                Point::new(x, y),
+            self.draw_label(
+                Clip::Figure,
+                Point::new(x_mid, y),
                 sub,
                 0.5,
-                0.0,
+                Some(0.0),
                 0.0,
                 ColorSpec::Color(self.par.col_sub),
                 self.par.cex_sub,
                 self.par.font_sub,
             );
         }
-        if let Some(xlab) = xlab {
+        if let Some(xlab) = &opts.xlab {
             let y = self.plt.y0 - (self.par.mgp[0] + (1.0 - Y_LINE_BIAS)) * lh;
-            let x = (self.plt.x0 + self.plt.x1) / 2.0;
-            self.text_gc_at(
-                Point::new(x, y),
+            self.draw_label(
+                Clip::Figure,
+                Point::new(x_mid, y),
                 xlab,
                 0.5,
-                0.0,
+                Some(0.0),
                 0.0,
                 ColorSpec::Color(self.par.col_lab),
                 self.par.cex_lab,
                 self.par.font_lab,
             );
         }
-        if let Some(ylab) = ylab {
+        if let Some(ylab) = &opts.ylab {
             let x = self.plt.x0 - (self.par.mgp[0] + Y_LINE_BIAS) * lh;
-            let y = (self.plt.y0 + self.plt.y1) / 2.0;
-            self.text_gc_at(
-                Point::new(x, y),
+            self.draw_label(
+                Clip::Figure,
+                Point::new(x, y_mid),
                 ylab,
                 0.5,
-                0.0,
+                Some(0.0),
                 90.0,
                 ColorSpec::Color(self.par.col_lab),
                 self.par.cex_lab,
