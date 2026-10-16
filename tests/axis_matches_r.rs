@@ -103,9 +103,9 @@ fn axis_and_label_text_positions_match_r() {
         let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), par);
         let opts = PlotOptions {
             pch: 19,
-            main: Some("Title"),
-            xlab: Some("x"),
-            ylab: Some("y"),
+            main: Some("Title".into()),
+            xlab: Some("x".into()),
+            ylab: Some("y".into()),
             ..PlotOptions::default()
         };
         plot(&mut dev, &x, &y, &opts);

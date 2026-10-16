@@ -119,8 +119,8 @@ fn cases() -> Vec<Case> {
                 let o = PlotOptions {
                     xaxp: Some([1.0, 10.0, 3.0]),
                     yaxp: Some([2.0, 8.0, 6.0]),
-                    xlab: Some("x"),
-                    ylab: Some("y"),
+                    xlab: Some("x".into()),
+                    ylab: Some("y".into()),
                     ..Default::default()
                 };
                 plot(d, &x, &x, &o);

@@ -564,3 +564,142 @@ fn plotmath_title_mtext_text_legend_match_r() {
         );
     }
 }
+
+#[test]
+fn plotmath_high_level_titles_match_r() {
+    if !rscript_available() {
+        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+        return;
+    }
+    let dir = std::env::temp_dir();
+    let r_pdf = dir.join("rs_graphics_plotmath_highlevel.pdf");
+    let script = format!(
+        "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
+         par(mfrow = c(2, 3))\n\
+         plot(1:10, (1:10)^2, main = expression(y == x^2), sub = expression(n[obs]),\n\
+              xlab = expression(x[i]), ylab = expression(-log[10](italic(p))))\n\
+         x <- c(1, 2, 2, 3, 3, 3, 4, 4, 5)\n\
+         hist(x, main = expression(Histogram ~ of ~ X[1]), ylab = expression(count[i]))\n\
+         barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), main = expression(bold(Bars)),\n\
+                 xlab = expression(group[k]))\n\
+         boxplot(list(c(1, 2, 3, 4, 9), c(2, 3, 4)), main = expression(sigma^2),\n\
+                 ylab = expression(mu %+-% sigma))\n\
+         pie(c(1, 2, 3), labels = c('a', 'b', 'c'), main = expression(pi * r^2))\n\
+         invisible(dev.off())\n",
+        r_pdf.display()
+    );
+    let script_path = dir.join("rs_graphics_plotmath_highlevel.R");
+    std::fs::write(&script_path, script).unwrap();
+    let out = Command::new("Rscript")
+        .arg(&script_path)
+        .output()
+        .expect("run Rscript");
+    assert!(
+        out.status.success(),
+        "Rscript failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    use rs_graphics::highlevel::{
+        BarplotOptions, BoxplotOptions, HistOptions, PieOptions, PlotOptions, barplot, boxplot,
+        hist, pie, plot,
+    };
+    let math = |s: &str| Some(Label::math(s));
+    let abc = || Some(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    let mut d = Device::new(
+        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
+        Par::default(),
+    );
+    d.mfrow(2, 3);
+    let x: Vec<f64> = (1..=10).map(f64::from).collect();
+    let y: Vec<f64> = x.iter().map(|v| v * v).collect();
+    plot(
+        &mut d,
+        &x,
+        &y,
+        &PlotOptions {
+            main: math("y == x^2"),
+            sub: math("n[obs]"),
+            xlab: math("x[i]"),
+            ylab: math("-log[10](italic(p))"),
+            ..PlotOptions::default()
+        },
+    );
+    hist(
+        &mut d,
+        &[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0],
+        &HistOptions {
+            main: math("Histogram ~ of ~ X[1]"),
+            ylab: math("count[i]"),
+            ..HistOptions::default()
+        },
+    );
+    barplot(
+        &mut d,
+        &[3.0, 5.0, 2.0],
+        &BarplotOptions {
+            names: abc(),
+            main: math("bold(Bars)"),
+            xlab: math("group[k]"),
+            ..BarplotOptions::default()
+        },
+    );
+    boxplot(
+        &mut d,
+        &[vec![1.0, 2.0, 3.0, 4.0, 9.0], vec![2.0, 3.0, 4.0]],
+        &BoxplotOptions {
+            main: math("sigma^2"),
+            ylab: math("mu %+-% sigma"),
+            ..BoxplotOptions::default()
+        },
+    );
+    pie(
+        &mut d,
+        &[1.0, 2.0, 3.0],
+        &PieOptions {
+            labels: abc(),
+            main: math("pi * r^2"),
+            ..PieOptions::default()
+        },
+    );
+
+    let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
+    let ours = extract(&latin1(&d.into_backend().finish())).0;
+    let r = extract(&latin1(&std::fs::read(&r_pdf).unwrap())).0;
+    let show = |t: &[Text]| {
+        t.iter()
+            .map(|t| {
+                format!(
+                    "{} {:.2} ({:.2}, {:.2}) {:?}",
+                    t.font,
+                    t.size,
+                    t.x,
+                    t.y,
+                    String::from_utf8_lossy(&t.text)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert_eq!(
+        ours.len(),
+        r.len(),
+        "text count\nours:\n{}\nr:\n{}",
+        show(&ours),
+        show(&r)
+    );
+    for (a, b) in ours.iter().zip(&r) {
+        let ok = a.font == b.font
+            && (a.size - b.size).abs() < 0.01
+            && (a.x - b.x).abs() < 0.05
+            && (a.y - b.y).abs() < 0.05
+            && a.dir == b.dir
+            && a.text == b.text;
+        assert!(
+            ok,
+            "text differs:\n ours={a:?}\n r=   {b:?}\nours:\n{}\nr:\n{}",
+            show(&ours),
+            show(&r)
+        );
+    }
+}

@@ -4,8 +4,9 @@ use std::f64::consts::PI;
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
-use crate::device::Device;
+use crate::device::{Device, TitleOptions};
 use crate::lty::LineType;
+use crate::plotmath::Label;
 
 /// R's default pie slice color cycle (used when `col` isn't given).
 const DEFAULT_COLORS: [&str; 6] = [
@@ -20,7 +21,7 @@ const DEFAULT_COLORS: [&str; 6] = [
 /// Options for [`pie`], covering the subset of `pie()`'s arguments this
 /// crate implements.
 #[derive(Clone, Debug)]
-pub struct PieOptions<'a> {
+pub struct PieOptions {
     pub labels: Option<Vec<String>>,
     /// Pie radius in user units, where the plot region's shorter side
     /// spans `[-1, 1]` before the usual 4% axis extension. R's default is
@@ -30,7 +31,8 @@ pub struct PieOptions<'a> {
     /// built-in 6-color cycle if `None`.
     pub col: Option<Vec<ColorSpec>>,
     pub border: ColorSpec,
-    pub main: Option<&'a str>,
+    /// Title, as for `plot()` (text or a plotmath expression).
+    pub main: Option<Label>,
     /// Approximate number of polygon edges for a full circle. R's
     /// default is `200`.
     pub edges: usize,
@@ -40,7 +42,7 @@ pub struct PieOptions<'a> {
     pub init_angle_deg: Option<f64>,
 }
 
-impl<'a> Default for PieOptions<'a> {
+impl Default for PieOptions {
     fn default() -> Self {
         PieOptions {
             labels: None,
@@ -159,7 +161,10 @@ pub fn pie<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &PieOptions) {
         }
     }
 
-    if let Some(main) = opts.main {
-        dev.title(Some(main), None, None, None);
+    if let Some(main) = &opts.main {
+        dev.title_with(&TitleOptions {
+            main: Some(main.clone()),
+            ..TitleOptions::default()
+        });
     }
 }

@@ -42,10 +42,10 @@ const R_PRELUDE: &str = "x <- 1:10\n\
 fn pl(dev: &mut Dev, y: &[f64], main: Option<&str>, axes: bool) {
     let opts = PlotOptions {
         type_: PlotType::Lines,
-        main,
+        main: main.map(Into::into),
         axes,
-        xlab: axes.then_some("x"),
-        ylab: axes.then_some("y"),
+        xlab: axes.then(|| "x".into()),
+        ylab: axes.then(|| "y".into()),
         ..PlotOptions::default()
     };
     plot(dev, &xs(), y, &opts);

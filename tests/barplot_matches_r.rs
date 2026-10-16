@@ -111,8 +111,8 @@ fn cases() -> Vec<Case> {
             run: |d| {
                 let o = BarplotOptions {
                     names: names(&["A", "B", "C", "D"]),
-                    main: Some("Vec"),
-                    ylab: Some("v"),
+                    main: Some("Vec".into()),
+                    ylab: Some("v".into()),
                     ..Default::default()
                 };
                 barplot(d, &[23.0, 41.0, 12.0, -5.0], &o);

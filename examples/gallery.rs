@@ -95,9 +95,9 @@ fn draw_scatter<B: Backend>(dev: &mut Device<B>) {
     let opts = PlotOptions {
         pch: 19,
         col: ColorSpec::Index(4),
-        main: Some("plot(): scatter"),
-        xlab: Some("x"),
-        ylab: Some("y"),
+        main: Some("plot(): scatter".into()),
+        xlab: Some("x".into()),
+        ylab: Some("y".into()),
         ..PlotOptions::default()
     };
     plot(dev, &x, &y, &opts);
@@ -111,9 +111,9 @@ fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
         type_: rs_graphics::highlevel::PlotType::Lines,
         col: ColorSpec::Index(2),
         lwd: 2.0,
-        main: Some("plot(): line"),
-        xlab: Some("x"),
-        ylab: Some("sin(x)"),
+        main: Some("plot(): line".into()),
+        xlab: Some("x".into()),
+        ylab: Some("sin(x)".into()),
         ..PlotOptions::default()
     };
     plot(dev, &x, &y, &opts);
@@ -129,9 +129,9 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
         col: ColorSpec::Index(4),
         xlog: true,
         ylog: true,
-        main: Some("plot(): log = \"xy\""),
-        xlab: Some("x"),
-        ylab: Some("2 * x^1.5"),
+        main: Some("plot(): log = \"xy\"".into()),
+        xlab: Some("x".into()),
+        ylab: Some("2 * x^1.5".into()),
         ..PlotOptions::default()
     };
     plot(dev, &x, &y, &opts);
@@ -149,9 +149,9 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         pch: 19,
         xlog: true,
         ylog: true,
-        main: Some("abline() on log axes"),
-        xlab: Some("x"),
-        ylab: Some("y"),
+        main: Some("abline() on log axes".into()),
+        xlab: Some("x".into()),
+        ylab: Some("y".into()),
         ..PlotOptions::default()
     };
     plot(dev, &x, &y, &opts);
@@ -183,9 +183,9 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         col: ColorSpec::Index(2),
         lwd: 2.0,
         ylim: Some((-1.0, 1.6)),
-        main: Some("legend(\"topright\")"),
-        xlab: Some("x"),
-        ylab: Some("value"),
+        main: Some("legend(\"topright\")".into()),
+        xlab: Some("x".into()),
+        ylab: Some("value".into()),
         ..PlotOptions::default()
     };
     plot(dev, &x, &sin, &opts);
@@ -209,7 +209,7 @@ fn draw_hist<B: Backend>(dev: &mut Device<B>) {
     let data = parse_data(include_str!("data/hist_x.txt"));
 
     let opts = HistOptions {
-        main: Some("hist(): approximately normal data"),
+        main: Some("hist(): approximately normal data".into()),
         ..HistOptions::default()
     };
     hist(dev, &data, &opts);
@@ -224,8 +224,8 @@ fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
 
     let opts = BarplotOptions {
         names: Some(names),
-        main: Some("barplot()"),
-        ylab: Some("value"),
+        main: Some("barplot()".into()),
+        ylab: Some("value".into()),
         ..BarplotOptions::default()
     };
     barplot(dev, &heights, &opts);
@@ -240,7 +240,7 @@ fn barplot_sample_columns() -> Vec<Vec<f64>> {
     ]
 }
 
-fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions<'static> {
+fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions {
     BarplotOptions {
         names: Some(
             vec!["Q1", "Q2", "Q3", "Q4"]
@@ -250,7 +250,7 @@ fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions<'stat
         ),
         legend_text: Some(vec!["x", "y", "z"].into_iter().map(String::from).collect()),
         beside,
-        main: Some(main),
+        main: Some(main.into()),
         ..BarplotOptions::default()
     }
 }
@@ -278,8 +278,8 @@ fn draw_boxplot<B: Backend>(dev: &mut Device<B>) {
 
     let opts = BoxplotOptions {
         names: Some(names),
-        main: Some("boxplot()"),
-        ylab: Some("value"),
+        main: Some("boxplot()".into()),
+        ylab: Some("value".into()),
         ..BoxplotOptions::default()
     };
     boxplot(dev, &groups, &opts);
@@ -299,8 +299,8 @@ fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
     let opts = BoxplotOptions {
         names: Some(names),
         horizontal: true,
-        main: Some("boxplot(horizontal = TRUE)"),
-        xlab: Some("value"),
+        main: Some("boxplot(horizontal = TRUE)".into()),
+        xlab: Some("value".into()),
         ..BoxplotOptions::default()
     };
     boxplot(dev, &groups, &opts);
@@ -315,7 +315,7 @@ fn draw_pie<B: Backend>(dev: &mut Device<B>) {
 
     let opts = PieOptions {
         labels: Some(labels),
-        main: Some("pie()"),
+        main: Some("pie()".into()),
         ..PieOptions::default()
     };
     pie(dev, &values, &opts);

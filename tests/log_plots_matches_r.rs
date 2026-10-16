@@ -86,8 +86,8 @@ fn cases() -> Vec<Case> {
                 let opts = PlotOptions {
                     xlog: true,
                     ylog: true,
-                    xlab: Some("x"),
-                    ylab: Some("y"),
+                    xlab: Some("x".into()),
+                    ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
                 plot(d, &[1.0, 1000.0], &[1.0, 1e4], &opts);
@@ -108,8 +108,8 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 let opts = PlotOptions {
                     xlog: true,
-                    xlab: Some("x"),
-                    ylab: Some("y"),
+                    xlab: Some("x".into()),
+                    ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
                 plot(d, &[1.0, 1000.0], &[0.0, 10.0], &opts);
@@ -124,7 +124,7 @@ fn cases() -> Vec<Case> {
             name: "hist_logx",
             r: "hist(hx, log = 'x', ylab = 'n')",
             draw: |d| {
-                let o = HistOptions { xlog: true, main: Some("Histogram of hx"), xlab: Some("hx"), ylab: Some("n"), ..Default::default() };
+                let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
                 hist(d, &hist_data(), &o);
             },
         },
@@ -132,7 +132,7 @@ fn cases() -> Vec<Case> {
             name: "hist_logy",
             r: "suppressWarnings(hist(hx, log = 'y', ylab = 'n'))",
             draw: |d| {
-                let o = HistOptions { ylog: true, main: Some("Histogram of hx"), xlab: Some("hx"), ylab: Some("n"), ..Default::default() };
+                let o = HistOptions { ylog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
                 hist(d, &hist_data(), &o);
             },
         },
@@ -141,7 +141,7 @@ fn cases() -> Vec<Case> {
             r: "hist(hx, log = 'x', ylab = 'n')\n\
                 hist(hx * 1.05, add = TRUE, col = 'pink', border = 'red')",
             draw: |d| {
-                let o = HistOptions { xlog: true, main: Some("Histogram of hx"), xlab: Some("hx"), ylab: Some("n"), ..Default::default() };
+                let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
                 hist(d, &hist_data(), &o);
                 let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
                 let o = HistOptions {
@@ -198,8 +198,8 @@ fn cases() -> Vec<Case> {
                 let x: Vec<f64> = (1..=10).map(f64::from).collect();
                 let o = PlotOptions {
                     xaxt: Some(AxisType::None),
-                    xlab: Some("x"),
-                    ylab: Some("y"),
+                    xlab: Some("x".into()),
+                    ylab: Some("y".into()),
                     ..Default::default()
                 };
                 plot(d, &x, &x, &o);
@@ -216,8 +216,8 @@ fn cases() -> Vec<Case> {
                 let o = BoxplotOptions {
                     horizontal: true,
                     names: Some(vec!["a".into(), "b".into()]),
-                    main: Some("H"),
-                    xlab: Some("value"),
+                    main: Some("H".into()),
+                    xlab: Some("value".into()),
                     ..Default::default()
                 };
                 boxplot(d, &[vec![1.0, 2.0, 2.5, 3.0, 7.0], vec![2.0, 3.0, 3.5, 4.0, 4.2, 5.0]], &o);
@@ -231,7 +231,7 @@ fn cases() -> Vec<Case> {
                 axis(3); axis(4)",
             draw: |d| {
                 d.par.lab = [10, 3, 7];
-                let o = PlotOptions { xlab: Some("x"), ylab: Some("y"), ..Default::default() };
+                let o = PlotOptions { xlab: Some("x".into()), ylab: Some("y".into()), ..Default::default() };
                 plot(d, &[0.0, 1.0], &[0.0, 1.0], &o);
                 d.set_new(true);
                 d.par.lab = [2, 12, 7];

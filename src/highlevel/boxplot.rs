@@ -5,8 +5,9 @@
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
-use crate::device::{Device, LineStyle};
+use crate::device::{Device, LineStyle, TitleOptions};
 use crate::lty::LineType;
+use crate::plotmath::Label;
 
 /// Tukey's five-number summary (`fivenum()` in R's `stats` package):
 /// `[min, lower hinge, median, upper hinge, max]`. This is *not* the same
@@ -98,7 +99,7 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
 /// Options for [`boxplot`], covering the subset of `boxplot.default`'s/
 /// `bxp`'s arguments this crate implements.
 #[derive(Clone, Debug)]
-pub struct BoxplotOptions<'a> {
+pub struct BoxplotOptions {
     /// Category labels under each box (only drawn when there's more than
     /// one box, matching R's `show.names <- n > 1`).
     pub names: Option<Vec<String>>,
@@ -107,10 +108,11 @@ pub struct BoxplotOptions<'a> {
     /// The `range` argument (whisker/outlier IQR multiplier). R's default
     /// is `1.5`.
     pub range_coef: f64,
-    pub main: Option<&'a str>,
-    pub sub: Option<&'a str>,
-    pub xlab: Option<&'a str>,
-    pub ylab: Option<&'a str>,
+    /// Titles, as for `plot()` (text or a plotmath expression).
+    pub main: Option<Label>,
+    pub sub: Option<Label>,
+    pub xlab: Option<Label>,
+    pub ylab: Option<Label>,
     pub axes: bool,
     /// Notched boxes: the box narrows to half its width at the median,
     /// between [`BoxStats::conf`]'s limits (R's `notch.frac = 0.5`).
@@ -121,7 +123,7 @@ pub struct BoxplotOptions<'a> {
     pub horizontal: bool,
 }
 
-impl<'a> Default for BoxplotOptions<'a> {
+impl Default for BoxplotOptions {
     fn default() -> Self {
         BoxplotOptions {
             names: None,
@@ -305,7 +307,12 @@ pub fn boxplot<B: Backend>(
     }
 
     if dev.par.ann {
-        dev.title(opts.main, opts.sub, opts.xlab, opts.ylab);
+        dev.title_with(&TitleOptions {
+            main: opts.main.clone(),
+            sub: opts.sub.clone(),
+            xlab: opts.xlab.clone(),
+            ylab: opts.ylab.clone(),
+        });
     }
 
     if opts.axes {

@@ -54,8 +54,10 @@ crate's test suite (see [Testing](#testing) below).
   Used by `axis()` (labels), `title_with()` (`TitleOptions`), `mtext()`,
   `text()`/`text_at()` and `legend()` (entry labels and title), each
   placed as R's `GMMathText`/`GMathText` do; `legend()` sizes rows and
-  columns by the expressions' boxes. (`title()` and the high-level
-  `PlotOptions` titles stay text-only.) Accents, fractions, `sqrt`, big
+  columns by the expressions' boxes. The high-level plots' titles
+  (`main`/`sub`/`xlab`/`ylab` in `PlotOptions`, `HistOptions`,
+  `BarplotOptions`, `BoxplotOptions`, `PieOptions`) are `Label`s too;
+  only the plain-string `title()` wrapper is text-only. Accents, fractions, `sqrt`, big
   operators and `bgroup` are rejected as not yet supported.
   `legend()`
   (`Device::legend_with`, `src/device/legend.rs`) is a port of R's layout

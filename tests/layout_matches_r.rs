@@ -85,8 +85,8 @@ fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
                 .map(|i| ((b'A' + i as u8) as char).to_string())
                 .collect(),
         ),
-        main: Some(main),
-        ylab: Some("v"),
+        main: Some(main.into()),
+        ylab: Some("v".into()),
         ..Default::default()
     };
     barplot(d, h, &o);
@@ -262,9 +262,9 @@ fn cases() -> Vec<Case> {
                     let title = format!("p {k}");
                     let o = PlotOptions {
                         type_: PlotType::None,
-                        main: Some(&title),
-                        xlab: Some("x"),
-                        ylab: Some("y"),
+                        main: Some(title.as_str().into()),
+                        xlab: Some("x".into()),
+                        ylab: Some("y".into()),
                         ..Default::default()
                     };
                     plot(d, &x, &y, &o);

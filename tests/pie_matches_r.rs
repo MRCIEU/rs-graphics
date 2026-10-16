@@ -167,7 +167,7 @@ fn pie_matches_r() {
         let mut dev = Device::new(PdfBackend::new(c.width, c.height).with_compression(false), par);
         let opts = PieOptions {
             labels: Some(LABELS.iter().map(|s| s.to_string()).collect()),
-            main: Some("pie()"),
+            main: Some("pie()".into()),
             clockwise: c.clockwise,
             init_angle_deg: c.init_angle_deg,
             radius: c.radius,

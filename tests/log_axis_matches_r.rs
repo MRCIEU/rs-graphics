@@ -118,8 +118,8 @@ fn draw_ours(c: &Case) -> String {
         xlog: c.xlog,
         ylog: c.ylog,
         xlim: c.xlim,
-        xlab: Some("x"),
-        ylab: Some("y"),
+        xlab: Some("x".into()),
+        ylab: Some("y".into()),
         ..PlotOptions::default()
     };
     plot(&mut dev, &values(c.x, c.xlog), &values(c.y, c.ylog), &opts);

@@ -6,9 +6,10 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
-use crate::device::{AxisOptions, Device, LineStyle};
+use crate::device::{AxisOptions, Device, LineStyle, TitleOptions};
 use crate::lty::LineType;
 use crate::par::AxisType;
+use crate::plotmath::Label;
 
 use super::data_range;
 
@@ -46,7 +47,7 @@ impl PlotType {
 /// Options for [`plot`], covering the subset of `plot.default`'s
 /// arguments this crate implements.
 #[derive(Clone, Debug)]
-pub struct PlotOptions<'a> {
+pub struct PlotOptions {
     pub type_: PlotType,
     pub pch: i32,
     pub col: ColorSpec,
@@ -60,13 +61,15 @@ pub struct PlotOptions<'a> {
     pub ylim: Option<(f64, f64)>,
     pub xlog: bool,
     pub ylog: bool,
-    pub main: Option<&'a str>,
-    pub sub: Option<&'a str>,
+    /// Titles, drawn by `title()`: text (`Some("Weight".into())`) or a
+    /// plotmath expression (`Some(Label::math("x^2"))`).
+    pub main: Option<Label>,
+    pub sub: Option<Label>,
     /// R defaults `xlab`/`ylab` to the deparsed variable names passed as
     /// `x`/`y`; we have no equivalent, so these default to `None` (no
-    /// label) and callers should pass explicit strings.
-    pub xlab: Option<&'a str>,
-    pub ylab: Option<&'a str>,
+    /// label) and callers should pass explicit labels.
+    pub xlab: Option<Label>,
+    pub ylab: Option<Label>,
     pub axes: bool,
     /// Inline `xaxt`/`yaxt` (`plot(x, y, xaxt = "n")`): `AxisType::None`
     /// leaves out that axis; `None` uses `par(xaxt/yaxt)`.
@@ -79,7 +82,7 @@ pub struct PlotOptions<'a> {
     pub yaxp: Option<[f64; 3]>,
 }
 
-impl<'a> Default for PlotOptions<'a> {
+impl Default for PlotOptions {
     fn default() -> Self {
         PlotOptions {
             type_: PlotType::Points,
@@ -169,6 +172,11 @@ pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOp
     }
 
     if dev.par.ann {
-        dev.title(opts.main, opts.sub, opts.xlab, opts.ylab);
+        dev.title_with(&TitleOptions {
+            main: opts.main.clone(),
+            sub: opts.sub.clone(),
+            xlab: opts.xlab.clone(),
+            ylab: opts.ylab.clone(),
+        });
     }
 }

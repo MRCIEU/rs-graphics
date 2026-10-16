@@ -7,8 +7,9 @@
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
-use crate::device::Device;
+use crate::device::{Device, TitleOptions};
 use crate::lty::LineType;
+use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
 /// Sturges' rule (`nclass.Sturges()`): `ceiling(log2(length(x)) + 1)`.
@@ -54,7 +55,7 @@ fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
 /// Options for [`hist`], covering the subset of `hist.default`'s
 /// arguments this crate implements.
 #[derive(Clone, Debug)]
-pub struct HistOptions<'a> {
+pub struct HistOptions {
     /// If `Some`, used verbatim as the bin edges (must be increasing,
     /// length >= 2). If `None`, computed via Sturges' rule + `pretty()`,
     /// matching R's default `breaks = "Sturges"`.
@@ -64,9 +65,11 @@ pub struct HistOptions<'a> {
     pub freq: bool,
     pub col: ColorSpec,
     pub border: ColorSpec,
-    pub main: Option<&'a str>,
-    pub xlab: Option<&'a str>,
-    pub ylab: Option<&'a str>,
+    /// Titles, as for `plot()` (text or a plotmath expression); `None`
+    /// gives R's defaults ("Histogram of x", "x", "Frequency"/"Density").
+    pub main: Option<Label>,
+    pub xlab: Option<Label>,
+    pub ylab: Option<Label>,
     pub axes: bool,
     /// `log = "x"` / `"y"`. As in R, a log y axis still takes its range
     /// from 0, which R "corrects" to about 1e-307 (with a warning).
@@ -78,7 +81,7 @@ pub struct HistOptions<'a> {
     pub add: bool,
 }
 
-impl<'a> Default for HistOptions<'a> {
+impl Default for HistOptions {
     fn default() -> Self {
         HistOptions {
             breaks: None,
@@ -153,15 +156,16 @@ pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> H
         dev.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), opts.xlog, opts.ylog);
 
         if dev.par.ann {
-            let ylab = opts
-                .ylab
-                .unwrap_or(if opts.freq { "Frequency" } else { "Density" });
-            dev.title(
-                Some(opts.main.unwrap_or("Histogram of x")),
-                None,
-                Some(opts.xlab.unwrap_or("x")),
-                Some(ylab),
-            );
+            let or = |l: &Option<Label>, default: &str| {
+                Some(l.clone().unwrap_or_else(|| Label::from(default)))
+            };
+            let ylab = if opts.freq { "Frequency" } else { "Density" };
+            dev.title_with(&TitleOptions {
+                main: or(&opts.main, "Histogram of x"),
+                sub: None,
+                xlab: or(&opts.xlab, "x"),
+                ylab: or(&opts.ylab, ylab),
+            });
         }
 
         if opts.axes {

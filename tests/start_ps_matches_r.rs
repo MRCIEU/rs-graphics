@@ -46,8 +46,8 @@ fn draw_ours(start: f64, ps: f64) -> String {
     dev.par.ps = ps;
     let opts = PlotOptions {
         type_: PlotType::parse("b"),
-        xlab: Some("x"),
-        ylab: Some("y"),
+        xlab: Some("x".into()),
+        ylab: Some("y".into()),
         ..PlotOptions::default()
     };
     plot(&mut dev, &[1.0, 2.0, 3.0, 4.0], &[1.0, 3.0, 2.0, 4.0], &opts);

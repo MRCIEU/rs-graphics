@@ -12,14 +12,15 @@
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
-use crate::device::{Device, LegendEntry, LegendOptions, LegendPos};
+use crate::device::{Device, LegendEntry, LegendOptions, LegendPos, TitleOptions};
 use crate::lty::LineType;
 use crate::par::AxisStyle;
+use crate::plotmath::Label;
 
 /// Options for [`barplot`] / [`barplot_matrix`], covering the subset of
 /// `barplot.default`'s arguments this crate implements.
 #[derive(Clone, Debug)]
-pub struct BarplotOptions<'a> {
+pub struct BarplotOptions {
     /// Labels drawn under each bar (R's `names.arg`; R takes them from
     /// `names(height)`/`colnames(height)`), only shown if `Some`. For a
     /// `beside` matrix either one name per bar or one per column (centred
@@ -49,14 +50,15 @@ pub struct BarplotOptions<'a> {
     /// smallest height, as in R.
     pub xlog: bool,
     pub ylog: bool,
-    pub main: Option<&'a str>,
-    pub sub: Option<&'a str>,
-    pub xlab: Option<&'a str>,
-    pub ylab: Option<&'a str>,
+    /// Titles, as for `plot()` (text or a plotmath expression).
+    pub main: Option<Label>,
+    pub sub: Option<Label>,
+    pub xlab: Option<Label>,
+    pub ylab: Option<Label>,
     pub axes: bool,
 }
 
-impl<'a> Default for BarplotOptions<'a> {
+impl Default for BarplotOptions {
     fn default() -> Self {
         BarplotOptions {
             names: None,
@@ -355,7 +357,12 @@ fn barplot_impl<B: Backend>(
     }
 
     if dev.par.ann {
-        dev.title(opts.main, opts.sub, opts.xlab, opts.ylab);
+        dev.title_with(&TitleOptions {
+            main: opts.main.clone(),
+            sub: opts.sub.clone(),
+            xlab: opts.xlab.clone(),
+            ylab: opts.ylab.clone(),
+        });
     }
 
     if opts.axes {

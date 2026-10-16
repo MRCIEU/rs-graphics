@@ -284,8 +284,8 @@ fn legend_layout_matches_r() {
         let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), Par::default());
         let opts = PlotOptions {
             pch: 19,
-            xlab: Some("x"),
-            ylab: Some("y"),
+            xlab: Some("x".into()),
+            ylab: Some("y".into()),
             ..PlotOptions::default()
         };
         plot(&mut dev, &x, &y, &opts);
