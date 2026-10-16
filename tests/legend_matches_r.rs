@@ -100,9 +100,12 @@ fn cases() -> Vec<Case> {
             r: r#"legend("topright", legend=c("alpha","beta gamma"), col=c(1,2), pch=c(19,1), lty=c(1,2), lwd=c(1,2), title="Key")"#,
             run: |d| {
                 let e = vec![
-                    LegendEntry::point("alpha", ColorSpec::Index(1), 19).with_line(1.0, solid()),
+                    LegendEntry::point("alpha", ColorSpec::Index(1), 19)
+                        .lwd(1.0)
+                        .lty(solid()),
                     LegendEntry::point("beta gamma", ColorSpec::Index(2), 1)
-                        .with_line(2.0, LineType::from_code(2)),
+                        .lwd(2.0)
+                        .lty(LineType::from_code(2)),
                 ];
                 let o = LegendOptions {
                     title: Some("Key".into()),
@@ -215,8 +218,12 @@ fn cases() -> Vec<Case> {
             run: |d| {
                 d.par.cex = 1.5;
                 let e = vec![
-                    LegendEntry::point("alpha", black(), 1).with_line(1.0, solid()),
-                    LegendEntry::point("beta gamma", black(), 2).with_line(1.0, solid()),
+                    LegendEntry::point("alpha", black(), 1)
+                        .lwd(1.0)
+                        .lty(solid()),
+                    LegendEntry::point("beta gamma", black(), 2)
+                        .lwd(1.0)
+                        .lty(solid()),
                 ];
                 let o = LegendOptions {
                     cex: 0.8,

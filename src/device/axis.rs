@@ -99,6 +99,32 @@ pub struct AxisOptions {
     pub tcl: Option<f64>,
 }
 
+crate::setters::setters!(AxisOptions {
+    at: option_values f64,
+    labels: labels Label,
+    draw_labels: value bool,
+    tick: value bool,
+    line: option f64,
+    pos: option f64,
+    outer: value bool,
+    font: option i32,
+    lty: value LineType,
+    lwd: value f64,
+    lwd_ticks: option f64,
+    col: option ColorSpec,
+    col_ticks: option ColorSpec,
+    hadj: option f64,
+    padj: values f64,
+    gap_axis: option f64,
+    cex_axis: option f64,
+    col_axis: option ColorSpec,
+    las: option i32,
+    axp: option [f64; 3],
+    axt: option AxisType,
+    tck: option f64,
+    tcl: option f64,
+});
+
 impl Default for AxisOptions {
     fn default() -> Self {
         AxisOptions {

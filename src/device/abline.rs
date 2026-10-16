@@ -33,6 +33,16 @@ pub struct AblineOptions {
     pub lwd: Vec<f64>,
 }
 
+crate::setters::setters!(AblineOptions {
+    coef: pair f64,
+    untf: value bool,
+    h: values f64,
+    v: values f64,
+    col: values ColorSpec,
+    lty: values LineType,
+    lwd: values f64,
+});
+
 impl<B: Backend> Device<B> {
     /// `abline(a, b, h, v, untf, col, lty, lwd)`; see [`AblineOptions`].
     /// For R's `abline(coef = )` or `abline(reg = )`, pass the intercept

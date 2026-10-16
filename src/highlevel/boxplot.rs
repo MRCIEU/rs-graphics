@@ -126,6 +126,21 @@ pub struct BoxplotOptions {
     pub horizontal: bool,
 }
 
+crate::setters::setters!(BoxplotOptions {
+    names: strings String,
+    col: value ColorSpec,
+    border: value ColorSpec,
+    range_coef: value f64,
+    main: option Label,
+    sub: option Label,
+    xlab: option Label,
+    ylab: option Label,
+    axes: value bool,
+    notch: value bool,
+    varwidth: value bool,
+    horizontal: value bool,
+});
+
 impl Default for BoxplotOptions {
     fn default() -> Self {
         BoxplotOptions {

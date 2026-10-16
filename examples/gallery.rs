@@ -37,14 +37,12 @@ fn draw_scatter<B: Backend>(dev: &mut Device<B>) {
     let x: Vec<f64> = (1..=25).map(|i| i as f64).collect();
     let y = parse_data(include_str!("data/scatter_y.txt"));
 
-    let opts = PlotOptions {
-        pch: vec![19],
-        col: vec![ColorSpec::Index(4)],
-        main: Some("plot(): scatter".into()),
-        xlab: Some("x".into()),
-        ylab: Some("y".into()),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .pch(19)
+        .col(4)
+        .main("plot(): scatter")
+        .xlab("x")
+        .ylab("y");
     plot(dev, &x, &y, &opts);
 }
 
@@ -52,15 +50,13 @@ fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
     let x: Vec<f64> = (0..=40).map(|i| i as f64 * 0.25).collect();
     let y: Vec<f64> = x.iter().map(|&xi| xi.sin()).collect();
 
-    let opts = PlotOptions {
-        type_: rs_graphics::highlevel::PlotType::Lines,
-        col: vec![ColorSpec::Index(2)],
-        lwd: vec![2.0],
-        main: Some("plot(): line".into()),
-        xlab: Some("x".into()),
-        ylab: Some("sin(x)".into()),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .type_(PlotType::Lines)
+        .col(2)
+        .lwd(2.0)
+        .main("plot(): line")
+        .xlab("x")
+        .ylab("sin(x)");
     plot(dev, &x, &y, &opts);
 }
 
@@ -68,17 +64,15 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
     let x: Vec<f64> = (0..=15).map(|i| 10f64.powf(i as f64 / 5.0)).collect();
     let y: Vec<f64> = x.iter().map(|&v| 2.0 * v.powf(1.5)).collect();
 
-    let opts = PlotOptions {
-        type_: rs_graphics::highlevel::PlotType::Both,
-        pch: vec![19],
-        col: vec![ColorSpec::Index(4)],
-        xlog: true,
-        ylog: true,
-        main: Some("plot(): log = \"xy\"".into()),
-        xlab: Some("x".into()),
-        ylab: Some("2 * x^1.5".into()),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .type_(PlotType::Both)
+        .pch(19)
+        .col(4)
+        .xlog(true)
+        .ylog(true)
+        .main("plot(): log = \"xy\"")
+        .xlab("x")
+        .ylab("2 * x^1.5");
     plot(dev, &x, &y, &opts);
 }
 
@@ -90,51 +84,43 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .map(|(i, &v)| 2.0 * v.powf(1.5) * 10f64.powf(0.15 * (3.0 * i as f64).sin()))
         .collect();
 
-    let opts = PlotOptions {
-        pch: vec![19],
-        xlog: true,
-        ylog: true,
-        main: Some("abline() on log axes".into()),
-        xlab: Some("x".into()),
-        ylab: Some("y".into()),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .pch(19)
+        .xlog(true)
+        .ylog(true)
+        .main("abline() on log axes")
+        .xlab("x")
+        .ylab("y");
     plot(dev, &x, &y, &opts);
     let grey = ColorSpec::from("grey");
     let dashed = LineType::DASHED;
-    dev.abline(&AblineOptions {
-        h: vec![1000.0],
-        v: vec![10.0],
-        col: vec![grey],
-        lwd: vec![1.0],
-        lty: vec![dashed],
-        ..AblineOptions::default()
-    });
     let solid = LineType::SOLID;
-    dev.abline(&AblineOptions {
-        coef: Some((2f64.log10(), 1.5)),
-        col: vec![ColorSpec::Index(2)],
-        lwd: vec![2.0],
-        lty: vec![solid],
-        ..AblineOptions::default()
-    });
-    dev.abline(&AblineOptions {
-        coef: Some((2000.0, 20.0)),
-        untf: true,
-        col: vec![ColorSpec::Index(3)],
-        lwd: vec![2.0],
-        lty: vec![solid],
-        ..AblineOptions::default()
-    });
+    dev.abline(
+        &AblineOptions::default()
+            .h(1000.0)
+            .v(10.0)
+            .col(grey)
+            .lty(dashed),
+    );
+    dev.abline(
+        &AblineOptions::default()
+            .coef(2f64.log10(), 1.5)
+            .col(2)
+            .lwd(2.0),
+    );
+    dev.abline(
+        &AblineOptions::default()
+            .coef(2000.0, 20.0)
+            .untf(true)
+            .col(3)
+            .lwd(2.0),
+    );
     let entries = vec![
-        LegendEntry::line("abline(log10(2), 1.5)", ColorSpec::Index(2), 2.0, solid),
-        LegendEntry::line("abline(2000, 20, untf = TRUE)", ColorSpec::Index(3), 2.0, solid),
+        LegendEntry::line("abline(log10(2), 1.5)", 2, 2.0, solid),
+        LegendEntry::line("abline(2000, 20, untf = TRUE)", 3, 2.0, solid),
         LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, dashed),
     ];
-    let o = LegendOptions {
-        bg: Some(ColorSpec::Color(Color::WHITE)),
-        ..LegendOptions::default()
-    };
+    let o = LegendOptions::default().bg(Color::WHITE);
     dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries, &o);
 }
 
@@ -143,61 +129,37 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
     let sin: Vec<f64> = x.iter().map(|&v| v.sin()).collect();
     let cos: Vec<f64> = x.iter().map(|&v| v.cos()).collect();
 
-    let opts = PlotOptions {
-        type_: rs_graphics::highlevel::PlotType::Lines,
-        col: vec![ColorSpec::Index(2)],
-        lwd: vec![2.0],
-        ylim: Some((-1.0, 1.6)),
-        main: Some("legend(\"topright\")".into()),
-        xlab: Some("x".into()),
-        ylab: Some("value".into()),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .type_(PlotType::Lines)
+        .col(2)
+        .lwd(2.0)
+        .ylim(-1.0, 1.6)
+        .main("legend(\"topright\")")
+        .xlab("x")
+        .ylab("value");
     plot(dev, &x, &sin, &opts);
-    dev.lines(
-        &x,
-        &cos,
-        &XyOptions {
-            col: vec![ColorSpec::Index(4)],
-            lwd: vec![2.0],
-            lty: Some(LineType::DASHED),
-            ..XyOptions::default()
-        },
-    );
+    let cos_line = XyOptions::default().col(4).lwd(2.0).lty(LineType::DASHED);
+    dev.lines(&x, &cos, &cos_line);
     let entries = vec![
-        LegendEntry::line("sin(x)", ColorSpec::Index(2), 2.0, LineType::SOLID),
-        LegendEntry::line("cos(x)", ColorSpec::Index(4), 2.0, LineType::DASHED),
+        LegendEntry::line("sin(x)", 2, 2.0, LineType::SOLID),
+        LegendEntry::line("cos(x)", 4, 2.0, LineType::DASHED),
     ];
-    let o = LegendOptions {
-        title: Some("Functions".into()),
-        ..LegendOptions::default()
-    };
+    let o = LegendOptions::default().title("Functions");
     dev.legend(LegendPos::Keyword(LegendKeyword::TopRight), &entries, &o);
 }
 
 fn draw_hist<B: Backend>(dev: &mut Device<B>) {
     let data = parse_data(include_str!("data/hist_x.txt"));
-
-    let opts = HistOptions {
-        main: Some("hist(): approximately normal data".into()),
-        ..HistOptions::default()
-    };
+    let opts = HistOptions::default().main("hist(): approximately normal data");
     hist(dev, &data, &opts);
 }
 
 fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
     let heights = vec![23.0, 41.0, 12.0, 35.0, 28.0];
-    let names = vec!["A", "B", "C", "D", "E"]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-    let opts = BarplotOptions {
-        names: Some(names),
-        main: Some("barplot()".into()),
-        ylab: Some("value".into()),
-        ..BarplotOptions::default()
-    };
+    let opts = BarplotOptions::default()
+        .names(["A", "B", "C", "D", "E"])
+        .main("barplot()")
+        .ylab("value");
     barplot(dev, &heights, &opts);
 }
 
@@ -211,18 +173,11 @@ fn barplot_sample_columns() -> Vec<Vec<f64>> {
 }
 
 fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions {
-    BarplotOptions {
-        names: Some(
-            vec!["Q1", "Q2", "Q3", "Q4"]
-                .into_iter()
-                .map(String::from)
-                .collect(),
-        ),
-        legend_text: Some(vec!["x", "y", "z"].into_iter().map(String::from).collect()),
-        beside,
-        main: Some(main.into()),
-        ..BarplotOptions::default()
-    }
+    BarplotOptions::default()
+        .names(["Q1", "Q2", "Q3", "Q4"])
+        .legend_text(["x", "y", "z"])
+        .beside(beside)
+        .main(main)
 }
 
 fn draw_barplot_stacked<B: Backend>(dev: &mut Device<B>) {
@@ -235,59 +190,36 @@ fn draw_barplot_beside<B: Backend>(dev: &mut Device<B>) {
     barplot_matrix(dev, &barplot_sample_columns(), &opts);
 }
 
-fn draw_boxplot<B: Backend>(dev: &mut Device<B>) {
-    let groups = vec![
+fn boxplot_sample_groups() -> Vec<Vec<f64>> {
+    vec![
         parse_data(include_str!("data/boxplot_ctrl.txt")),
         parse_data(include_str!("data/boxplot_treatA.txt")),
         parse_data(include_str!("data/boxplot_treatB.txt")),
-    ];
-    let names = vec!["Ctrl", "Treat A", "Treat B"]
-        .into_iter()
-        .map(String::from)
-        .collect();
+    ]
+}
 
-    let opts = BoxplotOptions {
-        names: Some(names),
-        main: Some("boxplot()".into()),
-        ylab: Some("value".into()),
-        ..BoxplotOptions::default()
-    };
-    boxplot(dev, &groups, &opts);
+fn draw_boxplot<B: Backend>(dev: &mut Device<B>) {
+    let opts = BoxplotOptions::default()
+        .names(["Ctrl", "Treat A", "Treat B"])
+        .main("boxplot()")
+        .ylab("value");
+    boxplot(dev, &boxplot_sample_groups(), &opts);
 }
 
 fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
-    let groups = vec![
-        parse_data(include_str!("data/boxplot_ctrl.txt")),
-        parse_data(include_str!("data/boxplot_treatA.txt")),
-        parse_data(include_str!("data/boxplot_treatB.txt")),
-    ];
-    let names = vec!["Ctrl", "Treat A", "Treat B"]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-    let opts = BoxplotOptions {
-        names: Some(names),
-        horizontal: true,
-        main: Some("boxplot(horizontal = TRUE)".into()),
-        xlab: Some("value".into()),
-        ..BoxplotOptions::default()
-    };
-    boxplot(dev, &groups, &opts);
+    let opts = BoxplotOptions::default()
+        .names(["Ctrl", "Treat A", "Treat B"])
+        .horizontal(true)
+        .main("boxplot(horizontal = TRUE)")
+        .xlab("value");
+    boxplot(dev, &boxplot_sample_groups(), &opts);
 }
 
 fn draw_pie<B: Backend>(dev: &mut Device<B>) {
     let values = vec![18.0, 25.0, 12.0, 30.0, 15.0];
-    let labels = vec!["Alpha", "Beta", "Gamma", "Delta", "Epsilon"]
-        .into_iter()
-        .map(String::from)
-        .collect();
-
-    let opts = PieOptions {
-        labels: Some(labels),
-        main: Some("pie()".into()),
-        ..PieOptions::default()
-    };
+    let opts = PieOptions::default()
+        .labels(["Alpha", "Beta", "Gamma", "Delta", "Epsilon"])
+        .main("pie()");
     pie(dev, &values, &opts);
 }
 
@@ -297,66 +229,19 @@ fn draw_pch<B: Backend>(dev: &mut Device<B>) {
     dev.par.mar = Sides::new(0.5, 0.5, 2.5, 0.5);
     dev.plot_new();
     dev.plot_window((0.5, 7.5), (-0.2, 5.4), &PlotWindowOptions::default());
-    let blue = ColorSpec::from("blue");
-    let red = ColorSpec::from("red");
-    let black = ColorSpec::Color(Color::BLACK);
+    let symbol = |pch: i32| XyOptions::default().pch(pch).col("blue").bg("red").cex(2.0);
+    let label = TextOptions::default().col(Color::BLACK).cex(0.8);
     for pch in 0..26 {
         let (x, y) = ((pch % 7) as f64 + 1.0, 5.0 - (pch / 7) as f64);
-        dev.points(
-            &[x],
-            &[y],
-            &XyOptions {
-                pch: vec![pch],
-                col: vec![blue],
-                bg: vec![red],
-                cex: vec![2.0],
-                ..XyOptions::default()
-            },
-        );
-        dev.text(
-            &[x],
-            &[y - 0.45],
-            &[pch.to_string()],
-            &TextOptions {
-                adj: Some(0.5),
-                col: vec![black],
-                cex: vec![0.8],
-                font: vec![1],
-                ..TextOptions::default()
-            },
-        );
+        dev.points(&[x], &[y], &symbol(pch));
+        dev.text(&[x], &[y - 0.45], &[pch.to_string()], &label);
     }
-    for (i, ch) in [".", "a", "M", "+", "*", "#", "o"].iter().enumerate() {
+    for (i, ch) in ['.', 'a', 'M', '+', '*', '#', 'o'].into_iter().enumerate() {
         let x = i as f64 + 1.0;
-        let pch = ch.chars().next().unwrap() as i32;
-        dev.points(
-            &[x],
-            &[0.6],
-            &XyOptions {
-                pch: vec![pch],
-                col: vec![blue],
-                bg: vec![red],
-                cex: vec![2.0],
-                ..XyOptions::default()
-            },
-        );
-        dev.text(
-            &[x],
-            &[0.15],
-            &[format!("\"{ch}\"")],
-            &TextOptions {
-                adj: Some(0.5),
-                col: vec![black],
-                cex: vec![0.8],
-                font: vec![1],
-                ..TextOptions::default()
-            },
-        );
+        dev.points(&[x], &[0.6], &symbol(ch as i32));
+        dev.text(&[x], &[0.15], &[format!("\"{ch}\"")], &label);
     }
-    dev.title(&TitleOptions {
-        main: Some("pch: col = \"blue\", bg = \"red\", cex = 2".into()),
-        ..TitleOptions::default()
-    });
+    dev.title(&TitleOptions::default().main("pch: col = \"blue\", bg = \"red\", cex = 2"));
 }
 
 /// `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))`: one wide panel above two.

@@ -92,6 +92,29 @@ pub struct PlotOptions {
     pub yaxp: Option<[f64; 3]>,
 }
 
+crate::setters::setters!(PlotOptions {
+    type_: value PlotType,
+    pch: values i32,
+    col: values ColorSpec,
+    bg: values ColorSpec,
+    lwd: values f64,
+    lty: option LineType,
+    cex: values f64,
+    xlim: pair f64,
+    ylim: pair f64,
+    xlog: value bool,
+    ylog: value bool,
+    main: option Label,
+    sub: option Label,
+    xlab: option Label,
+    ylab: option Label,
+    axes: value bool,
+    xaxt: option AxisType,
+    yaxt: option AxisType,
+    xaxp: option [f64; 3],
+    yaxp: option [f64; 3],
+});
+
 impl Default for PlotOptions {
     fn default() -> Self {
         PlotOptions {

@@ -54,7 +54,11 @@ fn draw_ours(start: f64, ps: f64) -> String {
     let black = ColorSpec::Index(1);
     let entries: Vec<LegendEntry> = ["a", "bb"]
         .iter()
-        .map(|l| LegendEntry::point(*l, black, 1).with_line(1.0, LineType::from_code(1)))
+        .map(|l| {
+            LegendEntry::point(*l, black, 1)
+                .lwd(1.0)
+                .lty(LineType::from_code(1))
+        })
         .collect();
     dev.legend(
         LegendPos::Keyword(LegendKeyword::TopLeft),

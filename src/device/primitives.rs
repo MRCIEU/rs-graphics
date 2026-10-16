@@ -57,6 +57,17 @@ pub struct XyOptions {
     pub xpd: Option<bool>,
 }
 
+crate::setters::setters!(XyOptions {
+    type_: option PlotType,
+    pch: values i32,
+    col: values ColorSpec,
+    bg: values ColorSpec,
+    cex: values f64,
+    lwd: values f64,
+    lty: option LineType,
+    xpd: option bool,
+});
+
 /// Arguments of `segments()`.
 #[derive(Clone, Debug, Default)]
 pub struct SegmentsOptions {
@@ -68,6 +79,13 @@ pub struct SegmentsOptions {
     pub lwd: Vec<f64>,
     pub xpd: Option<bool>,
 }
+
+crate::setters::setters!(SegmentsOptions {
+    col: values ColorSpec,
+    lty: values LineType,
+    lwd: values f64,
+    xpd: option bool,
+});
 
 /// Arguments of `arrows()`.
 #[derive(Clone, Debug)]
@@ -87,6 +105,16 @@ pub struct ArrowsOptions {
     pub lwd: Vec<f64>,
     pub xpd: Option<bool>,
 }
+
+crate::setters::setters!(ArrowsOptions {
+    length: value f64,
+    angle: value f64,
+    code: value u8,
+    col: values ColorSpec,
+    lty: values LineType,
+    lwd: values f64,
+    xpd: option bool,
+});
 
 impl Default for ArrowsOptions {
     fn default() -> Self {
@@ -117,6 +145,14 @@ pub struct RectOptions {
     pub xpd: Option<bool>,
 }
 
+crate::setters::setters!(RectOptions {
+    col: values ColorSpec,
+    border: values ColorSpec,
+    lty: values LineType,
+    lwd: values f64,
+    xpd: option bool,
+});
+
 /// Arguments of `polygon()`. A non-finite coordinate (R's `NA`) ends one
 /// polygon and starts the next; `col`, `border` and `lty` are recycled
 /// over those polygons.
@@ -133,6 +169,14 @@ pub struct PolygonOptions {
     pub lwd: Option<f64>,
     pub xpd: Option<bool>,
 }
+
+crate::setters::setters!(PolygonOptions {
+    col: values ColorSpec,
+    border: values ColorSpec,
+    lty: values LineType,
+    lwd: option f64,
+    xpd: option bool,
+});
 
 /// Arguments of `text()`.
 #[derive(Clone, Debug, Default)]
@@ -155,6 +199,16 @@ pub struct TextOptions {
     pub font: Vec<i32>,
     pub xpd: Option<bool>,
 }
+
+crate::setters::setters!(TextOptions {
+    adj: option f64,
+    vadj: option f64,
+    srt: value f64,
+    cex: values f64,
+    col: values ColorSpec,
+    font: values i32,
+    xpd: option bool,
+});
 
 /// Which region `box()` outlines.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -182,6 +236,13 @@ pub struct BoxOptions {
     pub lwd: Option<f64>,
 }
 
+crate::setters::setters!(BoxOptions {
+    which: value BoxWhich,
+    col: option ColorSpec,
+    lty: option LineType,
+    lwd: option f64,
+});
+
 /// Arguments of `plot.window()` besides the limits.
 #[derive(Clone, Debug, Default)]
 pub struct PlotWindowOptions {
@@ -193,6 +254,12 @@ pub struct PlotWindowOptions {
     /// log axes, as in R.
     pub asp: Option<f64>,
 }
+
+crate::setters::setters!(PlotWindowOptions {
+    xlog: value bool,
+    ylog: value bool,
+    asp: option f64,
+});
 
 impl<B: Backend> Device<B> {
     fn clip_for(&self, xpd: Option<bool>) -> Clip {

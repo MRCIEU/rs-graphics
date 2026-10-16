@@ -11,27 +11,23 @@
 //!
 //! // R: pdf("scatter.pdf", 7, 7); plot(x, y, main = ...); dev.off()
 //! let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
-//! plot(&mut dev, &x, &y, &PlotOptions {
-//!     pch: vec![19],
-//!     col: vec!["steelblue".into()],
-//!     main: Some(Label::math("y == beta[0] + beta[1] * x")),
-//!     xlab: Some("x".into()),
-//!     ylab: Some("y".into()),
-//!     ..PlotOptions::default()
-//! });
-//! dev.abline(&AblineOptions {
-//!     h: vec![6.0],
-//!     col: vec!["grey".into()],
-//!     lty: vec![LineType::DASHED],
-//!     ..AblineOptions::default()
-//! });
+//! let opts = PlotOptions::default()
+//!     .pch(19)
+//!     .col("steelblue")
+//!     .main(Label::math("y == beta[0] + beta[1] * x"))
+//!     .xlab("x")
+//!     .ylab("y");
+//! plot(&mut dev, &x, &y, &opts);
+//! dev.abline(&AblineOptions::default().h(6.0).col("grey").lty(LineType::DASHED));
 //! dev.save("scatter.pdf")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! [`device::Device`] holds the page and `par()` state; its methods are
-//! the low-level functions. Free functions in [`highlevel`] are the
-//! high-level plots. [`prelude`] imports both, with the value types.
+//! the low-level functions, each taking its data and an options struct
+//! (R's other arguments). Free functions in [`highlevel`] are the
+//! high-level plots. Options can be set field by field or with the
+//! chainable setters above ([`setters`]). [`prelude`] imports it all.
 
 #[doc(hidden)]
 pub mod afm;
@@ -52,3 +48,4 @@ pub mod plotmath;
 pub mod prelude;
 #[doc(hidden)]
 pub mod pretty;
+pub mod setters;

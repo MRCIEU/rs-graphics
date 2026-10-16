@@ -43,6 +43,17 @@ pub struct PieOptions {
     pub init_angle_deg: Option<f64>,
 }
 
+crate::setters::setters!(PieOptions {
+    labels: strings String,
+    radius: value f64,
+    col: option_values ColorSpec,
+    border: value ColorSpec,
+    main: option Label,
+    edges: value usize,
+    clockwise: value bool,
+    init_angle_deg: option f64,
+});
+
 impl Default for PieOptions {
     fn default() -> Self {
         PieOptions {

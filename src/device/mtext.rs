@@ -48,6 +48,18 @@ pub struct MtextOptions {
     pub font: Option<i32>,
 }
 
+crate::setters::setters!(MtextOptions {
+    side: value Side,
+    line: value f64,
+    outer: value bool,
+    at: option f64,
+    adj: option f64,
+    padj: option f64,
+    cex: option f64,
+    col: option ColorSpec,
+    font: option i32,
+});
+
 impl Default for MtextOptions {
     fn default() -> Self {
         MtextOptions {

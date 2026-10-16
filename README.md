@@ -23,20 +23,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); dev.off()
     let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
-    plot(&mut dev, &x, &y, &PlotOptions {
-        pch: vec![19],
-        col: vec!["steelblue".into()],
-        main: Some(Label::math("y == beta[0] + beta[1] * x")),
-        xlab: Some("x".into()),
-        ylab: Some("y".into()),
-        ..PlotOptions::default()
-    });
-    dev.abline(&AblineOptions {
-        h: vec![6.0],
-        col: vec!["grey".into()],
-        lty: vec![LineType::DASHED],
-        ..AblineOptions::default()
-    });
+    let opts = PlotOptions::default()
+        .pch(19)
+        .col("steelblue")
+        .main(Label::math("y == beta[0] + beta[1] * x"))
+        .xlab("x")
+        .ylab("y");
+    plot(&mut dev, &x, &y, &opts);
+    dev.abline(&AblineOptions::default().h(6.0).col("grey").lty(LineType::DASHED));
     dev.save("scatter.pdf")?;
     Ok(())
 }
@@ -53,11 +47,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   `pointsize`). `dev.finish()` returns the file's bytes, `dev.save(path)`
   writes them.
 - Each R function is one method taking its data and an options struct,
-  e.g. `dev.axis(1, &AxisOptions { las: Some(1), ..AxisOptions::default() })`
-  or `dev.text(&x, &y, &["a", "b"], &TextOptions::default())`. Unset
-  fields are R's defaults, mostly the current `par()` values. Arguments
-  R recycles per element (`points(x, y, col = groups)`) are `Vec`s,
-  recycled the same way; `xpd: Some(true)` is R's inline `xpd = TRUE`.
+  e.g. `dev.axis(1, &AxisOptions::default().las(1))` or
+  `dev.text(&x, &y, &["a", "b"], &TextOptions::default().col("red"))`.
+  Unset fields are R's defaults, mostly the current `par()` values.
+  Arguments R recycles per element (`points(x, y, col = groups)`) are
+  `Vec`s, recycled the same way; their setters take one value or several
+  (`.col("red")`, `.col(["red", "blue"])`). `.xpd(true)` is R's inline
+  `xpd = TRUE`. The fields are public, so struct literals
+  (`AxisOptions { las: Some(1), ..AxisOptions::default() }`) work too.
 - Change graphical parameters with `dev.par.<name> = ...` (R's `par()`),
   and multi-panel arrangements with `dev.mfrow(2, 2)` / `dev.layout(...)`.
 - Colours are `ColorSpec`s: `"red".into()`, `"#FF000080".into()`, a

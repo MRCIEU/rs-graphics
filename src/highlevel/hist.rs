@@ -80,6 +80,20 @@ pub struct HistOptions {
     pub add: bool,
 }
 
+crate::setters::setters!(HistOptions {
+    breaks: option_values f64,
+    freq: value bool,
+    col: value ColorSpec,
+    border: value ColorSpec,
+    main: option Label,
+    xlab: option Label,
+    ylab: option Label,
+    axes: value bool,
+    xlog: value bool,
+    ylog: value bool,
+    add: value bool,
+});
+
 impl Default for HistOptions {
     fn default() -> Self {
         HistOptions {

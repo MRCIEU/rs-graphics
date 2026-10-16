@@ -105,6 +105,13 @@ pub struct TitleOptions {
     pub ylab: Option<Label>,
 }
 
+crate::setters::setters!(TitleOptions {
+    main: option Label,
+    sub: option Label,
+    xlab: option Label,
+    ylab: option Label,
+});
+
 /// Shortcuts for a device with R's default `par()`. Use [`Device::new`]
 /// to start from other parameters: in particular `par.ps`, R's
 /// `pointsize`, sizes symbols and margin lines from creation on.

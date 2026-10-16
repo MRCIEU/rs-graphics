@@ -110,6 +110,18 @@ pub struct LegendEntry {
     pub pt_lwd: Option<f64>,
 }
 
+crate::setters::setters!(LegendEntry {
+    label: value Label,
+    col: value ColorSpec,
+    pch: option i32,
+    lty: option LineType,
+    lwd: option f64,
+    fill: option ColorSpec,
+    pt_bg: value ColorSpec,
+    pt_cex: option f64,
+    pt_lwd: option f64,
+});
+
 impl LegendEntry {
     fn base(label: impl Into<Label>, col: ColorSpec) -> Self {
         LegendEntry {
@@ -126,46 +138,33 @@ impl LegendEntry {
     }
 
     /// `legend(..., pch = pch, col = col)`.
-    pub fn point(label: impl Into<Label>, col: ColorSpec, pch: i32) -> Self {
+    pub fn point(label: impl Into<Label>, col: impl Into<ColorSpec>, pch: i32) -> Self {
         LegendEntry {
             pch: Some(pch),
-            ..Self::base(label, col)
+            ..Self::base(label, col.into())
         }
     }
 
     /// `legend(..., lty = lty, lwd = lwd, col = col)`.
-    pub fn line(label: impl Into<Label>, col: ColorSpec, lwd: f64, lty: LineType) -> Self {
+    pub fn line(
+        label: impl Into<Label>,
+        col: impl Into<ColorSpec>,
+        lwd: f64,
+        lty: LineType,
+    ) -> Self {
         LegendEntry {
             lty: Some(lty),
             lwd: Some(lwd),
-            ..Self::base(label, col)
+            ..Self::base(label, col.into())
         }
     }
 
     /// `legend(..., fill = fill)`: a filled box key.
-    pub fn filled(label: impl Into<Label>, fill: ColorSpec) -> Self {
+    pub fn filled(label: impl Into<Label>, fill: impl Into<ColorSpec>) -> Self {
         LegendEntry {
-            fill: Some(fill),
+            fill: Some(fill.into()),
             ..Self::base(label, ColorSpec::None)
         }
-    }
-
-    /// Adds a line segment to a point entry (R's `pch` + `lty`, drawn merged
-    /// by default).
-    pub fn with_line(mut self, lwd: f64, lty: LineType) -> Self {
-        self.lty = Some(lty);
-        self.lwd = Some(lwd);
-        self
-    }
-
-    pub fn with_pt_bg(mut self, bg: ColorSpec) -> Self {
-        self.pt_bg = bg;
-        self
-    }
-
-    pub fn with_pt_cex(mut self, cex: f64) -> Self {
-        self.pt_cex = Some(cex);
-        self
     }
 
     fn has_line(&self) -> bool {
@@ -216,6 +215,28 @@ pub struct LegendOptions {
     /// Temporarily override `par("xpd")` while drawing.
     pub xpd: Option<bool>,
 }
+
+crate::setters::setters!(LegendOptions {
+    bty_box: value bool,
+    bg: option ColorSpec,
+    cex: value f64,
+    xjust: option f64,
+    yjust: option f64,
+    x_intersp: value f64,
+    y_intersp: value f64,
+    seg_len: value f64,
+    text_width: option f64,
+    merge: option bool,
+    ncol: value usize,
+    horiz: value bool,
+    title: option Label,
+    title_cex: option f64,
+    inset: value (f64, f64),
+    text_col: option ColorSpec,
+    text_font: option i32,
+    border: value ColorSpec,
+    xpd: option bool,
+});
 
 impl Default for LegendOptions {
     fn default() -> Self {

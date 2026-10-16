@@ -223,7 +223,7 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         ..PlotOptions::default()
     };
     plot(dev, &x, &x, &opts);
-    let entries = [LegendEntry::point("a", "red".into(), 46)];
+    let entries = [LegendEntry::point("a", "red", 46)];
     dev.legend(
         LegendPos::Keyword(LegendKeyword::TopLeft),
         &entries,

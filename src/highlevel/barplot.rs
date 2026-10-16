@@ -60,6 +60,26 @@ pub struct BarplotOptions {
     pub axes: bool,
 }
 
+crate::setters::setters!(BarplotOptions {
+    names: strings String,
+    col: option_values ColorSpec,
+    border: value ColorSpec,
+    width: values f64,
+    space: option_values f64,
+    beside: value bool,
+    horiz: value bool,
+    legend_text: strings String,
+    xlim: pair f64,
+    ylim: pair f64,
+    xlog: value bool,
+    ylog: value bool,
+    main: option Label,
+    sub: option Label,
+    xlab: option Label,
+    ylab: option Label,
+    axes: value bool,
+});
+
 impl Default for BarplotOptions {
     fn default() -> Self {
         BarplotOptions {
