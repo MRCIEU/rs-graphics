@@ -254,6 +254,113 @@ pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
         .collect()
 }
 
+/// Default tick values, in data units, for a log axis whose `usr` range is
+/// `log_lo..log_hi` (log10 units, `log_lo < log_hi`), with `nint` intervals
+/// (`par("lab")`, 5 by default): `GAxisPars()` + `GLPretty()`
+/// (`graphics.c`) then `CreateAtVector()`'s log branch (`plot.c`).
+///
+/// Over less than about two decades the ticks are linear `pretty()` values;
+/// otherwise powers of ten with 1, 2, 5 (up to 2 decades between the
+/// outermost powers inside the range), 1, 5 (3 decades) or 1 (more, every
+/// few decades so there are about `nint` intervals) times each.
+pub fn log_axis_ticks(log_lo: f64, log_hi: f64, nint: i32) -> Vec<f64> {
+    // `GAxisPars()`: avoid infinities.
+    let log_hi = log_hi.min(308.0);
+    let log_lo = log_lo.max(-307.0).min(log_hi);
+    let (dl, dh) = (10f64.powf(log_lo), 10f64.powf(log_hi));
+
+    // `GLPretty()`.
+    let (mut p1, mut p2) = (dl.log10().ceil(), dh.log10().floor());
+    if p2 <= p1 && dh / dl > 10.0 {
+        p1 = (dl.log10() - 0.5).ceil();
+        p2 = (dh.log10() + 0.5).floor();
+    }
+    if p2 <= p1 {
+        // Very small range: a linear axis.
+        return pretty_ticks(dl, dh, nint);
+    }
+    let axp0 = 10f64.powf(p1);
+    let axp1 = 10f64.powf(p2);
+    let span = p2 - p1;
+
+    // `CreateAtVector()`, log branch, with its fuzz on `usr`.
+    let umin = dl * (1.0 - 1e-12);
+    let umax = dh * (1.0 + 1e-12);
+    let mut at = Vec::new();
+    if span <= 2.0 {
+        // 1, 2, 5 times 10^k.
+        let mut dn = axp0;
+        for f in [0.2, 0.5] {
+            if f * dn >= umin {
+                at.push(f * dn);
+            }
+        }
+        loop {
+            if dn > umax {
+                break;
+            }
+            at.push(dn);
+            if 2.0 * dn > umax {
+                break;
+            }
+            at.push(2.0 * dn);
+            if 5.0 * dn > umax {
+                break;
+            }
+            at.push(5.0 * dn);
+            dn *= 10.0;
+        }
+    } else if span <= 3.0 {
+        // 1, 5 times 10^k.
+        let mut dn = axp0;
+        if 0.5 * dn >= umin {
+            at.push(0.5 * dn);
+        }
+        loop {
+            if dn > umax {
+                break;
+            }
+            at.push(dn);
+            if 5.0 * dn > umax {
+                break;
+            }
+            at.push(5.0 * dn);
+            dn *= 10.0;
+        }
+    } else {
+        // 10^k, every `ne` decades.
+        let i = (axp1.log10().floor() - axp0.log10().ceil() + 0.25) as i32;
+        let mut ne = i / nint;
+        let d0 = umax.log10() - axp0.log10();
+        if ne < 1 {
+            ne = 1;
+        } else {
+            while ne > 1 && (nint * ne) as f64 > d0 {
+                ne -= 1;
+            }
+        }
+        let k = 1 + ne / 308;
+        if k > 1 {
+            ne = k * (ne / k);
+        }
+        let d1 = d0 - (nint * ne) as f64;
+        let start = if d1 > 5.0 {
+            axp0 * 10f64.powf((d1 / 2.0).floor())
+        } else {
+            axp0
+        };
+        let rng = 10f64.powf(ne as f64 / k as f64);
+        let mut dn = start;
+        while dn < umax {
+            at.push(dn);
+            for _ in 0..k {
+                dn *= rng;
+            }
+        }
+    }
+    at
+}
+
 /// Port of base R's `pretty.default()` (the user-facing `pretty()`
 /// function), used by e.g. `hist.default()` to choose bin edges. Unlike
 /// [`ge_pretty`], this uses `pretty.default()`'s own constants
@@ -305,6 +412,21 @@ pub fn pretty_r(lo_in: f64, up_in: f64, n: i32, min_n: i32) -> Vec<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Values as R's `axTicks()` gives them for these `usr` ranges.
+    #[test]
+    fn log_axis_ticks_follow_r_rules() {
+        let ticks = |lo: f64, hi: f64| log_axis_ticks(lo.log10(), hi.log10(), 5);
+        // Under 2 decades between powers inside: 1, 2, 5.
+        assert_eq!(ticks(3.0, 700.0), [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0]);
+        // 3 decades: 1, 5.
+        assert_eq!(ticks(1.0, 1000.0), [1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0]);
+        // More: powers of ten, every other one over 10 decades.
+        assert_eq!(ticks(1.0, 1e6), [1.0, 10.0, 100.0, 1e3, 1e4, 1e5, 1e6]);
+        assert_eq!(ticks(1e-5, 1e5), [1e-5, 1e-3, 1e-1, 1e1, 1e3, 1e5]);
+        // Less than a decade: linear pretty() ticks.
+        assert_eq!(ticks(2.0, 15.0), pretty_ticks(2.0, 15.0, 5));
+    }
 
     #[test]
     fn matches_known_r_output() {

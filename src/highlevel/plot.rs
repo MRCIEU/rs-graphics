@@ -92,8 +92,18 @@ impl<'a> Default for PlotOptions<'a> {
 /// `plot(x, y, ...)`: `plot.new()` + `plot.window()` + the requested
 /// point/line geometry + (optionally) `axis()`/`box()`/`title()`.
 pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOptions) {
-    let xlim = opts.xlim.unwrap_or_else(|| data_range(x));
-    let ylim = opts.ylim.unwrap_or_else(|| data_range(y));
+    // On a log axis, values <= 0 are dropped (R's `xy.coords()` makes
+    // them `NA`); `points()`/`lines()` then skip them.
+    let range = |v: &[f64], log: bool| {
+        if log {
+            let positive: Vec<f64> = v.iter().copied().filter(|&a| a > 0.0).collect();
+            data_range(&positive)
+        } else {
+            data_range(v)
+        }
+    };
+    let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.xlog));
+    let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
 
     dev.plot_new();
     dev.plot_window(xlim, ylim, opts.xlog, opts.ylog);

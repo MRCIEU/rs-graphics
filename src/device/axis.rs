@@ -25,7 +25,8 @@ const FLT_EPSILON: f64 = f32::EPSILON as f64;
 /// `NULL`), which falls back to the matching `par()` value.
 #[derive(Clone, Debug)]
 pub struct AxisOptions {
-    /// Tick positions, in user coordinates (log10 units on a log axis).
+    /// Tick positions, in user coordinates (data units, also on a log
+    /// axis).
     /// `None`: `pretty()` on the axis range.
     pub at: Option<Vec<f64>>,
     /// Labels for `at` (requires `at`). `None`: `at` formatted like R's
@@ -177,6 +178,13 @@ impl<B: Backend> Device<B> {
         ticks.retain(|t| t.0.is_finite());
         if ticks.is_empty() {
             return;
+        }
+        // From here on, positions are in `usr` units (log10 on a log axis;
+        // values <= 0 become -inf or NaN, outside every limit below).
+        if (x_axis && self.xlog) || (!x_axis && self.ylog) {
+            for t in &mut ticks {
+                t.0 = t.0.log10();
+            }
         }
 
         // `getxlimits`/`getylimits` (from the caller's `xpd`, before

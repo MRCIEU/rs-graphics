@@ -20,7 +20,8 @@ crate's test suite (see [Testing](#testing) below).
   with R's exact default values.
 - Coordinate systems and clipping (`src/device.rs`): `plot.new()`/
   `plot.window()` equivalents, user/device coordinate transforms, log
-  axes, and R's `xpd`-style clip regions (plot region, figure region,
+  axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, and
+  `at`/`pos` in data units), and R's `xpd`-style clip regions (plot region, figure region,
   or the whole device for outer-margin text).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
@@ -247,6 +248,11 @@ against a real R installation by shelling out to `Rscript`:
   overlays in a 2x2 page, `plot.new()` not resetting it, drawing and outer
   `mtext()` (not) resetting it, and setting it before plotting; every text
   origin and data-line vertex.
+- `tests/log_axis_matches_r.rs` - `plot(..., log = )` over ranges that hit
+  each of R's log tick rules (1-2-5, 1-5, decimated powers of ten, a
+  linear small range, a reversed axis with `at` in data units), with
+  non-positive values dropped: label strings and origins, axis and tick
+  segments, and the number of points drawn.
 - `tests/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
 

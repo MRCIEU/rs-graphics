@@ -16,7 +16,7 @@ use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par};
 use crate::pch;
-use crate::pretty::pretty_ticks;
+use crate::pretty::{log_axis_ticks, pretty_ticks};
 
 mod axis;
 mod legend;
@@ -358,15 +358,20 @@ impl<B: Backend> Device<B> {
     }
 
     /// Default tick locations R's `axis()` would pick for `side` when no
-    /// `at=` is given: `pretty()` on the current `usr` range for that
-    /// axis, with `n = 5` (R's `par("lab")[1:2]` default).
+    /// `at=` is given, in data units: `pretty()` on the current `usr` range
+    /// for that axis, with `n = 5` (R's `par("lab")[1:2]` default), or R's
+    /// log-axis rules (see [`log_axis_ticks`]) on a log axis.
     pub fn default_ticks(&self, side: Side) -> Vec<f64> {
-        let (lo, hi) = if side == 1 || side == 3 {
-            (self.usr.0, self.usr.1)
+        let (lo, hi, log) = if side == 1 || side == 3 {
+            (self.usr.0, self.usr.1, self.xlog)
         } else {
-            (self.usr.2, self.usr.3)
+            (self.usr.2, self.usr.3, self.ylog)
         };
-        pretty_ticks(lo.min(hi), lo.max(hi), 5)
+        if log {
+            log_axis_ticks(lo.min(hi), lo.max(hi), 5)
+        } else {
+            pretty_ticks(lo.min(hi), lo.max(hi), 5)
+        }
     }
 
     // ---------------------------------------------------------------
@@ -449,10 +454,12 @@ impl<B: Backend> Device<B> {
         let bg = self.resolve(bg);
         self.push_clip_for(self.par.xpd);
         for (&x, &y) in xs.iter().zip(ys) {
-            if !x.is_finite() || !y.is_finite() {
+            // Checked after conversion, like R, so values <= 0 on a log
+            // axis are skipped too.
+            let p = self.user_to_inches(x, y);
+            if !p.x.is_finite() || !p.y.is_finite() {
                 continue;
             }
-            let p = self.user_to_inches(x, y);
             self.draw_pch(pch, p, cex, col, bg);
         }
         self.pop_clip();
@@ -528,7 +535,8 @@ impl<B: Backend> Device<B> {
     }
 
     /// `lines(x, y, ...)`: connects points with a polyline, breaking into
-    /// separate segments at non-finite (`NA`) coordinates, matching R.
+    /// separate segments at non-finite (`NA`) coordinates, and at values
+    /// <= 0 on a log axis, matching R.
     pub fn lines(&mut self, xs: &[f64], ys: &[f64], style: LineStyle) {
         let Some(col) = self.resolve(style.col) else {
             return;
@@ -537,8 +545,9 @@ impl<B: Backend> Device<B> {
         self.push_clip_for(self.par.xpd);
         let mut run: Vec<Point> = Vec::new();
         for (&x, &y) in xs.iter().zip(ys) {
-            if x.is_finite() && y.is_finite() {
-                run.push(self.user_to_inches(x, y));
+            let p = self.user_to_inches(x, y);
+            if p.x.is_finite() && p.y.is_finite() {
+                run.push(p);
             } else if run.len() >= 2 {
                 self.backend.draw_polyline(&run, &stroke);
                 run.clear();
