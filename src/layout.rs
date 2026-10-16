@@ -422,7 +422,7 @@ fn sum_flag(values: &[f64], flags: &[bool], cm: bool) -> f64 {
     values
         .iter()
         .zip(flags)
-        .filter(|(_, &f)| f == cm)
+        .filter(|&(_, &f)| f == cm)
         .map(|(v, _)| v)
         .sum()
 }
