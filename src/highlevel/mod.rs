@@ -14,7 +14,7 @@
 //! `*.default` R function in `r-source/src/library/graphics/R/`, reduced to
 //! the common/core use cases: there are no formula interfaces or
 //! S3-style dispatch on input type, and each module's docs (and the
-//! README's "Out of scope" section) say what else isn't implemented.
+//! "Out of scope" section of DEVELOPER.md) say what else isn't implemented.
 //!
 //! Each starts a new plot (moving to the next panel of a multi-panel
 //! page). They use only `Device`'s public API, like plots written outside
