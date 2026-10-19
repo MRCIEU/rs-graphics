@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `axis()`: a port of `C_axis` (`plot.c`, incl. `GetAxisLimits`,
 //! `getxlimits`/`getylimits` and `ComputePAdjValue`), with the labels placed
 //! by `GMtext()` (`graphics.c`).

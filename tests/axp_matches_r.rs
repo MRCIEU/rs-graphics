@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Cross-checks `par(xaxp/yaxp)` against R: the values `plot.window()`
 //! sets (linear, log with each tick-rule code, reversed, tiny ranges,
 //! `par(lab)`), and the ticks `axis()` draws when they are changed

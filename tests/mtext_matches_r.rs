@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Cross-checks `mtext()` placement (every side, inner and outer margins,
 //! `line`, `at`, `adj`, `padj`, `cex`, `font`, and `par(las)` 0..=3) against
 //! a real R `pdf()` device's uncompressed output, inside a 2x2 `mfrow` page

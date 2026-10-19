@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Small geometric primitives shared by the backend/device layers.
 //! All coordinates in this crate's internal engine are in **inches**,
 //! origin at the bottom-left, y increasing upward - i.e. exactly PDF's

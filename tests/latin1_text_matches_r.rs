@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Cross-checks non-ASCII (Latin-1) text against a real R `pdf()` device's
 //! uncompressed output: the bytes written (R encodes e.g. `±` as `\261`)
 //! (R writes them raw, we as octal escapes; both decode to the same bytes)

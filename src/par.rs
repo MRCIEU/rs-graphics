@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `par()` state: the subset of R's graphics parameters this crate
 //! implements, with R's exact default values (cross-checked against
 //! `Rscript -e 'str(par())'` and `r-source/src/library/graphics/src/par.c`).

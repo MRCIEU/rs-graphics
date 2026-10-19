@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Cross-checks `abline()`, `segments()`, `hist()` (incl. `add = TRUE`)
 //! and `barplot()` on log axes, `par(lab)`, `plot(xaxt = "n")` and a horizontal
 //! `boxplot()` with axes, against a real R `pdf()` device's uncompressed

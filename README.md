@@ -415,6 +415,12 @@ GPL-2.0-or-later, so it is licensed under version 3 of the GPL, as R's
 "or later" terms allow. Programs that use rs-graphics must therefore be
 distributed under GPL-3.0 (or a later version).
 
+The ported parts of R remain copyright The R Core Team, The R Foundation,
+Robert Gentleman and Ross Ihaka, and Paul Murrell and Ross Ihaka.
+[NOTICE](NOTICE) lists these notices, the R source files the code was
+translated from, and when. Programs that use rs-graphics should carry the
+same section in their notices.
+
 The crate embeds Adobe's Helvetica and Symbol AFM metrics (`assets/afm/`, under
 the notice in `assets/afm/MustRead.html`) and the Liberation Sans fonts
 (`assets/fonts/`, SIL OFL 1.1). Their notices, and those of the

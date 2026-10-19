@@ -1,3 +1,11 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Cross-checks default axis tick labels for ranges that straddle zero
 //! against a real R `pdf()` device: R snaps a tick within `range / (100 *
 //! n)` of zero to exactly 0 (`CreateAtVector()`), so e.g. -0.2..0.4 is
