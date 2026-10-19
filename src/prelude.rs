@@ -12,7 +12,8 @@
 //! use rs_graphics::prelude::*;
 //! ```
 //!
-//! The device and its options types, `par()`, colours, line types,
+//! The device, the `Graphics` trait (R's graphics functions) and their
+//! options types, recorded `Plot`s, `par()`, colours, line types,
 //! labels, layouts, the high-level plots' options and results, and the
 //! backends.
 
@@ -33,5 +34,6 @@ pub use crate::highlevel::{
 };
 pub use crate::layout::{Layout, LayoutSize};
 pub use crate::lty::LineType;
-pub use crate::par::{AxisStyle, AxisType, Par, Pty, Sides};
+pub use crate::par::{AxisStyle, AxisType, Par, ParOptions, Pty, Sides};
 pub use crate::plotmath::{Expression, Label};
+pub use crate::recording::{Plot, Replayed};

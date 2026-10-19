@@ -7,7 +7,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! R's graphics functions as the [`Graphics`] trait, implemented by
-//! [`Device`] (which draws).
+//! [`Device`] (which draws) and [`Plot`](crate::recording::Plot) (which
+//! records, to draw later).
 //!
 //! Each method starts a call for one R function, taking R's data
 //! arguments; the call's chainable setters take R's other arguments, and
@@ -53,9 +54,10 @@ use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions,
 };
+use crate::par::ParOptions;
 use crate::plotmath::Label;
 
-mod sealed {
+pub(crate) mod sealed {
     pub trait Sealed {}
 }
 
@@ -71,12 +73,16 @@ impl<B: Backend> sealed::Sealed for Device<B> {}
 /// panel of a multi-panel page (or to a new page). The others add to the
 /// current plot.
 ///
-/// Implemented by [`Device`] only; the trait can't be implemented outside
-/// this crate. Write your own plots as functions or extension-trait
-/// methods generic over `G: Graphics` (see the crate docs).
+/// Implemented by [`Device`], which draws, and by
+/// [`Plot`](crate::recording::Plot), which records the calls to draw
+/// later; the trait can't be implemented outside this crate. Write your
+/// own plots as functions or extension-trait methods generic over
+/// `G: Graphics` (see the crate docs), and they work on both.
 pub trait Graphics: sealed::Sealed + Sized {
     /// What [`legend`](Graphics::legend)'s `.draw()` returns:
-    /// `Option<LegendLayout>` on a [`Device`].
+    /// `Option<LegendLayout>` on a [`Device`], `()` on a
+    /// [`Plot`](crate::recording::Plot) (whose legend layouts come from
+    /// [`Device::add_plot`]).
     type LegendResult;
 
     /// `plot.new()`: moves to the next figure and sets up its figure and
@@ -437,6 +443,20 @@ pub trait Graphics: sealed::Sealed + Sized {
         }
     }
 
+    /// `par(...)`: changes graphical parameters; options in
+    /// [`ParOptions`] (each a [`Par`](crate::par::Par) field, plus `new`
+    /// for R's `par(new = TRUE)`). On a [`Device`] it is the same as
+    /// assigning `dev.par.<field>` (and [`Device::set_new`] for `new`);
+    /// in a recorded [`Plot`](crate::recording::Plot) it is the way to
+    /// change them. As in R, `mar`, `oma`, `pty` and `plt` take effect at
+    /// the next [`plot_new`](Graphics::plot_new).
+    fn par(&mut self) -> ParCall<'_, Self> {
+        ParCall {
+            target: self,
+            opts: ParOptions::default(),
+        }
+    }
+
     // ---- what `.draw()` calls; not part of the public API ----
 
     #[doc(hidden)]
@@ -489,6 +509,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     fn emit_mtext(&mut self, text: Label, side: Side, opts: MtextOptions);
     #[doc(hidden)]
     fn emit_title(&mut self, opts: TitleOptions);
+    #[doc(hidden)]
+    fn emit_par(&mut self, opts: ParOptions);
 }
 
 impl<B: Backend> Graphics for Device<B> {
@@ -565,6 +587,12 @@ impl<B: Backend> Graphics for Device<B> {
     }
     fn emit_title(&mut self, opts: TitleOptions) {
         self.title_impl(&opts)
+    }
+    fn emit_par(&mut self, opts: ParOptions) {
+        opts.apply(&mut self.par);
+        if let Some(new) = opts.new {
+            self.set_new(new);
+        }
     }
 }
 
@@ -706,6 +734,12 @@ call!(
 call!(
     /// [`Graphics::title`]'s call.
     TitleCall, TitleOptions, emit_title -> (),
+    {},
+    |t, o| (o)
+);
+call!(
+    /// [`Graphics::par`]'s call.
+    ParCall, ParOptions, emit_par -> (),
     {},
     |t, o| (o)
 );

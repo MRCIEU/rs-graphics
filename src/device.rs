@@ -460,6 +460,11 @@ impl<B: Backend> Device<B> {
         }
     }
 
+    /// Whether anything has been plotted yet.
+    pub(crate) fn is_used(&self) -> bool {
+        self.used
+    }
+
     /// `par("new")`.
     pub fn is_new(&self) -> bool {
         self.hold_figure

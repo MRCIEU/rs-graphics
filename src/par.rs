@@ -304,6 +304,89 @@ impl Par {
     }
 }
 
+// `ParOptions`: every `Par` field as an `Option`, its `apply`, and its
+// setters (on `ParOptions` and `ParCall`), from one field list.
+macro_rules! par_options {
+    ($($field:ident : $t:ty),* $(,)?) => {
+        /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
+        /// plus `new` (R's `par(new = TRUE)`, see
+        /// [`Device::set_new`](crate::device::Device::set_new)).
+        #[derive(Clone, Debug, Default, PartialEq)]
+        pub struct ParOptions {
+            $(
+                #[doc = concat!("New value of [`Par::", stringify!($field), "`].")]
+                pub $field: Option<$t>,
+            )*
+            /// `par(new = )`: draw the next plot over the current figure.
+            pub new: Option<bool>,
+        }
+
+        impl ParOptions {
+            /// Sets the given fields of `par` (all but `new`, which is
+            /// device state).
+            pub fn apply(&self, par: &mut Par) {
+                $(
+                    if let Some(v) = &self.$field {
+                        par.$field = v.clone();
+                    }
+                )*
+            }
+        }
+
+        $crate::setters::setters!(ParOptions => [ParCall] {
+            $($field: option $t,)*
+            new: option bool,
+        });
+    };
+}
+
+par_options!(
+    mar: Sides<f64>,
+    oma: Sides<f64>,
+    plt: Option<[f64; 4]>,
+    pty: Pty,
+    xaxs: AxisStyle,
+    yaxs: AxisStyle,
+    col: Color,
+    bg: Color,
+    fg: Color,
+    col_axis: Color,
+    col_lab: Color,
+    col_main: Color,
+    col_sub: Color,
+    palette: Vec<Color>,
+    lwd: f64,
+    lty: LineType,
+    lend: LineEnd,
+    ljoin: LineJoin,
+    lmitre: f64,
+    pch: i32,
+    ps: f64,
+    cex: f64,
+    mex: f64,
+    cex_axis: f64,
+    cex_lab: f64,
+    cex_main: f64,
+    cex_sub: f64,
+    font: i32,
+    font_axis: i32,
+    font_lab: i32,
+    font_main: i32,
+    font_sub: i32,
+    las: i32,
+    xaxt: AxisType,
+    yaxt: AxisType,
+    tcl: f64,
+    mgp: [f64; 3],
+    lab: [i32; 3],
+    xaxp: [f64; 3],
+    yaxp: [f64; 3],
+    lheight: f64,
+    adj: f64,
+    xpd: bool,
+    ann: bool,
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,5 +408,23 @@ mod tests {
         assert_eq!(Pty::parse("q"), None);
         assert_eq!("t".parse::<AxisType>(), Ok(AxisType::Standard));
         assert!("y".parse::<AxisType>().is_err());
+    }
+
+    #[test]
+    fn par_options_apply_only_what_is_set() {
+        let mut par = Par::default();
+        let opts = ParOptions::default()
+            .las(1)
+            .mar([1.0, 2.0, 3.0, 4.0])
+            .plt([0.1, 0.9, 0.2, 0.8]);
+        opts.apply(&mut par);
+        assert_eq!(par.las, 1);
+        assert_eq!(par.mar.left, 2.0);
+        assert_eq!(par.plt, Some([0.1, 0.9, 0.2, 0.8]));
+        assert_eq!(par.cex, Par::default().cex);
+
+        // `plt` back to the mar-based region.
+        ParOptions::default().plt(None).apply(&mut par);
+        assert_eq!(par.plt, None);
     }
 }

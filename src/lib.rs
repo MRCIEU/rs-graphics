@@ -77,11 +77,34 @@
 //! # assert!(!pdf.is_empty());
 //! ```
 //!
+//! # Plots as values
+//!
+//! A [`recording::Plot`] implements the same trait but records the calls
+//! instead of drawing them, so a plot can be built without a device and
+//! drawn later with [`Device::add_plot`](device::Device::add_plot) (or
+//! [`add_plot_at`](device::Device::add_plot_at) for a chosen panel), as
+//! often as needed and on any device. The output is identical to making
+//! the calls on the device.
+//!
+//! ```
+//! use rs_graphics::prelude::*;
+//!
+//! let mut plot = Plot::new();
+//! plot.par().las(1).draw();
+//! plot.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).main("Recorded").draw();
+//!
+//! let mut dev = Device::pdf(8.0, 4.0);
+//! dev.mfrow(1, 2);
+//! dev.add_plot_at(1, 2, &plot); // right-hand panel
+//! # let _ = dev.finish();
+//! ```
+//!
 //! # Your own plots
 //!
 //! Write plots of your own against the [`graphics::Graphics`] trait: as
 //! functions taking `&mut G` for any `G: Graphics`, or as methods of an
-//! extension trait, which read like the built-in ones.
+//! extension trait, which read like the built-in ones. Either way they
+//! work on a device and in a recorded `Plot`.
 //!
 //! ```
 //! use rs_graphics::prelude::*;
@@ -122,4 +145,5 @@ pub mod plotmath;
 pub mod prelude;
 #[doc(hidden)]
 pub mod pretty;
+pub mod recording;
 pub mod setters;

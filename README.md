@@ -67,7 +67,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   current plot. Your own plots can be functions generic over
   `G: Graphics` or methods of an extension trait (example in the crate
   docs).
-- Change graphical parameters with `dev.par.<name> = ...` (R's `par()`).
+- Plots as values: `let mut plot = Plot::new();` records the same calls
+  without a device (`plot.hist(&x).draw()`), and `dev.add_plot(&plot)` /
+  `dev.add_plot_at(row, col, &plot)` draw them later, identically to
+  calling them on the device, as often as needed. `add_plot` restores
+  `par` afterwards; `legend()` layouts come back from `add_plot`.
+- Change graphical parameters with `dev.par.<name> = ...` (R's `par()`),
+  or `dev.par().las(1).draw()`, which also works in a recorded `Plot`.
   `mar`, `oma` and the other region settings take effect at the next
   plot. Sides are R's numbers (`dev.mtext("y", 4).draw()`) or
   `Side::Right`.
@@ -400,6 +406,10 @@ against a real R installation by shelling out to `Rscript`:
   line's vertices, colour, width and dash pattern.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
+- `tests/plot_replay.rs` (no R needed) - recorded `Plot`s drawn with
+  `add_plot`/`add_plot_at` give byte-identical output to direct calls
+  (every kind of call, all backends, mixed in multi-panel pages), `par`
+  is restored, and recorded results match the device's.
 - `tests/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
   `plot_new()` move nothing until the next plot (R would move margin
   text but not the data).
