@@ -17,7 +17,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{pie, PieOptions};
+use rs_graphics::highlevel::PieOptions;
 use rs_graphics::par::{AxisStyle, Par};
 
 fn rscript_available() -> bool {
@@ -75,7 +75,7 @@ struct Case {
     exact_axes: bool,
     clockwise: bool,
     /// `None`: R's default (90 when clockwise, else 0).
-    init_angle_deg: Option<f64>,
+    init_angle: Option<f64>,
     radius: f64,
 }
 
@@ -87,7 +87,7 @@ fn cases() -> Vec<Case> {
         r_args: "",
         exact_axes: false,
         clockwise: false,
-        init_angle_deg: None,
+        init_angle: None,
         radius: 0.8,
     };
     vec![
@@ -120,7 +120,7 @@ fn cases() -> Vec<Case> {
             height: 5.0,
             r_args: ", init.angle = 45",
             exact_axes: true,
-            init_angle_deg: Some(45.0),
+            init_angle: Some(45.0),
             ..base
         },
     ]
@@ -174,14 +174,14 @@ fn pie_matches_r() {
         }
         let mut dev = Device::new(PdfBackend::new(c.width, c.height).with_compression(false), par);
         let opts = PieOptions {
-            labels: Some(LABELS.iter().map(|s| s.to_string()).collect()),
+            labels: Some(LABELS.iter().map(|&s| s.into()).collect()),
             main: Some("pie()".into()),
             clockwise: c.clockwise,
-            init_angle_deg: c.init_angle_deg,
+            init_angle: c.init_angle,
             radius: c.radius,
             ..PieOptions::default()
         };
-        pie(&mut dev, &VALUES, &opts);
+        dev.pie(&VALUES, &opts);
         let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 
         let (r_p, o_p) = (paths(&r_pdf), paths(&ours));

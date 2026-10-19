@@ -81,7 +81,8 @@ impl Values<i32> for char {
 /// `setters!(Struct { field: kind Type, ... })` adds a chainable setter for
 /// each field. Kinds: `value` (plain field), `option` (`Option<T>`, set to
 /// `Some`), `values` (`Vec<T>` recycled by R), `option_values`
-/// (`Option<Vec<T>>`), `strings` (`Option<Vec<String>>`), `labels`
+/// (`Option<Vec<T>>`), `list` (`Option<Vec<T>>` from any iterator of
+/// `Into<T>`, e.g. strings for `Label`s), `labels`
 /// (`Option<Vec<Option<Label>>>`) and `pair` (`Option<(f64, f64)>`).
 macro_rules! setters {
     ($ty:ident { $($field:ident : $kind:ident $t:ty),* $(,)? }) => {
@@ -122,9 +123,9 @@ macro_rules! setters {
             self
         }
     };
-    (@one $ty:ident $field:ident strings $t:ty) => {
+    (@one $ty:ident $field:ident list $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        pub fn $field<S: Into<String>>(mut self, values: impl IntoIterator<Item = S>) -> Self {
+        pub fn $field<S: Into<$t>>(mut self, values: impl IntoIterator<Item = S>) -> Self {
             self.$field = Some(values.into_iter().map(Into::into).collect());
             self
         }
@@ -211,7 +212,7 @@ mod tests {
         assert!(!plot.axes);
 
         let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
-        assert_eq!(bars.names, Some(vec!["a".to_string(), "b".to_string()]));
+        assert_eq!(bars.names, Some(vec![Label::from("a"), Label::from("b")]));
         assert_eq!(bars.col, Some(vec![ColorSpec::from("grey")]));
 
         assert_eq!(TextOptions::default().srt(45.0).srt, 45.0);

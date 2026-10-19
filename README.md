@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .main(Label::math("y == beta[0] + beta[1] * x"))
         .xlab("x")
         .ylab("y");
-    plot(&mut dev, &x, &y, &opts);
+    dev.plot(&x, &y, &opts);
     dev.abline(&AblineOptions::default().h(6.0).col("grey").lty(LineType::DASHED));
     dev.save("scatter.pdf")?;
     Ok(())
@@ -37,8 +37,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 - `rs_graphics::prelude::*` imports the device, its options types,
-  `Par`, colours, line types, labels, layouts, the high-level plots and
-  the backends.
+  `Par`, colours, line types, labels, layouts, the high-level plots'
+  options and results, and the backends.
 - `Device::for_path` picks PDF, SVG or PNG from the file extension (the
   dpi is used for PNG); `Device::pdf(w, h)`, `Device::svg(w, h)` and
   `Device::png(w, h, dpi)` choose one directly. These start from R's
@@ -46,8 +46,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   ..Par::default() })` for other starting parameters (like R's
   `pointsize`). `dev.finish()` returns the file's bytes, `dev.save(path)`
   writes them.
-- Each R function is one method taking its data and an options struct,
-  e.g. `dev.axis(1, &AxisOptions::default().las(1))` or
+- Each R function is one `Device` method taking its data and an options
+  struct, e.g. `dev.hist(&x, &HistOptions::default())`,
+  `dev.axis(1, &AxisOptions::default().las(1))` or
   `dev.text(&x, &y, &["a", "b"], &TextOptions::default().col("red"))`.
   Unset fields are R's defaults, mostly the current `par()` values.
   Arguments R recycles per element (`points(x, y, col = groups)`) are
@@ -55,8 +56,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   (`.col("red")`, `.col(["red", "blue"])`). `.xpd(true)` is R's inline
   `xpd = TRUE`. The fields are public, so struct literals
   (`AxisOptions { las: Some(1), ..AxisOptions::default() }`) work too.
-- Change graphical parameters with `dev.par.<name> = ...` (R's `par()`),
-  and multi-panel arrangements with `dev.mfrow(2, 2)` / `dev.layout(...)`.
+- As in R, the high-level plots (`dev.plot`, `hist`, `barplot`,
+  `boxplot`, `pie`) start a new plot, moving to the next panel after
+  `dev.mfrow(2, 2)` / `dev.layout(...)`; the other methods add to the
+  current plot. Your own plots can be functions taking `&mut Device<B>`
+  or methods of an extension trait (example in the crate docs).
+- Change graphical parameters with `dev.par.<name> = ...` (R's `par()`).
+  `mar`, `oma` and the other region settings take effect at the next
+  plot. Sides are R's numbers (`dev.mtext("y", 4, ..)`) or `Side::Right`.
 - Colours are `ColorSpec`s: `"red".into()`, `"#FF000080".into()`, a
   palette index `ColorSpec::Index(2)`, or `ColorSpec::None`. Line types:
   `LineType::SOLID`, `DASHED`, ... or `"42".parse()?`.
@@ -82,6 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   - each a `Device` method taking its data and an options struct
   (`src/device.rs` and `src/device/*.rs`; R's `box()` is `box_()`).
   `mtext()` (`Device::mtext` + `MtextOptions`, `src/device/mtext.rs`)
+  takes the side as an argument, like `axis()`, and
   covers all four sides of the figure and outer (`oma`) margins with
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
@@ -111,7 +119,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   `legend()`
   (`Device::legend`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
-  filled boxes and merged point+line keys.
+  filled boxes and merged point+line keys, and returns R's `rect` and
+  `text` positions (`LegendLayout`, in `par("usr")` units).
+- Coordinates: `Device::usr()` is R's `par("usr")` (log10 on log axes),
+  `Device::xlog()`/`ylog()` tell which axes are logarithmic, and
+  `user_to_inches`/`inches_to_user` convert between data units and
+  device inches.
 - Multi-panel layouts (`src/layout.rs`, `Device::{mfrow, mfcol, layout,
   mfg}`): `par(mfrow=)`/`par(mfcol=)` (incl. R's automatic `cex` of
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
@@ -141,7 +154,8 @@ the corresponding `*.default` R function:
 - `plot()` - scatter/line plots (`type = "p"/"l"/"b"/"c"/"o"/"n"`).
 - `hist()` - histograms, including R's Sturges'-rule default binning and
   `add = TRUE`.
-- `barplot()` - vectors and matrices (stacked or `beside`), vertical or
+- `barplot()` - vectors and matrices (one method; a matrix is given as
+  its columns, `Vec<Vec<f64>>`), stacked or `beside`, vertical or
   `horiz`, with `legend.text`, `space`, `width`, `xlim`/`ylim`.
 - `boxplot()` - Tukey boxplots (via `fivenum()`, not `quantile()` -
   see [Design notes](#design-notes)), including the 1.5*IQR outlier rule,
@@ -322,8 +336,8 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
 - `tests/text_metrics_matches_r.rs` - `Device::text_metrics` vs. R's
-  `strwidth()`/`strheight()`: `cex`, `font`, multi-line text, `par(ps)`
-  and a 2x2 `mfrow`.
+  `strwidth()`/`strheight()`: `cex`, `font`, multi-line text, `par(ps)`,
+  `par(lheight)` and a 2x2 `mfrow`.
 - `tests/colour_zero_matches_r.rs` - colour 0 is `par("bg")` (with
   `pdf(bg = )`, the transparent default, and after `par(bg = )`): every
   painting operator and its colours.
@@ -378,6 +392,9 @@ against a real R installation by shelling out to `Rscript`:
   line's vertices, colour, width and dash pattern.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
+- `tests/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
+  `plot_new()` move nothing until the next plot (R would move margin
+  text but not the data).
 - `tests/axp_matches_r.rs` - `par("xaxp")`/`par("yaxp")` after
   `plot.window()` (linear, log with each tick rule, reversed, `par(lab)`),
   and the ticks drawn with `xaxp`/`yaxp` changed afterwards, inline in
@@ -395,12 +412,14 @@ against a real R installation by shelling out to `Rscript`:
   origins for `las = 0..3`.
 - `tests/legend_matches_r.rs` - legend box and label origins for keyword
   positions, `inset`, `ncol`/`horiz`, titles, filled boxes,
-  `cex`/`intersp` and `par(cex)`.
+  `cex`/`intersp` and `par(cex)`, and `legend()`'s return value (also on
+  log axes).
 - `tests/primitives_matches_r.rs` - per-element recycling in `points()`,
   `segments()`, `arrows()`, `rect()`, `polygon()` and `text()`,
   `lines(type = )`, `par("fg")` defaults, polygons split at `NA`, default
-  `text()` labels, `box(which = )` and `plot.window(asp = )`: every
-  painted path and text item in order.
+  `text()` labels, `box(which = )`, `plot.window(asp = )` and `plot()`'s
+  axes following `par(col.axis)` etc.: every painted path and text item in
+  order.
 
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but

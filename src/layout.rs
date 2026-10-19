@@ -144,15 +144,15 @@ impl Layout {
 
     /// Column widths (`widths =`); padded with relative `1`s if shorter
     /// than the number of columns, extra entries are ignored.
-    pub fn with_widths(mut self, widths: &[LayoutSize]) -> Layout {
+    pub fn widths(mut self, widths: &[LayoutSize]) -> Layout {
         let (w, cm) = pad_sizes(widths, self.ncol);
         self.widths = w;
         self.cm_widths = cm;
         self
     }
 
-    /// Row heights (`heights =`); see [`Layout::with_widths`].
-    pub fn with_heights(mut self, heights: &[LayoutSize]) -> Layout {
+    /// Row heights (`heights =`); see [`Layout::widths`].
+    pub fn heights(mut self, heights: &[LayoutSize]) -> Layout {
         let (h, cm) = pad_sizes(heights, self.nrow);
         self.heights = h;
         self.cm_heights = cm;
@@ -161,14 +161,14 @@ impl Layout {
 
     /// `respect = TRUE/FALSE`: one unit of width equals one unit of
     /// height in every relative-size cell.
-    pub fn with_respect(mut self, respect: bool) -> Layout {
+    pub fn respect(mut self, respect: bool) -> Layout {
         self.respect = if respect { Respect::All } else { Respect::No };
         self
     }
 
     /// `respect = <matrix>`: respect only the marked cells (given as rows,
     /// like `mat`).
-    pub fn with_respect_matrix(mut self, respect: &[Vec<bool>]) -> Result<Layout, LayoutError> {
+    pub fn respect_matrix(mut self, respect: &[Vec<bool>]) -> Result<Layout, LayoutError> {
         if respect.len() != self.nrow || respect.iter().any(|r| r.len() != self.ncol) {
             return Err(LayoutError(
                 "'respect' must be logical or matrix with same dimension as 'mat'".into(),
@@ -580,7 +580,7 @@ mod tests {
         // layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE), heights = c(1, 3))
         let l = Layout::new(&[vec![1, 1], vec![2, 3]])
             .unwrap()
-            .with_heights(&[LayoutSize::Relative(1.0), LayoutSize::Relative(3.0)]);
+            .heights(&[LayoutSize::Relative(1.0), LayoutSize::Relative(3.0)]);
         let top = l.figure_region_nic(1, 6.0, 4.0);
         assert!(close(top[0], 0.0) && close(top[1], 1.0));
         assert!(close(top[2], 0.75) && close(top[3], 1.0));
@@ -593,7 +593,7 @@ mod tests {
         // A 2 cm column in a 6 in (15.24 cm) wide region.
         let l = Layout::new(&[vec![1, 2]])
             .unwrap()
-            .with_widths(&[LayoutSize::Cm(2.0), LayoutSize::Relative(1.0)]);
+            .widths(&[LayoutSize::Cm(2.0), LayoutSize::Relative(1.0)]);
         let r = l.figure_region_nic(1, 6.0, 4.0);
         assert!(close(r[1], 2.0 / (6.0 * 2.54)));
         let r2 = l.figure_region_nic(2, 6.0, 4.0);
@@ -606,7 +606,7 @@ mod tests {
         // layout shrinks to a centred square-celled block.
         let l = Layout::new(&[vec![1, 2], vec![3, 4]])
             .unwrap()
-            .with_respect(true);
+            .respect(true);
         let r = l.figure_region_nic(1, 6.0, 4.0);
         let w_in = (r[1] - r[0]) * 6.0;
         let h_in = (r[3] - r[2]) * 4.0;

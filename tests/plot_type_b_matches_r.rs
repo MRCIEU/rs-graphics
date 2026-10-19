@@ -18,7 +18,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{plot, PlotOptions, PlotType};
+use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
@@ -97,7 +97,7 @@ fn draw_ours(c: &Case) -> String {
         axes: false,
         ..PlotOptions::default()
     };
-    plot(&mut dev, &X, &Y, &opts);
+    dev.plot(&X, &Y, &opts);
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

@@ -19,7 +19,7 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{boxplot, BoxplotOptions};
+use rs_graphics::highlevel::BoxplotOptions;
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
@@ -151,7 +151,7 @@ fn draw_ours(c: &Case) -> String {
         horizontal: c.horizontal,
         ..Default::default()
     };
-    boxplot(&mut dev, &groups(), &opts);
+    dev.boxplot(&groups(), &opts);
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

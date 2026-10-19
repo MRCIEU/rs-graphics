@@ -16,8 +16,10 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::{Device, LegendEntry, LegendKeyword, LegendOptions, LegendPos};
-use rs_graphics::highlevel::{plot, PlotOptions};
+use rs_graphics::device::{
+    Device, LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos,
+};
+use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
 
@@ -98,7 +100,7 @@ fn solid() -> LineType {
 struct Case {
     name: &'static str,
     r: &'static str,
-    run: fn(&mut Device<PdfBackend>),
+    run: fn(&mut Device<PdfBackend>) -> Option<LegendLayout>,
 }
 
 fn cases() -> Vec<Case> {
@@ -119,7 +121,7 @@ fn cases() -> Vec<Case> {
                     title: Some("Key".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o)
             },
         },
         Case {
@@ -135,7 +137,7 @@ fn cases() -> Vec<Case> {
                     inset: (0.05, 0.05),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::BottomLeft), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::BottomLeft), &e, &o)
             },
         },
         Case {
@@ -149,10 +151,10 @@ fn cases() -> Vec<Case> {
                 ];
                 let o = LegendOptions {
                     ncol: 2,
-                    bty_box: false,
+                    bty: LegendBty::None,
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::Center), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::Center), &e, &o)
             },
         },
         Case {
@@ -167,7 +169,7 @@ fn cases() -> Vec<Case> {
                     horiz: true,
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::Top), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::Top), &e, &o)
             },
         },
         Case {
@@ -186,7 +188,7 @@ fn cases() -> Vec<Case> {
                     title: Some("T".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Xy(5.0, 20.0), &e, &o);
+                d.legend(LegendPos::Xy(5.0, 20.0), &e, &o)
             },
         },
         Case {
@@ -201,7 +203,7 @@ fn cases() -> Vec<Case> {
                     LegendPos::Corners(5.0, 10.0, 15.0, 20.0),
                     &e,
                     &LegendOptions::default(),
-                );
+                )
             },
         },
         Case {
@@ -217,7 +219,7 @@ fn cases() -> Vec<Case> {
                     title: Some("A rather long legend title".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::Right), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::Right), &e, &o)
             },
         },
         Case {
@@ -238,7 +240,7 @@ fn cases() -> Vec<Case> {
                     title: Some("Key".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o)
             },
         },
         Case {
@@ -253,10 +255,40 @@ fn cases() -> Vec<Case> {
                     text_width: Some(2.0),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o);
+                d.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o)
             },
         },
     ]
+}
+
+/// Compares `legend()`'s return value with R's, printed by the script as
+/// `name left top w h text.x... text.y...`. Tolerance: 1/5000 of the axis
+/// range (about 0.1pt on these pages).
+fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: (f64, f64, f64, f64)) {
+    let line = r_stdout
+        .lines()
+        .find(|l| l.split_whitespace().next() == Some(name))
+        .unwrap_or_else(|| panic!("{name}: no return value printed by R"));
+    let r: Vec<f64> = line
+        .split_whitespace()
+        .skip(1)
+        .map(|v| v.parse().unwrap())
+        .collect();
+    let n = ours.text_x.len();
+    assert_eq!(r.len(), 4 + 2 * n, "{name}: number of returned values");
+    let (tx, ty) = (
+        (usr.1 - usr.0).abs() / 5000.0,
+        (usr.3 - usr.2).abs() / 5000.0,
+    );
+    let mut ours_flat = vec![(ours.left, tx), (ours.top, ty), (ours.w, tx), (ours.h, ty)];
+    ours_flat.extend(ours.text_x.iter().map(|&v| (v, tx)));
+    ours_flat.extend(ours.text_y.iter().map(|&v| (v, ty)));
+    for (k, (&(a, tol), &b)) in ours_flat.iter().zip(&r).enumerate() {
+        assert!(
+            (a - b).abs() < tol,
+            "{name}: returned value {k} differs: ours={a} r={b}\nours={ours:?}\nr={r:?}"
+        );
+    }
 }
 
 #[test]
@@ -271,10 +303,14 @@ fn legend_layout_matches_r() {
     for c in &cases {
         script.push_str(&format!(
             "pdf(file = '{}/rs_graphics_legend_{}.pdf', width = 6, height = 4, compress = FALSE)\n\
-             plot(x, y, pch = 19, xlab = 'x', ylab = 'y')\n{}\ninvisible(dev.off())\n",
+             plot(x, y, pch = 19, xlab = 'x', ylab = 'y')\n\
+             l <- {{ {} }}\n\
+             cat('{}', unlist(l$rect[c('left', 'top', 'w', 'h')]), l$text$x, l$text$y, '\\n')\n\
+             invisible(dev.off())\n",
             dir.display(),
             c.name,
-            c.r
+            c.r,
+            c.name
         ));
     }
     let script_path = dir.join("rs_graphics_legend.R");
@@ -303,8 +339,14 @@ fn legend_layout_matches_r() {
             ylab: Some("y".into()),
             ..PlotOptions::default()
         };
-        plot(&mut dev, &x, &y, &opts);
-        (c.run)(&mut dev);
+        dev.plot(&x, &y, &opts);
+        let layout = (c.run)(&mut dev).expect("legend drawn");
+        check_return_value(
+            c.name,
+            &layout,
+            &String::from_utf8_lossy(&out.stdout),
+            dev.usr(),
+        );
         let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 
         let (r_t, our_t) = (text_origins(&r_pdf), text_origins(&ours));
@@ -334,4 +376,51 @@ fn legend_layout_matches_r() {
             }
         }
     }
+}
+
+/// On log axes R's return value is in `usr` units (log10), as ours.
+#[test]
+fn legend_return_value_on_log_axes_matches_r() {
+    if !rscript_available() {
+        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+        return;
+    }
+    let script = "pdf(NULL, width = 6, height = 4)\n\
+                  plot(c(1, 1000), c(2, 500), log = 'xy')\n\
+                  l <- legend('topleft', legend = c('a', 'bb'), pch = 1:2, inset = 0.05)\n\
+                  cat('log', unlist(l$rect[c('left', 'top', 'w', 'h')]), l$text$x, l$text$y, '\\n')\n";
+    let out = Command::new("Rscript")
+        .args(["-e", script])
+        .output()
+        .expect("run Rscript");
+    assert!(
+        out.status.success(),
+        "Rscript failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let opts = PlotOptions {
+        xlog: true,
+        ylog: true,
+        ..PlotOptions::default()
+    };
+    dev.plot(&[1.0, 1000.0], &[2.0, 500.0], &opts);
+    let e = vec![
+        LegendEntry::point("a", black(), 1),
+        LegendEntry::point("bb", black(), 2),
+    ];
+    let o = LegendOptions {
+        inset: (0.05, 0.05),
+        ..Default::default()
+    };
+    let layout = dev
+        .legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o)
+        .expect("legend drawn");
+    check_return_value(
+        "log",
+        &layout,
+        &String::from_utf8_lossy(&out.stdout),
+        dev.usr(),
+    );
 }

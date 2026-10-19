@@ -47,16 +47,55 @@ mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
-pub use legend::{LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
+pub use legend::{LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
 pub use mtext::MtextOptions;
 pub use primitives::{
     ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
     SegmentsOptions, TextOptions, XyOptions,
 };
 
-/// Which axis/box side, in R's `side` convention: `1` = bottom, `2` =
-/// left, `3` = top, `4` = right.
-pub type Side = i32;
+/// A side of the plot, figure or page, as R's `side` argument. Functions
+/// take `impl Into<Side>`, so R's numbers work too: `1` = bottom, `2` =
+/// left, `3` = top, `4` = right (`dev.axis(1, ..)` is
+/// `dev.axis(Side::Bottom, ..)`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Side {
+    Bottom = 1,
+    Left = 2,
+    Top = 3,
+    Right = 4,
+}
+
+impl Side {
+    /// All four sides, in R's order (1 to 4).
+    pub const ALL: [Side; 4] = [Side::Bottom, Side::Left, Side::Top, Side::Right];
+
+    /// R's number for the side (1 to 4).
+    pub fn number(self) -> i32 {
+        self as i32
+    }
+
+    /// Bottom or top: the sides that carry an x axis.
+    pub fn is_horizontal(self) -> bool {
+        matches!(self, Side::Bottom | Side::Top)
+    }
+}
+
+impl From<i32> for Side {
+    /// R's side numbers.
+    ///
+    /// # Panics
+    /// If `n` isn't 1 to 4 (R: "invalid axis number").
+    fn from(n: i32) -> Side {
+        match n {
+            1 => Side::Bottom,
+            2 => Side::Left,
+            3 => Side::Top,
+            4 => Side::Right,
+            _ => panic!("invalid side {n}: must be 1 (bottom), 2 (left), 3 (top) or 4 (right)"),
+        }
+    }
+}
 
 /// `dev->yLineBias` for R's pdf/png/svg devices (see `GMtext()`).
 const Y_LINE_BIAS: f64 = 0.2;
@@ -66,7 +105,12 @@ pub struct Device<B: Backend> {
     pub par: Par,
     width_in: f64,
     height_in: f64,
-    /// Figure region (device inches minus outer margins).
+    /// Inner region (the device minus the outer margins), as of the last
+    /// `plot_new()`.
+    inner: Rect,
+    /// `par(mar)` as of the last `plot_new()`, for `title()`.
+    mar: Sides<f64>,
+    /// Figure region (part of the inner region).
     fig: Rect,
     /// Plot region (figure region minus `mar` margins).
     plt: Rect,
@@ -180,6 +224,8 @@ impl<B: Backend> Device<B> {
             par,
             width_in,
             height_in,
+            inner: Rect::new(0.0, 0.0, width_in, height_in),
+            mar: Sides::new(0.0, 0.0, 0.0, 0.0),
             fig: Rect::new(0.0, 0.0, width_in, height_in),
             plt: Rect::new(0.0, 0.0, width_in, height_in),
             usr: (0.0, 1.0, 0.0, 1.0),
@@ -217,20 +263,41 @@ impl<B: Backend> Device<B> {
         std::fs::write(path, self.finish())
     }
 
+    /// Page width in inches (R's `par("din")[1]`).
     pub fn width_in(&self) -> f64 {
         self.width_in
     }
 
+    /// Page height in inches (R's `par("din")[2]`).
     pub fn height_in(&self) -> f64 {
         self.height_in
     }
 
+    /// The current plot region, in device inches from the bottom-left
+    /// corner of the page (R's `par("plt")`, but in inches).
     pub fn plot_region(&self) -> Rect {
         self.plt
     }
 
+    /// R's `par("usr")`: the user coordinate limits `(x0, x1, y0, y1)` of
+    /// the plot region. As in R, a log axis's limits are log10 values
+    /// (`par("usr")` of `plot(1:100, log = "x")` starts at about 0, not
+    /// 1); everything that takes coordinates (`points()`, `axis(at = )`,
+    /// [`Device::user_to_inches`], ...) takes data units instead.
     pub fn usr(&self) -> (f64, f64, f64, f64) {
         self.usr
+    }
+
+    /// Whether the x axis is logarithmic (R's `par("xlog")`), as set by
+    /// the last `plot_window()` (`plot_new()` resets it).
+    pub fn xlog(&self) -> bool {
+        self.xlog
+    }
+
+    /// Whether the y axis is logarithmic (R's `par("ylog")`); see
+    /// [`Device::xlog`].
+    pub fn ylog(&self) -> bool {
+        self.ylog
     }
 
     fn recompute_layout(&mut self) {
@@ -243,6 +310,8 @@ impl<B: Backend> Device<B> {
             self.width_in - omi.right,
             self.height_in - omi.top,
         );
+        self.inner = inner;
+        self.mar = self.par.mar;
         let [fx0, fx1, fy0, fy1] = self.fig_nic.unwrap_or_else(|| {
             self.arrangement
                 .figure_region_nic(self.current_figure, inner.width(), inner.height())
@@ -425,8 +494,9 @@ impl<B: Backend> Device<B> {
     /// - **Regions:** figure and plot regions are computed now from
     ///   `par.mar`/`oma` (in lines of [`Device::line_height_inches`], so
     ///   `par.cex`, `mex` and the starting `ps` count too), `par.pty` and
-    ///   `par.plt`. Changing these afterwards has no
-    ///   effect until the next call.
+    ///   `par.plt`. Changing these afterwards has no effect until the
+    ///   next call, also on margin text (`title()`, `mtext()`,
+    ///   `axis(outer = )`), which R would place with the new `mar`/`oma`.
     /// - **New page:** what happens depends on the backend. PDF starts
     ///   a new page in the file, SVG discards the previous page, and PNG
     ///   paints over it. The page is then filled with `par.bg`, unless
@@ -543,14 +613,19 @@ impl<B: Backend> Device<B> {
     /// `par("xaxp")` (sides 1, 3) or `par("yaxp")` (sides 2, 4), which
     /// `plot_new()` and `plot_window()` set with `pretty()` (or R's
     /// log-axis rules) and `par("lab")`.
-    pub fn default_ticks(&self, side: Side) -> Vec<f64> {
-        let axp = if side == 1 || side == 3 { self.par.xaxp } else { self.par.yaxp };
+    pub fn default_ticks(&self, side: impl Into<Side>) -> Vec<f64> {
+        let side = side.into();
+        let axp = if side.is_horizontal() {
+            self.par.xaxp
+        } else {
+            self.par.yaxp
+        };
         self.ticks_from_axp(side, axp)
     }
 
     /// `CreateAtVector()` for `side`'s axis with the given `axp`.
     fn ticks_from_axp(&self, side: Side, axp: [f64; 3]) -> Vec<f64> {
-        let (lo, hi, log, nint) = if side == 1 || side == 3 {
+        let (lo, hi, log, nint) = if side.is_horizontal() {
             (self.usr.0, self.usr.1, self.xlog, self.par.lab[0])
         } else {
             (self.usr.2, self.usr.3, self.ylog, self.par.lab[1])
@@ -569,6 +644,25 @@ impl<B: Backend> Device<B> {
         let ux = if self.xlog { x.log10() } else { x };
         let uy = if self.ylog { y.log10() } else { y };
         self.usr_to_inches(ux, uy)
+    }
+
+    /// Map a point in device inches to data units (not log10 on a log
+    /// axis): the inverse of [`Device::user_to_inches`] (R's
+    /// `grconvertX(x, "inches", "user")`, but measured from the page's
+    /// bottom-left corner, and in data units on log axes).
+    pub fn inches_to_user(&self, p: Point) -> (f64, f64) {
+        let (ux, uy) = self.inches_to_usr(p);
+        let x = if self.xlog { 10f64.powf(ux) } else { ux };
+        let y = if self.ylog { 10f64.powf(uy) } else { uy };
+        (x, y)
+    }
+
+    /// Map a point in device inches to `usr` units (log10 on a log axis).
+    pub(crate) fn inches_to_usr(&self, p: Point) -> (f64, f64) {
+        let (x0, x1, y0, y1) = self.usr;
+        let ux = x0 + (p.x - self.plt.x0) / self.plt.width() * (x1 - x0);
+        let uy = y0 + (p.y - self.plt.y0) / self.plt.height() * (y1 - y0);
+        (ux, uy)
     }
 
     /// Map a point in `usr` units (log10 on a log axis) to device inches.
@@ -848,7 +942,7 @@ impl<B: Backend> Device<B> {
     /// `GEStrWidth`/`GEStrHeight` at `par(ps) * par(cex) * cex` points
     /// (after the backend's font-size rounding). The width is that of the
     /// widest line; the height is the ascent of "M" plus one line height
-    /// (`1.2 * ps / 72` inches, times the cex) per `\n`.
+    /// (`par(lheight) * 1.2 * ps / 72` inches, times the cex) per `\n`.
     pub fn text_metrics(&self, text: &str, font: i32, cex: f64) -> (f64, f64) {
         let face = self.par.font_face(font);
         let size = self.font_size_pt(cex);
@@ -857,7 +951,7 @@ impl<B: Backend> Device<B> {
             .map(|line| afm::str_width_inches(line, face, size, 1.0))
             .fold(0.0, f64::max);
         let newlines = text.matches('\n').count() as f64;
-        let line = 1.2 * self.par.ps * self.par.cex * cex / 72.0;
+        let line = self.par.lheight * 1.2 * self.par.ps * self.par.cex * cex / 72.0;
         (width, newlines * line + afm::m_height_inches(face, size, 1.0))
     }
 
@@ -935,7 +1029,7 @@ impl<B: Backend> Device<B> {
         if let Some(main) = &opts.main {
             // `vpos = 0.5 * mar[2]`, `adjy = 0.5` (finite, so `GEText`
             // uses `yc * height(M)`, not exact ink centring).
-            let y = self.plt.y1 + 0.5 * self.par.mar.top * lh;
+            let y = self.plt.y1 + 0.5 * self.mar.top * lh;
             self.draw_label(
                 Clip::Figure,
                 Point::new(x_mid, y),
@@ -1072,5 +1166,34 @@ mod tests {
         assert_eq!(f(&[0.0, 1e5, 2e5]), ["0e+00", "1e+05", "2e+05"]);
         assert_eq!(f(&[0.0, 50000.0, 100000.0]), ["0e+00", "5e+04", "1e+05"]);
         assert_eq!(f(&[0.0, 2000.0, 4000.0]), ["0", "2000", "4000"]);
+    }
+
+    #[test]
+    fn inches_to_user_inverts_user_to_inches() {
+        use super::{Device, PlotWindowOptions, Side};
+        let mut dev = Device::pdf(7.0, 5.0);
+        dev.plot_new();
+        assert!(!dev.xlog() && !dev.ylog());
+        let log_x = PlotWindowOptions {
+            xlog: true,
+            ..PlotWindowOptions::default()
+        };
+        dev.plot_window((1.0, 1000.0), (-2.0, 3.0), &log_x);
+        assert!(dev.xlog() && !dev.ylog());
+        for (x, y) in [(1.0, -2.0), (31.6, 0.25), (1000.0, 3.0)] {
+            let (x2, y2) = dev.inches_to_user(dev.user_to_inches(x, y));
+            assert!(
+                (x2 - x).abs() < 1e-9 * x && (y2 - y).abs() < 1e-9,
+                "{x}, {y}"
+            );
+        }
+        assert_eq!(Side::from(3), Side::Top);
+        assert_eq!(Side::Right.number(), 4);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid side 5")]
+    fn side_numbers_outside_1_to_4_panic() {
+        let _ = super::Side::from(5);
     }
 }

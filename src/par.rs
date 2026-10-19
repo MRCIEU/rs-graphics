@@ -133,9 +133,10 @@ crate::error::from_str_via_parse!(AxisType, "axis type");
 #[derive(Clone, Debug)]
 pub struct Par {
     /// Margins in lines: bottom, left, top, right. Default `c(5.1, 4.1,
-    /// 4.1, 2.1)`.
+    /// 4.1, 2.1)`. Applied at the next `plot_new()`.
     pub mar: Sides<f64>,
-    /// Outer margins in lines. Default `c(0, 0, 0, 0)`.
+    /// Outer margins in lines. Default `c(0, 0, 0, 0)`. Applied at the
+    /// next `plot_new()`.
     pub oma: Sides<f64>,
     /// `par(plt = c(x0, x1, y0, y1))`: the plot region as fractions of the
     /// figure region, instead of the figure less `mar`. `None` (the default)
@@ -147,11 +148,6 @@ pub struct Par {
     pub pty: Pty,
     pub xaxs: AxisStyle,
     pub yaxs: AxisStyle,
-    /// Unused: log axes are set with
-    /// [`PlotWindowOptions`](crate::device::PlotWindowOptions).
-    pub xlog: bool,
-    /// Unused (as `xlog`).
-    pub ylog: bool,
 
     /// `par(col)`: default colour of points, lines, `abline()` and `box()`.
     pub col: Color,
@@ -223,7 +219,9 @@ pub struct Par {
     /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
     pub xaxp: [f64; 3],
     pub yaxp: [f64; 3],
-    /// Unused (R's `par(lheight)`).
+    /// `par(lheight)`: multiplies the height of each extra line of text in
+    /// [`Device::text_metrics`](crate::device::Device::text_metrics). (Text
+    /// is drawn one line at a time, so this doesn't affect drawing.)
     pub lheight: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
@@ -240,8 +238,6 @@ impl Default for Par {
             pty: Pty::Maximal,
             xaxs: AxisStyle::Regular,
             yaxs: AxisStyle::Regular,
-            xlog: false,
-            ylog: false,
 
             col: Color::BLACK,
             bg: Color::WHITE,

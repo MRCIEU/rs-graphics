@@ -17,7 +17,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
-use rs_graphics::highlevel::{plot, PlotOptions};
+use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
 
@@ -147,7 +147,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..Default::default()
                 };
-                plot(d, &x, &x, &o);
+                d.plot(&x, &x, &o);
                 // Like R, `par()` keeps what `plot.window()` computed.
                 assert_eq!(d.par.xaxp, [2.0, 10.0, 4.0]);
             },

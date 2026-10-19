@@ -18,7 +18,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{plot, PlotOptions};
+use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
@@ -45,7 +45,7 @@ fn pl(d: &mut Dev, n: usize, main: &'static str) {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    plot(d, &x, &x, &o);
+    d.plot(&x, &x, &o);
 }
 
 struct Case {

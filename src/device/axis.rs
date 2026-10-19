@@ -167,7 +167,7 @@ impl Default for AxisOptions {
 
 /// `ComputePAdjValue()`: the default `padj` for `side` and `las`.
 fn default_padj(side: Side, las: i32) -> f64 {
-    let x_axis = side == 1 || side == 3;
+    let x_axis = side.is_horizontal();
     match las {
         1 if !x_axis => 0.5,
         2 => 0.5,
@@ -178,12 +178,14 @@ fn default_padj(side: Side, las: i32) -> f64 {
 
 impl<B: Backend> Device<B> {
     /// `axis(side, ...)` with all of R's arguments; see [`AxisOptions`].
+    /// `side` is a [`Side`] or R's number for it (1 to 4).
     ///
     /// # Panics
-    /// If `labels` is given without `at`, or their lengths differ (R's
-    /// errors).
-    pub fn axis(&mut self, side: Side, opts: &AxisOptions) {
-        let x_axis = side == 1 || side == 3;
+    /// If `side` is a number other than 1 to 4, or `labels` is given
+    /// without `at`, or their lengths differ (R's errors).
+    pub fn axis(&mut self, side: impl Into<Side>, opts: &AxisOptions) {
+        let side = side.into();
+        let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);
         let perpendicular = if x_axis {
             las == 2 || las == 3
@@ -286,7 +288,10 @@ impl<B: Backend> Device<B> {
         // The axis line's position across the axis, and which way is
         // "outward" (away from the plot region).
         let lh = self.line_height_inches();
-        let outward = if side <= 2 { -1.0 } else { 1.0 };
+        let outward = match side {
+            Side::Bottom | Side::Left => -1.0,
+            Side::Top | Side::Right => 1.0,
+        };
         let axis_base = match pos {
             Some(p) => {
                 if x_axis {
@@ -296,21 +301,12 @@ impl<B: Backend> Device<B> {
                 }
             }
             None => {
-                let edge = if opts.outer {
-                    let omi = self.omi();
-                    match side {
-                        1 => omi.bottom,
-                        2 => omi.left,
-                        3 => self.height_in - omi.top,
-                        _ => self.width_in - omi.right,
-                    }
-                } else {
-                    match side {
-                        1 => self.plt.y0,
-                        2 => self.plt.x0,
-                        3 => self.plt.y1,
-                        _ => self.plt.x1,
-                    }
+                let region = if opts.outer { self.inner } else { self.plt };
+                let edge = match side {
+                    Side::Bottom => region.y0,
+                    Side::Left => region.x0,
+                    Side::Top => region.y1,
+                    Side::Right => region.x1,
                 };
                 edge + outward * line * lh
             }
@@ -386,18 +382,18 @@ impl<B: Backend> Device<B> {
             .hadj
             .filter(|h| h.is_finite())
             .unwrap_or(if perpendicular {
-                if side <= 2 { 1.0 } else { 0.0 }
+                if outward < 0.0 { 1.0 } else { 0.0 }
             } else {
                 0.5
             });
         // `GMtext()`'s rotation and `yLineBias` nudge.
         let (angle, bias) = match (side, perpendicular) {
-            (1 | 3, true) => (90.0, 0.0),
-            (_, true) => (0.0, 0.0),
-            (1, false) => (0.0, 1.0 - Y_LINE_BIAS),
-            (2, false) => (90.0, Y_LINE_BIAS),
-            (3, false) => (0.0, Y_LINE_BIAS),
-            (_, false) => (90.0, 1.0 - Y_LINE_BIAS),
+            (Side::Bottom | Side::Top, true) => (90.0, 0.0),
+            (Side::Left | Side::Right, true) => (0.0, 0.0),
+            (Side::Bottom, false) => (0.0, 1.0 - Y_LINE_BIAS),
+            (Side::Left, false) => (90.0, Y_LINE_BIAS),
+            (Side::Top, false) => (0.0, Y_LINE_BIAS),
+            (Side::Right, false) => (90.0, 1.0 - Y_LINE_BIAS),
         };
         let label_perp = axis_base + outward * (self.par.mgp[1] - lineoff + bias) * lh;
 
@@ -468,13 +464,13 @@ mod tests {
 
     #[test]
     fn default_padj_follows_compute_padj_value() {
-        for side in 1..=4 {
+        for side in Side::ALL {
             assert_eq!(default_padj(side, 0), 0.0);
             assert_eq!(default_padj(side, 2), 0.5);
         }
-        assert_eq!(default_padj(1, 1), 0.0);
-        assert_eq!(default_padj(2, 1), 0.5);
-        assert_eq!(default_padj(3, 3), 0.5);
-        assert_eq!(default_padj(4, 3), 0.0);
+        assert_eq!(default_padj(Side::Bottom, 1), 0.0);
+        assert_eq!(default_padj(Side::Left, 1), 0.5);
+        assert_eq!(default_padj(Side::Top, 3), 0.5);
+        assert_eq!(default_padj(Side::Right, 3), 0.0);
     }
 }

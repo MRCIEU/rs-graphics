@@ -438,32 +438,34 @@ fn plotmath_title_mtext_text_legend_match_r() {
         xlab: Some(Label::math("x[1] + x[2]")),
         ylab: Some(Label::math("-log[10](italic(p))")),
     });
-    let mt = |side, line| MtextOptions {
-        side,
+    let mt = |line| MtextOptions {
         line,
         ..MtextOptions::default()
     };
     d.mtext(
         Label::math("beta^2"),
+        3,
         &MtextOptions {
             adj: Some(0.0),
-            ..mt(3, 0.5)
+            ..mt(0.5)
         },
     );
-    d.mtext(Label::math("Omega ~ infinity"), &mt(4, 1.0));
+    d.mtext(Label::math("Omega ~ infinity"), 4, &mt(1.0));
     d.mtext(
         Label::math("10^-5"),
+        1,
         &MtextOptions {
             outer: true,
-            ..mt(1, 0.5)
+            ..mt(0.5)
         },
     );
     d.par.las = 1;
     d.mtext(
         Label::math("gamma[k]"),
+        2,
         &MtextOptions {
             at: Some(8.0),
-            ..mt(2, 3.0)
+            ..mt(3.0)
         },
     );
     d.par.las = 0;
@@ -615,11 +617,10 @@ fn plotmath_high_level_titles_match_r() {
     );
 
     use rs_graphics::highlevel::{
-        BarplotOptions, BoxplotOptions, HistOptions, PieOptions, PlotOptions, barplot, boxplot,
-        hist, pie, plot,
+        BarplotOptions, BoxplotOptions, HistOptions, PieOptions, PlotOptions,
     };
     let math = |s: &str| Some(Label::math(s));
-    let abc = || Some(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    let abc = || Some(vec!["a".into(), "b".into(), "c".into()]);
     let mut d = Device::new(
         PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
         Par::default(),
@@ -627,8 +628,7 @@ fn plotmath_high_level_titles_match_r() {
     d.mfrow(2, 3);
     let x: Vec<f64> = (1..=10).map(f64::from).collect();
     let y: Vec<f64> = x.iter().map(|v| v * v).collect();
-    plot(
-        &mut d,
+    d.plot(
         &x,
         &y,
         &PlotOptions {
@@ -639,8 +639,7 @@ fn plotmath_high_level_titles_match_r() {
             ..PlotOptions::default()
         },
     );
-    hist(
-        &mut d,
+    d.hist(
         &[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0],
         &HistOptions {
             main: math("Histogram ~ of ~ X[1]"),
@@ -648,9 +647,8 @@ fn plotmath_high_level_titles_match_r() {
             ..HistOptions::default()
         },
     );
-    barplot(
-        &mut d,
-        &[3.0, 5.0, 2.0],
+    d.barplot(
+        [3.0, 5.0, 2.0],
         &BarplotOptions {
             names: abc(),
             main: math("bold(Bars)"),
@@ -658,8 +656,7 @@ fn plotmath_high_level_titles_match_r() {
             ..BarplotOptions::default()
         },
     );
-    boxplot(
-        &mut d,
+    d.boxplot(
         &[vec![1.0, 2.0, 3.0, 4.0, 9.0], vec![2.0, 3.0, 4.0]],
         &BoxplotOptions {
             main: math("sigma^2"),
@@ -667,8 +664,7 @@ fn plotmath_high_level_titles_match_r() {
             ..BoxplotOptions::default()
         },
     );
-    pie(
-        &mut d,
+    d.pie(
         &[1.0, 2.0, 3.0],
         &PieOptions {
             labels: abc(),

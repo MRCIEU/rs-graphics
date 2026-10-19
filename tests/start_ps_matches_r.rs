@@ -19,7 +19,7 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::ColorSpec;
 use rs_graphics::device::{Device, LegendEntry, LegendKeyword, LegendOptions, LegendPos};
-use rs_graphics::highlevel::{PlotOptions, PlotType, plot};
+use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
 
@@ -58,7 +58,7 @@ fn draw_ours(start: f64, ps: f64) -> String {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    plot(&mut dev, &[1.0, 2.0, 3.0, 4.0], &[1.0, 3.0, 2.0, 4.0], &opts);
+    dev.plot(&[1.0, 2.0, 3.0, 4.0], &[1.0, 3.0, 2.0, 4.0], &opts);
     let black = ColorSpec::Index(1);
     let entries: Vec<LegendEntry> = ["a", "bb"]
         .iter()

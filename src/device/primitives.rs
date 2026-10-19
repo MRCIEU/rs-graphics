@@ -624,15 +624,7 @@ impl<B: Backend> Device<B> {
         let rect = match opts.which {
             BoxWhich::Plot => self.plt,
             BoxWhich::Figure => self.fig,
-            BoxWhich::Inner => {
-                let omi = self.omi();
-                Rect::new(
-                    omi.left,
-                    omi.bottom,
-                    self.width_in - omi.right,
-                    self.height_in - omi.top,
-                )
-            }
+            BoxWhich::Inner => self.inner,
             BoxWhich::Outer => Rect::new(0.0, 0.0, self.width_in, self.height_in),
         };
         self.dirty();

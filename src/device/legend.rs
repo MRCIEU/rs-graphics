@@ -14,7 +14,8 @@
 //! R computes everything in *user* coordinates; since the user -> device
 //! mapping is linear (also for log axes, where user coordinates are
 //! `log10`-transformed), this port works directly in device inches (y up),
-//! which gives identical results for non-reversed axes. Reversed axes
+//! which gives identical results for non-reversed axes, and converts what
+//! it returns ([`LegendLayout`]) back to user coordinates. Reversed axes
 //! (`xlim = c(hi, lo)`) are not handled.
 //!
 //! Labels and the title may be plotmath expressions (`Label::math`).
@@ -93,6 +94,29 @@ impl LegendKeyword {
 }
 
 crate::error::from_str_via_parse!(LegendKeyword, "legend position");
+
+/// R's `legend(bty = )`: whether the legend has a box around it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LegendBty {
+    /// `"o"` (the default): draw the box.
+    #[default]
+    Box,
+    /// `"n"`: no box.
+    None,
+}
+
+impl LegendBty {
+    /// `"o"` or `"n"`.
+    pub fn parse(s: &str) -> Option<LegendBty> {
+        match s {
+            "o" => Some(LegendBty::Box),
+            "n" => Some(LegendBty::None),
+            _ => None,
+        }
+    }
+}
+
+crate::error::from_str_via_parse!(LegendBty, "legend box type");
 
 /// One row (key + label) of a legend.
 #[derive(Clone, Debug)]
@@ -188,8 +212,8 @@ impl LegendEntry {
 /// The scalar arguments of R's `legend()`, with R's defaults.
 #[derive(Clone, Debug)]
 pub struct LegendOptions {
-    /// `bty != "n"`: draw the surrounding box.
-    pub bty_box: bool,
+    /// `bty`: whether to draw the surrounding box.
+    pub bty: LegendBty,
     /// Box fill (`bg=`); `None` = `par("bg")` (transparent, so unfilled,
     /// on PDF by default: see [`Backend::default_bg`]).
     pub bg: Option<ColorSpec>,
@@ -226,7 +250,7 @@ pub struct LegendOptions {
 }
 
 crate::setters::setters!(LegendOptions {
-    bty_box: value bool,
+    bty: value LegendBty,
     bg: option ColorSpec,
     cex: value f64,
     xjust: option f64,
@@ -250,7 +274,7 @@ crate::setters::setters!(LegendOptions {
 impl Default for LegendOptions {
     fn default() -> Self {
         LegendOptions {
-            bty_box: true,
+            bty: LegendBty::Box,
             bg: None,
             cex: 1.0,
             xjust: None,
@@ -273,25 +297,27 @@ impl Default for LegendOptions {
     }
 }
 
-/// The legend box that was drawn, in device inches (y up): what R returns as
-/// `legend()$rect` (there in user units).
-#[derive(Clone, Copy, Debug)]
+/// Where `legend()` drew, as R's (invisible) return value `list(rect =
+/// list(w, h, left, top), text = list(x, y))`. All in `usr` units, as in
+/// R: log10 values on a log axis (see [`Device::usr`]).
+#[derive(Clone, Debug, PartialEq)]
 pub struct LegendLayout {
+    /// `rect$left`, `rect$top`: the box's top-left corner.
     pub left: f64,
     pub top: f64,
+    /// `rect$w`, `rect$h`: the box's width and height.
     pub w: f64,
     pub h: f64,
-}
-
-impl LegendLayout {
-    pub fn rect(&self) -> Rect {
-        Rect::new(self.left, self.top - self.h, self.left + self.w, self.top)
-    }
+    /// `text$x`, `text$y`: each label's anchor (its left end and vertical
+    /// centre).
+    pub text_x: Vec<f64>,
+    pub text_y: Vec<f64>,
 }
 
 impl<B: Backend> Device<B> {
-    /// `legend(pos, ...)`: see the module docs. Returns the box geometry, or
-    /// `None` if `entries` is empty (R errors there).
+    /// `legend(pos, ...)`: see the module docs. Returns where the box and
+    /// labels went (R's return value, in `usr` units), or `None` if
+    /// `entries` is empty (R errors there).
     pub fn legend(
         &mut self,
         pos: LegendPos,
@@ -449,7 +475,7 @@ impl<B: Backend> Device<B> {
         // the `rect()`/`segments()`/`points()` calls R makes.
         let lwd_box = self.par.lwd;
         self.push_clip_for(self.par.xpd);
-        if opts.bty_box {
+        if opts.bty == LegendBty::Box {
             let bg = opts.bg.unwrap_or(ColorSpec::Color(self.par.bg));
             let fill = self.resolve(bg).filter(|c| c.a > 0);
             let stroke = self.stroke_of(self.par.fg, lwd_box, self.par.lty);
@@ -535,8 +561,13 @@ impl<B: Backend> Device<B> {
             let anchor = Point::new(left + w * 0.5, top - ymaxtitle);
             self.draw_label(clip, anchor, t, 0.5, Some(0.0), 0.0, text_col, tcex, font);
         }
+        let mut text_x = Vec::with_capacity(n);
+        let mut text_y = Vec::with_capacity(n);
         for i in 0..n {
             let anchor = Point::new(xt[i] + opts.x_intersp * xc, yt[i]);
+            let (tx, ty) = self.inches_to_usr(anchor);
+            text_x.push(tx);
+            text_y.push(ty);
             let label = &entries[i].label;
             self.draw_label(
                 clip,
@@ -551,7 +582,16 @@ impl<B: Backend> Device<B> {
             );
         }
 
-        LegendLayout { left, top, w, h }
+        let (left_u, top_u) = self.inches_to_usr(Point::new(left, top));
+        let (right_u, bottom_u) = self.inches_to_usr(Point::new(left + w, top - h));
+        LegendLayout {
+            left: left_u,
+            top: top_u,
+            w: right_u - left_u,
+            h: top_u - bottom_u,
+            text_x,
+            text_y,
+        }
     }
 }
 

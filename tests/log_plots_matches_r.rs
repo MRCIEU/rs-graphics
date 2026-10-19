@@ -23,10 +23,7 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{
-    barplot, barplot_matrix, boxplot, hist, plot, BarplotOptions, BoxplotOptions, HistOptions,
-    PlotOptions,
-};
+use rs_graphics::highlevel::{BarplotOptions, BoxplotOptions, HistOptions, PlotOptions};
 use rs_graphics::lty::LineType;
 use rs_graphics::par::{AxisType, Par};
 use rs_graphics::prelude::*;
@@ -112,7 +109,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
-                plot(d, &[1.0, 1000.0], &[1.0, 1e4], &opts);
+                d.plot(&[1.0, 1000.0], &[1.0, 1e4], &opts);
                 let black = ColorSpec::Index(1);
                 d.abline(&AblineOptions {
                     h: vec![10.0],
@@ -172,7 +169,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
-                plot(d, &[1.0, 1000.0], &[0.0, 10.0], &opts);
+                d.plot(&[1.0, 1000.0], &[0.0, 10.0], &opts);
                 let black = ColorSpec::Index(1);
                 d.abline(&AblineOptions {
                     coef: Some((1.0, 2.0)),
@@ -205,7 +202,7 @@ fn cases() -> Vec<Case> {
             r: "hist(hx, log = 'x', ylab = 'n')",
             draw: |d| {
                 let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                hist(d, &hist_data(), &o);
+                d.hist(&hist_data(), &o);
             },
         },
         Case {
@@ -213,7 +210,7 @@ fn cases() -> Vec<Case> {
             r: "suppressWarnings(hist(hx, log = 'y', ylab = 'n'))",
             draw: |d| {
                 let o = HistOptions { ylog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                hist(d, &hist_data(), &o);
+                d.hist(&hist_data(), &o);
             },
         },
         Case {
@@ -222,7 +219,7 @@ fn cases() -> Vec<Case> {
                 hist(hx * 1.05, add = TRUE, col = 'pink', border = 'red')",
             draw: |d| {
                 let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                hist(d, &hist_data(), &o);
+                d.hist(&hist_data(), &o);
                 let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
                 let o = HistOptions {
                     add: true,
@@ -230,7 +227,7 @@ fn cases() -> Vec<Case> {
                     border: red(),
                     ..Default::default()
                 };
-                hist(d, &more, &o);
+                d.hist(&more, &o);
             },
         },
         Case {
@@ -238,11 +235,11 @@ fn cases() -> Vec<Case> {
             r: "barplot(c(3, 40, 700, 12), names.arg = c('a', 'b', 'c', 'd'), log = 'y')",
             draw: |d| {
                 let o = BarplotOptions {
-                    names: Some(["a", "b", "c", "d"].map(String::from).to_vec()),
+                    names: Some(["a", "b", "c", "d"].map(Label::from).to_vec()),
                     ylog: true,
                     ..Default::default()
                 };
-                barplot(d, &[3.0, 40.0, 700.0, 12.0], &o);
+                d.barplot([3.0, 40.0, 700.0, 12.0], &o);
             },
         },
         Case {
@@ -252,7 +249,7 @@ fn cases() -> Vec<Case> {
             r: "barplot(cbind(c(2, 5), c(30, 60), c(400, 100)), log = 'y')",
             draw: |d| {
                 let o = BarplotOptions { ylog: true, ..Default::default() };
-                barplot_matrix(d, &[vec![2.0, 5.0], vec![30.0, 60.0], vec![400.0, 100.0]], &o);
+                d.barplot(&[vec![2.0, 5.0], vec![30.0, 60.0], vec![400.0, 100.0]], &o);
             },
         },
         Case {
@@ -267,7 +264,7 @@ fn cases() -> Vec<Case> {
                     xlim: Some((1.0, 100.0)),
                     ..Default::default()
                 };
-                barplot_matrix(d, &[vec![2.0, 5.0], vec![30.0, 60.0]], &o);
+                d.barplot(&[vec![2.0, 5.0], vec![30.0, 60.0]], &o);
             },
         },
         Case {
@@ -282,7 +279,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..Default::default()
                 };
-                plot(d, &x, &x, &o);
+                d.plot(&x, &x, &o);
                 let fg = ColorSpec::Index(1);
                 let labels = ["a", "b", "c"].map(String::from).to_vec();
                 d.axis(
@@ -316,7 +313,13 @@ fn cases() -> Vec<Case> {
                     xlab: Some("value".into()),
                     ..Default::default()
                 };
-                boxplot(d, &[vec![1.0, 2.0, 2.5, 3.0, 7.0], vec![2.0, 3.0, 3.5, 4.0, 4.2, 5.0]], &o);
+                d.boxplot(
+                    &[
+                        vec![1.0, 2.0, 2.5, 3.0, 7.0],
+                        vec![2.0, 3.0, 3.5, 4.0, 4.2, 5.0],
+                    ],
+                    &o,
+                );
             },
         },
         Case {
@@ -328,11 +331,11 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.par.lab = [10, 3, 7];
                 let o = PlotOptions { xlab: Some("x".into()), ylab: Some("y".into()), ..Default::default() };
-                plot(d, &[0.0, 1.0], &[0.0, 1.0], &o);
+                d.plot(&[0.0, 1.0], &[0.0, 1.0], &o);
                 d.set_new(true);
                 d.par.lab = [2, 12, 7];
                 let o = PlotOptions { xlog: true, ylog: true, axes: false, ..Default::default() };
-                plot(d, &[1.0, 1e6], &[1.0, 50.0], &o);
+                d.plot(&[1.0, 1e6], &[1.0, 50.0], &o);
                 let fg = ColorSpec::Index(1);
                 d.axis(
                     3,

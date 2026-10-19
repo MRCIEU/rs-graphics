@@ -51,7 +51,7 @@ fn draw_scatter<B: Backend>(dev: &mut Device<B>) {
         .main("plot(): scatter")
         .xlab("x")
         .ylab("y");
-    plot(dev, &x, &y, &opts);
+    dev.plot(&x, &y, &opts);
 }
 
 fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
@@ -65,7 +65,7 @@ fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
         .main("plot(): line")
         .xlab("x")
         .ylab("sin(x)");
-    plot(dev, &x, &y, &opts);
+    dev.plot(&x, &y, &opts);
 }
 
 fn draw_log<B: Backend>(dev: &mut Device<B>) {
@@ -81,7 +81,7 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
         .main("plot(): log = \"xy\"")
         .xlab("x")
         .ylab("2 * x^1.5");
-    plot(dev, &x, &y, &opts);
+    dev.plot(&x, &y, &opts);
 }
 
 fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
@@ -99,7 +99,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .main("abline() on log axes")
         .xlab("x")
         .ylab("y");
-    plot(dev, &x, &y, &opts);
+    dev.plot(&x, &y, &opts);
     let grey = ColorSpec::from("grey");
     let dashed = LineType::DASHED;
     let solid = LineType::SOLID;
@@ -145,7 +145,7 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         .main("legend(\"topright\")")
         .xlab("x")
         .ylab("value");
-    plot(dev, &x, &sin, &opts);
+    dev.plot(&x, &sin, &opts);
     let cos_line = XyOptions::default().col(4).lwd(2.0).lty(LineType::DASHED);
     dev.lines(&x, &cos, &cos_line);
     let entries = vec![
@@ -159,7 +159,7 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
 fn draw_hist<B: Backend>(dev: &mut Device<B>) {
     let data = parse_data(include_str!("data/hist_x.txt"));
     let opts = HistOptions::default().main("hist(): approximately normal data");
-    hist(dev, &data, &opts);
+    dev.hist(&data, &opts);
 }
 
 fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
@@ -168,7 +168,7 @@ fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
         .names(["A", "B", "C", "D", "E"])
         .main("barplot()")
         .ylab("value");
-    barplot(dev, &heights, &opts);
+    dev.barplot(&heights, &opts);
 }
 
 fn barplot_sample_columns() -> Vec<Vec<f64>> {
@@ -190,12 +190,12 @@ fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions {
 
 fn draw_barplot_stacked<B: Backend>(dev: &mut Device<B>) {
     let opts = barplot_sample_opts("barplot(): stacked", false);
-    barplot_matrix(dev, &barplot_sample_columns(), &opts);
+    dev.barplot(barplot_sample_columns(), &opts);
 }
 
 fn draw_barplot_beside<B: Backend>(dev: &mut Device<B>) {
     let opts = barplot_sample_opts("barplot(): beside", true);
-    barplot_matrix(dev, &barplot_sample_columns(), &opts);
+    dev.barplot(barplot_sample_columns(), &opts);
 }
 
 fn boxplot_sample_groups() -> Vec<Vec<f64>> {
@@ -211,7 +211,7 @@ fn draw_boxplot<B: Backend>(dev: &mut Device<B>) {
         .names(["Ctrl", "Treat A", "Treat B"])
         .main("boxplot()")
         .ylab("value");
-    boxplot(dev, &boxplot_sample_groups(), &opts);
+    dev.boxplot(&boxplot_sample_groups(), &opts);
 }
 
 fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
@@ -220,7 +220,7 @@ fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
         .horizontal(true)
         .main("boxplot(horizontal = TRUE)")
         .xlab("value");
-    boxplot(dev, &boxplot_sample_groups(), &opts);
+    dev.boxplot(&boxplot_sample_groups(), &opts);
 }
 
 fn draw_pie<B: Backend>(dev: &mut Device<B>) {
@@ -228,7 +228,7 @@ fn draw_pie<B: Backend>(dev: &mut Device<B>) {
     let opts = PieOptions::default()
         .labels(["Alpha", "Beta", "Gamma", "Delta", "Epsilon"])
         .main("pie()");
-    pie(dev, &values, &opts);
+    dev.pie(&values, &opts);
 }
 
 /// A chart of every plotting symbol: `pch = 0:25` (with `col`, `bg`) plus

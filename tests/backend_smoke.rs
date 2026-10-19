@@ -230,7 +230,7 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         main: Some(Label::math("alpha^2")),
         ..PlotOptions::default()
     };
-    plot(dev, &x, &x, &opts);
+    dev.plot(&x, &x, &opts);
     let entries = [LegendEntry::point("a", "red", 46)];
     dev.legend(
         LegendPos::Keyword(LegendKeyword::TopLeft),
@@ -243,7 +243,7 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         cex: vec![0.5],
         ..PlotOptions::default()
     };
-    plot(dev, &x, &[3.0, 1.0, 2.0], &dots);
+    dev.plot(&x, &[3.0, 1.0, 2.0], &dots);
 }
 
 #[test]

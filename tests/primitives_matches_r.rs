@@ -11,7 +11,8 @@
 //! `points()`/`segments()`/`arrows()`/`rect()`/`polygon()`/`text()`,
 //! `lines(type = )`, R's `par("fg")` defaults, `NA`-separated polygons,
 //! vectorised and default `text()` labels, `box(which = )` and
-//! `plot.window(asp = )`. Every painted path (operator, vertices, fill and
+//! `plot.window(asp = )`, and `plot()`'s axes taking their style from
+//! `par()`. Every painted path (operator, vertices, fill and
 //! stroke colour, width, dash; circles by operator only) and every text
 //! item (string, origin, size, colour) is compared in order. Skipped if
 //! `Rscript` isn't available.
@@ -259,6 +260,24 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            // `plot()`'s axes take their colour, size, font and `las` from
+            // `par()` (R's `localAxis()`); labels use `par(col.axis)`.
+            name: "plot_axis_par",
+            r: "par(fg = 'red', col.axis = 'blue', cex.axis = 1.3, font.axis = 2, las = 1)\n\
+                plot(c(1, 3), c(2, 5), pch = 19, ann = FALSE)",
+            draw: |d| {
+                let red = Color::parse("red").unwrap();
+                d.par.fg = red;
+                d.par.col = red;
+                d.par.col_axis = Color::parse("blue").unwrap();
+                d.par.cex_axis = 1.3;
+                d.par.font_axis = 2;
+                d.par.las = 1;
+                d.par.ann = false;
+                d.plot(&[1.0, 3.0], &[2.0, 5.0], &PlotOptions::default().pch(19));
+            },
+        },
+        Case {
             name: "arrows_log",
             r: "plot.new(); plot.window(c(1, 100), c(1, 10), log = 'x')\n\
                 arrows(c(0, 10, -5), 2, c(50, 20, 30), c(5, 8, 9))",
@@ -305,7 +324,7 @@ fn cases() -> Vec<Case> {
 
 /// Cases drawn on `plot.new(); plot.window(c(0, 10), c(0, 10))`.
 fn on_window(name: &str) -> bool {
-    !matches!(name, "box_regions" | "asp")
+    !matches!(name, "box_regions" | "asp" | "plot_axis_par")
 }
 
 #[derive(Clone, Debug)]

@@ -58,7 +58,7 @@ impl PlotType {
 
 crate::error::from_str_via_parse!(PlotType, "plot type");
 
-/// Options for [`plot`], covering the subset of `plot.default`'s
+/// Options for [`Device::plot`], covering the subset of `plot.default`'s
 /// arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct PlotOptions {
@@ -150,70 +150,66 @@ impl Default for PlotOptions {
     }
 }
 
-/// `plot(x, y, ...)`: `plot.new()` + `plot.window()` + the requested
-/// point/line geometry + (optionally) `axis()`/`box()`/`title()`.
-pub fn plot<B: Backend>(dev: &mut Device<B>, x: &[f64], y: &[f64], opts: &PlotOptions) {
-    // On a log axis, values <= 0 are dropped (R's `xy.coords()` makes
-    // them `NA`); `points()`/`lines()` then skip them.
-    let range = |v: &[f64], log: bool| {
-        if log {
-            let positive: Vec<f64> = v.iter().copied().filter(|&a| a > 0.0).collect();
-            data_range(&positive)
-        } else {
-            data_range(v)
-        }
-    };
-    let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.xlog));
-    let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
-
-    dev.plot_new();
-    let window = PlotWindowOptions {
-        xlog: opts.xlog,
-        ylog: opts.ylog,
-        ..PlotWindowOptions::default()
-    };
-    dev.plot_window(xlim, ylim, &window);
-
-    // `plot.xy(xy, type, ...)`.
-    let xy = XyOptions {
-        type_: Some(opts.type_),
-        pch: opts.pch.clone(),
-        col: opts.col.clone(),
-        bg: opts.bg.clone(),
-        cex: opts.cex.clone(),
-        lwd: opts.lwd.clone(),
-        lty: opts.lty,
-        xpd: None,
-    };
-    dev.points(x, y, &xy);
-
-    if opts.axes {
-        let fg = ColorSpec::Color(dev.par.fg);
-        let (cex_axis, font_axis, las) = (dev.par.cex_axis, dev.par.font_axis, dev.par.las);
-        let axis = |dev: &mut Device<B>, side, axt, axp| {
-            let o = AxisOptions {
-                col: Some(fg),
-                col_axis: Some(fg),
-                cex_axis: Some(cex_axis),
-                font: Some(font_axis),
-                las: Some(las),
-                axt,
-                axp,
-                ..AxisOptions::default()
-            };
-            dev.axis(side, &o);
+impl<B: Backend> Device<B> {
+    /// `plot(x, y, ...)`: `plot.new()` + `plot.window()` + the requested
+    /// point/line geometry + (optionally) `axis()`/`box()`/`title()`. A
+    /// high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
+    /// page it moves to the next panel.
+    pub fn plot(&mut self, x: &[f64], y: &[f64], opts: &PlotOptions) {
+        // On a log axis, values <= 0 are dropped (R's `xy.coords()` makes
+        // them `NA`); `points()`/`lines()` then skip them.
+        let range = |v: &[f64], log: bool| {
+            if log {
+                let positive: Vec<f64> = v.iter().copied().filter(|&a| a > 0.0).collect();
+                data_range(&positive)
+            } else {
+                data_range(v)
+            }
         };
-        axis(dev, 1, opts.xaxt, opts.xaxp);
-        axis(dev, 2, opts.yaxt, opts.yaxp);
-        dev.box_(&BoxOptions::default());
-    }
+        let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.xlog));
+        let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
 
-    if dev.par.ann {
-        dev.title(&TitleOptions {
-            main: opts.main.clone(),
-            sub: opts.sub.clone(),
-            xlab: opts.xlab.clone(),
-            ylab: opts.ylab.clone(),
-        });
+        self.plot_new();
+        let window = PlotWindowOptions {
+            xlog: opts.xlog,
+            ylog: opts.ylog,
+            ..PlotWindowOptions::default()
+        };
+        self.plot_window(xlim, ylim, &window);
+
+        // `plot.xy(xy, type, ...)`.
+        let xy = XyOptions {
+            type_: Some(opts.type_),
+            pch: opts.pch.clone(),
+            col: opts.col.clone(),
+            bg: opts.bg.clone(),
+            cex: opts.cex.clone(),
+            lwd: opts.lwd.clone(),
+            lty: opts.lty,
+            xpd: None,
+        };
+        self.points(x, y, &xy);
+
+        if opts.axes {
+            // `localAxis()`: `axis(side, ...)` with the `par()` defaults.
+            for (side, axt, axp) in [(1, opts.xaxt, opts.xaxp), (2, opts.yaxt, opts.yaxp)] {
+                let o = AxisOptions {
+                    axt,
+                    axp,
+                    ..AxisOptions::default()
+                };
+                self.axis(side, &o);
+            }
+            self.box_(&BoxOptions::default());
+        }
+
+        if self.par.ann {
+            self.title(&TitleOptions {
+                main: opts.main.clone(),
+                sub: opts.sub.clone(),
+                xlab: opts.xlab.clone(),
+                ylab: opts.ylab.clone(),
+            });
+        }
     }
 }

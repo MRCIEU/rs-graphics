@@ -19,7 +19,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
-use rs_graphics::highlevel::{plot, PlotOptions};
+use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
@@ -130,7 +130,7 @@ fn draw_ours(c: &Case) -> String {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    plot(&mut dev, &values(c.x, c.xlog), &values(c.y, c.ylog), &opts);
+    dev.plot(&values(c.x, c.xlog), &values(c.y, c.ylog), &opts);
     if let Some(at) = c.at3 {
         let o = AxisOptions {
             at: Some(at.to_vec()),

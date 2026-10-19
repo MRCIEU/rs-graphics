@@ -18,7 +18,7 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AxisOptions, Device, MtextOptions};
-use rs_graphics::highlevel::{plot, PlotOptions, PlotType};
+use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
 
@@ -57,7 +57,7 @@ fn pl(dev: &mut Dev, y: &[f64], main: Option<&str>, axes: bool) {
         ylab: axes.then(|| "y".into()),
         ..PlotOptions::default()
     };
-    plot(dev, &xs(), y, &opts);
+    dev.plot(&xs(), y, &opts);
 }
 
 fn squares() -> Vec<f64> {
@@ -96,10 +96,13 @@ fn cases() -> Vec<Case> {
                     col: vec![ColorSpec::Color(Color::parse("red").unwrap())],
                     ..PlotOptions::default()
                 };
-                plot(d, &xs(), &roots(), &opts);
+                d.plot(&xs(), &roots(), &opts);
                 d.axis(4, &AxisOptions::default());
-                let o = MtextOptions { side: 4, line: 3.0, ..Default::default() };
-                d.mtext("sqrt", &o);
+                let o = MtextOptions {
+                    line: 3.0,
+                    ..Default::default()
+                };
+                d.mtext("sqrt", 4, &o);
             },
         },
         Case {
@@ -170,8 +173,11 @@ fn cases() -> Vec<Case> {
                 d.mfrow(1, 2);
                 pl(d, &squares(), Some("A"), true);
                 d.set_new(true);
-                let o = MtextOptions { side: 3, outer: true, ..Default::default() };
-                d.mtext("Outer", &o);
+                let o = MtextOptions {
+                    outer: true,
+                    ..Default::default()
+                };
+                d.mtext("Outer", 3, &o);
                 assert!(d.is_new());
                 pl(d, &falling(), None, false);
                 pl(d, &xs(), Some("B"), true);

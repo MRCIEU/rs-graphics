@@ -59,7 +59,7 @@ fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
     counts
 }
 
-/// Options for [`hist`], covering the subset of `hist.default`'s
+/// Options for [`Device::hist`], covering the subset of `hist.default`'s
 /// arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct HistOptions {
@@ -131,101 +131,107 @@ pub struct HistResult {
     pub mids: Vec<f64>,
 }
 
-/// `hist(x, ...)`.
-pub fn hist<B: Backend>(dev: &mut Device<B>, x: &[f64], opts: &HistOptions) -> HistResult {
-    let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
-    let n = data.len();
+impl<B: Backend> Device<B> {
+    /// `hist(x, ...)`. A high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
+    /// page it moves to the next panel,
+    /// unless `opts.add` (R's `add = TRUE`), which draws the bars on the
+    /// current plot. Returns the bins and counts (R's `"histogram"`
+    /// object).
+    pub fn hist(&mut self, x: &[f64], opts: &HistOptions) -> HistResult {
+        let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
+        let n = data.len();
 
-    let breaks = opts.breaks.clone().unwrap_or_else(|| {
-        let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
-        let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
-            (lo, hi)
+        let breaks = opts.breaks.clone().unwrap_or_else(|| {
+            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
+            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+                (lo, hi)
+            } else {
+                (0.0, 1.0)
+            };
+            let nclass = nclass_sturges(n).max(1);
+            pretty_r(lo, hi, nclass, 1)
+        });
+        let nb = breaks.len();
+
+        let counts = bin_counts(&data, &breaks);
+        let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
+        let density: Vec<f64> = counts
+            .iter()
+            .zip(&widths)
+            .map(|(&c, &w)| {
+                if n > 0 && w > 0.0 {
+                    c / (n as f64 * w)
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let mids: Vec<f64> = breaks.windows(2).map(|w| 0.5 * (w[0] + w[1])).collect();
+
+        let heights: Vec<f64> = if opts.freq {
+            counts.clone()
         } else {
-            (0.0, 1.0)
+            density.clone()
         };
-        let nclass = nclass_sturges(n).max(1);
-        pretty_r(lo, hi, nclass, 1)
-    });
-    let nb = breaks.len();
+        let ymax = heights.iter().cloned().fold(0.0_f64, f64::max);
 
-    let counts = bin_counts(&data, &breaks);
-    let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
-    let density: Vec<f64> = counts
-        .iter()
-        .zip(&widths)
-        .map(|(&c, &w)| {
-            if n > 0 && w > 0.0 {
-                c / (n as f64 * w)
-            } else {
-                0.0
+        // `plot.histogram()`: window, title, axes (unless `add`), then the
+        // bars.
+        if !opts.add {
+            self.plot_new();
+            let window = PlotWindowOptions {
+                xlog: opts.xlog,
+                ylog: opts.ylog,
+                ..PlotWindowOptions::default()
+            };
+            self.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), &window);
+
+            if self.par.ann {
+                let or = |l: &Option<Label>, default: &str| {
+                    Some(l.clone().unwrap_or_else(|| Label::from(default)))
+                };
+                let ylab = if opts.freq { "Frequency" } else { "Density" };
+                self.title(&TitleOptions {
+                    main: or(&opts.main, "Histogram of x"),
+                    sub: None,
+                    xlab: or(&opts.xlab, "x"),
+                    ylab: or(&opts.ylab, ylab),
+                });
             }
-        })
-        .collect();
-    let mids: Vec<f64> = breaks.windows(2).map(|w| 0.5 * (w[0] + w[1])).collect();
 
-    let heights: Vec<f64> = if opts.freq {
-        counts.clone()
-    } else {
-        density.clone()
-    };
-    let ymax = heights.iter().cloned().fold(0.0_f64, f64::max);
+            if opts.axes {
+                self.axis(1, &AxisOptions::default());
+                // `yt[yt %% 1 == 0]` for counts: whole numbers only.
+                let yticks = if opts.freq {
+                    self.default_ticks(2)
+                        .into_iter()
+                        .filter(|v| v % 1.0 == 0.0)
+                        .collect()
+                } else {
+                    self.default_ticks(2)
+                };
+                let y_axis = AxisOptions {
+                    at: Some(yticks),
+                    ..AxisOptions::default()
+                };
+                self.axis(2, &y_axis);
+            }
+        }
 
-    // `plot.histogram()`: window, title, axes (unless `add`), then the
-    // bars.
-    if !opts.add {
-        dev.plot_new();
-        let window = PlotWindowOptions {
-            xlog: opts.xlog,
-            ylog: opts.ylog,
-            ..PlotWindowOptions::default()
+        // `rect(breaks[-nB], 0, breaks[-1L], y, col = col, border = border)`.
+        let bars = RectOptions {
+            col: vec![opts.col],
+            border: vec![opts.border],
+            ..RectOptions::default()
         };
-        dev.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), &window);
+        self.rect(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
 
-        if dev.par.ann {
-            let or = |l: &Option<Label>, default: &str| {
-                Some(l.clone().unwrap_or_else(|| Label::from(default)))
-            };
-            let ylab = if opts.freq { "Frequency" } else { "Density" };
-            dev.title(&TitleOptions {
-                main: or(&opts.main, "Histogram of x"),
-                sub: None,
-                xlab: or(&opts.xlab, "x"),
-                ylab: or(&opts.ylab, ylab),
-            });
+        HistResult {
+            breaks,
+            counts,
+            density,
+            mids,
         }
-
-        if opts.axes {
-            dev.axis(1, &AxisOptions::default());
-            // `yt[yt %% 1 == 0]` for counts: whole numbers only.
-            let yticks = if opts.freq {
-                dev.default_ticks(2)
-                    .into_iter()
-                    .filter(|v| v % 1.0 == 0.0)
-                    .collect()
-            } else {
-                dev.default_ticks(2)
-            };
-            let y_axis = AxisOptions {
-                at: Some(yticks),
-                ..AxisOptions::default()
-            };
-            dev.axis(2, &y_axis);
-        }
-    }
-
-    // `rect(breaks[-nB], 0, breaks[-1L], y, col = col, border = border)`.
-    let bars = RectOptions {
-        col: vec![opts.col],
-        border: vec![opts.border],
-        ..RectOptions::default()
-    };
-    dev.rect(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
-
-    HistResult {
-        breaks,
-        counts,
-        density,
-        mids,
     }
 }
