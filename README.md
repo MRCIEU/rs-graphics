@@ -1,7 +1,7 @@
 # rs-graphics
 
 A Rust port of the core functionality of R's `graphics` package (see
-`r-source/src/library/graphics/` for the reference implementation this
+[https://github.com/wch/r-source](https://github.com/wch/r-source) for the reference implementation this
 crate is ported from), producing **SVG**, **PNG**, and **PDF** output.
 
 The design priority throughout is **visual and numerical fidelity with
