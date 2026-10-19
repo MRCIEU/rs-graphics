@@ -31,18 +31,21 @@ pub struct AblineOptions {
     /// Intercept and slope of a line (`a`, `b`); `None`: no such line.
     pub coef: Option<(f64, f64)>,
     /// `untf = TRUE`: on log axes, draw `y = a + b * x` in data units (a
-    /// curve) rather than a straight line in log units.
+    /// curve) rather than a straight line in log units. Default `false`.
     pub untf: bool,
-    /// Horizontal lines at these y values.
+    /// Horizontal lines at these y values; empty: none.
     pub h: Vec<f64>,
-    /// Vertical lines at these x values.
+    /// Vertical lines at these x values; empty: none.
     pub v: Vec<f64>,
+    /// Colours, recycled over the lines; empty: `par(col)`.
     pub col: Vec<ColorSpec>,
+    /// Line types, recycled over the lines; empty: `par(lty)`.
     pub lty: Vec<LineType>,
+    /// Line widths, recycled over the lines; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
 }
 
-crate::setters::setters!(AblineOptions {
+crate::setters::setters!(AblineOptions => [AblineCall] {
     coef: pair f64,
     untf: value bool,
     h: values f64,
@@ -53,13 +56,10 @@ crate::setters::setters!(AblineOptions {
 });
 
 impl<B: Backend> Device<B> {
-    /// `abline(a, b, h, v, untf, col, lty, lwd)`; see [`AblineOptions`].
-    /// For R's `abline(coef = )` or `abline(reg = )`, pass the intercept
-    /// and slope as `coef`.
-    ///
-    /// # Panics
-    /// If `coef` has a non-finite value (R: "'a' and 'b' must be finite").
-    pub fn abline(&mut self, opts: &AblineOptions) {
+    /// Draws R's `abline()`; the public entry is
+    /// [`Graphics::abline`](crate::graphics::Graphics::abline), whose docs
+    /// describe it.
+    pub(crate) fn abline_impl(&mut self, opts: &AblineOptions) {
         if let Some((a, b)) = opts.coef {
             assert!(
                 a.is_finite() && b.is_finite(),

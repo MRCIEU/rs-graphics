@@ -18,10 +18,11 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::ColorSpec;
-use rs_graphics::device::{Device, LegendEntry, LegendKeyword, LegendOptions, LegendPos};
-use rs_graphics::highlevel::{PlotOptions, PlotType, plot};
+use rs_graphics::device::{Device, LegendEntry, LegendKeyword, LegendPos};
+use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -53,12 +54,14 @@ fn draw_ours(start: f64, ps: f64) -> String {
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.par.ps = ps;
     let opts = PlotOptions {
-        type_: PlotType::Both,
+        type_: Some(PlotType::Both),
         xlab: Some("x".into()),
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    plot(&mut dev, &[1.0, 2.0, 3.0, 4.0], &[1.0, 3.0, 2.0, 4.0], &opts);
+    dev.plot(&[1.0, 2.0, 3.0, 4.0], &[1.0, 3.0, 2.0, 4.0])
+        .with(&opts)
+        .draw();
     let black = ColorSpec::Index(1);
     let entries: Vec<LegendEntry> = ["a", "bb"]
         .iter()
@@ -68,11 +71,8 @@ fn draw_ours(start: f64, ps: f64) -> String {
                 .lty(LineType::from_code(1))
         })
         .collect();
-    dev.legend(
-        LegendPos::Keyword(LegendKeyword::TopLeft),
-        &entries,
-        &LegendOptions::default(),
-    );
+    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
+        .draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

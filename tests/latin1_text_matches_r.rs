@@ -134,24 +134,21 @@ fn latin1_text_matches_r() {
     };
     let mut dev = Device::new(PdfBackend::new(6.0, 6.0).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 16.0), &PlotWindowOptions::default());
+    dev.plot_window((0.0, 10.0), (0.0, 16.0)).draw();
     let black = ColorSpec::Color(Color::BLACK);
     for (i, label) in LABELS.iter().enumerate() {
         for (j, adj) in [0.0, 0.5, 1.0].iter().enumerate() {
             let y = (3 * i + j + 1) as f64;
-            dev.text(
-                &[5.0],
-                &[y],
-                &[label],
-                &TextOptions {
+            dev.text(&[5.0], &[y], &[label])
+                .with(&TextOptions {
                     adj: Some(*adj),
                     vadj: Some(0.0),
                     col: vec![black],
                     cex: vec![1.0],
                     font: vec![1 + (i % 2) as i32],
                     ..TextOptions::default()
-                },
-            );
+                })
+                .draw();
         }
     }
     let ours = dev.into_backend().finish();

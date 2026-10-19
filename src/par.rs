@@ -133,9 +133,10 @@ crate::error::from_str_via_parse!(AxisType, "axis type");
 #[derive(Clone, Debug)]
 pub struct Par {
     /// Margins in lines: bottom, left, top, right. Default `c(5.1, 4.1,
-    /// 4.1, 2.1)`.
+    /// 4.1, 2.1)`. Applied at the next `plot_new()`.
     pub mar: Sides<f64>,
-    /// Outer margins in lines. Default `c(0, 0, 0, 0)`.
+    /// Outer margins in lines. Default `c(0, 0, 0, 0)`. Applied at the
+    /// next `plot_new()`.
     pub oma: Sides<f64>,
     /// `par(plt = c(x0, x1, y0, y1))`: the plot region as fractions of the
     /// figure region, instead of the figure less `mar`. `None` (the default)
@@ -145,13 +146,12 @@ pub struct Par {
     /// `par(pty)`: [`Pty::Square`] makes the `mar`-based plot region
     /// square. Applied at the next `plot_new()`.
     pub pty: Pty,
+    /// `par(xaxs)`: x axis range style; [`AxisStyle::Regular`] (`"r"`,
+    /// the default) extends the range by 4% on each side,
+    /// [`AxisStyle::Exact`] (`"i"`) uses it as given.
     pub xaxs: AxisStyle,
+    /// `par(yaxs)`: as `xaxs`, for the y axis.
     pub yaxs: AxisStyle,
-    /// Unused: log axes are set with
-    /// [`PlotWindowOptions`](crate::device::PlotWindowOptions).
-    pub xlog: bool,
-    /// Unused (as `xlog`).
-    pub ylog: bool,
 
     /// `par(col)`: default colour of points, lines, `abline()` and `box()`.
     pub col: Color,
@@ -162,19 +162,31 @@ pub struct Par {
     /// rectangle/polygon borders. R's `par(fg = )` sets `col` too; here set
     /// both fields to do the same.
     pub fg: Color,
+    /// `par(col.axis)`: colour of axis tick labels.
     pub col_axis: Color,
+    /// `par(col.lab)`: colour of `xlab`/`ylab`.
     pub col_lab: Color,
+    /// `par(col.main)`: colour of `main`.
     pub col_main: Color,
+    /// `par(col.sub)`: colour of `sub`.
     pub col_sub: Color,
 
+    /// R's `palette()`: the colours that numbers (`col = 2`) index,
+    /// from 1. Default [`DEFAULT_PALETTE`].
     pub palette: Vec<Color>,
 
+    /// `par(lwd)`: line width (1 = 1/96 inch, as in R). Default 1.
     pub lwd: f64,
+    /// `par(lty)`: line type. Default solid.
     pub lty: LineType,
+    /// `par(lend)`: line end style. Default round.
     pub lend: LineEnd,
+    /// `par(ljoin)`: line join style. Default round.
     pub ljoin: LineJoin,
+    /// `par(lmitre)`: mitre limit for mitred joins. Default 10.
     pub lmitre: f64,
 
+    /// `par(pch)`: default plotting symbol. Default 1 (open circle).
     pub pch: i32,
 
     /// Base point size, in big points (`par(ps)`). Default `12`. Its value
@@ -187,15 +199,28 @@ pub struct Par {
     pub cex: f64,
     /// `par(mex)`: margin-line expansion factor (a multiple of `cex`).
     pub mex: f64,
+    /// `par(cex.axis)`: size of axis tick labels, relative to `cex`.
+    /// Default 1.
     pub cex_axis: f64,
+    /// `par(cex.lab)`: size of `xlab`/`ylab`, relative to `cex`. Default
+    /// 1.
     pub cex_lab: f64,
+    /// `par(cex.main)`: size of `main`, relative to `cex`. Default 1.2.
     pub cex_main: f64,
+    /// `par(cex.sub)`: size of `sub`, relative to `cex`. Default 1.
     pub cex_sub: f64,
 
+    /// `par(font)`: font of text, as R's numbers: 1 plain (the default),
+    /// 2 bold, 3 italic, 4 bold italic, 5 Symbol. Other numbers are drawn
+    /// plain.
     pub font: i32,
+    /// `par(font.axis)`: font of axis tick labels, as `font`. Default 1.
     pub font_axis: i32,
+    /// `par(font.lab)`: font of `xlab`/`ylab`, as `font`. Default 1.
     pub font_lab: i32,
+    /// `par(font.main)`: font of `main`, as `font`. Default 2 (bold).
     pub font_main: i32,
+    /// `par(font.sub)`: font of `sub`, as `font`. Default 1.
     pub font_sub: i32,
 
     /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
@@ -204,6 +229,7 @@ pub struct Par {
     /// `par(xaxt)` / `par(yaxt)`: [`AxisType::None`] stops `axis()`
     /// drawing on the x (sides 1, 3) / y (sides 2, 4) axis.
     pub xaxt: AxisType,
+    /// `par(yaxt)`: see `xaxt`.
     pub yaxt: AxisType,
     /// Tick mark length in margin lines (negative = outward; R's default
     /// is -0.5).
@@ -222,12 +248,21 @@ pub struct Par {
     /// them from the axis range and `par(lab)`; change them afterwards to
     /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
     pub xaxp: [f64; 3],
+    /// `par(yaxp)`: see `xaxp`.
     pub yaxp: [f64; 3],
-    /// Unused (R's `par(lheight)`).
+    /// `par(lheight)`: multiplies the height of each extra line of text in
+    /// [`Device::text_metrics`](crate::device::Device::text_metrics). (Text
+    /// is drawn one line at a time, so this doesn't affect drawing.)
     pub lheight: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
+    /// `par(xpd)`: `false` (the default) clips drawing to the plot
+    /// region, `true` to the figure region. R's `NA` (the device) isn't
+    /// available.
     pub xpd: bool,
+    /// `par(ann)`: whether `plot()` and `barplot()` draw their titles and
+    /// axis labels. Default `true`. As in R, `hist()` and `boxplot()` use
+    /// their own `ann` option instead, and `pie()` always draws `main`.
     pub ann: bool,
 }
 
@@ -240,8 +275,6 @@ impl Default for Par {
             pty: Pty::Maximal,
             xaxs: AxisStyle::Regular,
             yaxs: AxisStyle::Regular,
-            xlog: false,
-            ylog: false,
 
             col: Color::BLACK,
             bg: Color::WHITE,
@@ -303,10 +336,95 @@ impl Par {
         }
     }
 
-    pub fn font_face(&self, code: i32) -> FontFace {
+    /// The face for R's font code `code` (1 plain, 2 bold, 3 italic, 4
+    /// bold italic, 5 Symbol).
+    pub(crate) fn font_face(&self, code: i32) -> FontFace {
         FontFace::from_r_font_code(code)
     }
 }
+
+// `ParOptions`: every `Par` field as an `Option`, its `apply`, and its
+// setters (on `ParOptions` and `ParCall`), from one field list.
+macro_rules! par_options {
+    ($($field:ident : $t:ty),* $(,)?) => {
+        /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
+        /// plus `new` (R's `par(new = TRUE)`, see
+        /// [`Device::set_new`](crate::device::Device::set_new)).
+        #[derive(Clone, Debug, Default, PartialEq)]
+        pub struct ParOptions {
+            $(
+                #[doc = concat!("New value of [`Par::", stringify!($field), "`].")]
+                pub $field: Option<$t>,
+            )*
+            /// `par(new = )`: draw the next plot over the current figure.
+            pub new: Option<bool>,
+        }
+
+        impl ParOptions {
+            /// Sets the given fields of `par` (all but `new`, which is
+            /// device state).
+            pub fn apply(&self, par: &mut Par) {
+                $(
+                    if let Some(v) = &self.$field {
+                        par.$field = v.clone();
+                    }
+                )*
+            }
+        }
+
+        $crate::setters::setters!(ParOptions => [ParCall] {
+            $($field: option $t,)*
+            new: option bool,
+        });
+    };
+}
+
+par_options!(
+    mar: Sides<f64>,
+    oma: Sides<f64>,
+    plt: Option<[f64; 4]>,
+    pty: Pty,
+    xaxs: AxisStyle,
+    yaxs: AxisStyle,
+    col: Color,
+    bg: Color,
+    fg: Color,
+    col_axis: Color,
+    col_lab: Color,
+    col_main: Color,
+    col_sub: Color,
+    palette: Vec<Color>,
+    lwd: f64,
+    lty: LineType,
+    lend: LineEnd,
+    ljoin: LineJoin,
+    lmitre: f64,
+    pch: i32,
+    ps: f64,
+    cex: f64,
+    mex: f64,
+    cex_axis: f64,
+    cex_lab: f64,
+    cex_main: f64,
+    cex_sub: f64,
+    font: i32,
+    font_axis: i32,
+    font_lab: i32,
+    font_main: i32,
+    font_sub: i32,
+    las: i32,
+    xaxt: AxisType,
+    yaxt: AxisType,
+    tcl: f64,
+    mgp: [f64; 3],
+    lab: [i32; 3],
+    xaxp: [f64; 3],
+    yaxp: [f64; 3],
+    lheight: f64,
+    adj: f64,
+    xpd: bool,
+    ann: bool,
+);
 
 #[cfg(test)]
 mod tests {
@@ -329,5 +447,23 @@ mod tests {
         assert_eq!(Pty::parse("q"), None);
         assert_eq!("t".parse::<AxisType>(), Ok(AxisType::Standard));
         assert!("y".parse::<AxisType>().is_err());
+    }
+
+    #[test]
+    fn par_options_apply_only_what_is_set() {
+        let mut par = Par::default();
+        let opts = ParOptions::default()
+            .las(1)
+            .mar([1.0, 2.0, 3.0, 4.0])
+            .plt([0.1, 0.9, 0.2, 0.8]);
+        opts.apply(&mut par);
+        assert_eq!(par.las, 1);
+        assert_eq!(par.mar.left, 2.0);
+        assert_eq!(par.plt, Some([0.1, 0.9, 0.2, 0.8]));
+        assert_eq!(par.cex, Par::default().cex);
+
+        // `plt` back to the mar-based region.
+        ParOptions::default().plt(None).apply(&mut par);
+        assert_eq!(par.plt, None);
     }
 }

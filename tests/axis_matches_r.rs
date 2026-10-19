@@ -18,7 +18,8 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{plot, PlotOptions};
+use rs_graphics::graphics::Graphics;
+use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
@@ -116,7 +117,7 @@ fn axis_and_label_text_positions_match_r() {
             ylab: Some("y".into()),
             ..PlotOptions::default()
         };
-        plot(&mut dev, &x, &y, &opts);
+        dev.plot(&x, &y).with(&opts).draw();
         let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
         let our_tm = normalise(text_matrices(&ours));
 

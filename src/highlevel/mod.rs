@@ -6,18 +6,19 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! High-level plotting functions built on top of [`crate::device::Device`],
-//! mirroring R's `plot()`, `hist()`, `barplot()`, `boxplot()`, and `pie()`.
+//! R's high-level plots, `plot()`, `hist()`, `barplot()`, `boxplot()` and
+//! `pie()`, as methods of [`crate::device::Device`] ([`Device::plot`](crate::graphics::Graphics::plot),
+//! ...), with their options and result types.
 //!
 //! Each function here is a fairly direct port of the corresponding
 //! `*.default` R function in `r-source/src/library/graphics/R/`, reduced to
 //! the common/core use cases: there are no formula interfaces or
 //! S3-style dispatch on input type, and each module's docs (and the
-//! README's "Out of scope" section) say what else isn't implemented.
+//! "Out of scope" section of DEVELOPER.md) say what else isn't implemented.
 //!
-//! They use only `Device`'s public API, so they are free functions taking
-//! `&mut Device`, called the same way as plots written outside the crate
-//! (see the crate docs for why the low-level functions are methods).
+//! Each starts a new plot (moving to the next panel of a multi-panel
+//! page). They use only `Device`'s public API, like plots written outside
+//! the crate (see the crate docs).
 
 pub mod barplot;
 pub mod boxplot;
@@ -25,16 +26,16 @@ pub mod hist;
 pub mod pie;
 pub mod plot;
 
-pub use barplot::{barplot, barplot_matrix, gray_colors, BarplotOptions};
-pub use boxplot::{boxplot, boxplot_stats, BoxStats, BoxplotOptions};
-pub use hist::{hist, HistOptions, HistResult};
-pub use pie::{pie, PieOptions};
-pub use plot::{plot, PlotOptions, PlotType};
+pub use barplot::{BarHeights, BarplotOptions};
+pub use boxplot::{BoxStats, BoxplotOptions, boxplot_stats};
+pub use hist::{HistOptions, HistResult};
+pub use pie::PieOptions;
+pub use plot::{PlotOptions, PlotType};
 
 /// Compute the finite min/max of a data slice, matching R's `range(x[is.finite(x)])`
 /// idiom used throughout the plotting defaults. Falls back to `(0.0, 1.0)` for
 /// empty/all-non-finite input. A single repeated value gives the degenerate
-/// `(v, v)`, as R's `range()` does; `Device::plot_window` (`GScale()`) widens
+/// `(v, v)`, as R's `range()` does; `Graphics::plot_window` (`GScale()`) widens
 /// it, so no padding is done here.
 pub(crate) fn data_range(xs: &[f64]) -> (f64, f64) {
     let mut lo = f64::INFINITY;

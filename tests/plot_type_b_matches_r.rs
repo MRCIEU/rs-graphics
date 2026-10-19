@@ -18,8 +18,9 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{plot, PlotOptions, PlotType};
+use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::par::Par;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -92,12 +93,12 @@ fn draw_ours(c: &Case) -> String {
     };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     let opts = PlotOptions {
-        type_: PlotType::parse(c.type_).unwrap(),
+        type_: Some(PlotType::parse(c.type_).unwrap()),
         ylog: c.ylog,
         axes: false,
         ..PlotOptions::default()
     };
-    plot(&mut dev, &X, &Y, &opts);
+    dev.plot(&X, &Y).with(&opts).draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

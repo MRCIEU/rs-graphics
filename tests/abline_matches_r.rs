@@ -57,14 +57,16 @@ fn cases() -> Vec<Case> {
             log: "",
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
-                d.abline(&AblineOptions {
-                    h: vec![2.0, 5.0, 8.0],
-                    v: vec![3.0, 7.0],
-                    col: col(&["red", "blue"]),
-                    lty: (1..=3).map(LineType::from_code).collect(),
-                    lwd: vec![1.0, 2.0],
-                    ..Default::default()
-                });
+                d.abline()
+                    .with(&AblineOptions {
+                        h: vec![2.0, 5.0, 8.0],
+                        v: vec![3.0, 7.0],
+                        col: col(&["red", "blue"]),
+                        lty: (1..=3).map(LineType::from_code).collect(),
+                        lwd: vec![1.0, 2.0],
+                        ..Default::default()
+                    })
+                    .draw();
             },
         },
         Case {
@@ -74,14 +76,16 @@ fn cases() -> Vec<Case> {
             log: "",
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
-                d.abline(&AblineOptions {
-                    coef: Some((1.0, 0.5)),
-                    h: vec![4.0, 6.0],
-                    v: vec![9.0],
-                    col: col(&["darkgreen", "orange", "purple"]),
-                    lwd: vec![3.0],
-                    ..Default::default()
-                });
+                d.abline()
+                    .with(&AblineOptions {
+                        coef: Some((1.0, 0.5)),
+                        h: vec![4.0, 6.0],
+                        v: vec![9.0],
+                        col: col(&["darkgreen", "orange", "purple"]),
+                        lwd: vec![3.0],
+                        ..Default::default()
+                    })
+                    .draw();
             },
         },
         Case {
@@ -105,14 +109,14 @@ fn cases() -> Vec<Case> {
                     col: vec![red],
                     ..AblineOptions::default()
                 };
-                d.abline(&fit);
+                d.abline().with(&fit).draw();
                 // R ignores coef values after the first two.
                 let first_two = AblineOptions {
                     coef: Some((2.0, -0.3)),
                     lty: vec![LineType::DASHED],
                     ..AblineOptions::default()
                 };
-                d.abline(&first_two);
+                d.abline().with(&first_two).draw();
             },
         },
         Case {
@@ -123,19 +127,23 @@ fn cases() -> Vec<Case> {
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
                 d.par.lend = LineEnd::Square;
-                d.abline(&AblineOptions {
-                    h: vec![2.0, 4.0],
-                    lty: vec![LineType::from_code(2), LineType::from_code(3)],
-                    lwd: vec![1.0, 3.0],
-                    ..Default::default()
-                });
+                d.abline()
+                    .with(&AblineOptions {
+                        h: vec![2.0, 4.0],
+                        lty: vec![LineType::from_code(2), LineType::from_code(3)],
+                        lwd: vec![1.0, 3.0],
+                        ..Default::default()
+                    })
+                    .draw();
                 d.par.lend = LineEnd::Butt;
-                d.abline(&AblineOptions {
-                    h: vec![6.0, 8.0],
-                    lty: vec![LineType::from_code(4), LineType::parse("42").unwrap()],
-                    lwd: vec![2.0],
-                    ..Default::default()
-                });
+                d.abline()
+                    .with(&AblineOptions {
+                        h: vec![6.0, 8.0],
+                        lty: vec![LineType::from_code(4), LineType::parse("42").unwrap()],
+                        lwd: vec![2.0],
+                        ..Default::default()
+                    })
+                    .draw();
             },
         },
         Case {
@@ -149,18 +157,22 @@ fn cases() -> Vec<Case> {
                 d.par.col = Color::parse("grey40").unwrap();
                 d.par.lty = LineType::from_code(2);
                 d.par.lwd = 2.0;
-                d.abline(&AblineOptions {
-                    h: vec![1.0, 10.0, 100.0],
-                    v: vec![2.0, 20.0],
-                    ..Default::default()
-                });
-                d.abline(&AblineOptions {
-                    coef: Some((1.0, 1.0)),
-                    untf: true,
-                    h: vec![50.0],
-                    col: col(&["red", "blue"]),
-                    ..Default::default()
-                });
+                d.abline()
+                    .with(&AblineOptions {
+                        h: vec![1.0, 10.0, 100.0],
+                        v: vec![2.0, 20.0],
+                        ..Default::default()
+                    })
+                    .draw();
+                d.abline()
+                    .with(&AblineOptions {
+                        coef: Some((1.0, 1.0)),
+                        untf: true,
+                        h: vec![50.0],
+                        col: col(&["red", "blue"]),
+                        ..Default::default()
+                    })
+                    .draw();
             },
         },
     ]
@@ -287,15 +299,13 @@ fn abline_matches_r() {
         );
         dev.plot_new();
         let (xl, yl) = c.lims;
-        dev.plot_window(
-            xl,
-            yl,
-            &PlotWindowOptions {
+        dev.plot_window(xl, yl)
+            .with(&PlotWindowOptions {
                 xlog: c.log.contains('x'),
                 ylog: c.log.contains('y'),
                 ..PlotWindowOptions::default()
-            },
-        );
+            })
+            .draw();
         (c.draw)(&mut dev);
         let ours = interpret(&String::from_utf8_lossy(&dev.into_backend().finish()));
         let name = c.name;
@@ -318,9 +328,11 @@ fn abline_matches_r() {
 fn abline_coef_must_be_finite() {
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0), &PlotWindowOptions::default());
-    dev.abline(&AblineOptions {
-        coef: Some((f64::NAN, 1.0)),
-        ..AblineOptions::default()
-    });
+    dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
+    dev.abline()
+        .with(&AblineOptions {
+            coef: Some((f64::NAN, 1.0)),
+            ..AblineOptions::default()
+        })
+        .draw();
 }

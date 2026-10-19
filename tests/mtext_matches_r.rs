@@ -153,14 +153,12 @@ fn mtext_placement_matches_r() {
     let mut dev = Device::new(PdfBackend::new(8.0, 6.0).with_compression(false), par);
     dev.mfrow(2, 2);
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 5.0), &PlotWindowOptions::default());
+    dev.plot_window((0.0, 10.0), (0.0, 5.0)).draw();
     for c in &cases {
         dev.par.las = c.las;
-        dev.mtext(
-            c.text,
-            &MtextOptions {
-                side: c.side,
-                line: c.line,
+        dev.mtext(c.text, c.side)
+            .with(&MtextOptions {
+                line: Some(c.line),
                 outer: c.outer,
                 at: c.at,
                 adj: c.adj,
@@ -168,8 +166,8 @@ fn mtext_placement_matches_r() {
                 cex: c.cex,
                 col: None::<ColorSpec>,
                 font: c.font,
-            },
-        );
+            })
+            .draw();
     }
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

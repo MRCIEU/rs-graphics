@@ -209,6 +209,23 @@ impl From<Option<Color>> for ColorSpec {
 
 crate::error::from_str_via_parse!(Color, "colour");
 
+/// R's `gray.colors(n)` (`start = 0.3`, `end = 0.9`, `gamma = 2.2`).
+pub fn gray_colors(n: usize) -> Vec<ColorSpec> {
+    let (gamma, a, b) = (2.2_f64, 0.3_f64.powf(2.2), 0.9_f64.powf(2.2));
+    (0..n)
+        .map(|i| {
+            let t = if n > 1 {
+                i as f64 / (n - 1) as f64
+            } else {
+                0.0
+            };
+            let level = (a + (b - a) * t).powf(1.0 / gamma);
+            let v = (255.0 * level + 0.5) as u8;
+            ColorSpec::Color(Color::rgb(v, v, v))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +272,18 @@ mod tests {
         let blue = ColorSpec::Color(Color::rgb(0, 0, 255));
         assert_eq!(ColorSpec::from(&name), blue);
         assert_eq!(ColorSpec::from(name), blue);
+    }
+
+    #[test]
+    fn gray_colors_match_r() {
+        // R: gray.colors(1) = "#4D4D4D", gray.colors(3) =
+        // "#4D4D4D" "#AEAEAE" "#E6E6E6".
+        let hex = |c: &ColorSpec| match c {
+            ColorSpec::Color(c) => c.to_hex().to_uppercase(),
+            _ => unreachable!(),
+        };
+        assert_eq!(hex(&gray_colors(1)[0]), "#4D4D4D");
+        let g3: Vec<String> = gray_colors(3).iter().map(hex).collect();
+        assert_eq!(g3, ["#4D4D4D", "#AEAEAE", "#E6E6E6"]);
     }
 }

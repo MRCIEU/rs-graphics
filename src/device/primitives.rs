@@ -67,7 +67,7 @@ pub struct XyOptions {
     pub xpd: Option<bool>,
 }
 
-crate::setters::setters!(XyOptions {
+crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
     type_: option PlotType,
     pch: values i32,
     col: values ColorSpec,
@@ -92,7 +92,7 @@ pub struct SegmentsOptions {
     pub xpd: Option<bool>,
 }
 
-crate::setters::setters!(SegmentsOptions {
+crate::setters::setters!(SegmentsOptions => [SegmentsCall] {
     col: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
@@ -100,15 +100,16 @@ crate::setters::setters!(SegmentsOptions {
 });
 
 /// Arguments of `arrows()`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ArrowsOptions {
-    /// Length of the head's edges in inches (R's default 0.25).
-    pub length: f64,
-    /// Angle between the shaft and each edge of the head, in degrees (R's
-    /// default 30; 90 gives flat caps, as for error bars).
-    pub angle: f64,
-    /// Heads at the start (1), the end (2, R's default) or both ends (3).
-    pub code: u8,
+    /// Length of the head's edges in inches; `None`: 0.25 (R's default).
+    pub length: Option<f64>,
+    /// Angle between the shaft and each edge of the head, in degrees (90
+    /// gives flat caps, as for error bars); `None`: 30 (R's default).
+    pub angle: Option<f64>,
+    /// Heads at the start (1), the end (2) or both ends (3); `None`: 2
+    /// (R's default).
+    pub code: Option<u8>,
     /// Recycled per arrow; empty: `par(fg)` (R's default).
     pub col: Vec<ColorSpec>,
     /// Recycled per arrow; empty: `par(lty)`.
@@ -120,29 +121,15 @@ pub struct ArrowsOptions {
     pub xpd: Option<bool>,
 }
 
-crate::setters::setters!(ArrowsOptions {
-    length: value f64,
-    angle: value f64,
-    code: value u8,
+crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
+    length: option f64,
+    angle: option f64,
+    code: option u8,
     col: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
     xpd: option bool,
 });
-
-impl Default for ArrowsOptions {
-    fn default() -> Self {
-        ArrowsOptions {
-            length: 0.25,
-            angle: 30.0,
-            code: 2,
-            col: Vec::new(),
-            lty: Vec::new(),
-            lwd: Vec::new(),
-            xpd: None,
-        }
-    }
-}
 
 /// Arguments of `rect()`.
 #[derive(Clone, Debug, Default)]
@@ -161,7 +148,7 @@ pub struct RectOptions {
     pub xpd: Option<bool>,
 }
 
-crate::setters::setters!(RectOptions {
+crate::setters::setters!(RectOptions => [RectCall] {
     col: values ColorSpec,
     border: values ColorSpec,
     lty: values LineType,
@@ -188,7 +175,7 @@ pub struct PolygonOptions {
     pub xpd: Option<bool>,
 }
 
-crate::setters::setters!(PolygonOptions {
+crate::setters::setters!(PolygonOptions => [PolygonCall] {
     col: values ColorSpec,
     border: values ColorSpec,
     lty: values LineType,
@@ -208,8 +195,8 @@ pub struct TextOptions {
     /// `None` (R's `NA`, the default) centres the text's ink, or an
     /// expression's box, on it.
     pub vadj: Option<f64>,
-    /// Rotation in degrees, counterclockwise (R's `srt`).
-    pub srt: f64,
+    /// Rotation in degrees, counterclockwise (R's `srt`); `None`: 0.
+    pub srt: Option<f64>,
     /// Recycled per label, times `par(cex)`; empty: 1.
     pub cex: Vec<f64>,
     /// Recycled per label; empty: `par(col)`.
@@ -222,10 +209,10 @@ pub struct TextOptions {
     pub xpd: Option<bool>,
 }
 
-crate::setters::setters!(TextOptions {
+crate::setters::setters!(TextOptions => [TextCall] {
     adj: option f64,
     vadj: option f64,
-    srt: value f64,
+    srt: option f64,
     cex: values f64,
     col: values ColorSpec,
     font: values i32,
@@ -249,7 +236,8 @@ pub enum BoxWhich {
 /// Arguments of `box()`.
 #[derive(Clone, Debug, Default)]
 pub struct BoxOptions {
-    pub which: BoxWhich,
+    /// Which region to outline; `None`: the plot region (R's default).
+    pub which: Option<BoxWhich>,
     /// `None`: `par(col)` (R's `C_box`; R's `par(fg = )` sets `col` too,
     /// so set both `par.fg` and `par.col` to follow it).
     pub col: Option<ColorSpec>,
@@ -259,8 +247,8 @@ pub struct BoxOptions {
     pub lwd: Option<f64>,
 }
 
-crate::setters::setters!(BoxOptions {
-    which: value BoxWhich,
+crate::setters::setters!(BoxOptions => [BoxCall] {
+    which: option BoxWhich,
     col: option ColorSpec,
     lty: option LineType,
     lwd: option f64,
@@ -269,16 +257,16 @@ crate::setters::setters!(BoxOptions {
 /// Arguments of `plot.window()` besides the limits.
 #[derive(Clone, Debug, Default)]
 pub struct PlotWindowOptions {
-    /// Log x axis (R's `log = "x"`).
+    /// Log x axis (R's `log = "x"`); default `false`.
     pub xlog: bool,
-    /// Log y axis (R's `log = "y"`).
+    /// Log y axis (R's `log = "y"`); default `false`.
     pub ylog: bool,
     /// R's `asp`: one x unit is `asp` y units long on the page. Ignored on
-    /// log axes, as in R.
+    /// log axes, as in R. `None` (R's `NA`): no constraint.
     pub asp: Option<f64>,
 }
 
-crate::setters::setters!(PlotWindowOptions {
+crate::setters::setters!(PlotWindowOptions => [PlotWindowCall] {
     xlog: value bool,
     ylog: value bool,
     asp: option f64,
@@ -293,32 +281,15 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// `plot.window(xlim, ylim, log, asp)`: sets up the user coordinates
-    /// of the current plot region. Call it after [`Device::plot_new`] and
-    /// before drawing.
-    ///
-    /// - `xlim`/`ylim` are in data units, also on a log axis, and may be
-    ///   decreasing (a reversed axis).
-    /// - `opts.xlog`/`ylog` make that axis log10 (R's `log = "x"`/`"y"`/
-    ///   `"xy"`). [`Device::usr`] is then in log10 units on that axis, as
-    ///   R's `par("usr")` is.
-    /// - `opts.asp` (linear axes only, as in R): `C_plot_window` first
-    ///   widens whichever range is needed so one x unit is `asp` y units
-    ///   long on the page, centred on the given limits.
-    /// - Each range then goes through R's `GScale()` (`graphics.c`):
-    ///   - With `par(xaxs/yaxs) = "r"` (the default), 4% is added at each
-    ///     end; with `"i"` the limits are used as given.
-    ///   - A zero-width range is widened: to -1..1 around 0, otherwise by
-    ///     40% of the value either side.
-    ///   - Non-finite limits are replaced by huge finite ones. On a log
-    ///     axis, a limit <= 0 gives a lower end of about 1e-307, where R
-    ///     warns "nonfinite axis limits"; this function doesn't warn or
-    ///     panic.
-    /// - Sets `par.xaxp`/`par.yaxp` (the default tick range and count,
-    ///   R's `GAxisPars()`) from the new range and `par.lab`. Later calls
-    ///   to `axis()` without `at` read them. Changing `par.lab` afterwards
-    ///   doesn't change them, as in R.
-    pub fn plot_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), opts: &PlotWindowOptions) {
+    /// Draws R's `plot_window()`; the public entry is
+    /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window), whose docs
+    /// describe it.
+    pub(crate) fn plot_window_impl(
+        &mut self,
+        xlim: (f64, f64),
+        ylim: (f64, f64),
+        opts: &PlotWindowOptions,
+    ) {
         let asp = opts.asp.filter(|a| a.is_finite() && *a > 0.0);
         let (Some(asp), false, false) = (asp, opts.xlog, opts.ylog) else {
             self.set_window(xlim, ylim, opts.xlog, opts.ylog);
@@ -351,17 +322,17 @@ impl<B: Backend> Device<B> {
         );
     }
 
-    /// `points(x, y, ...)`: R's `plot.xy(type = "p")` unless
-    /// `opts.type_` says otherwise. Points with a non-finite coordinate
-    /// (including values <= 0 on a log axis) are skipped.
-    pub fn points(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
+    /// Draws R's `points()`; the public entry is
+    /// [`Graphics::points`](crate::graphics::Graphics::points), whose docs
+    /// describe it.
+    pub(crate) fn points_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
         self.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Points), opts);
     }
 
-    /// `lines(x, y, ...)`: R's `plot.xy(type = "l")` unless `opts.type_`
-    /// says otherwise. The polyline breaks at non-finite coordinates
-    /// (R's `NA`, or values <= 0 on a log axis).
-    pub fn lines(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
+    /// Draws R's `lines()`; the public entry is
+    /// [`Graphics::lines`](crate::graphics::Graphics::lines), whose docs
+    /// describe it.
+    pub(crate) fn lines_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
         self.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Lines), opts);
     }
 
@@ -432,11 +403,10 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `segments(x0, y0, x1, y1, ...)` in data units. The four coordinate
-    /// slices and the styles are recycled to the longest; a segment with a
-    /// non-finite end after conversion (including values <= 0 on a log
-    /// axis) is skipped, as `C_segments`.
-    pub fn segments(
+    /// Draws R's `segments()`; the public entry is
+    /// [`Graphics::segments`](crate::graphics::Graphics::segments), whose docs
+    /// describe it.
+    pub(crate) fn segments_impl(
         &mut self,
         x0: &[f64],
         y0: &[f64],
@@ -463,18 +433,23 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `arrows(x0, y0, x1, y1, ...)`, a port of `C_arrows` / `GArrow()`:
-    /// each segment with open heads - two lines of `length` inches at
-    /// `angle` degrees to the shaft - at its start, end or both (`code`).
-    /// Coordinates and styles are recycled to the longest. As in R, an
-    /// arrow with a non-finite end after conversion (including values <= 0
-    /// on a log axis) is skipped, and the heads of a segment shorter than
-    /// 1/1000 inch are not drawn (R also warns).
-    pub fn arrows(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: &ArrowsOptions) {
+    /// Draws R's `arrows()`; the public entry is
+    /// [`Graphics::arrows`](crate::graphics::Graphics::arrows), whose docs
+    /// describe it.
+    pub(crate) fn arrows_impl(
+        &mut self,
+        x0: &[f64],
+        y0: &[f64],
+        x1: &[f64],
+        y1: &[f64],
+        opts: &ArrowsOptions,
+    ) {
         let n = recycled_len(&[x0.len(), y0.len(), x1.len(), y1.len()]);
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
-        let (length, angle, code) = (opts.length, opts.angle.to_radians(), opts.code);
+        let length = opts.length.unwrap_or(0.25);
+        let angle = opts.angle.unwrap_or(30.0).to_radians();
+        let code = opts.code.unwrap_or(2);
         self.push_clip_region(self.clip_for(opts.xpd));
         for i in 0..n {
             let (a, b, c, d) = (
@@ -518,10 +493,17 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `rect(xleft, ybottom, xright, ytop, ...)` in data units, with
-    /// coordinates and styles recycled to the longest. Rectangles with a
-    /// non-finite corner (e.g. at 0 on a log axis) are skipped, as in R.
-    pub fn rect(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: &RectOptions) {
+    /// Draws R's `rect()`; the public entry is
+    /// [`Graphics::rect`](crate::graphics::Graphics::rect), whose docs
+    /// describe it.
+    pub(crate) fn rect_impl(
+        &mut self,
+        x0: &[f64],
+        y0: &[f64],
+        x1: &[f64],
+        y1: &[f64],
+        opts: &RectOptions,
+    ) {
         let n = recycled_len(&[x0.len(), y0.len(), x1.len(), y1.len()]);
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
@@ -542,10 +524,10 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `polygon(x, y, ...)`: one polygon per run of finite points
-    /// (non-finite coordinates, R's `NA`, separate them), with `col`,
-    /// `border` and `lty` recycled over the polygons, as `C_polygon`.
-    pub fn polygon(&mut self, x: &[f64], y: &[f64], opts: &PolygonOptions) {
+    /// Draws R's `polygon()`; the public entry is
+    /// [`Graphics::polygon`](crate::graphics::Graphics::polygon), whose docs
+    /// describe it.
+    pub(crate) fn polygon_impl(&mut self, x: &[f64], y: &[f64], opts: &PolygonOptions) {
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, opts.lwd.unwrap_or(self.par.lwd));
         self.push_clip_region(self.clip_for(opts.xpd));
@@ -570,15 +552,10 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `text(x, y, labels, ...)` in data units: each label (text, or a
-    /// plotmath expression such as `Label::math("alpha^2")`) at its point,
-    /// with `x`/`y` recycled to the longer and labels recycled over the
-    /// points (extra labels are ignored; R truncates them with a warning).
-    /// Empty `labels`
-    /// are R's default, the indices `"1"`, `"2"`, .... Placement follows
-    /// `GEText()`/`GEMathText()`: horizontally `adj` of the width;
-    /// vertically see [`TextOptions::vadj`].
-    pub fn text<L: Clone + Into<Label>>(
+    /// Draws R's `text()`; the public entry is
+    /// [`Graphics::text`](crate::graphics::Graphics::text), whose docs
+    /// describe it.
+    pub(crate) fn text_impl<L: Clone + Into<Label>>(
         &mut self,
         x: &[f64],
         y: &[f64],
@@ -602,7 +579,7 @@ impl<B: Backend> Device<B> {
                 &label,
                 hadj,
                 opts.vadj,
-                opts.srt,
+                opts.srt.unwrap_or(0.0),
                 pick(&opts.col, i, col),
                 pick(&opts.cex, i, 1.0),
                 pick(&opts.font, i, font),
@@ -610,9 +587,10 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// `box(which, ...)`: outlines the plot region, figure, inner region
-    /// or the whole device. Not clipped.
-    pub fn box_(&mut self, opts: &BoxOptions) {
+    /// Draws R's `box()`; the public entry is
+    /// [`Graphics::box_`](crate::graphics::Graphics::box_), whose docs
+    /// describe it.
+    pub(crate) fn box_impl(&mut self, opts: &BoxOptions) {
         let Some(color) = self.resolve(opts.col.unwrap_or(ColorSpec::Color(self.par.col))) else {
             return;
         };
@@ -621,18 +599,10 @@ impl<B: Backend> Device<B> {
             opts.lwd.unwrap_or(self.par.lwd),
             opts.lty.unwrap_or(LineType::SOLID),
         );
-        let rect = match opts.which {
+        let rect = match opts.which.unwrap_or_default() {
             BoxWhich::Plot => self.plt,
             BoxWhich::Figure => self.fig,
-            BoxWhich::Inner => {
-                let omi = self.omi();
-                Rect::new(
-                    omi.left,
-                    omi.bottom,
-                    self.width_in - omi.right,
-                    self.height_in - omi.top,
-                )
-            }
+            BoxWhich::Inner => self.inner,
             BoxWhich::Outer => Rect::new(0.0, 0.0, self.width_in, self.height_in),
         };
         self.dirty();

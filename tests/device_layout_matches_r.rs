@@ -71,7 +71,7 @@ fn plot_region_and_usr_match_r() {
     let backend = PdfBackend::new(width, height).with_compression(false);
     let mut dev = Device::new(backend, par);
     dev.plot_new();
-    dev.plot_window(xlim, ylim, &PlotWindowOptions::default());
+    dev.plot_window(xlim, ylim).draw();
 
     let plt = dev.plot_region();
     assert!(

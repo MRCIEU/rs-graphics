@@ -15,9 +15,10 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{barplot, plot, BarplotOptions, PlotOptions, PlotType};
+use rs_graphics::highlevel::{BarplotOptions, PlotOptions, PlotType};
 use rs_graphics::layout::{Layout, LayoutSize};
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -90,14 +91,14 @@ fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
     let o = BarplotOptions {
         names: Some(
             (0..h.len())
-                .map(|i| ((b'A' + i as u8) as char).to_string())
+                .map(|i| ((b'A' + i as u8) as char).to_string().into())
                 .collect(),
         ),
         main: Some(main.into()),
         ylab: Some("v".into()),
         ..Default::default()
     };
-    barplot(d, h, &o);
+    d.barplot(h).with(&o).draw();
 }
 
 struct Case {
@@ -180,7 +181,7 @@ fn cases() -> Vec<Case> {
             run: |d| {
                 let l = Layout::new(&[vec![1, 1], vec![2, 3]])
                     .unwrap()
-                    .with_heights(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)]);
+                    .heights(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)]);
                 d.layout(l);
                 bp(d, &[3.0, 5.0, 2.0], "wide");
                 bp(d, &[4.0, 1.0], "left");
@@ -195,7 +196,7 @@ fn cases() -> Vec<Case> {
             run: |d| {
                 let l = Layout::new(&[vec![1, 2]])
                     .unwrap()
-                    .with_widths(&[LayoutSize::Cm(4.0), LayoutSize::Relative(1.0)]);
+                    .widths(&[LayoutSize::Cm(4.0), LayoutSize::Relative(1.0)]);
                 d.layout(l);
                 bp(d, &[3.0, 5.0], "narrow");
                 bp(d, &[4.0, 1.0, 6.0], "wide");
@@ -209,8 +210,8 @@ fn cases() -> Vec<Case> {
             run: |d| {
                 let l = Layout::new(&[vec![1, 2], vec![3, 3]])
                     .unwrap()
-                    .with_widths(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
-                    .with_heights(&[LayoutSize::Cm(5.0), LayoutSize::Relative(1.0)]);
+                    .widths(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
+                    .heights(&[LayoutSize::Cm(5.0), LayoutSize::Relative(1.0)]);
                 d.layout(l);
                 bp(d, &[3.0, 5.0], "a");
                 bp(d, &[4.0, 1.0, 6.0], "b");
@@ -225,7 +226,7 @@ fn cases() -> Vec<Case> {
             run: |d| {
                 let l = Layout::new(&[vec![1, 2], vec![3, 4]])
                     .unwrap()
-                    .with_respect(true);
+                    .respect(true);
                 d.layout(l);
                 for k in 1..=4 {
                     bp(d, &[k as f64, 2.0], &format!("r {k}"));
@@ -240,8 +241,8 @@ fn cases() -> Vec<Case> {
             run: |d| {
                 let l = Layout::new(&[vec![1, 2]])
                     .unwrap()
-                    .with_widths(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
-                    .with_respect_matrix(&[vec![true, false]])
+                    .widths(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
+                    .respect_matrix(&[vec![true, false]])
                     .unwrap();
                 d.layout(l);
                 bp(d, &[3.0, 5.0], "sq");
@@ -269,13 +270,13 @@ fn cases() -> Vec<Case> {
                 for k in 1..=4 {
                     let title = format!("p {k}");
                     let o = PlotOptions {
-                        type_: PlotType::None,
+                        type_: Some(PlotType::None),
                         main: Some(title.as_str().into()),
                         xlab: Some("x".into()),
                         ylab: Some("y".into()),
                         ..Default::default()
                     };
-                    plot(d, &x, &y, &o);
+                    d.plot(&x, &y).with(&o).draw();
                 }
             },
             check_rects: false,

@@ -81,69 +81,94 @@ impl Values<i32> for char {
 /// `setters!(Struct { field: kind Type, ... })` adds a chainable setter for
 /// each field. Kinds: `value` (plain field), `option` (`Option<T>`, set to
 /// `Some`), `values` (`Vec<T>` recycled by R), `option_values`
-/// (`Option<Vec<T>>`), `strings` (`Option<Vec<String>>`), `labels`
+/// (`Option<Vec<T>>`), `list` (`Option<Vec<T>>` from any iterator of
+/// `Into<T>`, e.g. strings for `Label`s), `labels`
 /// (`Option<Vec<Option<Label>>>`) and `pair` (`Option<(f64, f64)>`).
+///
+/// `setters!(Struct => [CallA, CallB] { ... })` also gives each listed
+/// builder in [`crate::graphics`] the same setters (writing to its
+/// `opts`), plus `with(&Struct)`.
 macro_rules! setters {
-    ($ty:ident { $($field:ident : $kind:ident $t:ty),* $(,)? }) => {
+    ($ty:ident $body:tt) => {
+        $crate::setters::setters!(@opts $ty $body);
+    };
+    ($ty:ident => [$($call:ident),+ $(,)?] $body:tt) => {
+        $crate::setters::setters!(@opts $ty $body);
+        $( $crate::setters::setters!(@call $ty $call $body); )+
+    };
+    (@opts $ty:ident { $($field:ident : $kind:ident $t:ty),* $(,)? }) => {
         // R's argument names, such as `sub` (a subtitle) and `add`, win over
         // clippy's wish to keep `std::ops` method names free.
         #[allow(clippy::should_implement_trait)]
         impl $ty {
-            $( $crate::setters::setters!(@one $ty $field $kind $t); )*
+            $( $crate::setters::setters!(@one [] $ty $field $kind $t); )*
         }
     };
-    (@one $ty:ident $field:ident value $t:ty) => {
+    (@call $ty:ident $call:ident { $($field:ident : $kind:ident $t:ty),* $(,)? }) => {
+        #[allow(clippy::should_implement_trait)]
+        impl<'a, G: $crate::graphics::Graphics> $crate::graphics::$call<'a, G> {
+            #[doc = concat!("Uses a copy of `opts` (a reusable [`", stringify!($ty),
+                "`]) for this call. Setters called afterwards change only this \
+                call; setters called before are replaced.")]
+            pub fn with(mut self, opts: &$ty) -> Self {
+                self.opts = opts.clone();
+                self
+            }
+            $( $crate::setters::setters!(@one [opts] $ty $field $kind $t); )*
+        }
+    };
+    (@one [$($p:ident)?] $ty:ident $field:ident value $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
         pub fn $field(mut self, value: impl Into<$t>) -> Self {
-            self.$field = value.into();
+            self$(.$p)?.$field = value.into();
             self
         }
     };
-    (@one $ty:ident $field:ident option $t:ty) => {
+    (@one [$($p:ident)?] $ty:ident $field:ident option $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
         pub fn $field(mut self, value: impl Into<$t>) -> Self {
-            self.$field = Some(value.into());
+            self$(.$p)?.$field = Some(value.into());
             self
         }
     };
-    (@one $ty:ident $field:ident values $t:ty) => {
+    (@one [$($p:ident)?] $ty:ident $field:ident values $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
             "`] to one value or several.")]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
-            self.$field = values.into_values();
+            self$(.$p)?.$field = values.into_values();
             self
         }
     };
-    (@one $ty:ident $field:ident option_values $t:ty) => {
+    (@one [$($p:ident)?] $ty:ident $field:ident option_values $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
             "`] to one value or several.")]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
-            self.$field = Some(values.into_values());
+            self$(.$p)?.$field = Some(values.into_values());
             self
         }
     };
-    (@one $ty:ident $field:ident strings $t:ty) => {
+    (@one [$($p:ident)?] $ty:ident $field:ident list $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        pub fn $field<S: Into<String>>(mut self, values: impl IntoIterator<Item = S>) -> Self {
-            self.$field = Some(values.into_iter().map(Into::into).collect());
+        pub fn $field<S: Into<$t>>(mut self, values: impl IntoIterator<Item = S>) -> Self {
+            self$(.$p)?.$field = Some(values.into_iter().map(Into::into).collect());
             self
         }
     };
-    (@one $ty:ident $field:ident labels $t:ty) => {
+    (@one [$($p:ident)?] $ty:ident $field:ident labels $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
             "`], all present (set the field directly for `NA` labels).")]
         pub fn $field<L: Into<$crate::plotmath::Label>>(
             mut self,
             values: impl IntoIterator<Item = L>,
         ) -> Self {
-            self.$field = Some(values.into_iter().map(|l| Some(l.into())).collect());
+            self$(.$p)?.$field = Some(values.into_iter().map(|l| Some(l.into())).collect());
             self
         }
     };
-    (@one $ty:ident $field:ident pair $t:ty) => {
+    (@one [$($p:ident)?] $ty:ident $field:ident pair $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
         pub fn $field(mut self, a: f64, b: f64) -> Self {
-            self.$field = Some((a, b));
+            self$(.$p)?.$field = Some((a, b));
             self
         }
     };
@@ -211,9 +236,29 @@ mod tests {
         assert!(!plot.axes);
 
         let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
-        assert_eq!(bars.names, Some(vec!["a".to_string(), "b".to_string()]));
-        assert_eq!(bars.col, Some(vec![ColorSpec::from("grey")]));
+        assert_eq!(bars.names, Some(vec![Label::from("a"), Label::from("b")]));
+        assert_eq!(bars.col, vec![ColorSpec::from("grey")]);
 
-        assert_eq!(TextOptions::default().srt(45.0).srt, 45.0);
+        assert_eq!(TextOptions::default().srt(45.0).srt, Some(45.0));
+    }
+
+    #[test]
+    fn calls_have_the_same_setters_and_with() {
+        use crate::device::{AxisOptions, Device};
+        use crate::graphics::Graphics;
+
+        let mut dev = Device::svg(4.0, 4.0);
+        let saved = AxisOptions::default().las(1).at([1.0, 2.0]).lwd(3.0);
+
+        let call = dev.axis(2).las(2).tick(false);
+        assert_eq!((call.opts.las, call.opts.tick), (Some(2), false));
+
+        // `with` replaces what was set before it; later setters override
+        // just this call, leaving `saved` alone.
+        let call = dev.axis(2).las(2).with(&saved).lwd(0.5);
+        assert_eq!(call.opts.las, Some(1));
+        assert_eq!(call.opts.at, Some(vec![1.0, 2.0]));
+        assert_eq!(call.opts.lwd, Some(0.5));
+        assert_eq!(saved.lwd, Some(3.0));
     }
 }

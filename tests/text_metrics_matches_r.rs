@@ -8,14 +8,15 @@
 
 //! Cross-checks `Device::text_metrics` against R's `strwidth()`/
 //! `strheight()` (`units = "inches"`) on a `pdf()` device: plain text,
-//! `cex`/`font`, multi-line text, `par(ps)` and the `cexbase` of a 2x2
-//! `mfrow`. Strings avoid kerning pairs that R's `pdf()` skips (the
+//! `cex`/`font`, multi-line text, `par(ps)`, `par(lheight)` and the
+//! `cexbase` of a 2x2 `mfrow`. Strings avoid kerning pairs that R's `pdf()` skips (the
 //! `KPend` bug we don't copy). Skipped if `Rscript` isn't available.
 
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
+use rs_graphics::graphics::Graphics;
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
@@ -31,6 +32,7 @@ struct Case {
     cex: f64,
     font: i32,
     ps: f64,
+    lheight: f64,
     mfrow: bool,
 }
 
@@ -40,6 +42,7 @@ const CASES: &[Case] = &[
         cex: 1.0,
         font: 1,
         ps: 12.0,
+        lheight: 1.0,
         mfrow: false,
     },
     Case {
@@ -47,6 +50,7 @@ const CASES: &[Case] = &[
         cex: 1.5,
         font: 2,
         ps: 12.0,
+        lheight: 1.0,
         mfrow: false,
     },
     Case {
@@ -54,6 +58,7 @@ const CASES: &[Case] = &[
         cex: 1.0,
         font: 3,
         ps: 12.0,
+        lheight: 1.0,
         mfrow: false,
     },
     Case {
@@ -61,6 +66,7 @@ const CASES: &[Case] = &[
         cex: 0.7,
         font: 1,
         ps: 9.0,
+        lheight: 1.0,
         mfrow: false,
     },
     Case {
@@ -68,7 +74,16 @@ const CASES: &[Case] = &[
         cex: 1.2,
         font: 4,
         ps: 10.0,
+        lheight: 1.0,
         mfrow: true,
+    },
+    Case {
+        text: "three\nshort\nlines",
+        cex: 1.0,
+        font: 1,
+        ps: 12.0,
+        lheight: 2.5,
+        mfrow: false,
     },
 ];
 
@@ -82,7 +97,7 @@ fn text_metrics_match_r() {
     let mut script = String::new();
     for c in CASES {
         script.push_str(&format!(
-            "pdf(NULL, width = 7, height = 6)\n{}par(ps = {}); plot.new()\n\
+            "pdf(NULL, width = 7, height = 6)\n{}par(ps = {}, lheight = {}); plot.new()\n\
              cat(sprintf('%.10g', c(strwidth('{t}', 'inches', cex = {cex}, font = {f}), \
                                     strheight('{t}', 'inches', cex = {cex}, font = {f}))), '\\n')\n\
              invisible(dev.off())\n",
@@ -92,6 +107,7 @@ fn text_metrics_match_r() {
                 ""
             },
             c.ps,
+            c.lheight,
             t = r_str(c.text),
             cex = c.cex,
             f = c.font,
@@ -118,6 +134,7 @@ fn text_metrics_match_r() {
             .collect();
         let par = Par {
             ps: c.ps,
+            lheight: c.lheight,
             ..Par::default()
         };
         let mut dev = Device::new(PdfBackend::new(7.0, 6.0), par);

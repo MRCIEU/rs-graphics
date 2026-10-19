@@ -19,8 +19,9 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{boxplot, BoxplotOptions};
+use rs_graphics::highlevel::BoxplotOptions;
 use rs_graphics::par::Par;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -143,15 +144,15 @@ fn draw_ours(c: &Case) -> String {
     };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     let opts = BoxplotOptions {
-        col: ColorSpec::Color(Color::parse(c.col).unwrap()),
-        border: ColorSpec::Color(Color::parse(c.border).unwrap()),
+        col: Some(ColorSpec::Color(Color::parse(c.col).unwrap())),
+        border: Some(ColorSpec::Color(Color::parse(c.border).unwrap())),
         axes: false,
         notch: c.notch,
         varwidth: c.varwidth,
         horizontal: c.horizontal,
         ..Default::default()
     };
-    boxplot(&mut dev, &groups(), &opts);
+    dev.boxplot(&groups()).with(&opts).draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

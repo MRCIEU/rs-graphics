@@ -16,8 +16,10 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::{barplot, barplot_matrix, BarplotOptions};
+use rs_graphics::highlevel::BarplotOptions;
 use rs_graphics::par::Par;
+use rs_graphics::plotmath::Label;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -76,8 +78,8 @@ fn rects(pdf: &str) -> Vec<[f64; 4]> {
     out
 }
 
-fn names(n: &[&str]) -> Option<Vec<String>> {
-    Some(n.iter().map(|s| s.to_string()).collect())
+fn names(n: &[&str]) -> Option<Vec<Label>> {
+    Some(n.iter().map(|&s| s.into()).collect())
 }
 
 fn red_green_blue() -> Option<Vec<ColorSpec>> {
@@ -123,7 +125,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("v".into()),
                     ..Default::default()
                 };
-                barplot(d, &[23.0, 41.0, 12.0, -5.0], &o);
+                d.barplot([23.0, 41.0, 12.0, -5.0]).with(&o).draw();
             },
             check_text: true,
         },
@@ -136,7 +138,7 @@ fn cases() -> Vec<Case> {
                     legend_text: names(&["r1", "r2", "r3"]),
                     ..Default::default()
                 };
-                barplot_matrix(d, &mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -147,10 +149,10 @@ fn cases() -> Vec<Case> {
                 let o = BarplotOptions {
                     names: names(&["a", "b", "c", "d"]),
                     beside: true,
-                    col: red_green_blue(),
+                    col: red_green_blue().expect("REASON"),
                     ..Default::default()
                 };
-                barplot_matrix(d, &mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -163,7 +165,7 @@ fn cases() -> Vec<Case> {
                     horiz: true,
                     ..Default::default()
                 };
-                barplot_matrix(d, &mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -179,7 +181,7 @@ fn cases() -> Vec<Case> {
                     legend_text: names(&["r1", "r2", "r3"]),
                     ..Default::default()
                 };
-                barplot_matrix(d, &mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -195,7 +197,7 @@ fn cases() -> Vec<Case> {
                     ylim: Some((-8.0, 12.0)),
                     ..Default::default()
                 };
-                barplot_matrix(d, &cols, &o);
+                d.barplot(&cols).with(&o).draw();
             },
             check_text: false,
         },

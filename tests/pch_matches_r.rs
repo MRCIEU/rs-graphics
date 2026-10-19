@@ -123,7 +123,7 @@ fn draw_ours(c: &Case) -> String {
     par.cex = c.par_cex;
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 8.0), (0.0, 6.0), &PlotWindowOptions::default());
+    dev.plot_window((0.0, 8.0), (0.0, 6.0)).draw();
     let col = ColorSpec::Color(Color::parse(c.col).unwrap());
     let bg = c
         .bg
@@ -131,31 +131,27 @@ fn draw_ours(c: &Case) -> String {
     dev.par.lwd = c.lwd;
     for pch in 0..26 {
         let (x, y) = pch_pos(pch);
-        dev.points(
-            &[x],
-            &[y],
-            &XyOptions {
+        dev.points(&[x], &[y])
+            .with(&XyOptions {
                 pch: vec![pch as i32],
                 col: vec![col],
                 bg: vec![bg],
                 cex: vec![c.cex],
                 ..XyOptions::default()
-            },
-        );
+            })
+            .draw();
     }
     dev.par.lwd = 1.0;
     for (i, &ch) in CHARS.iter().enumerate() {
         let (x, y) = char_pos(i);
-        dev.points(
-            &[x],
-            &[y],
-            &XyOptions {
+        dev.points(&[x], &[y])
+            .with(&XyOptions {
                 pch: vec![ch as i32],
                 col: vec![col],
                 cex: vec![c.cex],
                 ..XyOptions::default()
-            },
-        );
+            })
+            .draw();
     }
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
