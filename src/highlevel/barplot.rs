@@ -191,6 +191,194 @@ fn recycle(v: &[f64], n: usize) -> Vec<f64> {
     (0..n).map(|k| v[k % v.len()]).collect()
 }
 
+/// Everything `barplot()` works out before drawing: bar positions, the
+/// bars themselves, colours, axis limits and where the names go. Needs no
+/// device, so a recorded plot can return the same bar centres as
+/// [`Device::barplot`] (and panics on the same invalid input).
+pub(crate) struct BarLayout {
+    beside: bool,
+    w_l: Vec<f64>,
+    w_r: Vec<f64>,
+    /// Bar centres (R's `w.m`): what `barplot()` returns.
+    pub(crate) w_m: Vec<f64>,
+    /// (position index, base, top, colour index) per bar.
+    bars: Vec<(usize, f64, f64, usize)>,
+    colors: Vec<ColorSpec>,
+    xlim: (f64, f64),
+    ylim: (f64, f64),
+    /// Where `names` go along the category axis, if given.
+    names_at: Option<Vec<f64>>,
+}
+
+/// See [`BarLayout`].
+pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayout {
+    let (columns, vector_input): (&[Vec<f64>], bool) = match heights {
+        BarHeights::Vector(v) => {
+            assert!(!v.is_empty(), "barplot: 'height' must be non-empty");
+            (std::slice::from_ref(v), true)
+        }
+        BarHeights::Matrix(columns) => {
+            assert!(!columns.is_empty(), "barplot: 'height' must be non-empty");
+            let nr = columns[0].len();
+            assert!(
+                nr > 0 && columns.iter().all(|c| c.len() == nr),
+                "barplot: matrix columns must be non-empty and of equal length"
+            );
+            (columns, false)
+        }
+    };
+    let nc = columns.len();
+    let nr = columns[0].len();
+    let beside = vector_input || opts.beside;
+    let horiz = opts.horiz;
+    assert!(!opts.width.is_empty(), "barplot: 'width' must be non-empty");
+
+    // --- geometry along the category axis (w.l / w.m / w.r) ---
+    let mean_width = opts.width.iter().sum::<f64>() / opts.width.len() as f64;
+    let space_in = opts.space.clone().unwrap_or_else(|| {
+        if !vector_input && beside {
+            vec![0.0, 1.0]
+        } else {
+            vec![0.2]
+        }
+    });
+    assert!(!space_in.is_empty(), "barplot: 'space' must be non-empty");
+    let space: Vec<f64> = space_in.iter().map(|s| s * mean_width).collect();
+
+    let nbars = if beside { nr * nc } else { nc };
+    let space_v: Vec<f64> = if beside && space.len() == 2 && !vector_input {
+        (0..nc)
+            .flat_map(|_| std::iter::once(space[1]).chain(std::iter::repeat_n(space[0], nr - 1)))
+            .collect()
+    } else {
+        recycle(&space, nbars)
+    };
+    let base_n = if beside { nr } else { nc };
+    let width_v: Vec<f64> = (0..nbars)
+        .map(|k| opts.width[(k % base_n) % opts.width.len()])
+        .collect();
+
+    let mut w_l = vec![0.0; nbars];
+    let mut w_r = vec![0.0; nbars];
+    let mut w_m = vec![0.0; nbars];
+    let mut cum = 0.0;
+    for k in 0..nbars {
+        cum += space_v[k] + width_v[k];
+        w_r[k] = cum;
+        w_m[k] = cum - width_v[k] / 2.0;
+        w_l[k] = w_m[k] - width_v[k] / 2.0;
+    }
+
+    // --- log scale in the data direction: where bars start ---
+    let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
+    let rectbase = if log_dat {
+        let min_h = columns
+            .iter()
+            .flatten()
+            .copied()
+            .filter(|h| !h.is_nan())
+            .fold(f64::INFINITY, f64::min);
+        assert!(
+            min_h > 0.0,
+            "barplot: log scale error: at least one 'height + offset' value <= 0"
+        );
+        for (log, lim, name) in [
+            (opts.xlog, opts.xlim, "xlim"),
+            (opts.ylog, opts.ylim, "ylim"),
+        ] {
+            if let (true, Some(l)) = (log, lim) {
+                assert!(
+                    l.0.min(l.1) > 0.0,
+                    "barplot: log scale error: '{name}' <= 0"
+                );
+            }
+        }
+        match (horiz, opts.ylim, opts.xlim) {
+            (false, Some(l), _) if opts.ylog => l.0,
+            (true, _, Some(l)) if opts.xlog => l.0,
+            _ => 0.9 * min_h,
+        }
+    } else {
+        0.0
+    };
+
+    // --- bars: (position index, base, top, colour index) ---
+    let mut bars: Vec<(usize, f64, f64, usize)> = Vec::new();
+    let mut extent_lo = f64::INFINITY;
+    let mut extent_hi = f64::NEG_INFINITY;
+    let mut note = |h: f64| {
+        // `range(rAdj, height)` with `rAdj = 0.9 * height` on a log value
+        // axis, else `-0.01 * height`.
+        let adj = if log_dat { 0.9 * h } else { -0.01 * h };
+        extent_lo = extent_lo.min(adj).min(h);
+        extent_hi = extent_hi.max(adj).max(h);
+    };
+    if beside {
+        for (j, col) in columns.iter().enumerate() {
+            for (i, &h) in col.iter().enumerate() {
+                let k = j * nr + i;
+                bars.push((k, rectbase, h, k));
+                note(h);
+            }
+        }
+    } else {
+        // `rbind(rectbase, apply(height, 2, cumsum))`: the first segment
+        // starts at `rectbase`, the sums themselves start from 0.
+        note(rectbase);
+        for (j, col) in columns.iter().enumerate() {
+            let mut acc = 0.0;
+            for (i, &h) in col.iter().enumerate() {
+                let base = if i == 0 { rectbase } else { acc };
+                acc += h;
+                bars.push((j, base, acc, i));
+                note(acc);
+            }
+        }
+    }
+
+    let colors: Vec<ColorSpec> = match &opts.col {
+        Some(c) if !c.is_empty() => c.clone(),
+        _ if vector_input => vec![ColorSpec::Color(Color::parse("grey").unwrap())],
+        _ => gray_colors(nr),
+    };
+
+    let cat_lim = (
+        w_l.iter().cloned().fold(f64::INFINITY, f64::min),
+        w_r.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+    );
+    let val_lim = (extent_lo, extent_hi);
+    let (xlim, ylim) = if horiz {
+        (opts.xlim.unwrap_or(val_lim), opts.ylim.unwrap_or(cat_lim))
+    } else {
+        (opts.xlim.unwrap_or(cat_lim), opts.ylim.unwrap_or(val_lim))
+    };
+
+    let names_at = opts.names.as_ref().map(|names| {
+        if names.len() == w_m.len() {
+            w_m.clone()
+        } else if beside && names.len() == nc {
+            // colMeans(w.m): the centre of each group of bars.
+            (0..nc)
+                .map(|j| w_m[j * nr..(j + 1) * nr].iter().sum::<f64>() / nr as f64)
+                .collect()
+        } else {
+            panic!("barplot: incorrect number of names");
+        }
+    });
+
+    BarLayout {
+        beside,
+        w_l,
+        w_r,
+        w_m,
+        bars,
+        colors,
+        xlim,
+        ylim,
+        names_at,
+    }
+}
+
 impl<B: Backend> Device<B> {
     /// `barplot(height, ...)`. A high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
     /// page it moves to the next panel.
@@ -204,156 +392,24 @@ impl<B: Backend> Device<B> {
     /// (for `beside`: one centre per bar, `nrow` per group; otherwise one
     /// per column).
     pub fn barplot(&mut self, heights: impl Into<BarHeights>, opts: &BarplotOptions) -> Vec<f64> {
-        match heights.into() {
-            BarHeights::Vector(v) => {
-                assert!(!v.is_empty(), "barplot: 'height' must be non-empty");
-                self.barplot_impl(&[v], true, opts)
-            }
-            BarHeights::Matrix(columns) => {
-                assert!(!columns.is_empty(), "barplot: 'height' must be non-empty");
-                let nr = columns[0].len();
-                assert!(
-                    nr > 0 && columns.iter().all(|c| c.len() == nr),
-                    "barplot: matrix columns must be non-empty and of equal length"
-                );
-                self.barplot_impl(&columns, false, opts)
-            }
-        }
+        let layout = bar_layout(&heights.into(), opts);
+        self.barplot_impl(layout, opts)
     }
 
-    fn barplot_impl(
-        &mut self,
-        columns: &[Vec<f64>],
-        vector_input: bool,
-        opts: &BarplotOptions,
-    ) -> Vec<f64> {
-        let nc = columns.len();
-        let nr = columns[0].len();
-        let beside = vector_input || opts.beside;
+    /// Draws `layout`; returns its bar centres.
+    fn barplot_impl(&mut self, layout: BarLayout, opts: &BarplotOptions) -> Vec<f64> {
+        let BarLayout {
+            beside,
+            w_l,
+            w_r,
+            w_m,
+            bars,
+            colors,
+            xlim,
+            ylim,
+            names_at,
+        } = layout;
         let horiz = opts.horiz;
-        assert!(!opts.width.is_empty(), "barplot: 'width' must be non-empty");
-
-        // --- geometry along the category axis (w.l / w.m / w.r) ---
-        let mean_width = opts.width.iter().sum::<f64>() / opts.width.len() as f64;
-        let space_in = opts.space.clone().unwrap_or_else(|| {
-            if !vector_input && beside {
-                vec![0.0, 1.0]
-            } else {
-                vec![0.2]
-            }
-        });
-        assert!(!space_in.is_empty(), "barplot: 'space' must be non-empty");
-        let space: Vec<f64> = space_in.iter().map(|s| s * mean_width).collect();
-
-        let nbars = if beside { nr * nc } else { nc };
-        let space_v: Vec<f64> = if beside && space.len() == 2 && !vector_input {
-            (0..nc)
-                .flat_map(|_| {
-                    std::iter::once(space[1]).chain(std::iter::repeat_n(space[0], nr - 1))
-                })
-                .collect()
-        } else {
-            recycle(&space, nbars)
-        };
-        let base_n = if beside { nr } else { nc };
-        let width_v: Vec<f64> = (0..nbars)
-            .map(|k| opts.width[(k % base_n) % opts.width.len()])
-            .collect();
-
-        let mut w_l = vec![0.0; nbars];
-        let mut w_r = vec![0.0; nbars];
-        let mut w_m = vec![0.0; nbars];
-        let mut cum = 0.0;
-        for k in 0..nbars {
-            cum += space_v[k] + width_v[k];
-            w_r[k] = cum;
-            w_m[k] = cum - width_v[k] / 2.0;
-            w_l[k] = w_m[k] - width_v[k] / 2.0;
-        }
-
-        // --- log scale in the data direction: where bars start ---
-        let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
-        let rectbase = if log_dat {
-            let min_h = columns
-                .iter()
-                .flatten()
-                .copied()
-                .filter(|h| !h.is_nan())
-                .fold(f64::INFINITY, f64::min);
-            assert!(
-                min_h > 0.0,
-                "barplot: log scale error: at least one 'height + offset' value <= 0"
-            );
-            for (log, lim, name) in [
-                (opts.xlog, opts.xlim, "xlim"),
-                (opts.ylog, opts.ylim, "ylim"),
-            ] {
-                if let (true, Some(l)) = (log, lim) {
-                    assert!(
-                        l.0.min(l.1) > 0.0,
-                        "barplot: log scale error: '{name}' <= 0"
-                    );
-                }
-            }
-            match (horiz, opts.ylim, opts.xlim) {
-                (false, Some(l), _) if opts.ylog => l.0,
-                (true, _, Some(l)) if opts.xlog => l.0,
-                _ => 0.9 * min_h,
-            }
-        } else {
-            0.0
-        };
-
-        // --- bars: (position index, base, top, colour index) ---
-        let mut bars: Vec<(usize, f64, f64, usize)> = Vec::new();
-        let mut extent_lo = f64::INFINITY;
-        let mut extent_hi = f64::NEG_INFINITY;
-        let mut note = |h: f64| {
-            // `range(rAdj, height)` with `rAdj = 0.9 * height` on a log value
-            // axis, else `-0.01 * height`.
-            let adj = if log_dat { 0.9 * h } else { -0.01 * h };
-            extent_lo = extent_lo.min(adj).min(h);
-            extent_hi = extent_hi.max(adj).max(h);
-        };
-        if beside {
-            for (j, col) in columns.iter().enumerate() {
-                for (i, &h) in col.iter().enumerate() {
-                    let k = j * nr + i;
-                    bars.push((k, rectbase, h, k));
-                    note(h);
-                }
-            }
-        } else {
-            // `rbind(rectbase, apply(height, 2, cumsum))`: the first segment
-            // starts at `rectbase`, the sums themselves start from 0.
-            note(rectbase);
-            for (j, col) in columns.iter().enumerate() {
-                let mut acc = 0.0;
-                for (i, &h) in col.iter().enumerate() {
-                    let base = if i == 0 { rectbase } else { acc };
-                    acc += h;
-                    bars.push((j, base, acc, i));
-                    note(acc);
-                }
-            }
-        }
-
-        let colors: Vec<ColorSpec> = match &opts.col {
-            Some(c) if !c.is_empty() => c.clone(),
-            _ if vector_input => vec![ColorSpec::Color(Color::parse("grey").unwrap())],
-            _ => gray_colors(nr),
-        };
-
-        let cat_lim = (
-            w_l.iter().cloned().fold(f64::INFINITY, f64::min),
-            w_r.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-        );
-        let val_lim = (extent_lo, extent_hi);
-        let (xlim, ylim) = if horiz {
-            (opts.xlim.unwrap_or(val_lim), opts.ylim.unwrap_or(cat_lim))
-        } else {
-            (opts.xlim.unwrap_or(cat_lim), opts.ylim.unwrap_or(val_lim))
-        };
 
         // barplot() temporarily sets the *value* axis to `"i"` (exact fit, no
         // 4% padding), leaving the categorical axis at its regular setting.
@@ -390,17 +446,7 @@ impl<B: Backend> Device<B> {
             }
         }
 
-        if let Some(names) = &opts.names {
-            let at: Vec<f64> = if names.len() == w_m.len() {
-                w_m.clone()
-            } else if beside && names.len() == nc {
-                // colMeans(w.m): the centre of each group of bars.
-                (0..nc)
-                    .map(|j| w_m[j * nr..(j + 1) * nr].iter().sum::<f64>() / nr as f64)
-                    .collect()
-            } else {
-                panic!("barplot: incorrect number of names");
-            };
+        if let (Some(names), Some(at)) = (&opts.names, names_at) {
             // `axis(side, at = at, labels = names.arg, lty = 0)`: names only.
             let names = AxisOptions {
                 at: Some(at),

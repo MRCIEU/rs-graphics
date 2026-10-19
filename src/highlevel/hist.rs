@@ -131,6 +131,48 @@ pub struct HistResult {
     pub mids: Vec<f64>,
 }
 
+/// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
+/// mid-points. Needs no device, so a recorded plot can return the same
+/// result as [`Device::hist`].
+pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
+    let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
+    let n = data.len();
+
+    let breaks = opts.breaks.clone().unwrap_or_else(|| {
+        let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
+        let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+            (lo, hi)
+        } else {
+            (0.0, 1.0)
+        };
+        let nclass = nclass_sturges(n).max(1);
+        pretty_r(lo, hi, nclass, 1)
+    });
+
+    let counts = bin_counts(&data, &breaks);
+    let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
+    let density: Vec<f64> = counts
+        .iter()
+        .zip(&widths)
+        .map(|(&c, &w)| {
+            if n > 0 && w > 0.0 {
+                c / (n as f64 * w)
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let mids: Vec<f64> = breaks.windows(2).map(|w| 0.5 * (w[0] + w[1])).collect();
+
+    HistResult {
+        breaks,
+        counts,
+        density,
+        mids,
+    }
+}
+
 impl<B: Backend> Device<B> {
     /// `hist(x, ...)`. A high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
     /// page it moves to the next panel,
@@ -138,36 +180,13 @@ impl<B: Backend> Device<B> {
     /// current plot. Returns the bins and counts (R's `"histogram"`
     /// object).
     pub fn hist(&mut self, x: &[f64], opts: &HistOptions) -> HistResult {
-        let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
-        let n = data.len();
-
-        let breaks = opts.breaks.clone().unwrap_or_else(|| {
-            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
-            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
-                (lo, hi)
-            } else {
-                (0.0, 1.0)
-            };
-            let nclass = nclass_sturges(n).max(1);
-            pretty_r(lo, hi, nclass, 1)
-        });
+        let HistResult {
+            breaks,
+            counts,
+            density,
+            mids,
+        } = hist_bins(x, opts);
         let nb = breaks.len();
-
-        let counts = bin_counts(&data, &breaks);
-        let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
-        let density: Vec<f64> = counts
-            .iter()
-            .zip(&widths)
-            .map(|(&c, &w)| {
-                if n > 0 && w > 0.0 {
-                    c / (n as f64 * w)
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-        let mids: Vec<f64> = breaks.windows(2).map(|w| 0.5 * (w[0] + w[1])).collect();
 
         let heights: Vec<f64> = if opts.freq {
             counts.clone()

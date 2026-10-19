@@ -169,6 +169,16 @@ impl Default for BoxplotOptions {
     }
 }
 
+/// Each group's statistics, as [`Device::boxplot`] returns them. Needs no
+/// device, so a recorded plot can return the same result.
+pub(crate) fn boxplot_all_stats(groups: &[Vec<f64>], opts: &BoxplotOptions) -> Vec<BoxStats> {
+    assert!(!groups.is_empty(), "boxplot: need at least one group");
+    groups
+        .iter()
+        .map(|g| boxplot_stats(g, opts.range))
+        .collect()
+}
+
 impl<B: Backend> Device<B> {
     /// `boxplot(x, ...)` where `x` is a slice of groups (R's `list`/formula
     /// input reduced to its common case). A single group is
@@ -177,11 +187,7 @@ impl<B: Backend> Device<B> {
     /// Returns each group's statistics.
     pub fn boxplot(&mut self, groups: &[Vec<f64>], opts: &BoxplotOptions) -> Vec<BoxStats> {
         let n = groups.len();
-        assert!(n > 0, "boxplot: need at least one group");
-        let stats: Vec<BoxStats> = groups
-            .iter()
-            .map(|g| boxplot_stats(g, opts.range))
-            .collect();
+        let stats = boxplot_all_stats(groups, opts);
         let at: Vec<f64> = (1..=n).map(|i| i as f64).collect();
         let xlim = (0.5, n as f64 + 0.5);
 
