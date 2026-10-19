@@ -6,47 +6,53 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Plots as values: a [`Plot`] records [`Graphics`] calls without a
-//! device, and [`Device::add_plot`] draws them later (like R's
+//! Figures as values: a [`Figure`] records [`Graphics`] calls without a
+//! device, and [`Device::add_figure`] draws them later (like R's
 //! `recordPlot()`/`replayPlot()`).
+//!
+//! "Figure" has its meaning in R's base graphics: the **figure region**,
+//! one plot together with its margins (one panel of an `mfrow`/`layout`
+//! page). A `Figure` usually holds the contents of one: a high-level call
+//! such as `plot()` or `hist()` and what is drawn on top of it.
 //!
 //! ```
 //! use rs_graphics::prelude::*;
 //!
-//! // Build a plot without a device...
-//! let mut plot = Plot::new();
-//! plot.barplot([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
-//! plot.abline().h(4.0).lty(LineType::DASHED).draw();
+//! // Build a figure without a device...
+//! let mut fig = Figure::new();
+//! fig.barplot([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
+//! fig.abline().h(4.0).lty(LineType::DASHED).draw();
 //!
 //! // ...and draw it later, as often as needed.
 //! let mut dev = Device::pdf(8.0, 4.0);
 //! dev.mfrow(1, 2);
-//! dev.add_plot(&plot); // panel 1
-//! dev.add_plot(&plot); // panel 2
+//! dev.add_figure(&fig); // panel 1
+//! dev.add_figure(&fig); // panel 2
 //! # let _ = dev.finish();
 //! ```
 //!
-//! - **Same output.** Drawing a `Plot` calls the same code, in the same
+//! - **Same output.** Drawing a `Figure` calls the same code, in the same
 //!   order, as making the calls on the device, so the output is
 //!   identical.
-//! - **Panels.** A plot that starts with a high-level call (`plot`,
+//! - **Panels.** A figure that starts with a high-level call (`plot`,
 //!   `hist`, ...) or `plot_new()` moves to the next panel when added,
 //!   exactly as those calls do on a device;
-//!   [`add_plot_at`](Device::add_plot_at) puts it in a chosen panel. A
-//!   plot without one draws into the current plot (a layer).
+//!   [`add_figure_at`](Device::add_figure_at) puts it in a chosen panel. A
+//!   figure without one draws into the current plot (a layer), and one
+//!   with several high-level calls fills several panels.
 //! - **Results.** `hist()`, `barplot()` and `boxplot()` don't need a
-//!   device to work out what they return, so `.draw()` on a `Plot` returns
+//!   device to work out what they return, so `.draw()` on a `Figure` returns
 //!   the same as on a device. `legend()`'s layout depends on the device;
-//!   [`Device::add_plot`] returns it.
+//!   [`Device::add_figure`] returns it.
 //! - **Graphical parameters.** Change them with
-//!   [`par()`](Graphics::par) calls in the plot (before the high-level
-//!   call for `mar`, `pty`, ...). `add_plot` restores the device's `par`
-//!   afterwards, so a plot's settings don't leak into the next one.
+//!   [`par()`](Graphics::par) calls in the figure (before the high-level
+//!   call for `mar`, `pty`, ...). `add_figure` restores the device's `par`
+//!   afterwards, so a figure's settings don't leak into the next one.
 //! - **What isn't recorded:** device queries (`usr()`, `plot_region()`,
 //!   `text_metrics()`, ...) and page layout (`mfrow`, `layout`, `fig`,
 //!   ...) are [`Device`] methods only.
-//! - **Data is copied** into the plot. For very large plots, draw on the
-//!   device directly.
+//! - **Data is copied** into the figure. For very large plots, draw on
+//!   the device directly.
 
 use crate::backend::Backend;
 use crate::device::{
@@ -65,17 +71,18 @@ use crate::highlevel::{
 use crate::par::ParOptions;
 use crate::plotmath::Label;
 
-/// A plot built without a device: a list of recorded [`Graphics`] calls,
-/// drawn with [`Device::add_plot`]. See the [module docs](self).
+/// The contents of a figure region (a plot and its margins), built
+/// without a device: a list of recorded [`Graphics`] calls, drawn with
+/// [`Device::add_figure`]. See the [module docs](self).
 #[derive(Clone, Debug, Default)]
-pub struct Plot {
+pub struct Figure {
     calls: Vec<Call>,
 }
 
-impl Plot {
-    /// An empty plot.
+impl Figure {
+    /// An empty figure.
     pub fn new() -> Self {
-        Plot::default()
+        Figure::default()
     }
 
     /// The number of recorded calls.
@@ -119,11 +126,11 @@ fn four(x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64]) -> [Vec<f64>; 4] {
     [x0.to_vec(), y0.to_vec(), x1.to_vec(), y1.to_vec()]
 }
 
-impl crate::graphics::sealed::Sealed for Plot {}
+impl crate::graphics::sealed::Sealed for Figure {}
 
 /// Records each call. `legend()`'s `.draw()` returns `()`: its layout
-/// comes from [`Device::add_plot`].
-impl Graphics for Plot {
+/// comes from [`Device::add_figure`].
+impl Graphics for Figure {
     type LegendResult = ();
 
     fn plot_new(&mut self) {
@@ -205,32 +212,32 @@ impl Graphics for Plot {
     }
 }
 
-/// What drawing a [`Plot`] produced that only a device can work out.
+/// What drawing a [`Figure`] produced that only a device can work out.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
-pub struct Replayed {
-    /// What each of the plot's `legend()` calls returned on the device, in
+pub struct FigureResult {
+    /// What each of the figure's `legend()` calls returned on the device, in
     /// order (see [`Graphics::legend`]).
     pub legends: Vec<Option<LegendLayout>>,
 }
 
 impl<B: Backend> Device<B> {
-    /// Draws `plot` on this device: its calls in order, exactly as if they
-    /// had been made here. A plot starting with a high-level call (or
+    /// Draws `fig` on this device: its calls in order, exactly as if they
+    /// had been made here. A figure starting with a high-level call (or
     /// `plot_new()`) moves to the next panel, as that call would.
     ///
     /// `par` is restored afterwards (like R's `op <- par(...);
-    /// on.exit(par(op))`), so the plot's `par()` calls don't affect what
+    /// on.exit(par(op))`), so the figure's `par()` calls don't affect what
     /// is drawn next. The panel position and `par(new)` are device state
     /// and are not restored.
     ///
     /// # Panics
     /// Where the recorded calls would panic on the device (e.g. `abline()`
     /// with a non-finite `coef`).
-    pub fn add_plot(&mut self, plot: &Plot) -> Replayed {
+    pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
         let saved = self.par.clone();
-        let mut out = Replayed::default();
-        for call in &plot.calls {
+        let mut out = FigureResult::default();
+        for call in &fig.calls {
             match call {
                 Call::PlotNew => self.plot_new_impl(),
                 Call::Par(o) => self.emit_par(o.clone()),
@@ -268,20 +275,20 @@ impl<B: Backend> Device<B> {
         out
     }
 
-    /// [`add_plot`](Device::add_plot) into the panel at `row`, `col` of
+    /// [`add_figure`](Device::add_figure) into the panel at `row`, `col` of
     /// the current `mfrow`/`mfcol`/`layout` arrangement (R's `par(mfg =
-    /// c(row, col))` before the plot), for a plot that starts with a
+    /// c(row, col))` before it), for a figure that starts with a
     /// high-level call or `plot_new()`. On a device with nothing drawn yet
     /// it first starts the page, since R ignores `mfg` until then (the
     /// same as `plot_new()`, then `mfg(row, col)`).
     ///
     /// # Panics
     /// If `row` or `col` is outside the arrangement.
-    pub fn add_plot_at(&mut self, row: usize, col: usize, plot: &Plot) -> Replayed {
+    pub fn add_figure_at(&mut self, row: usize, col: usize, fig: &Figure) -> FigureResult {
         if !self.is_used() {
             self.plot_new_impl();
         }
         self.mfg(row, col);
-        self.add_plot(plot)
+        self.add_figure(fig)
     }
 }

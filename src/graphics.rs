@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! R's graphics functions as the [`Graphics`] trait, implemented by
-//! [`Device`] (which draws) and [`Plot`](crate::recording::Plot) (which
+//! [`Device`] (which draws) and [`Figure`](crate::recording::Figure) (which
 //! records, to draw later).
 //!
 //! Each method starts a call for one R function, taking R's data
@@ -74,15 +74,15 @@ impl<B: Backend> sealed::Sealed for Device<B> {}
 /// current plot.
 ///
 /// Implemented by [`Device`], which draws, and by
-/// [`Plot`](crate::recording::Plot), which records the calls to draw
+/// [`Figure`](crate::recording::Figure), which records the calls to draw
 /// later; the trait can't be implemented outside this crate. Write your
 /// own plots as functions or extension-trait methods generic over
 /// `G: Graphics` (see the crate docs), and they work on both.
 pub trait Graphics: sealed::Sealed + Sized {
     /// What [`legend`](Graphics::legend)'s `.draw()` returns:
     /// `Option<LegendLayout>` on a [`Device`], `()` on a
-    /// [`Plot`](crate::recording::Plot) (whose legend layouts come from
-    /// [`Device::add_plot`]).
+    /// [`Figure`](crate::recording::Figure) (whose legend layouts come from
+    /// [`Device::add_figure`]).
     type LegendResult;
 
     /// `plot.new()`: moves to the next figure and sets up its figure and
@@ -447,7 +447,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`ParOptions`] (each a [`Par`](crate::par::Par) field, plus `new`
     /// for R's `par(new = TRUE)`). On a [`Device`] it is the same as
     /// assigning `dev.par.<field>` (and [`Device::set_new`] for `new`);
-    /// in a recorded [`Plot`](crate::recording::Plot) it is the way to
+    /// in a recorded [`Figure`](crate::recording::Figure) it is the way to
     /// change them. As in R, `mar`, `oma`, `pty` and `plt` take effect at
     /// the next [`plot_new`](Graphics::plot_new).
     fn par(&mut self) -> ParCall<'_, Self> {

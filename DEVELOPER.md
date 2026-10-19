@@ -329,8 +329,8 @@ against a real R installation by shelling out to `Rscript`:
   line's vertices, colour, width and dash pattern.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
-- `tests/plot_replay.rs` (no R needed) - recorded `Plot`s drawn with
-  `add_plot`/`add_plot_at` give byte-identical output to direct calls
+- `tests/figure_replay.rs` (no R needed) - recorded `Figure`s drawn with
+  `add_figure`/`add_figure_at` give byte-identical output to direct calls
   (every kind of call, all backends, mixed in multi-panel pages), `par`
   is restored, and recorded results match the device's.
 - `tests/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after

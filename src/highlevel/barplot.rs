@@ -205,7 +205,7 @@ fn recycle(v: &[f64], n: usize) -> Vec<f64> {
 
 /// Everything `barplot()` works out before drawing: bar positions, the
 /// bars themselves, colours, axis limits and where the names go. Needs no
-/// device, so a recorded plot can return the same bar centres as
+/// device, so a recorded figure can return the same bar centres as
 /// [`Graphics::barplot`](crate::graphics::Graphics::barplot) (and panics on the same invalid input).
 pub(crate) struct BarLayout {
     beside: bool,

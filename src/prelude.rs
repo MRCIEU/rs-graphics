@@ -13,7 +13,7 @@
 //! ```
 //!
 //! The device, the `Graphics` trait (R's graphics functions) and their
-//! options types, recorded `Plot`s, `par()`, colours, line types,
+//! options types, recorded `Figure`s, `par()`, colours, line types,
 //! labels, layouts, the high-level plots' options and results, and the
 //! backends.
 
@@ -36,4 +36,4 @@ pub use crate::layout::{Layout, LayoutSize};
 pub use crate::lty::LineType;
 pub use crate::par::{AxisStyle, AxisType, Par, ParOptions, Pty, Sides};
 pub use crate::plotmath::{Expression, Label};
-pub use crate::recording::{Plot, Replayed};
+pub use crate::recording::{Figure, FigureResult};

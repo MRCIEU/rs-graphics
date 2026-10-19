@@ -190,7 +190,7 @@ impl Default for BoxplotOptions {
 }
 
 /// Each group's statistics, as [`Graphics::boxplot`](crate::graphics::Graphics::boxplot) returns them. Needs no
-/// device, so a recorded plot can return the same result.
+/// device, so a recorded figure can return the same result.
 pub(crate) fn boxplot_all_stats(groups: &[Vec<f64>], opts: &BoxplotOptions) -> Vec<BoxStats> {
     assert!(!groups.is_empty(), "boxplot: need at least one group");
     groups

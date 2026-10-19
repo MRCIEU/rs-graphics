@@ -144,7 +144,7 @@ pub struct HistResult {
 }
 
 /// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
-/// mid-points. Needs no device, so a recorded plot can return the same
+/// mid-points. Needs no device, so a recorded figure can return the same
 /// result as [`Graphics::hist`](crate::graphics::Graphics::hist).
 pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();

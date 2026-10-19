@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let x = [1.0, 2.0, 3.0, 4.0, 5.0];
     let y = [2.1, 3.9, 6.2, 7.8, 10.1];
 
-    // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); dev.off()
+    // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); legend(...); dev.off()
     let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
     dev.plot(&x, &y)
         .pch(19)
@@ -37,6 +37,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ylab("y")
         .draw();
     dev.abline().h(6.0).col("grey").lty(LineType::DASHED).draw();
+    let keys = [
+        LegendEntry::point("observed", "steelblue", 19),
+        LegendEntry::line("threshold", "grey", 1.0, LineType::DASHED),
+    ];
+    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &keys).draw();
     dev.save("scatter.pdf")?;
     Ok(())
 }
@@ -122,28 +127,46 @@ dev.abline().with(&grid).h([2.0, 4.0, 6.0, 8.0]).draw();
 dev.abline().with(&grid).v([2.0, 4.0, 6.0, 8.0]).draw();
 ```
 
-### Plots as values
+### Figures as values
 
-A `Plot` records the same calls without a device, so you can build a plot
-once and draw it later, on any device and in any panel. The output is the
-same as making the calls on the device.
+A `Figure` records the same calls without a device, so you can build a
+figure (a plot and its margins, one panel of a page) once and draw it
+later, on any device and in any panel. The output is the same as making
+the calls on the device.
 
 ```rust
-let mut plot = Plot::new();
-plot.boxplot(&[vec![1.0, 2.0, 3.0, 9.0], vec![2.0, 3.0, 4.0]])
-    .names(["before", "after"])
+let dose = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+let response = [1.8, 3.1, 3.9, 5.2, 5.8, 7.1];
+let fitted = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+
+let mut fig = Figure::new();
+fig.plot(&dose, &response)
+    .xlab("Dose")
+    .ylab("Response")
+    .main(Label::math("y == alpha + beta * x"))
     .draw();
-plot.title().main(Label::math("Effect ~ (mu * g)")).draw();
+fig.lines(&dose, &fitted).col("red").draw();
+let keys = [
+    LegendEntry::point("observed", 1, 1),
+    LegendEntry::line("fitted", "red", 1.0, LineType::SOLID),
+];
+fig.legend(LegendPos::Keyword(LegendKeyword::BottomRight), &keys).draw();
 
 let mut dev = Device::pdf(8.0, 8.0);
 dev.mfrow(2, 2);
-dev.add_plot_at(2, 2, &plot); // bottom right
+dev.add_figure_at(1, 1, &fig); // top left
+dev.add_figure_at(2, 2, &fig); // bottom right
 ```
+
+The legend is placed when the figure is drawn, so it goes in the bottom
+right of whichever panel the figure lands in, sized for that page.
+`add_figure` returns where each legend went (R's `legend()` return
+value), since that depends on the device.
 
 ### Your own plots
 
 Write them once against the `Graphics` trait, and they work on a device
-and in a `Plot`, called like the built-in ones.
+and in a `Figure`, called like the built-in ones.
 
 ```rust
 trait Diagnostics {
