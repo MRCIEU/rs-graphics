@@ -55,7 +55,7 @@ pub struct MtextOptions {
     pub font: Option<i32>,
 }
 
-crate::setters::setters!(MtextOptions {
+crate::setters::setters!(MtextOptions => [MtextCall] {
     line: value f64,
     outer: value bool,
     at: option f64,
@@ -114,16 +114,15 @@ fn default_at_fraction(adj: f64, side: Side, las: i32) -> f64 {
 }
 
 impl<B: Backend> Device<B> {
-    /// `mtext(text, side, line, outer, at, adj, padj, cex, col, font)`, with
-    /// rotation from `par(las)`; see [`MtextOptions`]. `text` is text
-    /// (placed by `GMtext()`) or a plotmath expression (`Label::math(...)`,
-    /// placed by `GMMathText()`: its bounding box aligned by `adj`/`padj`,
-    /// in the plain font). `side` is a [`Side`] or R's number for it (1 to
-    /// 4); R's default is 3 (top).
-    ///
-    /// # Panics
-    /// If `side` is a number other than 1 to 4.
-    pub fn mtext(&mut self, text: impl Into<Label>, side: impl Into<Side>, opts: &MtextOptions) {
+    /// Draws R's `mtext()`; the public entry is
+    /// [`Graphics::mtext`](crate::graphics::Graphics::mtext), whose docs
+    /// describe it.
+    pub(crate) fn mtext_impl(
+        &mut self,
+        text: impl Into<Label>,
+        side: impl Into<Side>,
+        opts: &MtextOptions,
+    ) {
         let text = text.into();
         let side = side.into();
         let las = self.par.las;

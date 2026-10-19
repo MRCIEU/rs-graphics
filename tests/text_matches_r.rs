@@ -102,14 +102,11 @@ fn text_placement_matches_r() {
     par.mar = Sides::new(0.0, 0.0, 0.0, 0.0);
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 11.0), &PlotWindowOptions::default());
+    dev.plot_window((0.0, 10.0), (0.0, 11.0)).draw();
     let black = ColorSpec::Color(Color::BLACK);
     for (i, &(label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
-        dev.text(
-            &[5.0],
-            &[(i + 1) as f64],
-            &[label],
-            &TextOptions {
+        dev.text(&[5.0], &[(i + 1) as f64], &[label])
+            .with(&TextOptions {
                 adj: Some(h),
                 vadj: v,
                 srt: srt,
@@ -117,8 +114,8 @@ fn text_placement_matches_r() {
                 cex: vec![cex],
                 font: vec![font],
                 ..TextOptions::default()
-            },
-        );
+            })
+            .draw();
     }
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

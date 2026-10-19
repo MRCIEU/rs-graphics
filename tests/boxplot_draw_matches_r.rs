@@ -21,6 +21,7 @@ use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::BoxplotOptions;
 use rs_graphics::par::Par;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -151,7 +152,7 @@ fn draw_ours(c: &Case) -> String {
         horizontal: c.horizontal,
         ..Default::default()
     };
-    dev.boxplot(&groups(), &opts);
+    dev.boxplot(&groups()).with(&opts).draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

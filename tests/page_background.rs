@@ -64,27 +64,23 @@ fn svg_and_png_pages_are_filled() {
 fn two_pages<B: Backend>(backend: B) -> B {
     let mut dev = Device::new(backend, Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0), &PlotWindowOptions::default());
-    dev.points(
-        &[0.5],
-        &[0.5],
-        &XyOptions {
+    dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
+    dev.points(&[0.5], &[0.5])
+        .with(&XyOptions {
             pch: vec![0],
             col: vec![ColorSpec::Index(2)],
             ..XyOptions::default()
-        },
-    );
+        })
+        .draw();
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0), &PlotWindowOptions::default());
-    dev.points(
-        &[0.5],
-        &[0.5],
-        &XyOptions {
+    dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
+    dev.points(&[0.5], &[0.5])
+        .with(&XyOptions {
             pch: vec![0],
             col: vec![ColorSpec::Index(4)],
             ..XyOptions::default()
-        },
-    );
+        })
+        .draw();
     dev.into_backend()
 }
 

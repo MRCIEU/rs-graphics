@@ -22,6 +22,7 @@ use rs_graphics::device::{
 use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -121,7 +122,9 @@ fn cases() -> Vec<Case> {
                     title: Some("Key".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o)
+                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e)
+                    .with(&o)
+                    .draw()
             },
         },
         Case {
@@ -137,7 +140,9 @@ fn cases() -> Vec<Case> {
                     inset: (0.05, 0.05),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::BottomLeft), &e, &o)
+                d.legend(LegendPos::Keyword(LegendKeyword::BottomLeft), &e)
+                    .with(&o)
+                    .draw()
             },
         },
         Case {
@@ -154,7 +159,9 @@ fn cases() -> Vec<Case> {
                     bty: LegendBty::None,
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::Center), &e, &o)
+                d.legend(LegendPos::Keyword(LegendKeyword::Center), &e)
+                    .with(&o)
+                    .draw()
             },
         },
         Case {
@@ -169,7 +176,9 @@ fn cases() -> Vec<Case> {
                     horiz: true,
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::Top), &e, &o)
+                d.legend(LegendPos::Keyword(LegendKeyword::Top), &e)
+                    .with(&o)
+                    .draw()
             },
         },
         Case {
@@ -188,7 +197,7 @@ fn cases() -> Vec<Case> {
                     title: Some("T".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Xy(5.0, 20.0), &e, &o)
+                d.legend(LegendPos::Xy(5.0, 20.0), &e).with(&o).draw()
             },
         },
         Case {
@@ -199,11 +208,8 @@ fn cases() -> Vec<Case> {
                     LegendEntry::point("a", black(), 1),
                     LegendEntry::point("b", black(), 2),
                 ];
-                d.legend(
-                    LegendPos::Corners(5.0, 10.0, 15.0, 20.0),
-                    &e,
-                    &LegendOptions::default(),
-                )
+                d.legend(LegendPos::Corners(5.0, 10.0, 15.0, 20.0), &e)
+                    .draw()
             },
         },
         Case {
@@ -219,7 +225,9 @@ fn cases() -> Vec<Case> {
                     title: Some("A rather long legend title".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::Right), &e, &o)
+                d.legend(LegendPos::Keyword(LegendKeyword::Right), &e)
+                    .with(&o)
+                    .draw()
             },
         },
         Case {
@@ -240,7 +248,9 @@ fn cases() -> Vec<Case> {
                     title: Some("Key".into()),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e, &o)
+                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e)
+                    .with(&o)
+                    .draw()
             },
         },
         Case {
@@ -255,7 +265,9 @@ fn cases() -> Vec<Case> {
                     text_width: Some(2.0),
                     ..Default::default()
                 };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o)
+                d.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e)
+                    .with(&o)
+                    .draw()
             },
         },
     ]
@@ -339,7 +351,7 @@ fn legend_layout_matches_r() {
             ylab: Some("y".into()),
             ..PlotOptions::default()
         };
-        dev.plot(&x, &y, &opts);
+        dev.plot(&x, &y).with(&opts).draw();
         let layout = (c.run)(&mut dev).expect("legend drawn");
         check_return_value(
             c.name,
@@ -405,7 +417,7 @@ fn legend_return_value_on_log_axes_matches_r() {
         ylog: true,
         ..PlotOptions::default()
     };
-    dev.plot(&[1.0, 1000.0], &[2.0, 500.0], &opts);
+    dev.plot(&[1.0, 1000.0], &[2.0, 500.0]).with(&opts).draw();
     let e = vec![
         LegendEntry::point("a", black(), 1),
         LegendEntry::point("bb", black(), 2),
@@ -415,7 +427,9 @@ fn legend_return_value_on_log_axes_matches_r() {
         ..Default::default()
     };
     let layout = dev
-        .legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e, &o)
+        .legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e)
+        .with(&o)
+        .draw()
         .expect("legend drawn");
     check_return_value(
         "log",

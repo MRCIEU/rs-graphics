@@ -19,6 +19,7 @@ use rs_graphics::device::Device;
 use rs_graphics::highlevel::BarplotOptions;
 use rs_graphics::par::Par;
 use rs_graphics::plotmath::Label;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -124,7 +125,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("v".into()),
                     ..Default::default()
                 };
-                d.barplot([23.0, 41.0, 12.0, -5.0], &o);
+                d.barplot([23.0, 41.0, 12.0, -5.0]).with(&o).draw();
             },
             check_text: true,
         },
@@ -137,7 +138,7 @@ fn cases() -> Vec<Case> {
                     legend_text: names(&["r1", "r2", "r3"]),
                     ..Default::default()
                 };
-                d.barplot(mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -151,7 +152,7 @@ fn cases() -> Vec<Case> {
                     col: red_green_blue(),
                     ..Default::default()
                 };
-                d.barplot(mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -164,7 +165,7 @@ fn cases() -> Vec<Case> {
                     horiz: true,
                     ..Default::default()
                 };
-                d.barplot(mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -180,7 +181,7 @@ fn cases() -> Vec<Case> {
                     legend_text: names(&["r1", "r2", "r3"]),
                     ..Default::default()
                 };
-                d.barplot(mat(), &o);
+                d.barplot(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -196,7 +197,7 @@ fn cases() -> Vec<Case> {
                     ylim: Some((-8.0, 12.0)),
                     ..Default::default()
                 };
-                d.barplot(&cols, &o);
+                d.barplot(&cols).with(&o).draw();
             },
             check_text: false,
         },

@@ -11,8 +11,9 @@
 //! (`points`, `lines`, `segments`, `rect`, `polygon`, `text`, `box`,
 //! `abline`, `axis`, `title`, `mtext`, `legend`, `arrows`).
 //!
-//! Each R function is one method taking its data and an options struct
-//! (`dev.axis(1, &AxisOptions { .. })`), whose unset fields are R's
+//! The public entry to each R function is a [`Graphics`](crate::graphics::Graphics)
+//! method; the drawing code is here, in crate-private `*_impl` methods
+//! taking the data and an options struct, whose unset fields are R's
 //! defaults, mostly the `par()` values. `points()`, `lines()`,
 //! `segments()`, `arrows()`, `rect()`, `polygon()`, `text()`, `box()` and
 //! `plot.window()` are in `primitives.rs`; `axis()`, `abline()`,
@@ -56,8 +57,8 @@ pub use primitives::{
 
 /// A side of the plot, figure or page, as R's `side` argument. Functions
 /// take `impl Into<Side>`, so R's numbers work too: `1` = bottom, `2` =
-/// left, `3` = top, `4` = right (`dev.axis(1, ..)` is
-/// `dev.axis(Side::Bottom, ..)`).
+/// left, `3` = top, `4` = right (`dev.axis_impl(1, ..)` is
+/// `dev.axis_impl(Side::Bottom, ..)`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     Bottom = 1,
@@ -148,7 +149,7 @@ enum Clip {
     Device,
 }
 
-/// The labels of [`Device::title`]; `None` draws nothing.
+/// The labels of [`Graphics::title`](crate::graphics::Graphics::title); `None` draws nothing.
 #[derive(Clone, Debug, Default)]
 pub struct TitleOptions {
     pub main: Option<Label>,
@@ -157,7 +158,7 @@ pub struct TitleOptions {
     pub ylab: Option<Label>,
 }
 
-crate::setters::setters!(TitleOptions {
+crate::setters::setters!(TitleOptions => [TitleCall] {
     main: option Label,
     sub: option Label,
     xlab: option Label,
@@ -474,35 +475,10 @@ impl<B: Backend> Device<B> {
         self.fig
     }
 
-    /// `plot.new()`: moves to the next figure and sets up its figure and
-    /// plot regions.
-    ///
-    /// - **Coordinates:** like R, it leaves linear user coordinates of
-    ///   0..1 on both axes (as `plot_window((0, 1), (0, 1), ..)`:
-    ///   -0.04..1.04 with the default `xaxs = yaxs = "r"`) and their
-    ///   default ticks, so you can draw straight away. Call
-    ///   [`Device::plot_window`] next for other limits or log axes.
-    /// - **Which figure:** the next one in the order set by
-    ///   [`Device::mfrow`], [`Device::mfcol`], [`Device::layout`] or
-    ///   [`Device::mfg`] (one figure per page by default). After the last
-    ///   figure, it wraps to figure 1 on a new page. The first call always
-    ///   starts page one. After [`Device::fig`], the next call starts a
-    ///   new page unless `set_new(true)` comes first.
-    /// - **`par(new = TRUE)`:** after [`Device::set_new`]`(true)` it stays
-    ///   in the current figure and draws over it. The flag is not cleared
-    ///   here; any drawing clears it, as in R.
-    /// - **Regions:** figure and plot regions are computed now from
-    ///   `par.mar`/`oma` (in lines of [`Device::line_height_inches`], so
-    ///   `par.cex`, `mex` and the starting `ps` count too), `par.pty` and
-    ///   `par.plt`. Changing these afterwards has no effect until the
-    ///   next call, also on margin text (`title()`, `mtext()`,
-    ///   `axis(outer = )`), which R would place with the new `mar`/`oma`.
-    /// - **New page:** what happens depends on the backend. PDF starts
-    ///   a new page in the file, SVG discards the previous page, and PNG
-    ///   paints over it. The page is then filled with `par.bg`, unless
-    ///   that is fully transparent, which it is by default on PDF (as R's
-    ///   `pdf()`).
-    pub fn plot_new(&mut self) {
+    /// Draws R's `plot_new()`; the public entry is
+    /// [`Graphics::plot_new`](crate::graphics::Graphics::plot_new), whose docs
+    /// describe it.
+    pub(crate) fn plot_new_impl(&mut self) {
         let mut new_page = false;
         if !self.hold_figure || !self.used {
             self.current_figure += 1;
@@ -529,7 +505,7 @@ impl<B: Backend> Device<B> {
 
     /// The user coordinates for limits `xlim`/`ylim` (data units) on
     /// linear or log axes, through `GScale()`, and `par.xaxp`/`yaxp`; see
-    /// [`Device::plot_window`].
+    /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window).
     fn set_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), xlog: bool, ylog: bool) {
         self.xlog = xlog;
         self.ylog = ylog;
@@ -1011,13 +987,10 @@ impl<B: Backend> Device<B> {
     // title()
     // ---------------------------------------------------------------
 
-    /// `title(main=, sub=, xlab=, ylab=)`, each text or a plotmath
-    /// expression, drawn in `C_title`'s order (main, sub, xlab, ylab) with
-    /// `par(cex.main/col.main/font.main)` etc. Text is placed by `GMtext()`
-    /// (baseline on the line, nudged by `yLineBias`); expressions by
-    /// `GMathText()` (`main`: box centred on its line) and `GMMathText()`
-    /// (the others: box bottom on the nudged line).
-    pub fn title(&mut self, opts: &TitleOptions) {
+    /// Draws R's `title()`; the public entry is
+    /// [`Graphics::title`](crate::graphics::Graphics::title), whose docs
+    /// describe it.
+    pub(crate) fn title_impl(&mut self, opts: &TitleOptions) {
         let saved_xpd = self.par.xpd;
         self.par.xpd = true;
         let lh = self.line_height_inches();
@@ -1172,13 +1145,13 @@ mod tests {
     fn inches_to_user_inverts_user_to_inches() {
         use super::{Device, PlotWindowOptions, Side};
         let mut dev = Device::pdf(7.0, 5.0);
-        dev.plot_new();
+        dev.plot_new_impl();
         assert!(!dev.xlog() && !dev.ylog());
         let log_x = PlotWindowOptions {
             xlog: true,
             ..PlotWindowOptions::default()
         };
-        dev.plot_window((1.0, 1000.0), (-2.0, 3.0), &log_x);
+        dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x);
         assert!(dev.xlog() && !dev.ylog());
         for (x, y) in [(1.0, -2.0), (31.6, 0.25), (1000.0, 3.0)] {
             let (x2, y2) = dev.inches_to_user(dev.user_to_inches(x, y));

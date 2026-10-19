@@ -230,20 +230,17 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         main: Some(Label::math("alpha^2")),
         ..PlotOptions::default()
     };
-    dev.plot(&x, &x, &opts);
+    dev.plot(&x, &x).with(&opts).draw();
     let entries = [LegendEntry::point("a", "red", 46)];
-    dev.legend(
-        LegendPos::Keyword(LegendKeyword::TopLeft),
-        &entries,
-        &LegendOptions::default(),
-    );
+    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
+        .draw();
     // `pch = "."` small enough that its one-device-unit minimum applies.
     let dots = PlotOptions {
         pch: vec![46],
         cex: vec![0.5],
         ..PlotOptions::default()
     };
-    dev.plot(&x, &[3.0, 1.0, 2.0], &dots);
+    dev.plot(&x, &[3.0, 1.0, 2.0]).with(&dots).draw();
 }
 
 #[test]

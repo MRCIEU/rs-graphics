@@ -107,7 +107,7 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
     }
 }
 
-/// Options for [`Device::boxplot`], covering the subset of `boxplot.default`'s/
+/// Options for [`Graphics::boxplot`](crate::graphics::Graphics::boxplot), covering the subset of `boxplot.default`'s/
 /// `bxp`'s arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct BoxplotOptions {
@@ -135,7 +135,7 @@ pub struct BoxplotOptions {
     pub horizontal: bool,
 }
 
-crate::setters::setters!(BoxplotOptions {
+crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
     names: list Label,
     col: value ColorSpec,
     border: value ColorSpec,
@@ -169,7 +169,7 @@ impl Default for BoxplotOptions {
     }
 }
 
-/// Each group's statistics, as [`Device::boxplot`] returns them. Needs no
+/// Each group's statistics, as [`Graphics::boxplot`](crate::graphics::Graphics::boxplot) returns them. Needs no
 /// device, so a recorded plot can return the same result.
 pub(crate) fn boxplot_all_stats(groups: &[Vec<f64>], opts: &BoxplotOptions) -> Vec<BoxStats> {
     assert!(!groups.is_empty(), "boxplot: need at least one group");
@@ -180,12 +180,14 @@ pub(crate) fn boxplot_all_stats(groups: &[Vec<f64>], opts: &BoxplotOptions) -> V
 }
 
 impl<B: Backend> Device<B> {
-    /// `boxplot(x, ...)` where `x` is a slice of groups (R's `list`/formula
-    /// input reduced to its common case). A single group is
-    /// `dev.boxplot(&[x], &opts)`. A high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
-    /// page it moves to the next panel.
-    /// Returns each group's statistics.
-    pub fn boxplot(&mut self, groups: &[Vec<f64>], opts: &BoxplotOptions) -> Vec<BoxStats> {
+    /// Draws R's `boxplot()`; the public entry is
+    /// [`Graphics::boxplot`](crate::graphics::Graphics::boxplot), whose docs
+    /// describe it.
+    pub(crate) fn boxplot_impl(
+        &mut self,
+        groups: &[Vec<f64>],
+        opts: &BoxplotOptions,
+    ) -> Vec<BoxStats> {
         let n = groups.len();
         let stats = boxplot_all_stats(groups, opts);
         let at: Vec<f64> = (1..=n).map(|i| i as f64).collect();
@@ -235,12 +237,12 @@ impl<B: Backend> Device<B> {
             })
             .collect();
 
-        self.plot_new();
+        self.plot_new_impl();
         let window = PlotWindowOptions::default();
         if opts.horizontal {
-            self.plot_window(ylim, xlim, &window);
+            self.plot_window_impl(ylim, xlim, &window);
         } else {
-            self.plot_window(xlim, ylim, &window);
+            self.plot_window_impl(xlim, ylim, &window);
         }
 
         // `bxp()`'s `xypolygon`/`xysegments`/`xypoints`: (position, value) in,
@@ -290,7 +292,7 @@ impl<B: Backend> Device<B> {
                 lwd: Some(lwd),
                 ..PolygonOptions::default()
             };
-            self.polygon(&bx, &by, &box_fill);
+            self.polygon_impl(&bx, &by, &box_fill);
             // medlwd = 3 * par(lwd), with `lend = 1` (butt), "to avoid
             // overlap": round ends would reach past the box sides. With a
             // notch it spans only the notch.
@@ -304,7 +306,7 @@ impl<B: Backend> Device<B> {
                 ..SegmentsOptions::default()
             };
             let median = line(3.0 * lwd, LineType::SOLID);
-            self.segments(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
+            self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
             self.par.lend = lend;
             // Whiskers run from their ends to the hinges (which matters for
             // where the dashes fall); whisklty = "dashed". Then the staples
@@ -313,13 +315,13 @@ impl<B: Backend> Device<B> {
             for &(w, h) in &ends {
                 let (sx, sy) = xy(&[x, x], &[w, h]);
                 let dashed = line(lwd, LineType::DASHED);
-                self.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &dashed);
+                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &dashed);
             }
             let cap = half * 0.5;
             for &(w, _) in &ends {
                 let (sx, sy) = xy(&[x - cap, x + cap], &[w, w]);
                 let solid = line(lwd, LineType::SOLID);
-                self.segments(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &solid);
+                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &solid);
             }
             let box_border = PolygonOptions {
                 col: vec![ColorSpec::None],
@@ -328,7 +330,7 @@ impl<B: Backend> Device<B> {
                 lwd: Some(lwd),
                 ..PolygonOptions::default()
             };
-            self.polygon(&bx, &by, &box_border);
+            self.polygon_impl(&bx, &by, &box_border);
             if !s.outliers.is_empty() {
                 let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
                 let (ox, oy) = xy(&pos, &s.outliers);
@@ -337,7 +339,7 @@ impl<B: Backend> Device<B> {
                     col: vec![border],
                     ..XyOptions::default()
                 };
-                self.points(&ox, &oy, &outliers);
+                self.points_impl(&ox, &oy, &outliers);
             }
         }
 
@@ -355,13 +357,13 @@ impl<B: Backend> Device<B> {
                     labels: Some(labels.into_iter().map(Some).collect()),
                     ..AxisOptions::default()
                 };
-                self.axis(name_side, &names);
+                self.axis_impl(name_side, &names);
             }
-            self.axis(value_side, &AxisOptions::default());
+            self.axis_impl(value_side, &AxisOptions::default());
         }
 
         if self.par.ann {
-            self.title(&TitleOptions {
+            self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),
                 xlab: opts.xlab.clone(),
@@ -370,7 +372,7 @@ impl<B: Backend> Device<B> {
         }
 
         if opts.axes {
-            self.box_(&BoxOptions::default());
+            self.box_impl(&BoxOptions::default());
         }
 
         stats

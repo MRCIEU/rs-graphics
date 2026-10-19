@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! R's high-level plots, `plot()`, `hist()`, `barplot()`, `boxplot()` and
-//! `pie()`, as methods of [`crate::device::Device`] ([`Device::plot`](crate::device::Device::plot),
+//! `pie()`, as methods of [`crate::device::Device`] ([`Device::plot`](crate::graphics::Graphics::plot),
 //! ...), with their options and result types.
 //!
 //! Each function here is a fairly direct port of the corresponding
@@ -35,7 +35,7 @@ pub use plot::{PlotOptions, PlotType};
 /// Compute the finite min/max of a data slice, matching R's `range(x[is.finite(x)])`
 /// idiom used throughout the plotting defaults. Falls back to `(0.0, 1.0)` for
 /// empty/all-non-finite input. A single repeated value gives the degenerate
-/// `(v, v)`, as R's `range()` does; `Device::plot_window` (`GScale()`) widens
+/// `(v, v)`, as R's `range()` does; `Graphics::plot_window` (`GScale()`) widens
 /// it, so no padding is done here.
 pub(crate) fn data_range(xs: &[f64]) -> (f64, f64) {
     let mut lo = f64::INFINITY;

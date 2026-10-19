@@ -42,7 +42,7 @@ fn cols(names: &[&str]) -> Vec<ColorSpec> {
 /// `plot.new(); plot.window(c(0, 10), c(0, 10))`.
 fn window(d: &mut Dev) {
     d.plot_new();
-    d.plot_window((0.0, 10.0), (0.0, 10.0), &PlotWindowOptions::default());
+    d.plot_window((0.0, 10.0), (0.0, 10.0)).draw();
 }
 
 const WINDOW_R: &str = "plot.new(); plot.window(c(0, 10), c(0, 10))\n";
@@ -71,7 +71,7 @@ fn cases() -> Vec<Case> {
                     lwd: vec![1.0, 3.0],
                     ..XyOptions::default()
                 };
-                d.points(&x, &x, &opts);
+                d.points(&x, &x).with(&opts).draw();
             },
         },
         Case {
@@ -92,26 +92,26 @@ fn cases() -> Vec<Case> {
                     lty: Some(LineType::DASHED),
                     ..XyOptions::default()
                 };
-                d.lines(&x, &Y, &b);
+                d.lines(&x, &Y).with(&b).draw();
                 let o = XyOptions {
                     type_: Some(PlotType::Overplotted),
                     pch: vec![0],
                     col: cols(&["blue", "green"]),
                     ..XyOptions::default()
                 };
-                d.lines(&x, &shift(0.5), &o);
+                d.lines(&x, &shift(0.5)).with(&o).draw();
                 let c = XyOptions {
                     type_: Some(PlotType::BrokenLines),
                     lty: Some(LineType::DOTTED),
                     ..XyOptions::default()
                 };
-                d.points(&x, &shift(-0.5), &c);
+                d.points(&x, &shift(-0.5)).with(&c).draw();
                 let p = XyOptions {
                     type_: Some(PlotType::Points),
                     pch: vec![4],
                     ..XyOptions::default()
                 };
-                d.lines(&x, &shift(-1.0), &p);
+                d.lines(&x, &shift(-1.0)).with(&p).draw();
             },
         },
         Case {
@@ -129,18 +129,16 @@ fn cases() -> Vec<Case> {
                     lwd: vec![1.0, 4.0],
                     ..SegmentsOptions::default()
                 };
-                d.segments(
-                    &[1.0],
-                    &[1.0, 2.0, 3.0, 4.0],
-                    &[9.0],
-                    &[1.0, 2.0, 3.0, 4.0],
-                    &solid_dashed,
-                );
+                d.segments(&[1.0], &[1.0, 2.0, 3.0, 4.0], &[9.0], &[1.0, 2.0, 3.0, 4.0])
+                    .with(&solid_dashed)
+                    .draw();
                 let red = SegmentsOptions {
                     col: cols(&["red"]),
                     ..SegmentsOptions::default()
                 };
-                d.segments(&[1.0, 2.0], &[5.0], &[3.0, f64::NAN], &[6.0], &red);
+                d.segments(&[1.0, 2.0], &[5.0], &[3.0, f64::NAN], &[6.0])
+                    .with(&red)
+                    .draw();
                 let bars = ArrowsOptions {
                     code: 3,
                     angle: 90.0,
@@ -148,8 +146,10 @@ fn cases() -> Vec<Case> {
                     col: vec!["red".into(), ColorSpec::None],
                     ..ArrowsOptions::default()
                 };
-                d.arrows(&[2.0, 5.0, 7.0], &[6.0], &[3.0, 8.0, 9.0], &[9.0], &bars);
-                d.arrows(&[1.0], &[9.0], &[1.0], &[7.0], &ArrowsOptions::default());
+                d.arrows(&[2.0, 5.0, 7.0], &[6.0], &[3.0, 8.0, 9.0], &[9.0])
+                    .with(&bars)
+                    .draw();
+                d.arrows(&[1.0], &[9.0], &[1.0], &[7.0]).draw();
             },
         },
         Case {
@@ -168,18 +168,14 @@ fn cases() -> Vec<Case> {
                     lwd: vec![2.0],
                     ..RectOptions::default()
                 };
-                d.rect(
-                    &[1.0, 3.0, 5.0],
-                    &[1.0],
-                    &[2.0, 4.0, 6.0],
-                    &[2.0, 3.0, 4.0],
-                    &three,
-                );
+                d.rect(&[1.0, 3.0, 5.0], &[1.0], &[2.0, 4.0, 6.0], &[2.0, 3.0, 4.0])
+                    .with(&three)
+                    .draw();
                 let dashed = RectOptions {
                     lty: vec![LineType::DASHED],
                     ..RectOptions::default()
                 };
-                d.rect(&[7.0], &[1.0], &[9.0], &[3.0], &dashed);
+                d.rect(&[7.0], &[1.0], &[9.0], &[3.0]).with(&dashed).draw();
                 let na = f64::NAN;
                 let polys = PolygonOptions {
                     col: vec!["orange".into(), ColorSpec::None, "cyan".into()],
@@ -190,8 +186,9 @@ fn cases() -> Vec<Case> {
                 d.polygon(
                     &[1.0, 2.0, 3.0, na, 5.0, 6.0, 7.0, na, 8.0, 9.0, 9.0],
                     &[5.0, 8.0, 5.0, na, 5.0, 8.0, 5.0, na, 6.0, 6.0, 9.0],
-                    &polys,
-                );
+                )
+                .with(&polys)
+                .draw();
             },
         },
         Case {
@@ -209,24 +206,26 @@ fn cases() -> Vec<Case> {
                     font: vec![1, 2],
                     ..TextOptions::default()
                 };
-                d.text(&[2.0, 5.0, 8.0], &[2.0, 5.0, 8.0], &["a", "bb"], &vec_text);
+                d.text(&[2.0, 5.0, 8.0], &[2.0, 5.0, 8.0], &["a", "bb"])
+                    .with(&vec_text)
+                    .draw();
                 let numbers: [&str; 0] = [];
-                d.text(&[2.0, 4.0], &[9.0], &numbers, &TextOptions::default());
+                d.text(&[2.0, 4.0], &[9.0], &numbers).draw();
                 let edge = TextOptions {
                     adj: Some(0.0),
                     xpd: Some(true),
                     ..TextOptions::default()
                 };
-                d.text(&[9.5], &[1.0], &["edge"], &edge);
+                d.text(&[9.5], &[1.0], &["edge"]).with(&edge).draw();
                 let rot = TextOptions {
                     adj: Some(0.0),
                     vadj: Some(1.0),
                     srt: 45.0,
                     ..TextOptions::default()
                 };
-                d.text(&[3.0], &[3.0], &["rot"], &rot);
+                d.text(&[3.0], &[3.0], &["rot"]).with(&rot).draw();
                 d.par.adj = 1.0;
-                d.text(&[5.0], &[7.0], &["right"], &TextOptions::default());
+                d.text(&[5.0], &[7.0], &["right"]).draw();
             },
         },
         Case {
@@ -240,23 +239,29 @@ fn cases() -> Vec<Case> {
                 d.par.col = Color::parse("darkred").unwrap();
                 d.mfrow(1, 2);
                 d.plot_new();
-                d.box_(&BoxOptions::default());
-                d.box_(&BoxOptions {
-                    which: BoxWhich::Figure,
-                    col: Some("red".into()),
-                    ..BoxOptions::default()
-                });
-                d.box_(&BoxOptions {
-                    which: BoxWhich::Inner,
-                    lty: Some(LineType::DASHED),
-                    lwd: Some(2.0),
-                    ..BoxOptions::default()
-                });
-                d.box_(&BoxOptions {
-                    which: BoxWhich::Outer,
-                    col: Some("blue".into()),
-                    ..BoxOptions::default()
-                });
+                d.box_().draw();
+                d.box_()
+                    .with(&BoxOptions {
+                        which: BoxWhich::Figure,
+                        col: Some("red".into()),
+                        ..BoxOptions::default()
+                    })
+                    .draw();
+                d.box_()
+                    .with(&BoxOptions {
+                        which: BoxWhich::Inner,
+                        lty: Some(LineType::DASHED),
+                        lwd: Some(2.0),
+                        ..BoxOptions::default()
+                    })
+                    .draw();
+                d.box_()
+                    .with(&BoxOptions {
+                        which: BoxWhich::Outer,
+                        col: Some("blue".into()),
+                        ..BoxOptions::default()
+                    })
+                    .draw();
             },
         },
         Case {
@@ -274,7 +279,7 @@ fn cases() -> Vec<Case> {
                 d.par.font_axis = 2;
                 d.par.las = 1;
                 d.par.ann = false;
-                d.plot(&[1.0, 3.0], &[2.0, 5.0], &PlotOptions::default().pch(19));
+                d.plot(&[1.0, 3.0], &[2.0, 5.0]).pch(19).draw();
             },
         },
         Case {
@@ -283,18 +288,14 @@ fn cases() -> Vec<Case> {
                 arrows(c(0, 10, -5), 2, c(50, 20, 30), c(5, 8, 9))",
             draw: |d| {
                 d.plot_new();
-                d.plot_window(
-                    (1.0, 100.0),
-                    (1.0, 10.0),
-                    &PlotWindowOptions::default().xlog(true),
-                );
+                d.plot_window((1.0, 100.0), (1.0, 10.0)).xlog(true).draw();
                 d.arrows(
                     &[0.0, 10.0, -5.0],
                     &[2.0],
                     &[50.0, 20.0, 30.0],
                     &[5.0, 8.0, 9.0],
-                    &ArrowsOptions::default(),
-                );
+                )
+                .draw();
             },
         },
         Case {
@@ -307,16 +308,16 @@ fn cases() -> Vec<Case> {
                     asp: Some(1.0),
                     ..PlotWindowOptions::default()
                 };
-                d.plot_window((0.0, 10.0), (0.0, 2.0), &asp);
-                d.rect(&[0.0], &[0.0], &[10.0], &[2.0], &RectOptions::default());
+                d.plot_window((0.0, 10.0), (0.0, 2.0)).with(&asp).draw();
+                d.rect(&[0.0], &[0.0], &[10.0], &[2.0]).draw();
                 // Ignored on a log axis, as in R.
                 let log = PlotWindowOptions { xlog: true, ..asp };
-                d.plot_window((1.0, 100.0), (0.0, 2.0), &log);
+                d.plot_window((1.0, 100.0), (0.0, 2.0)).with(&log).draw();
                 let red = RectOptions {
                     border: cols(&["red"]),
                     ..RectOptions::default()
                 };
-                d.rect(&[1.0], &[0.0], &[100.0], &[2.0], &red);
+                d.rect(&[1.0], &[0.0], &[100.0], &[2.0]).with(&red).draw();
             },
         },
     ]

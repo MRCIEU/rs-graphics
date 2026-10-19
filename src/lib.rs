@@ -17,44 +17,51 @@
 //! let x = [1.0, 2.0, 3.0, 4.0, 5.0];
 //! let y = [2.1, 3.9, 6.2, 7.8, 10.1];
 //!
-//! // R: pdf("scatter.pdf", 7, 7); plot(x, y, main = ...); dev.off()
+//! // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); dev.off()
 //! let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
-//! let opts = PlotOptions::default()
+//! dev.plot(&x, &y)
 //!     .pch(19)
 //!     .col("steelblue")
 //!     .main(Label::math("y == beta[0] + beta[1] * x"))
 //!     .xlab("x")
-//!     .ylab("y");
-//! dev.plot(&x, &y, &opts);
-//! dev.abline(&AblineOptions::default().h(6.0).col("grey").lty(LineType::DASHED));
+//!     .ylab("y")
+//!     .draw();
+//! dev.abline().h(6.0).col("grey").lty(LineType::DASHED).draw();
 //! dev.save("scatter.pdf")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! [`device::Device`] holds the page and `par()` state, and every R
-//! graphics function is one of its methods, named as in R (`box()` is
-//! `box_()`, as `box` is a Rust keyword). Each takes its data and an
-//! options struct holding R's other arguments, set field by field or
-//! with the chainable setters above ([`setters`]). [`prelude`] imports
-//! it all.
+//! [`device::Device`] holds the page and `par()` state. Every R graphics
+//! function is a method of the [`graphics::Graphics`] trait, which
+//! `Device` implements, named as in R (`box()` is `box_()`, as `box` is a
+//! Rust keyword). A method takes R's data arguments and starts a call;
+//! the call's chainable setters take R's other arguments, and `.draw()`
+//! runs it. To reuse a set of arguments, build its options struct
+//! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
+//! [`prelude`] imports it all, including the trait.
 //!
 //! # High-level and low-level functions
 //!
-//! As in R, the high-level functions ([`Device::plot`](device::Device::plot), [`Device::hist`](device::Device::hist),
-//! [`Device::barplot`](device::Device::barplot), [`Device::boxplot`](device::Device::boxplot), [`Device::pie`](device::Device::pie)) start a
-//! new plot: they call [`Device::plot_new`](device::Device::plot_new), which moves to the next
-//! panel of a multi-panel page (or to a new page). Everything else
-//! ([`Device::points`](device::Device::points), [`Device::axis`](device::Device::axis), [`Device::legend`](device::Device::legend), ...) adds to
-//! the current plot. (`hist` with `add` set adds too, as R's `hist(add =
-//! TRUE)` does.)
+//! As in R, the high-level functions ([`plot`](graphics::Graphics::plot),
+//! [`hist`](graphics::Graphics::hist), [`barplot`](graphics::Graphics::barplot),
+//! [`boxplot`](graphics::Graphics::boxplot), [`pie`](graphics::Graphics::pie))
+//! start a new plot: they call [`plot_new`](graphics::Graphics::plot_new),
+//! which moves to the next panel of a multi-panel page (or to a new page).
+//! Everything else ([`points`](graphics::Graphics::points),
+//! [`axis`](graphics::Graphics::axis), [`legend`](graphics::Graphics::legend),
+//! ...) adds to the current plot. (`hist` with `add` set adds too, as R's
+//! `hist(add = TRUE)` does.)
 //!
 //! # Multi-panel pages
 //!
-//! [`Device::mfrow`](device::Device::mfrow), [`Device::mfcol`](device::Device::mfcol) and [`Device::layout`](device::Device::layout) split the
-//! page into panels; each high-level call (or [`Device::plot_new`](device::Device::plot_new))
-//! fills the next one, and low-level calls after it draw in that panel.
-//! [`Device::mfg`](device::Device::mfg) picks the next panel, and [`Device::set_new`](device::Device::set_new) draws
-//! over the current one.
+//! [`Device::mfrow`](device::Device::mfrow),
+//! [`Device::mfcol`](device::Device::mfcol) and
+//! [`Device::layout`](device::Device::layout) split the page into panels;
+//! each high-level call (or `plot_new()`) fills the next one, and
+//! low-level calls after it draw in that panel.
+//! [`Device::mfg`](device::Device::mfg) picks the next panel, and
+//! [`Device::set_new`](device::Device::set_new) draws over the current
+//! one.
 //!
 //! ```
 //! use rs_graphics::prelude::*;
@@ -62,20 +69,19 @@
 //! let x = [1.0, 2.0, 3.0, 4.0];
 //! let mut dev = Device::pdf(8.0, 4.0);
 //! dev.mfrow(1, 2);
-//! dev.plot(&x, &[1.0, 4.0, 9.0, 16.0], &PlotOptions::default()); // panel 1
-//! dev.abline(&AblineOptions::default().coef(0.0, 4.0));            // still panel 1
-//! dev.hist(&[1.0, 2.0, 2.5, 3.0, 3.2], &HistOptions::default());  // panel 2
-//! dev.mtext("Two panels", 3, &MtextOptions::default().outer(true).line(-1.5));
+//! dev.plot(&x, &[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
+//! dev.abline().coef(0.0, 4.0).draw(); // still panel 1
+//! dev.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
+//! dev.mtext("Two panels", 3).outer(true).line(-1.5).draw();
 //! let pdf = dev.finish();
 //! # assert!(!pdf.is_empty());
 //! ```
 //!
 //! # Your own plots
 //!
-//! The methods use the device's internals, but the high-level ones need
-//! only its public API, so you can write plots of your own the same way:
-//! as functions taking `&mut Device<B>`, or as methods through an
-//! extension trait, which reads like the built-in ones.
+//! Write plots of your own against the [`graphics::Graphics`] trait: as
+//! functions taking `&mut G` for any `G: Graphics`, or as methods of an
+//! extension trait, which read like the built-in ones.
 //!
 //! ```
 //! use rs_graphics::prelude::*;
@@ -85,10 +91,10 @@
 //!     fn obs_vs_exp(&mut self, exp: &[f64], obs: &[f64]);
 //! }
 //!
-//! impl<B: Backend> Diagnostic for Device<B> {
+//! impl<G: Graphics> Diagnostic for G {
 //!     fn obs_vs_exp(&mut self, exp: &[f64], obs: &[f64]) {
-//!         self.plot(exp, obs, &PlotOptions::default().pch(20));
-//!         self.abline(&AblineOptions::default().coef(0.0, 1.0).col("red"));
+//!         self.plot(exp, obs).pch(20).draw();
+//!         self.abline().coef(0.0, 1.0).col("red").draw();
 //!     }
 //! }
 //!
@@ -103,6 +109,7 @@ pub mod color;
 pub mod device;
 pub mod error;
 pub mod geometry;
+pub mod graphics;
 pub mod highlevel;
 pub mod layout;
 pub mod lty;

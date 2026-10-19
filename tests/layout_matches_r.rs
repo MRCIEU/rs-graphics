@@ -18,6 +18,7 @@ use rs_graphics::device::Device;
 use rs_graphics::highlevel::{BarplotOptions, PlotOptions, PlotType};
 use rs_graphics::layout::{Layout, LayoutSize};
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -97,7 +98,7 @@ fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
         ylab: Some("v".into()),
         ..Default::default()
     };
-    d.barplot(h, &o);
+    d.barplot(h).with(&o).draw();
 }
 
 struct Case {
@@ -275,7 +276,7 @@ fn cases() -> Vec<Case> {
                         ylab: Some("y".into()),
                         ..Default::default()
                     };
-                    d.plot(&x, &y, &o);
+                    d.plot(&x, &y).with(&o).draw();
                 }
             },
             check_rects: false,

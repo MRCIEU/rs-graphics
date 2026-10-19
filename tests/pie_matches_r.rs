@@ -19,6 +19,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::PieOptions;
 use rs_graphics::par::{AxisStyle, Par};
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -181,7 +182,7 @@ fn pie_matches_r() {
             radius: c.radius,
             ..PieOptions::default()
         };
-        dev.pie(&VALUES, &opts);
+        dev.pie(&VALUES).with(&opts).draw();
         let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 
         let (r_p, o_p) = (paths(&r_pdf), paths(&ours));

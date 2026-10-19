@@ -15,7 +15,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::HistOptions;
+use rs_graphics::graphics::Graphics;
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {
@@ -82,7 +82,7 @@ fn breaks_and_counts_match_r_sturges() {
 
         let backend = PdfBackend::new(6.0, 4.0).with_compression(false);
         let mut dev = Device::new(backend, Par::default());
-        let result = dev.hist(data, &HistOptions::default());
+        let result = dev.hist(data).draw();
 
         assert_eq!(
             result.breaks.len(),

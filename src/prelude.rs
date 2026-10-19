@@ -26,6 +26,7 @@ pub use crate::device::{
     LegendEntry, LegendKeyword, LegendOptions, LegendPos, MtextOptions, PlotWindowOptions,
     PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
 };
+pub use crate::graphics::Graphics;
 pub use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions, PlotType, boxplot_stats,

@@ -23,20 +23,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); dev.off()
     let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
-    let opts = PlotOptions::default()
+    dev.plot(&x, &y)
         .pch(19)
         .col("steelblue")
         .main(Label::math("y == beta[0] + beta[1] * x"))
         .xlab("x")
-        .ylab("y");
-    dev.plot(&x, &y, &opts);
-    dev.abline(&AblineOptions::default().h(6.0).col("grey").lty(LineType::DASHED));
+        .ylab("y")
+        .draw();
+    dev.abline().h(6.0).col("grey").lty(LineType::DASHED).draw();
     dev.save("scatter.pdf")?;
     Ok(())
 }
 ```
 
-- `rs_graphics::prelude::*` imports the device, its options types,
+- `rs_graphics::prelude::*` imports the device, the `Graphics` trait
+  (whose methods are R's graphics functions), their options types,
   `Par`, colours, line types, labels, layouts, the high-level plots'
   options and results, and the backends.
 - `Device::for_path` picks PDF, SVG or PNG from the file extension (the
@@ -46,24 +47,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   ..Par::default() })` for other starting parameters (like R's
   `pointsize`). `dev.finish()` returns the file's bytes, `dev.save(path)`
   writes them.
-- Each R function is one `Device` method taking its data and an options
-  struct, e.g. `dev.hist(&x, &HistOptions::default())`,
-  `dev.axis(1, &AxisOptions::default().las(1))` or
-  `dev.text(&x, &y, &["a", "b"], &TextOptions::default().col("red"))`.
-  Unset fields are R's defaults, mostly the current `par()` values.
-  Arguments R recycles per element (`points(x, y, col = groups)`) are
-  `Vec`s, recycled the same way; their setters take one value or several
+- Each R function is a method taking R's data arguments; chained setters
+  take the other arguments, and `.draw()` runs the call:
+  `dev.hist(&x).draw()`, `dev.axis(1).las(1).draw()`,
+  `dev.text(&x, &y, &["a", "b"]).col("red").draw()`. Nothing is drawn
+  without `.draw()` (the compiler warns). Unset arguments are R's
+  defaults, mostly the current `par()` values. Arguments R recycles per
+  element (`points(x, y, col = groups)`) take one value or several
   (`.col("red")`, `.col(["red", "blue"])`). `.xpd(true)` is R's inline
-  `xpd = TRUE`. The fields are public, so struct literals
-  (`AxisOptions { las: Some(1), ..AxisOptions::default() }`) work too.
+  `xpd = TRUE`.
+- To reuse arguments, build an options struct once (its setters are the
+  same, or use a struct literal: `AxisOptions { las: Some(1),
+  ..AxisOptions::default() }`) and pass it with `.with(&opts)`; setters
+  after it change only that call:
+  `dev.axis(2).with(&opts).col("red").draw()`.
 - As in R, the high-level plots (`dev.plot`, `hist`, `barplot`,
   `boxplot`, `pie`) start a new plot, moving to the next panel after
   `dev.mfrow(2, 2)` / `dev.layout(...)`; the other methods add to the
-  current plot. Your own plots can be functions taking `&mut Device<B>`
-  or methods of an extension trait (example in the crate docs).
+  current plot. Your own plots can be functions generic over
+  `G: Graphics` or methods of an extension trait (example in the crate
+  docs).
 - Change graphical parameters with `dev.par.<name> = ...` (R's `par()`).
   `mar`, `oma` and the other region settings take effect at the next
-  plot. Sides are R's numbers (`dev.mtext("y", 4, ..)`) or `Side::Right`.
+  plot. Sides are R's numbers (`dev.mtext("y", 4).draw()`) or
+  `Side::Right`.
 - Colours are `ColorSpec`s: `"red".into()`, `"#FF000080".into()`, a
   palette index `ColorSpec::Index(2)`, or `ColorSpec::None`. Line types:
   `LineType::SOLID`, `DASHED`, ... or `"42".parse()?`.
@@ -86,14 +93,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   or the whole device for outer-margin text).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
-  - each a `Device` method taking its data and an options struct
-  (`src/device.rs` and `src/device/*.rs`; R's `box()` is `box_()`).
-  `mtext()` (`Device::mtext` + `MtextOptions`, `src/device/mtext.rs`)
+  - each a `Graphics` method (`src/graphics.rs`) taking its data, with an
+  options struct for the other arguments; the drawing code is in
+  `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`).
+  `mtext()` (`Graphics::mtext` + `MtextOptions`, `src/device/mtext.rs`)
   takes the side as an argument, like `axis()`, and
   covers all four sides of the figure and outer (`oma`) margins with
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
-  gives error-bar caps). `axis()` (`Device::axis` + `AxisOptions`,
+  gives error-bar caps). `axis()` (`Graphics::axis` + `AxisOptions`,
   `src/device/axis.rs`) takes R's `line`/`pos`/`outer`, `tick`/`labels`
   (`None` entries are `NA`: tick drawn, label skipped; labels may be
   plotmath expressions, `Label::math("10^5")`),
@@ -117,7 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   Accents, fractions, `sqrt`, big
   operators and `bgroup` are rejected as not yet supported.
   `legend()`
-  (`Device::legend`, `src/device/legend.rs`) is a port of R's layout
+  (`Graphics::legend`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
   filled boxes and merged point+line keys, and returns R's `rect` and
   `text` positions (`LegendLayout`, in `par("usr")` units).

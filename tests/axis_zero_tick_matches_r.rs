@@ -89,29 +89,27 @@ fn zero_ticks_match_r() {
     let black = ColorSpec::Color(Color::BLACK);
     for &(xlim, ylim) in RANGES {
         dev.plot_new();
-        dev.plot_window(xlim, ylim, &PlotWindowOptions::default());
-        dev.axis(
-            1,
-            &AxisOptions {
+        dev.plot_window(xlim, ylim).draw();
+        dev.axis(1)
+            .with(&AxisOptions {
                 col: Some(black),
                 col_axis: Some(black),
                 cex_axis: Some(1.0),
                 font: Some(1),
                 las: Some(0),
                 ..AxisOptions::default()
-            },
-        );
-        dev.axis(
-            2,
-            &AxisOptions {
+            })
+            .draw();
+        dev.axis(2)
+            .with(&AxisOptions {
                 col: Some(black),
                 col_axis: Some(black),
                 cex_axis: Some(1.0),
                 font: Some(1),
                 las: Some(0),
                 ..AxisOptions::default()
-            },
-        );
+            })
+            .draw();
     }
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

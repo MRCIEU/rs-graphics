@@ -58,13 +58,13 @@ impl PlotType {
 
 crate::error::from_str_via_parse!(PlotType, "plot type");
 
-/// Options for [`Device::plot`], covering the subset of `plot.default`'s
+/// Options for [`Graphics::plot`](crate::graphics::Graphics::plot), covering the subset of `plot.default`'s
 /// arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct PlotOptions {
     pub type_: PlotType,
     /// Symbols, colours, fills, sizes and widths as for
-    /// [`Device::points`]: recycled per point, empty for the default
+    /// [`Graphics::points`](crate::graphics::Graphics::points): recycled per point, empty for the default
     /// (`par()`; no fill; size 1).
     pub pch: Vec<i32>,
     pub col: Vec<ColorSpec>,
@@ -100,7 +100,7 @@ pub struct PlotOptions {
     pub yaxp: Option<[f64; 3]>,
 }
 
-crate::setters::setters!(PlotOptions {
+crate::setters::setters!(PlotOptions => [PlotCall] {
     type_: value PlotType,
     pch: values i32,
     col: values ColorSpec,
@@ -151,11 +151,10 @@ impl Default for PlotOptions {
 }
 
 impl<B: Backend> Device<B> {
-    /// `plot(x, y, ...)`: `plot.new()` + `plot.window()` + the requested
-    /// point/line geometry + (optionally) `axis()`/`box()`/`title()`. A
-    /// high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
-    /// page it moves to the next panel.
-    pub fn plot(&mut self, x: &[f64], y: &[f64], opts: &PlotOptions) {
+    /// Draws R's `plot()`; the public entry is
+    /// [`Graphics::plot`](crate::graphics::Graphics::plot), whose docs
+    /// describe it.
+    pub(crate) fn plot_impl(&mut self, x: &[f64], y: &[f64], opts: &PlotOptions) {
         // On a log axis, values <= 0 are dropped (R's `xy.coords()` makes
         // them `NA`); `points()`/`lines()` then skip them.
         let range = |v: &[f64], log: bool| {
@@ -169,13 +168,13 @@ impl<B: Backend> Device<B> {
         let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.xlog));
         let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
 
-        self.plot_new();
+        self.plot_new_impl();
         let window = PlotWindowOptions {
             xlog: opts.xlog,
             ylog: opts.ylog,
             ..PlotWindowOptions::default()
         };
-        self.plot_window(xlim, ylim, &window);
+        self.plot_window_impl(xlim, ylim, &window);
 
         // `plot.xy(xy, type, ...)`.
         let xy = XyOptions {
@@ -188,7 +187,7 @@ impl<B: Backend> Device<B> {
             lty: opts.lty,
             xpd: None,
         };
-        self.points(x, y, &xy);
+        self.points_impl(x, y, &xy);
 
         if opts.axes {
             // `localAxis()`: `axis(side, ...)` with the `par()` defaults.
@@ -198,13 +197,13 @@ impl<B: Backend> Device<B> {
                     axp,
                     ..AxisOptions::default()
                 };
-                self.axis(side, &o);
+                self.axis_impl(side, &o);
             }
-            self.box_(&BoxOptions::default());
+            self.box_impl(&BoxOptions::default());
         }
 
         if self.par.ann {
-            self.title(&TitleOptions {
+            self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),
                 xlab: opts.xlab.clone(),

@@ -20,6 +20,7 @@ use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
+use rs_graphics::graphics::Graphics;
 
 fn rscript_available() -> bool {
     Command::new("Rscript")
@@ -45,7 +46,7 @@ fn pl(d: &mut Dev, n: usize, main: &'static str) {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    d.plot(&x, &x, &o);
+    d.plot(&x, &x).with(&o).draw();
 }
 
 struct Case {

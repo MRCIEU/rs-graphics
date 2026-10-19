@@ -119,7 +119,7 @@ impl<B: Backend> Device<B> {
 
     /// `strwidth(label, "inches", cex = cex, font = font)`, single-line
     /// text or an expression; `cex` is multiplied by `par(cex)`, as in
-    /// [`Device::text`].
+    /// [`Graphics::text`](crate::graphics::Graphics::text).
     pub(super) fn label_width(&mut self, label: &Label, font: i32, cex: f64) -> f64 {
         match label {
             Label::Text(t) => {

@@ -27,7 +27,7 @@ const DEFAULT_COLORS: [&str; 6] = [
     "cornsilk",
 ];
 
-/// Options for [`Device::pie`], covering the subset of `pie()`'s arguments this
+/// Options for [`Graphics::pie`](crate::graphics::Graphics::pie), covering the subset of `pie()`'s arguments this
 /// crate implements.
 #[derive(Clone, Debug)]
 pub struct PieOptions {
@@ -53,7 +53,7 @@ pub struct PieOptions {
     pub init_angle: Option<f64>,
 }
 
-crate::setters::setters!(PieOptions {
+crate::setters::setters!(PieOptions => [PieCall] {
     labels: list Label,
     radius: value f64,
     col: option_values ColorSpec,
@@ -80,9 +80,10 @@ impl Default for PieOptions {
 }
 
 impl<B: Backend> Device<B> {
-    /// `pie(x, ...)`. A high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
-    /// page it moves to the next panel.
-    pub fn pie(&mut self, x: &[f64], opts: &PieOptions) {
+    /// Draws R's `pie()`; the public entry is
+    /// [`Graphics::pie`](crate::graphics::Graphics::pie), whose docs
+    /// describe it.
+    pub(crate) fn pie_impl(&mut self, x: &[f64], opts: &PieOptions) {
         let nx = x.len();
         assert!(
             nx > 0 && x.iter().all(|&v| v.is_finite() && v >= 0.0),
@@ -95,7 +96,7 @@ impl<B: Backend> Device<B> {
             .clone()
             .unwrap_or_else(|| (1..=nx).map(|i| Label::from(i.to_string())).collect());
 
-        self.plot_new();
+        self.plot_new_impl();
 
         // Pre-scale xlim/ylim by the plot region's aspect ratio, then
         // `plot.window(xlim, ylim, asp = 1)` (with the current `xaxs`/`yaxs`,
@@ -111,7 +112,7 @@ impl<B: Backend> Device<B> {
             asp: Some(1.0),
             ..PlotWindowOptions::default()
         };
-        self.plot_window(xlim, ylim, &window);
+        self.plot_window_impl(xlim, ylim, &window);
 
         let twopi = if opts.clockwise { -2.0 * PI } else { 2.0 * PI };
         let init = opts
@@ -162,13 +163,13 @@ impl<B: Backend> Device<B> {
                 border: vec![opts.border],
                 ..PolygonOptions::default()
             };
-            self.polygon(&xs, &ys, &slice);
+            self.polygon_impl(&xs, &ys, &slice);
 
             let mid = 0.5 * (cum[i] + cum[i + 1]);
             let (px, py) = t2xy(mid);
             let label = &labels[i];
             if !matches!(label, Label::Text(t) if t.is_empty()) {
-                self.lines(&[px, 1.05 * px], &[py, 1.05 * py], &XyOptions::default());
+                self.lines_impl(&[px, 1.05 * px], &[py, 1.05 * py], &XyOptions::default());
                 // `text(1.1 * P$x, 1.1 * P$y, labels[i], xpd = TRUE, adj =
                 // ifelse(P$x < 0, 1, 0))`.
                 let at = TextOptions {
@@ -176,12 +177,12 @@ impl<B: Backend> Device<B> {
                     xpd: Some(true),
                     ..TextOptions::default()
                 };
-                self.text(&[1.1 * px], &[1.1 * py], std::slice::from_ref(label), &at);
+                self.text_impl(&[1.1 * px], &[1.1 * py], std::slice::from_ref(label), &at);
             }
         }
 
         if let Some(main) = &opts.main {
-            self.title(&TitleOptions {
+            self.title_impl(&TitleOptions {
                 main: Some(main.clone()),
                 ..TitleOptions::default()
             });

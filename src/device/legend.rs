@@ -249,7 +249,7 @@ pub struct LegendOptions {
     pub xpd: Option<bool>,
 }
 
-crate::setters::setters!(LegendOptions {
+crate::setters::setters!(LegendOptions => [LegendCall] {
     bty: value LegendBty,
     bg: option ColorSpec,
     cex: value f64,
@@ -315,10 +315,10 @@ pub struct LegendLayout {
 }
 
 impl<B: Backend> Device<B> {
-    /// `legend(pos, ...)`: see the module docs. Returns where the box and
-    /// labels went (R's return value, in `usr` units), or `None` if
-    /// `entries` is empty (R errors there).
-    pub fn legend(
+    /// Draws R's `legend()`; the public entry is
+    /// [`Graphics::legend`](crate::graphics::Graphics::legend), whose docs
+    /// describe it.
+    pub(crate) fn legend_impl(
         &mut self,
         pos: LegendPos,
         entries: &[LegendEntry],
@@ -331,12 +331,12 @@ impl<B: Backend> Device<B> {
         if let Some(xpd) = opts.xpd {
             self.par.xpd = xpd;
         }
-        let layout = self.legend_impl(pos, entries, opts);
+        let layout = self.draw_legend(pos, entries, opts);
         self.par.xpd = saved_xpd;
         Some(layout)
     }
 
-    fn legend_impl(
+    fn draw_legend(
         &mut self,
         pos: LegendPos,
         entries: &[LegendEntry],

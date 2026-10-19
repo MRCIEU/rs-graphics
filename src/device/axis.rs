@@ -109,7 +109,7 @@ pub struct AxisOptions {
     pub tcl: Option<f64>,
 }
 
-crate::setters::setters!(AxisOptions {
+crate::setters::setters!(AxisOptions => [AxisCall] {
     at: option_values f64,
     labels: labels Label,
     draw_labels: value bool,
@@ -177,13 +177,10 @@ fn default_padj(side: Side, las: i32) -> f64 {
 }
 
 impl<B: Backend> Device<B> {
-    /// `axis(side, ...)` with all of R's arguments; see [`AxisOptions`].
-    /// `side` is a [`Side`] or R's number for it (1 to 4).
-    ///
-    /// # Panics
-    /// If `side` is a number other than 1 to 4, or `labels` is given
-    /// without `at`, or their lengths differ (R's errors).
-    pub fn axis(&mut self, side: impl Into<Side>, opts: &AxisOptions) {
+    /// Draws R's `axis()`; the public entry is
+    /// [`Graphics::axis`](crate::graphics::Graphics::axis), whose docs
+    /// describe it.
+    pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) {
         let side = side.into();
         let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);

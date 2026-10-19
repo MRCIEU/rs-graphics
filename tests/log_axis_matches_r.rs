@@ -19,6 +19,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
+use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
 
@@ -130,13 +131,15 @@ fn draw_ours(c: &Case) -> String {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    dev.plot(&values(c.x, c.xlog), &values(c.y, c.ylog), &opts);
+    dev.plot(&values(c.x, c.xlog), &values(c.y, c.ylog))
+        .with(&opts)
+        .draw();
     if let Some(at) = c.at3 {
         let o = AxisOptions {
             at: Some(at.to_vec()),
             ..Default::default()
         };
-        dev.axis(3, &o);
+        dev.axis(3).with(&o).draw();
     }
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }

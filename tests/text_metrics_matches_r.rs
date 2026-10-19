@@ -16,6 +16,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
+use rs_graphics::graphics::Graphics;
 use rs_graphics::par::Par;
 
 fn rscript_available() -> bool {

@@ -17,7 +17,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::{AxisOptions, Device, MtextOptions};
+use rs_graphics::device::{Device, MtextOptions};
 use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
@@ -57,7 +57,7 @@ fn pl(dev: &mut Dev, y: &[f64], main: Option<&str>, axes: bool) {
         ylab: axes.then(|| "y".into()),
         ..PlotOptions::default()
     };
-    dev.plot(&xs(), y, &opts);
+    dev.plot(&xs(), y).with(&opts).draw();
 }
 
 fn squares() -> Vec<f64> {
@@ -96,13 +96,13 @@ fn cases() -> Vec<Case> {
                     col: vec![ColorSpec::Color(Color::parse("red").unwrap())],
                     ..PlotOptions::default()
                 };
-                d.plot(&xs(), &roots(), &opts);
-                d.axis(4, &AxisOptions::default());
+                d.plot(&xs(), &roots()).with(&opts).draw();
+                d.axis(4).draw();
                 let o = MtextOptions {
                     line: 3.0,
                     ..Default::default()
                 };
-                d.mtext("sqrt", 4, &o);
+                d.mtext("sqrt", 4).with(&o).draw();
             },
         },
         Case {
@@ -134,8 +134,8 @@ fn cases() -> Vec<Case> {
                 d.set_new(true);
                 d.plot_new();
                 d.plot_new();
-                d.plot_window((0.0, 20.0), (0.0, 1.0), &PlotWindowOptions::default());
-                d.axis(3, &AxisOptions::default());
+                d.plot_window((0.0, 20.0), (0.0, 1.0)).draw();
+                d.axis(3).draw();
                 pl(d, &xs(), Some("B"), true);
             },
         },
@@ -150,15 +150,13 @@ fn cases() -> Vec<Case> {
                 pl(d, &squares(), Some("A"), true);
                 d.set_new(true);
                 let black = ColorSpec::Index(1);
-                d.points(
-                    &[5.0],
-                    &[50.0],
-                    &XyOptions {
+                d.points(&[5.0], &[50.0])
+                    .with(&XyOptions {
                         pch: vec![19],
                         col: vec![black],
                         ..XyOptions::default()
-                    },
-                );
+                    })
+                    .draw();
                 assert!(!d.is_new());
                 pl(d, &falling(), Some("B"), true);
             },
@@ -177,7 +175,7 @@ fn cases() -> Vec<Case> {
                     outer: true,
                     ..Default::default()
                 };
-                d.mtext("Outer", 3, &o);
+                d.mtext("Outer", 3).with(&o).draw();
                 assert!(d.is_new());
                 pl(d, &falling(), None, false);
                 pl(d, &xs(), Some("B"), true);

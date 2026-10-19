@@ -9,7 +9,7 @@
 //! `barplot(height, ...)`, ported from `barplot.default` in
 //! `r-source/src/library/graphics/R/barplot.R`.
 //!
-//! [`Device::barplot`]. Supported: a plain vector (R's `vectorInput`
+//! [`Graphics::barplot`](crate::graphics::Graphics::barplot). Supported: a plain vector (R's `vectorInput`
 //! case) and a matrix (see [`BarHeights`]) drawn either stacked or
 //! `beside`, vertical or
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
@@ -28,7 +28,7 @@ use crate::device::{
 use crate::par::AxisStyle;
 use crate::plotmath::Label;
 
-/// Options for [`Device::barplot`], covering the subset of
+/// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
 /// `barplot.default`'s arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct BarplotOptions {
@@ -69,7 +69,7 @@ pub struct BarplotOptions {
     pub axes: bool,
 }
 
-crate::setters::setters!(BarplotOptions {
+crate::setters::setters!(BarplotOptions => [BarplotCall] {
     names: list Label,
     col: option_values ColorSpec,
     border: value ColorSpec,
@@ -113,7 +113,7 @@ impl Default for BarplotOptions {
     }
 }
 
-/// The `height` argument of [`Device::barplot`]: R's vector or matrix.
+/// The `height` argument of [`Graphics::barplot`](crate::graphics::Graphics::barplot): R's vector or matrix.
 /// Built with `.into()` from a vector of numbers (slice, array, `Vec`) or
 /// from a matrix given as its columns (`Vec<Vec<f64>>`, a slice or array of
 /// `Vec<f64>`).
@@ -194,7 +194,7 @@ fn recycle(v: &[f64], n: usize) -> Vec<f64> {
 /// Everything `barplot()` works out before drawing: bar positions, the
 /// bars themselves, colours, axis limits and where the names go. Needs no
 /// device, so a recorded plot can return the same bar centres as
-/// [`Device::barplot`] (and panics on the same invalid input).
+/// [`Graphics::barplot`](crate::graphics::Graphics::barplot) (and panics on the same invalid input).
 pub(crate) struct BarLayout {
     beside: bool,
     w_l: Vec<f64>,
@@ -380,24 +380,20 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
 }
 
 impl<B: Backend> Device<B> {
-    /// `barplot(height, ...)`. A high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
-    /// page it moves to the next panel.
-    /// `heights` is a
-    /// vector (one bar per value) or a matrix given as its columns (see
-    /// [`BarHeights`]), drawn stacked unless `opts.beside`.
-    ///
-    /// Returns the bar-centre coordinates along the category axis (R's
-    /// `w.m`, the value `barplot()` returns invisibly), useful for
-    /// overlaying annotations. For a matrix they are flattened column-major
-    /// (for `beside`: one centre per bar, `nrow` per group; otherwise one
-    /// per column).
-    pub fn barplot(&mut self, heights: impl Into<BarHeights>, opts: &BarplotOptions) -> Vec<f64> {
+    /// Draws R's `barplot()`; the public entry is
+    /// [`Graphics::barplot`](crate::graphics::Graphics::barplot), whose docs
+    /// describe it.
+    pub(crate) fn barplot_impl(
+        &mut self,
+        heights: impl Into<BarHeights>,
+        opts: &BarplotOptions,
+    ) -> Vec<f64> {
         let layout = bar_layout(&heights.into(), opts);
-        self.barplot_impl(layout, opts)
+        self.draw_barplot(layout, opts)
     }
 
     /// Draws `layout`; returns its bar centres.
-    fn barplot_impl(&mut self, layout: BarLayout, opts: &BarplotOptions) -> Vec<f64> {
+    fn draw_barplot(&mut self, layout: BarLayout, opts: &BarplotOptions) -> Vec<f64> {
         let BarLayout {
             beside,
             w_l,
@@ -419,13 +415,13 @@ impl<B: Backend> Device<B> {
         } else {
             self.par.yaxs = AxisStyle::Exact;
         }
-        self.plot_new();
+        self.plot_new_impl();
         let window = PlotWindowOptions {
             xlog: opts.xlog,
             ylog: opts.ylog,
             ..PlotWindowOptions::default()
         };
-        self.plot_window(xlim, ylim, &window);
+        self.plot_window_impl(xlim, ylim, &window);
         self.par.xaxs = saved_xaxs;
         self.par.yaxs = saved_yaxs;
 
@@ -440,9 +436,9 @@ impl<B: Backend> Device<B> {
                 ..RectOptions::default()
             };
             if horiz {
-                self.rect(&[base], &[w_l[k]], &[top], &[w_r[k]], &style);
+                self.rect_impl(&[base], &[w_l[k]], &[top], &[w_r[k]], &style);
             } else {
-                self.rect(&[w_l[k]], &[base], &[w_r[k]], &[top], &style);
+                self.rect_impl(&[w_l[k]], &[base], &[w_r[k]], &[top], &style);
             }
         }
 
@@ -454,7 +450,7 @@ impl<B: Backend> Device<B> {
                 tick: false,
                 ..AxisOptions::default()
             };
-            self.axis(if horiz { 2 } else { 1 }, &names);
+            self.axis_impl(if horiz { 2 } else { 1 }, &names);
         }
 
         if let Some(labels) = &opts.legend_text {
@@ -479,11 +475,11 @@ impl<B: Backend> Device<B> {
                 yjust: Some(1.0),
                 ..LegendOptions::default()
             };
-            self.legend(LegendPos::Xy(x, y), &entries, &lopts);
+            self.legend_impl(LegendPos::Xy(x, y), &entries, &lopts);
         }
 
         if self.par.ann {
-            self.title(&TitleOptions {
+            self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),
                 xlab: opts.xlab.clone(),
@@ -492,7 +488,7 @@ impl<B: Backend> Device<B> {
         }
 
         if opts.axes {
-            self.axis(if horiz { 1 } else { 2 }, &AxisOptions::default());
+            self.axis_impl(if horiz { 1 } else { 2 }, &AxisOptions::default());
         }
 
         self.par.xpd = saved_xpd;

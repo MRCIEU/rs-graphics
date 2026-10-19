@@ -59,7 +59,7 @@ fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
     counts
 }
 
-/// Options for [`Device::hist`], covering the subset of `hist.default`'s
+/// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
 /// arguments this crate implements.
 #[derive(Clone, Debug)]
 pub struct HistOptions {
@@ -89,7 +89,7 @@ pub struct HistOptions {
     pub add: bool,
 }
 
-crate::setters::setters!(HistOptions {
+crate::setters::setters!(HistOptions => [HistCall] {
     breaks: option_values f64,
     freq: value bool,
     col: value ColorSpec,
@@ -133,7 +133,7 @@ pub struct HistResult {
 
 /// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
 /// mid-points. Needs no device, so a recorded plot can return the same
-/// result as [`Device::hist`].
+/// result as [`Graphics::hist`](crate::graphics::Graphics::hist).
 pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let n = data.len();
@@ -174,12 +174,10 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
 }
 
 impl<B: Backend> Device<B> {
-    /// `hist(x, ...)`. A high-level plot: it starts a new plot with [`Device::plot_new`], so on a multi-panel
-    /// page it moves to the next panel,
-    /// unless `opts.add` (R's `add = TRUE`), which draws the bars on the
-    /// current plot. Returns the bins and counts (R's `"histogram"`
-    /// object).
-    pub fn hist(&mut self, x: &[f64], opts: &HistOptions) -> HistResult {
+    /// Draws R's `hist()`; the public entry is
+    /// [`Graphics::hist`](crate::graphics::Graphics::hist), whose docs
+    /// describe it.
+    pub(crate) fn hist_impl(&mut self, x: &[f64], opts: &HistOptions) -> HistResult {
         let HistResult {
             breaks,
             counts,
@@ -198,20 +196,20 @@ impl<B: Backend> Device<B> {
         // `plot.histogram()`: window, title, axes (unless `add`), then the
         // bars.
         if !opts.add {
-            self.plot_new();
+            self.plot_new_impl();
             let window = PlotWindowOptions {
                 xlog: opts.xlog,
                 ylog: opts.ylog,
                 ..PlotWindowOptions::default()
             };
-            self.plot_window((breaks[0], breaks[nb - 1]), (0.0, ymax), &window);
+            self.plot_window_impl((breaks[0], breaks[nb - 1]), (0.0, ymax), &window);
 
             if self.par.ann {
                 let or = |l: &Option<Label>, default: &str| {
                     Some(l.clone().unwrap_or_else(|| Label::from(default)))
                 };
                 let ylab = if opts.freq { "Frequency" } else { "Density" };
-                self.title(&TitleOptions {
+                self.title_impl(&TitleOptions {
                     main: or(&opts.main, "Histogram of x"),
                     sub: None,
                     xlab: or(&opts.xlab, "x"),
@@ -220,7 +218,7 @@ impl<B: Backend> Device<B> {
             }
 
             if opts.axes {
-                self.axis(1, &AxisOptions::default());
+                self.axis_impl(1, &AxisOptions::default());
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
                 let yticks = if opts.freq {
                     self.default_ticks(2)
@@ -234,7 +232,7 @@ impl<B: Backend> Device<B> {
                     at: Some(yticks),
                     ..AxisOptions::default()
                 };
-                self.axis(2, &y_axis);
+                self.axis_impl(2, &y_axis);
             }
         }
 
@@ -244,7 +242,7 @@ impl<B: Backend> Device<B> {
             border: vec![opts.border],
             ..RectOptions::default()
         };
-        self.rect(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
+        self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
 
         HistResult {
             breaks,
