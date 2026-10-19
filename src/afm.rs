@@ -50,6 +50,8 @@ pub enum FontFace {
 }
 
 impl FontFace {
+    /// The face for R's font number `code` (1 to 5, as above); any other
+    /// number gives [`FontFace::Plain`].
     pub fn from_r_font_code(code: i32) -> Self {
         match code {
             2 => FontFace::Bold,

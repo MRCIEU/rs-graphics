@@ -329,6 +329,11 @@ against a real R installation by shelling out to `Rscript`:
   line's vertices, colour, width and dash pattern.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
+- `tests/figure_legends_matches_r.rs` - recorded `Figure`s with legends
+  drawn into multi-panel pages (`mfrow` with `add_figure_at`, a shared-key
+  panel in a `layout()`, one figure added three times to a 3x2 page) vs.
+  the same R code: every text item, every legend box, and each
+  `FigureResult::legends` entry vs. R's `legend()` return value.
 - `tests/figure_replay.rs` (no R needed) - recorded `Figure`s drawn with
   `add_figure`/`add_figure_at` give byte-identical output to direct calls
   (every kind of call, all backends, mixed in multi-panel pages), `par`

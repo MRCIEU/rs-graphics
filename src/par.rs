@@ -146,7 +146,11 @@ pub struct Par {
     /// `par(pty)`: [`Pty::Square`] makes the `mar`-based plot region
     /// square. Applied at the next `plot_new()`.
     pub pty: Pty,
+    /// `par(xaxs)`: x axis range style; [`AxisStyle::Regular`] (`"r"`,
+    /// the default) extends the range by 4% on each side,
+    /// [`AxisStyle::Exact`] (`"i"`) uses it as given.
     pub xaxs: AxisStyle,
+    /// `par(yaxs)`: as `xaxs`, for the y axis.
     pub yaxs: AxisStyle,
 
     /// `par(col)`: default colour of points, lines, `abline()` and `box()`.
@@ -158,19 +162,31 @@ pub struct Par {
     /// rectangle/polygon borders. R's `par(fg = )` sets `col` too; here set
     /// both fields to do the same.
     pub fg: Color,
+    /// `par(col.axis)`: colour of axis tick labels.
     pub col_axis: Color,
+    /// `par(col.lab)`: colour of `xlab`/`ylab`.
     pub col_lab: Color,
+    /// `par(col.main)`: colour of `main`.
     pub col_main: Color,
+    /// `par(col.sub)`: colour of `sub`.
     pub col_sub: Color,
 
+    /// R's `palette()`: the colours that numbers (`col = 2`) index,
+    /// from 1. Default [`DEFAULT_PALETTE`].
     pub palette: Vec<Color>,
 
+    /// `par(lwd)`: line width (1 = 1/96 inch, as in R). Default 1.
     pub lwd: f64,
+    /// `par(lty)`: line type. Default solid.
     pub lty: LineType,
+    /// `par(lend)`: line end style. Default round.
     pub lend: LineEnd,
+    /// `par(ljoin)`: line join style. Default round.
     pub ljoin: LineJoin,
+    /// `par(lmitre)`: mitre limit for mitred joins. Default 10.
     pub lmitre: f64,
 
+    /// `par(pch)`: default plotting symbol. Default 1 (open circle).
     pub pch: i32,
 
     /// Base point size, in big points (`par(ps)`). Default `12`. Its value
@@ -183,15 +199,28 @@ pub struct Par {
     pub cex: f64,
     /// `par(mex)`: margin-line expansion factor (a multiple of `cex`).
     pub mex: f64,
+    /// `par(cex.axis)`: size of axis tick labels, relative to `cex`.
+    /// Default 1.
     pub cex_axis: f64,
+    /// `par(cex.lab)`: size of `xlab`/`ylab`, relative to `cex`. Default
+    /// 1.
     pub cex_lab: f64,
+    /// `par(cex.main)`: size of `main`, relative to `cex`. Default 1.2.
     pub cex_main: f64,
+    /// `par(cex.sub)`: size of `sub`, relative to `cex`. Default 1.
     pub cex_sub: f64,
 
+    /// `par(font)`: font of text, as R's numbers: 1 plain (the default),
+    /// 2 bold, 3 italic, 4 bold italic, 5 Symbol. Other numbers are drawn
+    /// plain.
     pub font: i32,
+    /// `par(font.axis)`: font of axis tick labels, as `font`. Default 1.
     pub font_axis: i32,
+    /// `par(font.lab)`: font of `xlab`/`ylab`, as `font`. Default 1.
     pub font_lab: i32,
+    /// `par(font.main)`: font of `main`, as `font`. Default 2 (bold).
     pub font_main: i32,
+    /// `par(font.sub)`: font of `sub`, as `font`. Default 1.
     pub font_sub: i32,
 
     /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
@@ -200,6 +229,7 @@ pub struct Par {
     /// `par(xaxt)` / `par(yaxt)`: [`AxisType::None`] stops `axis()`
     /// drawing on the x (sides 1, 3) / y (sides 2, 4) axis.
     pub xaxt: AxisType,
+    /// `par(yaxt)`: see `xaxt`.
     pub yaxt: AxisType,
     /// Tick mark length in margin lines (negative = outward; R's default
     /// is -0.5).
@@ -218,6 +248,7 @@ pub struct Par {
     /// them from the axis range and `par(lab)`; change them afterwards to
     /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
     pub xaxp: [f64; 3],
+    /// `par(yaxp)`: see `xaxp`.
     pub yaxp: [f64; 3],
     /// `par(lheight)`: multiplies the height of each extra line of text in
     /// [`Device::text_metrics`](crate::device::Device::text_metrics). (Text
@@ -225,7 +256,13 @@ pub struct Par {
     pub lheight: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
+    /// `par(xpd)`: `false` (the default) clips drawing to the plot
+    /// region, `true` to the figure region. R's `NA` (the device) isn't
+    /// available.
     pub xpd: bool,
+    /// `par(ann)`: whether `plot()` and `barplot()` draw their titles and
+    /// axis labels. Default `true`. As in R, `hist()` and `boxplot()` use
+    /// their own `ann` option instead, and `pie()` always draws `main`.
     pub ann: bool,
 }
 
@@ -299,7 +336,9 @@ impl Par {
         }
     }
 
-    pub fn font_face(&self, code: i32) -> FontFace {
+    /// The face for R's font code `code` (1 plain, 2 bold, 3 italic, 4
+    /// bold italic, 5 Symbol).
+    pub(crate) fn font_face(&self, code: i32) -> FontFace {
         FontFace::from_r_font_code(code)
     }
 }

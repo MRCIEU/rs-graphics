@@ -81,9 +81,10 @@
 //!
 //! A [`recording::Figure`] implements the same trait but records the calls
 //! instead of drawing them, so a figure (a plot and its margins, as R's
-//! figure region) can be built without a device and drawn later with [`Device::add_figure`](device::Device::add_figure) (or
-//! [`add_figure_at`](device::Device::add_figure_at) for a chosen panel), as
-//! often as needed and on any device. The output is identical to making
+//! figure region) can be built without a device and drawn later with
+//! [`Device::add_figure`](device::Device::add_figure) (or
+//! [`add_figure_at`](device::Device::add_figure_at) for a chosen panel),
+//! as often as needed and on any device. The output is identical to making
 //! the calls on the device.
 //!
 //! ```

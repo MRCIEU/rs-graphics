@@ -6,12 +6,17 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Small geometric primitives shared by the backend/device layers.
-//! All coordinates in this crate's internal engine are in **inches**,
-//! origin at the bottom-left, y increasing upward - i.e. exactly PDF's
-//! native page coordinate convention (see the module docs in
-//! `backend/mod.rs`).
+//! Points and rectangles in device inches: origin at the bottom-left of
+//! the page, y increasing upward (PDF's own convention). The device and
+//! backends work in these units; [`Device::plot_region`] and friends
+//! return them, and [`Device::user_to_inches`] /
+//! [`Device::inches_to_user`] convert to and from user coordinates.
+//!
+//! [`Device::plot_region`]: crate::device::Device::plot_region
+//! [`Device::user_to_inches`]: crate::device::Device::user_to_inches
+//! [`Device::inches_to_user`]: crate::device::Device::inches_to_user
 
+/// A point in device inches, from the bottom-left corner of the page.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Point {
     pub x: f64,
@@ -19,6 +24,7 @@ pub struct Point {
 }
 
 impl Point {
+    /// The point `(x, y)`.
     pub const fn new(x: f64, y: f64) -> Self {
         Point { x, y }
     }
@@ -41,6 +47,8 @@ pub struct Rect {
 }
 
 impl Rect {
+    /// The rectangle with corners `(x0, y0)` and `(x1, y1)`, in either
+    /// order (they are sorted).
     pub fn new(x0: f64, y0: f64, x1: f64, y1: f64) -> Self {
         Rect {
             x0: x0.min(x1),
@@ -50,10 +58,12 @@ impl Rect {
         }
     }
 
+    /// `x1 - x0`.
     pub fn width(&self) -> f64 {
         self.x1 - self.x0
     }
 
+    /// `y1 - y0`.
     pub fn height(&self) -> f64 {
         self.y1 - self.y0
     }
