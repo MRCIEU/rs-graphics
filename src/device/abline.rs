@@ -31,14 +31,17 @@ pub struct AblineOptions {
     /// Intercept and slope of a line (`a`, `b`); `None`: no such line.
     pub coef: Option<(f64, f64)>,
     /// `untf = TRUE`: on log axes, draw `y = a + b * x` in data units (a
-    /// curve) rather than a straight line in log units.
+    /// curve) rather than a straight line in log units. Default `false`.
     pub untf: bool,
-    /// Horizontal lines at these y values.
+    /// Horizontal lines at these y values; empty: none.
     pub h: Vec<f64>,
-    /// Vertical lines at these x values.
+    /// Vertical lines at these x values; empty: none.
     pub v: Vec<f64>,
+    /// Colours, recycled over the lines; empty: `par(col)`.
     pub col: Vec<ColorSpec>,
+    /// Line types, recycled over the lines; empty: `par(lty)`.
     pub lty: Vec<LineType>,
+    /// Line widths, recycled over the lines; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
 }
 

@@ -254,7 +254,7 @@ fn cases() -> Vec<Case> {
             setup: |p| p.lwd = 3.0,
             draw: |d| {
                 let o = AxisOptions {
-                    lwd: 2.0,
+                    lwd: Some(2.0),
                     lwd_ticks: Some(0.5),
                     col: col("red"),
                     col_ticks: col("blue"),
@@ -265,7 +265,7 @@ fn cases() -> Vec<Case> {
                 };
                 d.axis(1).with(&o).draw();
                 let o = AxisOptions {
-                    lty: LineType::from_code(2),
+                    lty: Some(LineType::from_code(2)),
                     draw_labels: false,
                     ..Default::default()
                 };
@@ -277,7 +277,11 @@ fn cases() -> Vec<Case> {
                     ..Default::default()
                 };
                 d.axis(3).with(&o).draw();
-                let o = AxisOptions { lwd: 0.0, lwd_ticks: Some(2.0), ..Default::default() };
+                let o = AxisOptions {
+                    lwd: Some(0.0),
+                    lwd_ticks: Some(2.0),
+                    ..Default::default()
+                };
                 d.axis(4).with(&o).draw();
             },
         },

@@ -60,43 +60,54 @@ fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
 }
 
 /// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
-/// arguments this crate implements.
+/// and `plot.histogram`'s arguments this crate implements. Unset fields
+/// are R's defaults, given for each.
 #[derive(Clone, Debug)]
 pub struct HistOptions {
-    /// If `Some`, used verbatim as the bin edges (must be increasing,
-    /// length >= 2). If `None`, computed via Sturges' rule + `pretty()`,
-    /// matching R's default `breaks = "Sturges"`.
+    /// Bin edges, used verbatim (must be increasing, length >= 2).
+    /// `None` (or empty): Sturges' rule + `pretty()`, R's default `breaks =
+    /// "Sturges"`.
     pub breaks: Option<Vec<f64>>,
-    /// `freq = TRUE` (the default here, even for unequal `breaks`, where
-    /// R defaults to `FALSE`): plot counts.
-    /// `freq = FALSE`: plot density (`count / (n * bin width)`).
-    pub freq: bool,
-    pub col: ColorSpec,
-    pub border: ColorSpec,
-    /// Titles, as for `plot()` (text or a plotmath expression); `None`
-    /// gives R's defaults ("Histogram of x", "x", "Frequency"/"Density").
+    /// `true`: plot counts; `false`: plot densities (`count / (n * bin
+    /// width)`). `None`: counts if the bins are equally wide, as R.
+    pub freq: Option<bool>,
+    /// Bar fill; `None`: `"lightgray"` (R's default).
+    pub col: Option<ColorSpec>,
+    /// Bar borders; `None`: `par(fg)` (R's default).
+    pub border: Option<ColorSpec>,
+    /// Main title, as for `plot()` (text or a plotmath expression);
+    /// `None`: "Histogram of x".
     pub main: Option<Label>,
+    /// x axis label; `None`: "x".
     pub xlab: Option<Label>,
+    /// y axis label; `None`: "Frequency" or "Density".
     pub ylab: Option<Label>,
+    /// Draw the titles (R's `ann`, which defaults to `TRUE`, not
+    /// `par(ann)`); default `true`.
+    pub ann: bool,
+    /// Draw the axes; default `true`.
     pub axes: bool,
-    /// `log = "x"` / `"y"`. As in R, a log y axis still takes its range
-    /// from 0, which R "corrects" to about 1e-307 (with a warning).
+    /// Log x axis (R's `log = "x"`); default `false`.
     pub xlog: bool,
+    /// Log y axis (R's `log = "y"`); default `false`. As in R, it still
+    /// takes its range from 0, which R "corrects" to about 1e-307 (with a
+    /// warning).
     pub ylog: bool,
     /// `add = TRUE`: draw the bars on the current plot, without a new
     /// plot, window, title or axes (so `main`/`xlab`/`ylab`/`axes`/`xlog`/
-    /// `ylog` are ignored).
+    /// `ylog` are ignored). Default `false`.
     pub add: bool,
 }
 
 crate::setters::setters!(HistOptions => [HistCall] {
     breaks: option_values f64,
-    freq: value bool,
-    col: value ColorSpec,
-    border: value ColorSpec,
+    freq: option bool,
+    col: option ColorSpec,
+    border: option ColorSpec,
     main: option Label,
     xlab: option Label,
     ylab: option Label,
+    ann: value bool,
     axes: value bool,
     xlog: value bool,
     ylog: value bool,
@@ -107,12 +118,13 @@ impl Default for HistOptions {
     fn default() -> Self {
         HistOptions {
             breaks: None,
-            freq: true,
-            col: ColorSpec::Color(Color::parse("lightgray").unwrap()),
-            border: ColorSpec::Index(1),
+            freq: None,
+            col: None,
+            border: None,
             main: None,
             xlab: None,
             ylab: None,
+            ann: true,
             axes: true,
             xlog: false,
             ylog: false,
@@ -138,7 +150,8 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let n = data.len();
 
-    let breaks = opts.breaks.clone().unwrap_or_else(|| {
+    let given = opts.breaks.clone().filter(|b| !b.is_empty());
+    let breaks = given.unwrap_or_else(|| {
         let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
         let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
@@ -186,7 +199,20 @@ impl<B: Backend> Device<B> {
         } = hist_bins(x, opts);
         let nb = breaks.len();
 
-        let heights: Vec<f64> = if opts.freq {
+        // R's `freq = NULL`: counts if the bins are equally wide
+        // (`equidist`; always for computed breaks).
+        let freq = opts.freq.unwrap_or_else(|| {
+            let given = opts.breaks.as_ref().is_some_and(|b| !b.is_empty());
+            let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
+            let (lo, hi) = widths
+                .iter()
+                .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &w| {
+                    (a.min(w), b.max(w))
+                });
+            let mean = widths.iter().sum::<f64>() / widths.len() as f64;
+            !given || hi - lo < 1e-7 * mean
+        });
+        let heights: Vec<f64> = if freq {
             counts.clone()
         } else {
             density.clone()
@@ -204,11 +230,11 @@ impl<B: Backend> Device<B> {
             };
             self.plot_window_impl((breaks[0], breaks[nb - 1]), (0.0, ymax), &window);
 
-            if self.par.ann {
+            if opts.ann {
                 let or = |l: &Option<Label>, default: &str| {
                     Some(l.clone().unwrap_or_else(|| Label::from(default)))
                 };
-                let ylab = if opts.freq { "Frequency" } else { "Density" };
+                let ylab = if freq { "Frequency" } else { "Density" };
                 self.title_impl(&TitleOptions {
                     main: or(&opts.main, "Histogram of x"),
                     sub: None,
@@ -220,7 +246,7 @@ impl<B: Backend> Device<B> {
             if opts.axes {
                 self.axis_impl(1, &AxisOptions::default());
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
-                let yticks = if opts.freq {
+                let yticks = if freq {
                     self.default_ticks(2)
                         .into_iter()
                         .filter(|v| v % 1.0 == 0.0)
@@ -238,8 +264,11 @@ impl<B: Backend> Device<B> {
 
         // `rect(breaks[-nB], 0, breaks[-1L], y, col = col, border = border)`.
         let bars = RectOptions {
-            col: vec![opts.col],
-            border: vec![opts.border],
+            col: vec![
+                opts.col
+                    .unwrap_or_else(|| ColorSpec::Color(Color::parse("lightgray").unwrap())),
+            ],
+            border: vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))],
             ..RectOptions::default()
         };
         self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);

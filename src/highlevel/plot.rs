@@ -58,50 +58,65 @@ impl PlotType {
 
 crate::error::from_str_via_parse!(PlotType, "plot type");
 
-/// Options for [`Graphics::plot`](crate::graphics::Graphics::plot), covering the subset of `plot.default`'s
-/// arguments this crate implements.
+/// Options for [`Graphics::plot`](crate::graphics::Graphics::plot), covering the subset of
+/// `plot.default`'s arguments this crate implements. Unset fields are R's
+/// defaults, given for each.
 #[derive(Clone, Debug)]
 pub struct PlotOptions {
-    pub type_: PlotType,
-    /// Symbols, colours, fills, sizes and widths as for
-    /// [`Graphics::points`](crate::graphics::Graphics::points): recycled per point, empty for the default
-    /// (`par()`; no fill; size 1).
+    /// What to draw (R's `type`); `None`: points (`"p"`).
+    pub type_: Option<PlotType>,
+    /// Plotting symbols, recycled per point; empty: `par(pch)`.
     pub pch: Vec<i32>,
+    /// Colours, recycled per point (lines use the first); empty:
+    /// `par(col)`.
     pub col: Vec<ColorSpec>,
+    /// Fill of symbols 21-25, recycled per point; empty: none (R's `NA`).
     pub bg: Vec<ColorSpec>,
+    /// Line widths, recycled per point (lines use the first); empty:
+    /// `par(lwd)`.
     pub lwd: Vec<f64>,
-    /// `None`: `par(lty)`.
+    /// Line type of lines; `None`: `par(lty)`.
     pub lty: Option<LineType>,
+    /// Symbol sizes, recycled per point, times `par(cex)`; empty: 1.
     pub cex: Vec<f64>,
-    /// Defaults to the finite data range, like R's `plot.window(xlim =
-    /// range(x))` (positive values only on a log axis).
+    /// x limits; `None`: the finite data range, like R's
+    /// `plot.window(xlim = range(x))` (positive values only on a log
+    /// axis).
     pub xlim: Option<(f64, f64)>,
+    /// y limits; `None`: the finite data range, as `xlim`.
     pub ylim: Option<(f64, f64)>,
+    /// Log x axis (R's `log = "x"`); default `false`.
     pub xlog: bool,
+    /// Log y axis (R's `log = "y"`); default `false`.
     pub ylog: bool,
-    /// Titles, drawn by `title()`: text (`Some("Weight".into())`) or a
-    /// plotmath expression (`Some(Label::math("x^2"))`).
+    /// Main title, drawn by `title()`: text (`"Weight"`) or a plotmath
+    /// expression (`Label::math("x^2")`); `None`: none.
     pub main: Option<Label>,
+    /// Subtitle; `None`: none.
     pub sub: Option<Label>,
-    /// R defaults `xlab`/`ylab` to the deparsed variable names passed as
-    /// `x`/`y`; we have no equivalent, so these default to `None` (no
-    /// label) and callers should pass explicit labels.
+    /// x axis label; `None`: none. (R defaults `xlab`/`ylab` to the
+    /// deparsed variable names passed as `x`/`y`; Rust has no equivalent,
+    /// so pass explicit labels.)
     pub xlab: Option<Label>,
+    /// y axis label; `None`: none (see `xlab`).
     pub ylab: Option<Label>,
+    /// Draw the axes and the box around the plot; default `true`.
     pub axes: bool,
-    /// Inline `xaxt`/`yaxt` (`plot(x, y, xaxt = "n")`): `AxisType::None`
-    /// leaves out that axis; `None` uses `par(xaxt/yaxt)`.
+    /// Inline `xaxt` (`plot(x, y, xaxt = "n")`): `AxisType::None` leaves
+    /// out the x axis; `None`: `par(xaxt)`.
     pub xaxt: Option<AxisType>,
+    /// Inline `yaxt`, as `xaxt`; `None`: `par(yaxt)`.
     pub yaxt: Option<AxisType>,
-    /// Inline `xaxp`/`yaxp` (`plot(x, y, xaxp = c(1, 10, 3))`): the default
-    /// ticks of that axis; `None` uses `par(xaxp/yaxp)` as `plot_window()`
-    /// sets it. Like R, `par()` itself is left unchanged.
+    /// Inline `xaxp` (`plot(x, y, xaxp = c(1, 10, 3))`): the default ticks
+    /// of the x axis; `None`: `par(xaxp)` as `plot_window()` sets it. Like
+    /// R, `par()` itself is left unchanged.
     pub xaxp: Option<[f64; 3]>,
+    /// Inline `yaxp`, as `xaxp`; `None`: `par(yaxp)`.
     pub yaxp: Option<[f64; 3]>,
 }
 
 crate::setters::setters!(PlotOptions => [PlotCall] {
-    type_: value PlotType,
+    type_: option PlotType,
     pch: values i32,
     col: values ColorSpec,
     bg: values ColorSpec,
@@ -126,7 +141,7 @@ crate::setters::setters!(PlotOptions => [PlotCall] {
 impl Default for PlotOptions {
     fn default() -> Self {
         PlotOptions {
-            type_: PlotType::Points,
+            type_: None,
             pch: Vec::new(),
             col: Vec::new(),
             bg: Vec::new(),
@@ -178,7 +193,7 @@ impl<B: Backend> Device<B> {
 
         // `plot.xy(xy, type, ...)`.
         let xy = XyOptions {
-            type_: Some(opts.type_),
+            type_: opts.type_,
             pch: opts.pch.clone(),
             col: opts.col.clone(),
             bg: opts.bg.clone(),

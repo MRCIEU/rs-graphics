@@ -11,8 +11,10 @@
 //! `points()`/`segments()`/`arrows()`/`rect()`/`polygon()`/`text()`,
 //! `lines(type = )`, R's `par("fg")` defaults, `NA`-separated polygons,
 //! vectorised and default `text()` labels, `box(which = )` and
-//! `plot.window(asp = )`, and `plot()`'s axes taking their style from
-//! `par()`. Every painted path (operator, vertices, fill and
+//! `plot.window(asp = )`, `plot()`'s axes taking their style from
+//! `par()`, and the high-level plots' `par()`-based defaults (borders,
+//! boxplot lines and outliers, `ann`), unequal-width `hist()` densities
+//! and missing pie labels. Every painted path (operator, vertices, fill and
 //! stroke colour, width, dash; circles by operator only) and every text
 //! item (string, origin, size, colour) is compared in order. Skipped if
 //! `Rscript` isn't available.
@@ -140,9 +142,9 @@ fn cases() -> Vec<Case> {
                     .with(&red)
                     .draw();
                 let bars = ArrowsOptions {
-                    code: 3,
-                    angle: 90.0,
-                    length: 0.1,
+                    code: Some(3),
+                    angle: Some(90.0),
+                    length: Some(0.1),
                     col: vec!["red".into(), ColorSpec::None],
                     ..ArrowsOptions::default()
                 };
@@ -220,7 +222,7 @@ fn cases() -> Vec<Case> {
                 let rot = TextOptions {
                     adj: Some(0.0),
                     vadj: Some(1.0),
-                    srt: 45.0,
+                    srt: Some(45.0),
                     ..TextOptions::default()
                 };
                 d.text(&[3.0], &[3.0], &["rot"]).with(&rot).draw();
@@ -242,14 +244,14 @@ fn cases() -> Vec<Case> {
                 d.box_().draw();
                 d.box_()
                     .with(&BoxOptions {
-                        which: BoxWhich::Figure,
+                        which: Some(BoxWhich::Figure),
                         col: Some("red".into()),
                         ..BoxOptions::default()
                     })
                     .draw();
                 d.box_()
                     .with(&BoxOptions {
-                        which: BoxWhich::Inner,
+                        which: Some(BoxWhich::Inner),
                         lty: Some(LineType::DASHED),
                         lwd: Some(2.0),
                         ..BoxOptions::default()
@@ -257,7 +259,7 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.box_()
                     .with(&BoxOptions {
-                        which: BoxWhich::Outer,
+                        which: Some(BoxWhich::Outer),
                         col: Some("blue".into()),
                         ..BoxOptions::default()
                     })
@@ -280,6 +282,51 @@ fn cases() -> Vec<Case> {
                 d.par.las = 1;
                 d.par.ann = false;
                 d.plot(&[1.0, 3.0], &[2.0, 5.0]).pch(19).draw();
+            },
+        },
+        Case {
+            // The high-level plots' par()-based defaults: hist/barplot/
+            // boxplot/pie borders par(fg); boxplot lines par(lty); hist and
+            // boxplot titles despite par(ann = FALSE) (their `ann` is TRUE),
+            // barplot's not (`ann = par("ann")`); hist with unequal breaks
+            // plots densities; a pie label past the end of `labels` is NA.
+            name: "highlevel_par_defaults",
+            r: "par(mfrow = c(2, 2), fg = 'red', col = 'red', ann = FALSE, lty = 3, lwd = 2)\n\
+                x <- c(1, 2, 2, 3, 3, 3, 7); hist(x, breaks = c(0, 2, 3, 8), main = 'H')\n\
+                barplot(c(3, 1, 2), main = 'B')\n\
+                boxplot(list(1:5, c(2, 4, 6)), main = 'X')\n\
+                pie(c(1, 2, 3), labels = c('a', 'b'))",
+            draw: |d| {
+                d.mfrow(2, 2);
+                let red = Color::parse("red").unwrap();
+                d.par.fg = red;
+                d.par.col = red;
+                d.par.ann = false;
+                d.par.lty = LineType::DOTTED;
+                d.par.lwd = 2.0;
+                d.hist(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 7.0])
+                    .breaks([0.0, 2.0, 3.0, 8.0])
+                    .main("H")
+                    .draw();
+                d.barplot([3.0, 1.0, 2.0]).main("B").draw();
+                d.boxplot(&[vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![2.0, 4.0, 6.0]])
+                    .main("X")
+                    .draw();
+                d.pie(&[1.0, 2.0, 3.0]).labels(["a", "b"]).draw();
+            },
+        },
+        Case {
+            // Outliers take par(pch) and the border colour.
+            name: "boxplot_outliers_par",
+            r: "par(pch = 2, lty = 2, fg = 'blue', col = 'blue')\n\
+                boxplot(list(c(1, 2, 3, 4, 5, 12)))",
+            draw: |d| {
+                let blue = Color::parse("blue").unwrap();
+                d.par.pch = 2;
+                d.par.lty = LineType::DASHED;
+                d.par.fg = blue;
+                d.par.col = blue;
+                d.boxplot(&[vec![1.0, 2.0, 3.0, 4.0, 5.0, 12.0]]).draw();
             },
         },
         Case {
@@ -325,7 +372,10 @@ fn cases() -> Vec<Case> {
 
 /// Cases drawn on `plot.new(); plot.window(c(0, 10), c(0, 10))`.
 fn on_window(name: &str) -> bool {
-    !matches!(name, "box_regions" | "asp" | "plot_axis_par")
+    !matches!(
+        name,
+        "box_regions" | "asp" | "plot_axis_par" | "highlevel_par_defaults" | "boxplot_outliers_par"
+    )
 }
 
 #[derive(Clone, Debug)]

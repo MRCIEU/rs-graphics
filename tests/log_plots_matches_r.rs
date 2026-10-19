@@ -240,8 +240,8 @@ fn cases() -> Vec<Case> {
                 let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
                 let o = HistOptions {
                     add: true,
-                    col: ColorSpec::Color(Color::parse("pink").unwrap()),
-                    border: red(),
+                    col: Some(ColorSpec::Color(Color::parse("pink").unwrap())),
+                    border: Some(red()),
                     ..Default::default()
                 };
                 d.hist(&more).with(&o).draw();

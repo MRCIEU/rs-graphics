@@ -117,9 +117,9 @@ fn arrows_match_r() {
     dev.plot_window((0.0, 10.0), (0.0, 10.0)).draw();
     for &(x0, y0, x1, y1, length, angle, code) in CALLS {
         let opts = ArrowsOptions {
-            length,
-            angle,
-            code,
+            length: Some(length),
+            angle: Some(angle),
+            code: Some(code),
             col: vec![ColorSpec::Color(Color::BLACK)],
             ..ArrowsOptions::default()
         };

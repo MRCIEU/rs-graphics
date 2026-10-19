@@ -28,12 +28,14 @@ use super::{Clip, Device, Side, Y_LINE_BIAS};
 /// The arguments of R's `mtext()` other than `text` and `side`, with
 /// R's defaults.
 /// `None` is R's `NA`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MtextOptions {
     /// Margin line, starting at 0 next to the plot region (or the inner
-    /// region for `outer`); may be negative or fractional.
-    pub line: f64,
+    /// region for `outer`); may be negative or fractional. `None`: 0 (R's
+    /// default).
+    pub line: Option<f64>,
     /// Draw in the outer margins (`par(oma)`) rather than the figure's.
+    /// Default `false`.
     pub outer: bool,
     /// Position along the side: a user coordinate for inner margins, or a
     /// fraction (0 to 1) of the inner region for outer ones. `None`: from
@@ -56,7 +58,7 @@ pub struct MtextOptions {
 }
 
 crate::setters::setters!(MtextOptions => [MtextCall] {
-    line: value f64,
+    line: option f64,
     outer: value bool,
     at: option f64,
     adj: option f64,
@@ -65,21 +67,6 @@ crate::setters::setters!(MtextOptions => [MtextCall] {
     col: option ColorSpec,
     font: option i32,
 });
-
-impl Default for MtextOptions {
-    fn default() -> Self {
-        MtextOptions {
-            line: 0.0,
-            outer: false,
-            at: None,
-            adj: None,
-            padj: None,
-            cex: None,
-            col: None,
-            font: None,
-        }
-    }
-}
 
 /// `ComputeAdjValue()`.
 fn default_adj(side: Side, las: i32) -> f64 {
@@ -180,9 +167,9 @@ impl<B: Backend> Device<B> {
             Side::Left | Side::Top => Y_LINE_BIAS,
         };
         let line = if parallel_text {
-            opts.line + bias / self.par.mex
+            opts.line.unwrap_or(0.0) + bias / self.par.mex
         } else {
-            opts.line
+            opts.line.unwrap_or(0.0)
         };
 
         // Position across the side.

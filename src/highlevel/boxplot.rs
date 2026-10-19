@@ -108,42 +108,61 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
 }
 
 /// Options for [`Graphics::boxplot`](crate::graphics::Graphics::boxplot), covering the subset of `boxplot.default`'s/
-/// `bxp`'s arguments this crate implements.
+/// `bxp`'s arguments this crate implements. Unset fields are R's
+/// defaults, given for each. Like `bxp()`, the boxes use `par(lty)` and
+/// `par(lwd)` (the median 3 times as wide), dashed whiskers, and
+/// `par(pch)` for outliers.
 #[derive(Clone, Debug)]
 pub struct BoxplotOptions {
     /// Group labels on the name axis (side 1, or 2 if `horizontal`);
     /// `None` gives `1, 2, ...`. Only drawn when there's more than one
     /// box, matching R's `show.names <- n > 1`.
     pub names: Option<Vec<Label>>,
-    pub col: ColorSpec,
-    pub border: ColorSpec,
-    /// The `range` argument (whisker/outlier IQR multiplier). R's default
-    /// is `1.5`.
-    pub range: f64,
-    /// Titles, as for `plot()` (text or a plotmath expression).
+    /// Box fill; `None`: `"lightgray"` (R's default).
+    pub col: Option<ColorSpec>,
+    /// Colour of the box outlines, median, whiskers, staples and
+    /// outliers; `None`: `par(fg)` (R's default).
+    pub border: Option<ColorSpec>,
+    /// Whiskers reach the most extreme point within `range` times the
+    /// box length (IQR) of the box; points beyond are outliers. `None`:
+    /// 1.5 (R's default).
+    pub range: Option<f64>,
+    /// Main title, as for `plot()` (text or a plotmath expression);
+    /// `None`: none.
     pub main: Option<Label>,
+    /// Subtitle; `None`: none.
     pub sub: Option<Label>,
+    /// x axis label; `None`: none.
     pub xlab: Option<Label>,
+    /// y axis label; `None`: none.
     pub ylab: Option<Label>,
+    /// Draw the titles (R's `ann`, which defaults to `TRUE`, not
+    /// `par(ann)`); default `true`.
+    pub ann: bool,
+    /// Draw the axes and the box around the plot; default `true`.
     pub axes: bool,
     /// Notched boxes: the box narrows to half its width at the median,
     /// between [`BoxStats::conf`]'s limits (R's `notch.frac = 0.5`).
+    /// Default `false`.
     pub notch: bool,
     /// Box widths proportional to the square root of the group size.
+    /// Default `false`.
     pub varwidth: bool,
-    /// Horizontal boxes: group names on side 2, values on side 1.
+    /// Horizontal boxes: group names on side 2, values on side 1. Default
+    /// `false`.
     pub horizontal: bool,
 }
 
 crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
     names: list Label,
-    col: value ColorSpec,
-    border: value ColorSpec,
-    range: value f64,
+    col: option ColorSpec,
+    border: option ColorSpec,
+    range: option f64,
     main: option Label,
     sub: option Label,
     xlab: option Label,
     ylab: option Label,
+    ann: value bool,
     axes: value bool,
     notch: value bool,
     varwidth: value bool,
@@ -154,13 +173,14 @@ impl Default for BoxplotOptions {
     fn default() -> Self {
         BoxplotOptions {
             names: None,
-            col: ColorSpec::Color(Color::parse("lightgray").unwrap()),
-            border: ColorSpec::Index(1),
-            range: 1.5,
+            col: None,
+            border: None,
+            range: None,
             main: None,
             sub: None,
             xlab: None,
             ylab: None,
+            ann: true,
             axes: true,
             notch: false,
             varwidth: false,
@@ -175,7 +195,7 @@ pub(crate) fn boxplot_all_stats(groups: &[Vec<f64>], opts: &BoxplotOptions) -> V
     assert!(!groups.is_empty(), "boxplot: need at least one group");
     groups
         .iter()
-        .map(|g| boxplot_stats(g, opts.range))
+        .map(|g| boxplot_stats(g, opts.range.unwrap_or(1.5)))
         .collect()
 }
 
@@ -256,8 +276,12 @@ impl<B: Backend> Device<B> {
             }
         };
         let lwd = self.par.lwd;
-        let border = opts.border;
-        let fill = opts.col;
+        let border = opts.border.unwrap_or(ColorSpec::Color(self.par.fg));
+        let fill = opts
+            .col
+            .unwrap_or_else(|| ColorSpec::Color(Color::parse("lightgray").unwrap()));
+        // bxp(): boxlty, medlty, staplelty = par(lty); whisklty "dashed".
+        let lty = self.par.lty;
         let notch_frac = if opts.notch { 0.5 } else { 1.0 };
         for (i, s) in stats.iter().enumerate() {
             let x = at[i];
@@ -305,7 +329,7 @@ impl<B: Backend> Device<B> {
                 lwd: vec![lwd],
                 ..SegmentsOptions::default()
             };
-            let median = line(3.0 * lwd, LineType::SOLID);
+            let median = line(3.0 * lwd, lty);
             self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
             self.par.lend = lend;
             // Whiskers run from their ends to the hinges (which matters for
@@ -320,13 +344,13 @@ impl<B: Backend> Device<B> {
             let cap = half * 0.5;
             for &(w, _) in &ends {
                 let (sx, sy) = xy(&[x - cap, x + cap], &[w, w]);
-                let solid = line(lwd, LineType::SOLID);
-                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &solid);
+                let staple = line(lwd, lty);
+                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &staple);
             }
             let box_border = PolygonOptions {
                 col: vec![ColorSpec::None],
                 border: vec![border],
-                lty: vec![LineType::SOLID],
+                lty: vec![lty],
                 lwd: Some(lwd),
                 ..PolygonOptions::default()
             };
@@ -334,8 +358,10 @@ impl<B: Backend> Device<B> {
             if !s.outliers.is_empty() {
                 let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
                 let (ox, oy) = xy(&pos, &s.outliers);
+                // outpch = par(pch). (R's outcex = par(cex) is then
+                // multiplied by par(cex) again, squaring it; we apply it
+                // once, as for any point.)
                 let outliers = XyOptions {
-                    pch: vec![1],
                     col: vec![border],
                     ..XyOptions::default()
                 };
@@ -362,7 +388,7 @@ impl<B: Backend> Device<B> {
             self.axis_impl(value_side, &AxisOptions::default());
         }
 
-        if self.par.ann {
+        if opts.ann {
             self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),

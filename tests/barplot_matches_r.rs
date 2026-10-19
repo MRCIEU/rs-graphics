@@ -149,7 +149,7 @@ fn cases() -> Vec<Case> {
                 let o = BarplotOptions {
                     names: names(&["a", "b", "c", "d"]),
                     beside: true,
-                    col: red_green_blue(),
+                    col: red_green_blue().expect("REASON"),
                     ..Default::default()
                 };
                 d.barplot(mat()).with(&o).draw();

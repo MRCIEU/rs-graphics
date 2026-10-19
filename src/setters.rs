@@ -237,9 +237,9 @@ mod tests {
 
         let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
         assert_eq!(bars.names, Some(vec![Label::from("a"), Label::from("b")]));
-        assert_eq!(bars.col, Some(vec![ColorSpec::from("grey")]));
+        assert_eq!(bars.col, vec![ColorSpec::from("grey")]);
 
-        assert_eq!(TextOptions::default().srt(45.0).srt, 45.0);
+        assert_eq!(TextOptions::default().srt(45.0).srt, Some(45.0));
     }
 
     #[test]
@@ -258,7 +258,7 @@ mod tests {
         let call = dev.axis(2).las(2).with(&saved).lwd(0.5);
         assert_eq!(call.opts.las, Some(1));
         assert_eq!(call.opts.at, Some(vec![1.0, 2.0]));
-        assert_eq!(call.opts.lwd, 0.5);
-        assert_eq!(saved.lwd, 3.0);
+        assert_eq!(call.opts.lwd, Some(0.5));
+        assert_eq!(saved.lwd, Some(3.0));
     }
 }

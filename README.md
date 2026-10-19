@@ -52,7 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   `dev.hist(&x).draw()`, `dev.axis(1).las(1).draw()`,
   `dev.text(&x, &y, &["a", "b"]).col("red").draw()`. Nothing is drawn
   without `.draw()` (the compiler warns). Unset arguments are R's
-  defaults, mostly the current `par()` values. Arguments R recycles per
+  defaults, mostly the current `par()` values: in the options structs,
+  every argument R lets you omit is an `Option` (or a `Vec`, empty for
+  the default), and each field's docs say what `None` gives. Arguments R recycles per
   element (`points(x, y, col = groups)`) take one value or several
   (`.col("red")`, `.col(["red", "blue"])`). `.xpd(true)` is R's inline
   `xpd = TRUE`.

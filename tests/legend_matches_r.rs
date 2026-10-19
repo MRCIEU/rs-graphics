@@ -137,7 +137,7 @@ fn cases() -> Vec<Case> {
                     LegendEntry::point("ccc", black(), 3),
                 ];
                 let o = LegendOptions {
-                    inset: (0.05, 0.05),
+                    inset: Some((0.05, 0.05)),
                     ..Default::default()
                 };
                 d.legend(LegendPos::Keyword(LegendKeyword::BottomLeft), &e)
@@ -155,8 +155,8 @@ fn cases() -> Vec<Case> {
                     LegendEntry::line("three", ColorSpec::Index(4), 1.0, LineType::from_code(3)),
                 ];
                 let o = LegendOptions {
-                    ncol: 2,
-                    bty: LegendBty::None,
+                    ncol: Some(2),
+                    bty: Some(LegendBty::None),
                     ..Default::default()
                 };
                 d.legend(LegendPos::Keyword(LegendKeyword::Center), &e)
@@ -191,9 +191,9 @@ fn cases() -> Vec<Case> {
                     LegendEntry::point("rrr", black(), 3),
                 ];
                 let o = LegendOptions {
-                    cex: 0.8,
-                    y_intersp: 1.5,
-                    x_intersp: 2.0,
+                    cex: Some(0.8),
+                    y_intersp: Some(1.5),
+                    x_intersp: Some(2.0),
                     title: Some("T".into()),
                     ..Default::default()
                 };
@@ -221,7 +221,7 @@ fn cases() -> Vec<Case> {
                     LegendEntry::line("hi", black(), 2.0, solid()),
                 ];
                 let o = LegendOptions {
-                    seg_len: 3.0,
+                    seg_len: Some(3.0),
                     title: Some("A rather long legend title".into()),
                     ..Default::default()
                 };
@@ -244,7 +244,7 @@ fn cases() -> Vec<Case> {
                         .lty(solid()),
                 ];
                 let o = LegendOptions {
-                    cex: 0.8,
+                    cex: Some(0.8),
                     title: Some("Key".into()),
                     ..Default::default()
                 };
@@ -423,7 +423,7 @@ fn legend_return_value_on_log_axes_matches_r() {
         LegendEntry::point("bb", black(), 2),
     ];
     let o = LegendOptions {
-        inset: (0.05, 0.05),
+        inset: Some((0.05, 0.05)),
         ..Default::default()
     };
     let layout = dev

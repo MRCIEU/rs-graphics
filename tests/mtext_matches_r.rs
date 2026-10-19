@@ -158,7 +158,7 @@ fn mtext_placement_matches_r() {
         dev.par.las = c.las;
         dev.mtext(c.text, c.side)
             .with(&MtextOptions {
-                line: c.line,
+                line: Some(c.line),
                 outer: c.outer,
                 at: c.at,
                 adj: c.adj,

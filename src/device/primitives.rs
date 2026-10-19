@@ -100,15 +100,16 @@ crate::setters::setters!(SegmentsOptions => [SegmentsCall] {
 });
 
 /// Arguments of `arrows()`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ArrowsOptions {
-    /// Length of the head's edges in inches (R's default 0.25).
-    pub length: f64,
-    /// Angle between the shaft and each edge of the head, in degrees (R's
-    /// default 30; 90 gives flat caps, as for error bars).
-    pub angle: f64,
-    /// Heads at the start (1), the end (2, R's default) or both ends (3).
-    pub code: u8,
+    /// Length of the head's edges in inches; `None`: 0.25 (R's default).
+    pub length: Option<f64>,
+    /// Angle between the shaft and each edge of the head, in degrees (90
+    /// gives flat caps, as for error bars); `None`: 30 (R's default).
+    pub angle: Option<f64>,
+    /// Heads at the start (1), the end (2) or both ends (3); `None`: 2
+    /// (R's default).
+    pub code: Option<u8>,
     /// Recycled per arrow; empty: `par(fg)` (R's default).
     pub col: Vec<ColorSpec>,
     /// Recycled per arrow; empty: `par(lty)`.
@@ -121,28 +122,14 @@ pub struct ArrowsOptions {
 }
 
 crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
-    length: value f64,
-    angle: value f64,
-    code: value u8,
+    length: option f64,
+    angle: option f64,
+    code: option u8,
     col: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
     xpd: option bool,
 });
-
-impl Default for ArrowsOptions {
-    fn default() -> Self {
-        ArrowsOptions {
-            length: 0.25,
-            angle: 30.0,
-            code: 2,
-            col: Vec::new(),
-            lty: Vec::new(),
-            lwd: Vec::new(),
-            xpd: None,
-        }
-    }
-}
 
 /// Arguments of `rect()`.
 #[derive(Clone, Debug, Default)]
@@ -208,8 +195,8 @@ pub struct TextOptions {
     /// `None` (R's `NA`, the default) centres the text's ink, or an
     /// expression's box, on it.
     pub vadj: Option<f64>,
-    /// Rotation in degrees, counterclockwise (R's `srt`).
-    pub srt: f64,
+    /// Rotation in degrees, counterclockwise (R's `srt`); `None`: 0.
+    pub srt: Option<f64>,
     /// Recycled per label, times `par(cex)`; empty: 1.
     pub cex: Vec<f64>,
     /// Recycled per label; empty: `par(col)`.
@@ -225,7 +212,7 @@ pub struct TextOptions {
 crate::setters::setters!(TextOptions => [TextCall] {
     adj: option f64,
     vadj: option f64,
-    srt: value f64,
+    srt: option f64,
     cex: values f64,
     col: values ColorSpec,
     font: values i32,
@@ -249,7 +236,8 @@ pub enum BoxWhich {
 /// Arguments of `box()`.
 #[derive(Clone, Debug, Default)]
 pub struct BoxOptions {
-    pub which: BoxWhich,
+    /// Which region to outline; `None`: the plot region (R's default).
+    pub which: Option<BoxWhich>,
     /// `None`: `par(col)` (R's `C_box`; R's `par(fg = )` sets `col` too,
     /// so set both `par.fg` and `par.col` to follow it).
     pub col: Option<ColorSpec>,
@@ -260,7 +248,7 @@ pub struct BoxOptions {
 }
 
 crate::setters::setters!(BoxOptions => [BoxCall] {
-    which: value BoxWhich,
+    which: option BoxWhich,
     col: option ColorSpec,
     lty: option LineType,
     lwd: option f64,
@@ -269,12 +257,12 @@ crate::setters::setters!(BoxOptions => [BoxCall] {
 /// Arguments of `plot.window()` besides the limits.
 #[derive(Clone, Debug, Default)]
 pub struct PlotWindowOptions {
-    /// Log x axis (R's `log = "x"`).
+    /// Log x axis (R's `log = "x"`); default `false`.
     pub xlog: bool,
-    /// Log y axis (R's `log = "y"`).
+    /// Log y axis (R's `log = "y"`); default `false`.
     pub ylog: bool,
     /// R's `asp`: one x unit is `asp` y units long on the page. Ignored on
-    /// log axes, as in R.
+    /// log axes, as in R. `None` (R's `NA`): no constraint.
     pub asp: Option<f64>,
 }
 
@@ -459,7 +447,9 @@ impl<B: Backend> Device<B> {
         let n = recycled_len(&[x0.len(), y0.len(), x1.len(), y1.len()]);
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
-        let (length, angle, code) = (opts.length, opts.angle.to_radians(), opts.code);
+        let length = opts.length.unwrap_or(0.25);
+        let angle = opts.angle.unwrap_or(30.0).to_radians();
+        let code = opts.code.unwrap_or(2);
         self.push_clip_region(self.clip_for(opts.xpd));
         for i in 0..n {
             let (a, b, c, d) = (
@@ -589,7 +579,7 @@ impl<B: Backend> Device<B> {
                 &label,
                 hadj,
                 opts.vadj,
-                opts.srt,
+                opts.srt.unwrap_or(0.0),
                 pick(&opts.col, i, col),
                 pick(&opts.cex, i, 1.0),
                 pick(&opts.font, i, font),
@@ -609,7 +599,7 @@ impl<B: Backend> Device<B> {
             opts.lwd.unwrap_or(self.par.lwd),
             opts.lty.unwrap_or(LineType::SOLID),
         );
-        let rect = match opts.which {
+        let rect = match opts.which.unwrap_or_default() {
             BoxWhich::Plot => self.plt,
             BoxWhich::Figure => self.fig,
             BoxWhich::Inner => self.inner,

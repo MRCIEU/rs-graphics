@@ -121,9 +121,10 @@ crate::error::from_str_via_parse!(LegendBty, "legend box type");
 /// One row (key + label) of a legend.
 #[derive(Clone, Debug)]
 pub struct LegendEntry {
-    /// Text or a plotmath expression (`Label::math(...)`).
+    /// Text or a plotmath expression (`Label::math(...)`). Required.
     pub label: Label,
-    /// Colour of the point/line symbol.
+    /// Colour of the point/line symbol. Required (set by the
+    /// constructors).
     pub col: ColorSpec,
     /// Plotting symbol of the key; `None` = no point.
     pub pch: Option<i32>,
@@ -135,8 +136,8 @@ pub struct LegendEntry {
     /// this row (but if any other row has a box, this row gets an empty one,
     /// as in R).
     pub fill: Option<ColorSpec>,
-    /// `pt.bg`: background for `pch` 21..25.
-    pub pt_bg: ColorSpec,
+    /// `pt.bg`: background for `pch` 21..25; `None`: none (R's `NA`).
+    pub pt_bg: Option<ColorSpec>,
     /// `pt.cex`; `None` = the legend's `cex`.
     pub pt_cex: Option<f64>,
     /// `pt.lwd`; `None` = this row's line width.
@@ -150,7 +151,7 @@ crate::setters::setters!(LegendEntry {
     lty: option LineType,
     lwd: option f64,
     fill: option ColorSpec,
-    pt_bg: value ColorSpec,
+    pt_bg: option ColorSpec,
     pt_cex: option f64,
     pt_lwd: option f64,
 });
@@ -164,7 +165,7 @@ impl LegendEntry {
             lty: None,
             lwd: None,
             fill: None,
-            pt_bg: ColorSpec::None,
+            pt_bg: None,
             pt_cex: None,
             pt_lwd: None,
         }
@@ -209,93 +210,77 @@ impl LegendEntry {
     }
 }
 
-/// The scalar arguments of R's `legend()`, with R's defaults.
-#[derive(Clone, Debug)]
+/// The scalar arguments of R's `legend()`. `None` is R's default, given
+/// for each field.
+#[derive(Clone, Debug, Default)]
 pub struct LegendOptions {
-    /// `bty`: whether to draw the surrounding box.
-    pub bty: LegendBty,
+    /// `bty`: whether to draw the surrounding box; `None`: a box (R's
+    /// `"o"`).
+    pub bty: Option<LegendBty>,
     /// Box fill (`bg=`); `None` = `par("bg")` (transparent, so unfilled,
     /// on PDF by default: see [`Backend::default_bg`]).
     pub bg: Option<ColorSpec>,
-    pub cex: f64,
-    /// `xjust` / `yjust`; `None` = R's default (0 / 1, or 0.5 for
-    /// [`LegendPos::Corners`]).
+    /// Size of the text and keys, times `par(cex)`; `None`: 1.
+    pub cex: Option<f64>,
+    /// Horizontal justification of the box relative to `x`; `None`: R's
+    /// default (0, or 0.5 for [`LegendPos::Corners`]).
     pub xjust: Option<f64>,
+    /// Vertical justification of the box relative to `y`; `None`: R's
+    /// default (1, or 0.5 for [`LegendPos::Corners`]).
     pub yjust: Option<f64>,
-    pub x_intersp: f64,
-    pub y_intersp: f64,
-    /// Length of line keys, in character widths.
-    pub seg_len: f64,
+    /// Space between key and label, in character widths; `None`: 1.
+    pub x_intersp: Option<f64>,
+    /// Space between rows, in character heights; `None`: 1.
+    pub y_intersp: Option<f64>,
+    /// Length of line keys, in character widths; `None`: 2.
+    pub seg_len: Option<f64>,
     /// `text.width`, in x *user* units; `None` = widest label.
     pub text_width: Option<f64>,
     /// `merge`; `None` = R's default (`do.lines && has.pch`).
     pub merge: Option<bool>,
-    pub ncol: usize,
+    /// Number of columns; `None`: 1.
+    pub ncol: Option<usize>,
+    /// Lay the entries out in one row. Default `false`.
     pub horiz: bool,
-    /// Text or a plotmath expression.
+    /// Text or a plotmath expression above the entries; `None`: no title.
     pub title: Option<Label>,
     /// `title.cex`; `None` = `cex`.
     pub title_cex: Option<f64>,
     /// `inset` as fractions of the plot region, `(x, y)`, for keyword
-    /// positions.
-    pub inset: (f64, f64),
+    /// positions; `None`: `(0, 0)`.
+    pub inset: Option<(f64, f64)>,
     /// `text.col`; `None` = `par("col")`.
     pub text_col: Option<ColorSpec>,
     /// `text.font`; `None` = `par("font")`.
     pub text_font: Option<i32>,
-    /// Border colour of filled box keys (`border=`).
-    pub border: ColorSpec,
-    /// Temporarily override `par("xpd")` while drawing.
+    /// Border colour of filled box keys (`border=`); `None`: black (R's
+    /// default).
+    pub border: Option<ColorSpec>,
+    /// R's inline `xpd` while drawing; `None`: `par(xpd)`.
     pub xpd: Option<bool>,
 }
 
 crate::setters::setters!(LegendOptions => [LegendCall] {
-    bty: value LegendBty,
+    bty: option LegendBty,
     bg: option ColorSpec,
-    cex: value f64,
+    cex: option f64,
     xjust: option f64,
     yjust: option f64,
-    x_intersp: value f64,
-    y_intersp: value f64,
-    seg_len: value f64,
+    x_intersp: option f64,
+    y_intersp: option f64,
+    seg_len: option f64,
     text_width: option f64,
     merge: option bool,
-    ncol: value usize,
+    ncol: option usize,
     horiz: value bool,
     title: option Label,
     title_cex: option f64,
-    inset: value (f64, f64),
+    inset: option (f64, f64),
     text_col: option ColorSpec,
     text_font: option i32,
-    border: value ColorSpec,
+    border: option ColorSpec,
     xpd: option bool,
 });
-
-impl Default for LegendOptions {
-    fn default() -> Self {
-        LegendOptions {
-            bty: LegendBty::Box,
-            bg: None,
-            cex: 1.0,
-            xjust: None,
-            yjust: None,
-            x_intersp: 1.0,
-            y_intersp: 1.0,
-            seg_len: 2.0,
-            text_width: None,
-            merge: None,
-            ncol: 1,
-            horiz: false,
-            title: None,
-            title_cex: None,
-            inset: (0.0, 0.0),
-            text_col: None,
-            text_font: None,
-            border: ColorSpec::Color(crate::color::Color::BLACK),
-            xpd: None,
-        }
-    }
-}
 
 /// Where `legend()` drew, as R's (invisible) return value `list(rect =
 /// list(w, h, left, top), text = list(x, y))`. All in `usr` units, as in
@@ -344,13 +329,21 @@ impl<B: Backend> Device<B> {
     ) -> LegendLayout {
         let n = entries.len();
         let plt = self.plt;
-        let cex = opts.cex;
+        // R's defaults for the arguments left unset.
+        let cex = opts.cex.unwrap_or(1.0);
+        let x_intersp = opts.x_intersp.unwrap_or(1.0);
+        let y_intersp = opts.y_intersp.unwrap_or(1.0);
+        let seg_len = opts.seg_len.unwrap_or(2.0);
+        let inset = opts.inset.unwrap_or((0.0, 0.0));
+        let border = opts
+            .border
+            .unwrap_or(ColorSpec::Color(crate::color::Color::BLACK));
 
         // Number of columns / rows ("legends per column").
         let (ncol, n_per_col) = if opts.horiz {
             (n, 1)
         } else {
-            let ncol = opts.ncol.max(1);
+            let ncol = opts.ncol.unwrap_or(1).max(1);
             (ncol, n.div_ceil(ncol))
         };
 
@@ -375,7 +368,7 @@ impl<B: Backend> Device<B> {
 
         // Row heights: at least a character cell, or the tallest label
         // (an expression can be taller).
-        let yextra = yc * (opts.y_intersp - 1.0);
+        let yextra = yc * (y_intersp - 1.0);
         let ymax = entries
             .iter()
             .map(|e| self.label_height(&e.label, font, cex))
@@ -421,12 +414,12 @@ impl<B: Backend> Device<B> {
             _ => {
                 let h_ = n_per_col as f64 * ychar + yc + title_extra_h;
 
-                w0 = text_w + (opts.x_intersp + 1.0) * xc;
+                w0 = text_w + (x_intersp + 1.0) * xc;
                 if has_fill {
                     w0 += dx_fill;
                 }
                 if do_lines {
-                    w0 += (opts.seg_len + x_off) * xc;
+                    w0 += (seg_len + x_off) * xc;
                 }
                 let mut w_ = ncol as f64 * w0 + 0.5 * xc;
                 let mut xextra_ = 0.0;
@@ -447,8 +440,8 @@ impl<B: Backend> Device<B> {
                     }
                     LegendPos::Keyword(k) => {
                         use LegendKeyword::*;
-                        let insetx = opts.inset.0 * plt.width();
-                        let insety = opts.inset.1 * plt.height();
+                        let insetx = inset.0 * plt.width();
+                        let insety = inset.1 * plt.height();
                         let l = match k {
                             BottomRight | TopRight | Right => plt.x1 - w_ - insetx,
                             BottomLeft | Left | TopLeft => plt.x0 + insetx,
@@ -475,7 +468,7 @@ impl<B: Backend> Device<B> {
         // the `rect()`/`segments()`/`points()` calls R makes.
         let lwd_box = self.par.lwd;
         self.push_clip_for(self.par.xpd);
-        if opts.bty == LegendBty::Box {
+        if opts.bty.unwrap_or_default() == LegendBty::Box {
             let bg = opts.bg.unwrap_or(ColorSpec::Color(self.par.bg));
             let fill = self.resolve(bg).filter(|c| c.a > 0);
             let stroke = self.stroke_of(self.par.fg, lwd_box, self.par.lty);
@@ -492,7 +485,7 @@ impl<B: Backend> Device<B> {
             .collect();
 
         if has_fill {
-            let border = self.resolve(opts.border);
+            let border = self.resolve(border);
             let stroke = border.map(|c| self.stroke_of(c, self.par.lwd, self.par.lty));
             for i in 0..n {
                 let fill = entries[i].fill.and_then(|f| self.resolve(f));
@@ -513,11 +506,11 @@ impl<B: Backend> Device<B> {
                     let x0 = xt[i] + x_off * xc;
                     self.backend.draw_line(
                         Point::new(x0, yt[i]),
-                        Point::new(x0 + opts.seg_len * xc, yt[i]),
+                        Point::new(x0 + seg_len * xc, yt[i]),
                         &stroke,
                     );
                 }
-                xt[i] += (opts.seg_len + x_off) * xc;
+                xt[i] += (seg_len + x_off) * xc;
             }
         }
 
@@ -531,12 +524,12 @@ impl<B: Backend> Device<B> {
                     continue;
                 };
                 let x1 = if merge && do_lines {
-                    xt[i] - (opts.seg_len / 2.0) * xc
+                    xt[i] - (seg_len / 2.0) * xc
                 } else {
                     xt[i]
                 };
                 let pt_cex = e.pt_cex.unwrap_or(cex);
-                let bg = self.resolve(e.pt_bg);
+                let bg = self.resolve(e.pt_bg.unwrap_or(ColorSpec::None));
                 let lwd = e.pt_lwd.or(e.lwd).unwrap_or(self.par.lwd);
                 self.draw_pch(
                     e.pch.unwrap_or(0),
@@ -564,7 +557,7 @@ impl<B: Backend> Device<B> {
         let mut text_x = Vec::with_capacity(n);
         let mut text_y = Vec::with_capacity(n);
         for i in 0..n {
-            let anchor = Point::new(xt[i] + opts.x_intersp * xc, yt[i]);
+            let anchor = Point::new(xt[i] + x_intersp * xc, yt[i]);
             let (tx, ty) = self.inches_to_usr(anchor);
             text_x.push(tx);
             text_y.push(ty);

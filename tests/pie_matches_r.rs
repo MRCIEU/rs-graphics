@@ -179,7 +179,7 @@ fn pie_matches_r() {
             main: Some("pie()".into()),
             clockwise: c.clockwise,
             init_angle: c.init_angle,
-            radius: c.radius,
+            radius: Some(c.radius),
             ..PieOptions::default()
         };
         dev.pie(&VALUES).with(&opts).draw();

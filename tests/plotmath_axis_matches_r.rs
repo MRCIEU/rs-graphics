@@ -447,23 +447,23 @@ fn plotmath_title_mtext_text_legend_match_r() {
     d.mtext(Label::math("beta^2"), 3)
         .with(&MtextOptions {
             adj: Some(0.0),
-            ..mt(0.5)
+            ..mt(Some(0.5))
         })
         .draw();
     d.mtext(Label::math("Omega ~ infinity"), 4)
-        .with(&mt(1.0))
+        .with(&mt(Some(1.0)))
         .draw();
     d.mtext(Label::math("10^-5"), 1)
         .with(&MtextOptions {
             outer: true,
-            ..mt(0.5)
+            ..mt(Some(0.5))
         })
         .draw();
     d.par.las = 1;
     d.mtext(Label::math("gamma[k]"), 2)
         .with(&MtextOptions {
             at: Some(8.0),
-            ..mt(3.0)
+            ..mt(Some(3.0))
         })
         .draw();
     d.par.las = 0;
@@ -481,7 +481,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .with(&TextOptions {
             adj: Some(0.0),
             vadj: Some(1.0),
-            srt: 30.0,
+            srt: Some(30.0),
             col: vec![black],
             cex: vec![1.5],
             font: vec![1],

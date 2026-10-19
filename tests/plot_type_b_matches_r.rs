@@ -93,7 +93,7 @@ fn draw_ours(c: &Case) -> String {
     };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     let opts = PlotOptions {
-        type_: PlotType::parse(c.type_).unwrap(),
+        type_: Some(PlotType::parse(c.type_).unwrap()),
         ylog: c.ylog,
         axes: false,
         ..PlotOptions::default()

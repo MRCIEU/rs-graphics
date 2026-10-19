@@ -109,7 +109,7 @@ fn text_placement_matches_r() {
             .with(&TextOptions {
                 adj: Some(h),
                 vadj: v,
-                srt: srt,
+                srt: Some(srt),
                 col: vec![black],
                 cex: vec![cex],
                 font: vec![font],

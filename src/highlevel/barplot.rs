@@ -29,50 +29,62 @@ use crate::par::AxisStyle;
 use crate::plotmath::Label;
 
 /// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
-/// `barplot.default`'s arguments this crate implements.
+/// `barplot.default`'s arguments this crate implements. Unset fields are
+/// R's defaults, given for each.
 #[derive(Clone, Debug)]
 pub struct BarplotOptions {
-    /// Labels drawn under each bar, or beside it if `horiz` (R's `names.arg`; R takes them from
-    /// `names(height)`/`colnames(height)`), only shown if `Some`. For a
-    /// `beside` matrix either one name per bar or one per column (centred
-    /// under each group of bars).
+    /// Labels drawn under each bar, or beside it if `horiz` (R's
+    /// `names.arg`). For a `beside` matrix either one name per bar or one
+    /// per column (centred under each group of bars). `None`: no names
+    /// (R takes them from `names(height)`/`colnames(height)`, which Rust
+    /// data doesn't have).
     pub names: Option<Vec<Label>>,
     /// Fill colours, recycled over the bars of a vector / the rows of a
-    /// matrix. `None` = R's default: `"grey"` for a vector,
+    /// matrix. Empty: R's default, `"grey"` for a vector,
     /// `gray.colors(nrow)` for a matrix.
-    pub col: Option<Vec<ColorSpec>>,
-    pub border: ColorSpec,
-    /// Bar widths (recycled), default `1`.
+    pub col: Vec<ColorSpec>,
+    /// Bar borders; `None`: `par(fg)` (R's default).
+    pub border: Option<ColorSpec>,
+    /// Bar widths, recycled; empty: 1 (R's default).
     pub width: Vec<f64>,
     /// Space before each bar as a fraction of the mean bar width: one value,
-    /// or `[within group, between groups]` for a `beside` matrix. `None` =
-    /// R's default (`0.2`, or `[0, 1]` for a `beside` matrix).
+    /// or `[within group, between groups]` for a `beside` matrix. `None`
+    /// (or empty): R's default, `0.2`, or `[0, 1]` for a `beside` matrix.
     pub space: Option<Vec<f64>>,
-    /// Matrix only: bars side by side instead of stacked.
+    /// Matrix only: bars side by side instead of stacked. Default `false`.
     pub beside: bool,
-    /// Horizontal bars.
+    /// Horizontal bars. Default `false`.
     pub horiz: bool,
-    /// Matrix only: legend labels, one per row (R's `legend.text`).
+    /// Matrix only: legend labels, one per row (R's `legend.text`);
+    /// `None`: no legend.
     pub legend_text: Option<Vec<Label>>,
+    /// x limits; `None`: from the bars.
     pub xlim: Option<(f64, f64)>,
+    /// y limits; `None`: from the bars.
     pub ylim: Option<(f64, f64)>,
-    /// `log = "x"` / `"y"`. On a log value axis bars start at the lower
-    /// limit given (`ylim`, or `xlim` if `horiz`), else at 0.9 times the
-    /// smallest height, as in R.
+    /// Log x axis (R's `log = "x"`); default `false`. On a log value
+    /// axis bars start at the lower limit given (`ylim`, or `xlim` if
+    /// `horiz`), else at 0.9 times the smallest height, as in R.
     pub xlog: bool,
+    /// Log y axis (R's `log = "y"`); default `false`. See `xlog`.
     pub ylog: bool,
-    /// Titles, as for `plot()` (text or a plotmath expression).
+    /// Main title, as for `plot()` (text or a plotmath expression);
+    /// `None`: none. Titles are drawn when `par(ann)` is true, as in R.
     pub main: Option<Label>,
+    /// Subtitle; `None`: none.
     pub sub: Option<Label>,
+    /// x axis label; `None`: none.
     pub xlab: Option<Label>,
+    /// y axis label; `None`: none.
     pub ylab: Option<Label>,
+    /// Draw the value axis; default `true`.
     pub axes: bool,
 }
 
 crate::setters::setters!(BarplotOptions => [BarplotCall] {
     names: list Label,
-    col: option_values ColorSpec,
-    border: value ColorSpec,
+    col: values ColorSpec,
+    border: option ColorSpec,
     width: values f64,
     space: option_values f64,
     beside: value bool,
@@ -93,9 +105,9 @@ impl Default for BarplotOptions {
     fn default() -> Self {
         BarplotOptions {
             names: None,
-            col: None,
-            border: ColorSpec::Index(1),
-            width: vec![1.0],
+            col: Vec::new(),
+            border: None,
+            width: Vec::new(),
             space: None,
             beside: false,
             horiz: false,
@@ -231,18 +243,25 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
     let nr = columns[0].len();
     let beside = vector_input || opts.beside;
     let horiz = opts.horiz;
-    assert!(!opts.width.is_empty(), "barplot: 'width' must be non-empty");
+    let width: &[f64] = if opts.width.is_empty() {
+        &[1.0]
+    } else {
+        &opts.width
+    };
 
     // --- geometry along the category axis (w.l / w.m / w.r) ---
-    let mean_width = opts.width.iter().sum::<f64>() / opts.width.len() as f64;
-    let space_in = opts.space.clone().unwrap_or_else(|| {
-        if !vector_input && beside {
-            vec![0.0, 1.0]
-        } else {
-            vec![0.2]
-        }
-    });
-    assert!(!space_in.is_empty(), "barplot: 'space' must be non-empty");
+    let mean_width = width.iter().sum::<f64>() / width.len() as f64;
+    let space_in = opts
+        .space
+        .clone()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            if !vector_input && beside {
+                vec![0.0, 1.0]
+            } else {
+                vec![0.2]
+            }
+        });
     let space: Vec<f64> = space_in.iter().map(|s| s * mean_width).collect();
 
     let nbars = if beside { nr * nc } else { nc };
@@ -255,7 +274,7 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
     };
     let base_n = if beside { nr } else { nc };
     let width_v: Vec<f64> = (0..nbars)
-        .map(|k| opts.width[(k % base_n) % opts.width.len()])
+        .map(|k| width[(k % base_n) % width.len()])
         .collect();
 
     let mut w_l = vec![0.0; nbars];
@@ -336,10 +355,12 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
         }
     }
 
-    let colors: Vec<ColorSpec> = match &opts.col {
-        Some(c) if !c.is_empty() => c.clone(),
-        _ if vector_input => vec![ColorSpec::Color(Color::parse("grey").unwrap())],
-        _ => gray_colors(nr),
+    let colors: Vec<ColorSpec> = if !opts.col.is_empty() {
+        opts.col.clone()
+    } else if vector_input {
+        vec![ColorSpec::Color(Color::parse("grey").unwrap())]
+    } else {
+        gray_colors(nr)
     };
 
     let cat_lim = (
@@ -432,7 +453,7 @@ impl<B: Backend> Device<B> {
         for &(k, base, top, ci) in &bars {
             let style = RectOptions {
                 col: vec![colors[ci % colors.len()]],
-                border: vec![opts.border],
+                border: vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))],
                 ..RectOptions::default()
             };
             if horiz {

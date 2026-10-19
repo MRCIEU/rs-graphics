@@ -50,7 +50,7 @@ const R_PRELUDE: &str = "x <- 1:10\n\
 /// Ours: as `pl()` above.
 fn pl(dev: &mut Dev, y: &[f64], main: Option<&str>, axes: bool) {
     let opts = PlotOptions {
-        type_: PlotType::Lines,
+        type_: Some(PlotType::Lines),
         main: main.map(Into::into),
         axes,
         xlab: axes.then(|| "x".into()),
@@ -91,7 +91,7 @@ fn cases() -> Vec<Case> {
                 pl(d, &squares(), Some("Two scales"), true);
                 d.set_new(true);
                 let opts = PlotOptions {
-                    type_: PlotType::Lines,
+                    type_: Some(PlotType::Lines),
                     axes: false,
                     col: vec![ColorSpec::Color(Color::parse("red").unwrap())],
                     ..PlotOptions::default()
@@ -99,7 +99,7 @@ fn cases() -> Vec<Case> {
                 d.plot(&xs(), &roots()).with(&opts).draw();
                 d.axis(4).draw();
                 let o = MtextOptions {
-                    line: 3.0,
+                    line: Some(3.0),
                     ..Default::default()
                 };
                 d.mtext("sqrt", 4).with(&o).draw();

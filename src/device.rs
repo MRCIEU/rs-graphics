@@ -152,9 +152,13 @@ enum Clip {
 /// The labels of [`Graphics::title`](crate::graphics::Graphics::title); `None` draws nothing.
 #[derive(Clone, Debug, Default)]
 pub struct TitleOptions {
+    /// Main title, above the plot.
     pub main: Option<Label>,
+    /// Subtitle, below the x axis label.
     pub sub: Option<Label>,
+    /// x axis label.
     pub xlab: Option<Label>,
+    /// y axis label.
     pub ylab: Option<Label>,
 }
 

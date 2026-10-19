@@ -270,7 +270,7 @@ fn cases() -> Vec<Case> {
                 for k in 1..=4 {
                     let title = format!("p {k}");
                     let o = PlotOptions {
-                        type_: PlotType::None,
+                        type_: Some(PlotType::None),
                         main: Some(title.as_str().into()),
                         xlab: Some("x".into()),
                         ylab: Some("y".into()),

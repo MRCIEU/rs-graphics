@@ -144,8 +144,8 @@ fn draw_ours(c: &Case) -> String {
     };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     let opts = BoxplotOptions {
-        col: ColorSpec::Color(Color::parse(c.col).unwrap()),
-        border: ColorSpec::Color(Color::parse(c.border).unwrap()),
+        col: Some(ColorSpec::Color(Color::parse(c.col).unwrap())),
+        border: Some(ColorSpec::Color(Color::parse(c.border).unwrap())),
         axes: false,
         notch: c.notch,
         varwidth: c.varwidth,
