@@ -166,6 +166,19 @@ right of whichever panel the figure lands in, sized for that page.
 `add_figure` returns where each legend went (R's `legend()` return
 value), since that depends on the device.
 
+A figure has no page size or format of its own, so to save one, open a
+device for the file and add the figure to it, as R replays a recorded
+plot onto a device you've opened. The same figure can go to several
+files:
+
+```rust
+for path in ["fit.pdf", "fit.png"] {
+    let mut dev = Device::for_path(path, 7.0, 5.0, 300.0)?;
+    dev.add_figure(&fig);
+    dev.save(path)?;
+}
+```
+
 ### Your own plots
 
 Write them once against the `Graphics` trait, and they work on a device

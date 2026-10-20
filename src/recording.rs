@@ -54,6 +54,33 @@
 //!   no `mfrow`/`mfcol` setters (a figure is one panel).
 //! - **Data is copied** into the figure. For very large plots, draw on
 //!   the device directly.
+//!
+//! # Saving a figure
+//!
+//! A figure has no page size, format or resolution, so there is no
+//! `Figure::save`: open a device for the file, add the figure, and save
+//! the device, as in R (`png(...); replayPlot(p); dev.off()`). The same
+//! figure can go to several files:
+//!
+//! ```no_run
+//! use rs_graphics::prelude::*;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut fig = Figure::new();
+//! fig.hist(&[2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8]).draw();
+//!
+//! for path in ["hist.pdf", "hist.png"] {
+//!     let mut dev = Device::for_path(path, 7.0, 5.0, 300.0)?;
+//!     dev.add_figure(&fig);
+//!     dev.save(path)?;
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! For device options, such as a PDF background or a different starting
+//! `par()`, build the device with [`Device::new`] and a configured backend
+//! (e.g. [`PdfBackend::with_background`](crate::backend::pdf::PdfBackend::with_background)).
 
 use crate::backend::Backend;
 use crate::device::{
