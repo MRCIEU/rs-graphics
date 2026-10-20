@@ -375,6 +375,45 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "mex_2",
+            r_par: "par(mex = 2, mgp = c(2.5, 0.8, 0))",
+            r: "axis(1); axis(2); axis(3, las = 2); axis(4, las = 1); \
+                title(main = 'M', sub = 'S', xlab = 'X', ylab = 'Y'); \
+                mtext('A', 3, line = 1); mtext('B', 4, line = 1)",
+            xlim: (0.0, 10.0),
+            setup: |p| {
+                p.mex = 2.0;
+                p.mgp = [2.5, 0.8, 0.0];
+            },
+            draw: |d| {
+                d.axis(1).draw();
+                d.axis(2).draw();
+                d.axis(3).las(2).draw();
+                d.axis(4).las(1).draw();
+                d.title().main("M").sub("S").xlab("X").ylab("Y").draw();
+                d.mtext("A", 3).line(1).draw();
+                d.mtext("B", 4).line(1).draw();
+            },
+        },
+        Case {
+            name: "mex_0_7",
+            r_par: "par(mex = 0.7)",
+            r: "axis(1); axis(2); axis(3, las = 2); axis(4, las = 1); \
+                title(main = 'M', sub = 'S', xlab = 'X', ylab = 'Y'); \
+                mtext('A', 3, line = 1); mtext('B', 4, line = 1)",
+            xlim: (0.0, 10.0),
+            setup: |p| p.mex = 0.7,
+            draw: |d| {
+                d.axis(1).draw();
+                d.axis(2).draw();
+                d.axis(3).las(2).draw();
+                d.axis(4).las(1).draw();
+                d.title().main("M").sub("S").xlab("X").ylab("Y").draw();
+                d.mtext("A", 3).line(1).draw();
+                d.mtext("B", 4).line(1).draw();
+            },
+        },
+        Case {
             name: "na_labels_reversed",
             r_par: "",
             r: "axis(1, at = seq(0, 10, 0.5), labels = c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ'))",

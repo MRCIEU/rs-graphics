@@ -27,7 +27,7 @@ use crate::lty::LineType;
 use crate::par::AxisType;
 use crate::plotmath::Label;
 
-use super::{Device, Side, Xpd, Y_LINE_BIAS, format_axis_labels};
+use super::{Device, Side, Xpd, format_axis_labels};
 
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
@@ -400,14 +400,8 @@ impl<B: Backend> Device<B> {
                 0.5
             });
         // `GMtext()`'s rotation and `yLineBias` nudge.
-        let (angle, bias) = match (side, perpendicular) {
-            (Side::Bottom | Side::Top, true) => (90.0, 0.0),
-            (Side::Left | Side::Right, true) => (0.0, 0.0),
-            (Side::Bottom, false) => (0.0, 1.0 - Y_LINE_BIAS),
-            (Side::Left, false) => (90.0, Y_LINE_BIAS),
-            (Side::Top, false) => (0.0, Y_LINE_BIAS),
-            (Side::Right, false) => (90.0, 1.0 - Y_LINE_BIAS),
-        };
+        let angle = if x_axis == perpendicular { 90.0 } else { 0.0 };
+        let bias = self.line_bias(side, !perpendicular);
         let label_perp = axis_base + outward * (mgp[1] - lineoff + bias) * lh;
 
         // Labels left to right (bottom to top), skipping those within `gap`

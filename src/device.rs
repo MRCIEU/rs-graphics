@@ -1192,6 +1192,22 @@ impl<B: Backend> Device<B> {
     // title()
     // ---------------------------------------------------------------
 
+    /// `GMtext()`'s `yLineBias` nudge (`graphics.c`), in margin lines, for
+    /// text on `side`: `1 - bias` on sides 1 and 4, `bias` on 2 and 3, divided
+    /// by `par(mex)` as R does (so the nudge stays the same size in inches);
+    /// 0 for text perpendicular to the side. Shared by `title()`, `axis()`
+    /// and `mtext()`.
+    pub(crate) fn line_bias(&self, side: Side, parallel: bool) -> f64 {
+        if !parallel {
+            return 0.0;
+        }
+        let bias = match side {
+            Side::Bottom | Side::Right => 1.0 - Y_LINE_BIAS,
+            Side::Left | Side::Top => Y_LINE_BIAS,
+        };
+        bias / self.par.mex
+    }
+
     /// Draws R's `title()`; the public entry is
     /// [`Graphics::title`](crate::graphics::Graphics::title), whose docs
     /// describe it.
@@ -1202,8 +1218,7 @@ impl<B: Backend> Device<B> {
         let x_mid = (self.plt.x0 + self.plt.x1) / 2.0;
         let y_mid = (self.plt.y0 + self.plt.y1) / 2.0;
         // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
-        // `GMtext` nudges the line by `yLineBias` (0.2 on pdf/png/svg
-        // devices) - `1 - bias` on side 1, `bias` on sides 2/3.
+        // `GMtext` nudges the line by `yLineBias` (see `line_bias`).
         if let Some(main) = &opts.main {
             // `vpos = 0.5 * mar[2]`, `adjy = 0.5` (finite, so `GEText`
             // uses `yc * height(M)`, not exact ink centring).
@@ -1221,7 +1236,8 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(sub) = &opts.sub {
-            let y = self.plt.y0 - (self.par.mgp[0] + 1.0 + (1.0 - Y_LINE_BIAS)) * lh;
+            let line = self.par.mgp[0] + 1.0 + self.line_bias(Side::Bottom, true);
+            let y = self.plt.y0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
                 Point::new(x_mid, y),
@@ -1235,7 +1251,8 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(xlab) = &opts.xlab {
-            let y = self.plt.y0 - (self.par.mgp[0] + (1.0 - Y_LINE_BIAS)) * lh;
+            let line = self.par.mgp[0] + self.line_bias(Side::Bottom, true);
+            let y = self.plt.y0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
                 Point::new(x_mid, y),
@@ -1249,7 +1266,8 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(ylab) = &opts.ylab {
-            let x = self.plt.x0 - (self.par.mgp[0] + Y_LINE_BIAS) * lh;
+            let line = self.par.mgp[0] + self.line_bias(Side::Left, true);
+            let x = self.plt.x0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
                 Point::new(x, y_mid),

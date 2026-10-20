@@ -23,7 +23,7 @@ use crate::geometry::Point;
 
 use crate::plotmath::Label;
 
-use super::{Device, Side, Xpd, Y_LINE_BIAS};
+use super::{Device, Side, Xpd};
 
 /// The arguments of R's `mtext()` other than `text` and `side`, with
 /// R's defaults.
@@ -162,15 +162,7 @@ impl<B: Backend> Device<B> {
         } else {
             90.0
         };
-        let bias = match side {
-            Side::Bottom | Side::Right => 1.0 - Y_LINE_BIAS,
-            Side::Left | Side::Top => Y_LINE_BIAS,
-        };
-        let line = if parallel_text {
-            opts.line.unwrap_or(0.0) + bias / self.par.mex
-        } else {
-            opts.line.unwrap_or(0.0)
-        };
+        let line = opts.line.unwrap_or(0.0) + self.line_bias(side, parallel_text);
 
         // Position across the side.
         let lh = self.line_height_inches();
