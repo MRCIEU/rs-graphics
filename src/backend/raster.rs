@@ -696,7 +696,8 @@ impl RasterBackend {
     /// Paint with at most `threads` threads (default: the number of CPUs).
     /// With one thread the output is exactly that of drawing onto a single
     /// canvas; with more, edge pixels of some shapes can differ from it by
-    /// a few levels (see `PAD`), but not between thread counts above one.
+    /// up to a few dozen levels (see `PAD`), but not between thread counts
+    /// above one.
     pub fn with_threads(mut self, threads: usize) -> Self {
         self.flush();
         let canvas = self.canvas();

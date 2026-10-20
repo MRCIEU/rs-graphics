@@ -11,6 +11,11 @@
 //! (`points`, `lines`, `segments`, `rect`, `polygon`, `text`, `box`,
 //! `abline`, `axis`, `title`, `mtext`, `legend`, `arrows`).
 //!
+//! Devices are opened for a file with [`Device::pdf`], [`Device::svg`],
+//! [`Device::png`] or [`Device::format`] (a [`DeviceBuilder`], in
+//! `open.rs`) and written by [`Device::close`]; [`Device::new`] with
+//! [`Device::finish`] keeps the output in memory.
+//!
 //! The public entry to each R function is a [`Graphics`](crate::graphics::Graphics)
 //! method; the drawing code is here, in crate-private `*_impl` methods
 //! taking the data and an options struct, whose unset fields are R's
@@ -24,14 +29,11 @@
 //! of `GE*` engine calls.
 
 use crate::afm::{self};
-use std::path::Path;
+use std::fs::File;
+use std::io::Write;
 
-use crate::backend::pdf::PdfBackend;
-use crate::backend::raster::RasterBackend;
-use crate::backend::svg::SvgBackend;
-use crate::backend::{AnyBackend, Backend, Stroke, TextStyle};
+use crate::backend::{Backend, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
-use crate::error::ParseValueError;
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
@@ -44,12 +46,14 @@ mod abline;
 mod axis;
 mod legend;
 mod mtext;
+mod open;
 mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
 pub use legend::{LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
 pub use mtext::MtextOptions;
+pub use open::DeviceBuilder;
 pub use primitives::{
     ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
     SegmentsOptions, TextOptions, XyOptions,
@@ -57,8 +61,8 @@ pub use primitives::{
 
 /// A side of the plot, figure or page, as R's `side` argument. Functions
 /// take `impl Into<Side>`, so R's numbers work too: `1` = bottom, `2` =
-/// left, `3` = top, `4` = right (`dev.axis_impl(1, ..)` is
-/// `dev.axis_impl(Side::Bottom, ..)`).
+/// left, `3` = top, `4` = right (`dev.axis(1)` is
+/// `dev.axis(Side::Bottom)`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     Bottom = 1,
@@ -101,8 +105,18 @@ impl From<i32> for Side {
 /// `dev->yLineBias` for R's pdf/png/svg devices (see `GMtext()`).
 const Y_LINE_BIAS: f64 = 0.2;
 
+/// A graphics device: a page (or several, for PDF) drawn onto a
+/// [`Backend`], plus R's `par()` state and the page layout. Open one for
+/// a file with [`Device::pdf`], [`Device::svg`], [`Device::png`] or
+/// [`Device::format`], or wrap a backend with [`Device::new`]; draw with
+/// the [`Graphics`](crate::graphics::Graphics) methods.
 pub struct Device<B: Backend> {
     backend: B,
+    /// R's `par()` state. Set it with
+    /// [`par()`](crate::graphics::Graphics::par) calls or directly. As in
+    /// R, the margins and plot-region settings (`mar`, `oma`, `pty`,
+    /// `plt`, ...) take effect at the next `plot_new()`; the page layout
+    /// (`mfrow`, `layout`, `fig`) is device state, not part of `Par`.
     pub par: Par,
     width_in: f64,
     height_in: f64,
@@ -138,6 +152,9 @@ pub struct Device<B: Backend> {
     /// `par.ps` when the device was created: R's `startps`, which sets the
     /// device's character size `cra` (`1.2 * startps` points high).
     start_ps: f64,
+    /// The file created by [`DeviceBuilder::open`], which
+    /// [`close`](Device::close) writes; `None` for [`Device::new`].
+    file: Option<File>,
 }
 
 /// Where drawing is clipped to: R's `xpd = FALSE` (plot region), `TRUE`
@@ -169,55 +186,16 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     ylab: option Label,
 });
 
-/// Shortcuts for a device with R's default `par()`. Use [`Device::new`]
-/// to start from other parameters: in particular `par.ps`, R's
-/// `pointsize`, sizes symbols and margin lines from creation on.
-impl Device<PdfBackend> {
-    /// R's `pdf(width = , height = )`: a PDF page `width_in` x
-    /// `height_in` inches.
-    pub fn pdf(width_in: f64, height_in: f64) -> Self {
-        Device::new(PdfBackend::new(width_in, height_in), Par::default())
-    }
-}
-
-impl Device<SvgBackend> {
-    /// R's `svg(width = , height = )`.
-    pub fn svg(width_in: f64, height_in: f64) -> Self {
-        Device::new(SvgBackend::new(width_in, height_in), Par::default())
-    }
-}
-
-impl Device<RasterBackend> {
-    /// A PNG of `width_in` x `height_in` inches at `dpi` (R's `png(width,
-    /// height, units = "in", res = dpi)`), on white.
-    pub fn png(width_in: f64, height_in: f64, dpi: f64) -> Self {
-        Device::new(
-            RasterBackend::new(width_in, height_in, dpi, Color::WHITE),
-            Par::default(),
-        )
-    }
-}
-
-impl Device<AnyBackend> {
-    /// A device whose format follows `path`'s extension (`.pdf`, `.svg`
-    /// or `.png`; `dpi` is used for PNG only), for
-    /// [`save`](Device::save) to the same path. Fails for other
-    /// extensions.
-    pub fn for_path(
-        path: impl AsRef<Path>,
-        width_in: f64,
-        height_in: f64,
-        dpi: f64,
-    ) -> Result<Self, ParseValueError> {
-        let backend = AnyBackend::for_path(path, width_in, height_in, dpi)?;
-        Ok(Device::new(backend, Par::default()))
-    }
-}
-
 impl<B: Backend> Device<B> {
-    /// A device drawing onto `backend` with graphical parameters `par`. If
-    /// `par.bg` is left at its default (white), it starts as the backend's
-    /// background instead, as R's `par("bg")` does - transparent for PDF.
+    /// A device drawing onto `backend` with graphical parameters `par`: the
+    /// general route, for any [`Backend`] and backend options that
+    /// [`DeviceBuilder`] doesn't cover (e.g. PNG
+    /// [`with_threads`](crate::backend::raster::RasterBackend::with_threads)). If `par.bg` is left
+    /// at its default (white), it starts as the backend's background
+    /// instead, as R's `par("bg")` does - transparent for PDF. The device
+    /// has no file: get its output with [`finish`](Device::finish). To open
+    /// a device for a file, use [`Device::pdf`], [`Device::svg`],
+    /// [`Device::png`] or [`Device::format`].
     pub fn new(backend: B, mut par: Par) -> Self {
         if par.bg == Par::default().bg {
             par.bg = backend.default_bg();
@@ -246,26 +224,42 @@ impl<B: Backend> Device<B> {
             hold_figure: false,
             used: false,
             start_ps: par_ps,
+            file: None,
         };
         dev.recompute_layout();
         dev
     }
 
     /// The backend, to finish it with its own `finish()` or set options.
+    /// On a device opened for a file this doesn't write the file (it stays
+    /// empty); use [`close`](Device::close) for that.
     pub fn into_backend(self) -> B {
         self.backend
     }
 
-    /// The finished file's bytes (PDF, PNG, or SVG as UTF-8).
+    /// The finished output's bytes (PDF, PNG, or SVG as UTF-8). On a device
+    /// opened for a file this doesn't write the file (it stays empty); use
+    /// [`close`](Device::close) for that.
     pub fn finish(self) -> Vec<u8> {
         self.backend.into_bytes()
     }
 
-    /// Writes the finished file to `path` (R's `dev.off()`). The format is
-    /// the backend's, whatever `path`'s extension; see
-    /// [`Device::for_path`] to choose the backend from the path.
-    pub fn save(self, path: impl AsRef<Path>) -> std::io::Result<()> {
-        std::fs::write(path, self.finish())
+    /// Closes the device (R's `dev.off()`): finishes the output and writes
+    /// it to the file created when the device was opened
+    /// ([`DeviceBuilder::open`]). A device dropped without `close()`
+    /// leaves that file empty. A device made with [`Device::new`] has no
+    /// file: this returns an [`InvalidInput`](std::io::ErrorKind::InvalidInput)
+    /// error; use [`finish`](Device::finish) for its bytes.
+    pub fn close(mut self) -> std::io::Result<()> {
+        let Some(mut file) = self.file.take() else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "no file to close: the device was made with Device::new; \
+                 open one with Device::pdf/svg/png/format, or use finish()",
+            ));
+        };
+        file.write_all(&self.finish())?;
+        file.flush()
     }
 
     /// Page width in inches (R's `par("din")[1]`).
@@ -437,7 +431,10 @@ impl<B: Backend> Device<B> {
     /// `par(mfg = c(row, col))`: makes the figure at (`row`, `col`)
     /// (1-based) the one the next `plot_new()` draws into, without
     /// advancing or starting a new page. As in R, the figure number is
-    /// derived from the `mfrow`/`mfcol` ordering even under `layout()`.
+    /// derived from the `mfrow`/`mfcol` ordering even under `layout()`,
+    /// and it has no effect before anything has been plotted: the first
+    /// `plot_new()` always starts at figure 1 (see
+    /// [`add_figure_at`](Device::add_figure_at), which handles that).
     ///
     /// # Panics
     /// If `row`/`col` are outside the current arrangement.
@@ -682,8 +679,9 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// The device's starting point size (R's `startps`): `par.ps` as
-    /// passed to [`Device::new`]. Margin lines, plotting symbols and
+    /// The device's starting point size (R's `startps`): the
+    /// [`pointsize`](DeviceBuilder::pointsize) it was opened with, or
+    /// `par.ps` as passed to [`Device::new`]. Margin lines, plotting symbols and
     /// `par("cin")` are sized from it, as from R's `cra`; changing
     /// `par.ps` later only changes text size.
     pub fn start_ps(&self) -> f64 {
@@ -1163,6 +1161,8 @@ impl<B: Backend> Device<B> {
         self.par.xpd = saved_xpd;
     }
 
+    /// Direct access to the backend. Drawing through it isn't clipped,
+    /// doesn't follow `par()`, and doesn't reset `par(new)`.
     pub fn backend_mut(&mut self) -> &mut B {
         &mut self.backend
     }
@@ -1246,8 +1246,9 @@ mod tests {
 
     #[test]
     fn inches_to_user_inverts_user_to_inches() {
-        use super::{Device, PlotWindowOptions, Side};
-        let mut dev = Device::pdf(7.0, 5.0);
+        use super::{Device, Par, PlotWindowOptions, Side};
+        use crate::backend::pdf::PdfBackend;
+        let mut dev = Device::new(PdfBackend::new(7.0, 5.0), Par::default());
         dev.plot_new_impl();
         assert!(!dev.xlog() && !dev.ylog());
         let log_x = PlotWindowOptions {

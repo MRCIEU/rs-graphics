@@ -23,16 +23,16 @@ pub use crate::backend::svg::SvgBackend;
 pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
 pub use crate::device::{
-    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, LegendBty,
-    LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextOptions,
+    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, DeviceBuilder,
+    LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextOptions,
     PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
     TitleOptions, XyOptions,
 };
 pub use crate::geometry::{Point, Rect};
 pub use crate::graphics::Graphics;
 pub use crate::highlevel::{
-    BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
-    PlotOptions, PlotType, boxplot_stats,
+    BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, OrderH,
+    PieOptions, PlotOptions, PlotType, boxplot_stats,
 };
 pub use crate::layout::{Layout, LayoutSize};
 pub use crate::lty::LineType;

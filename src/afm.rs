@@ -6,10 +6,11 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Font width metrics from the standard Adobe Helvetica AFM files that R
-//! itself ships (`r-source/src/library/grDevices/inst/afm/Helvetica*.afm`)
-//! and uses by default for the `pdf()`/`postscript()` devices' string
-//! width/height calculations. Using the same tables (including kerning
+//! Font width metrics from the standard Adobe AFM files that R itself
+//! ships (`r-source/src/library/grDevices/inst/afm/`): the four
+//! `Helvetica*.afm` faces, and `Symbol.afm` for font 5 (plotmath), indexed
+//! by its own Symbol encoding. R uses them by default for the
+//! `pdf()`/`postscript()` devices' string width/height calculations. Using the same tables (including kerning
 //! pairs) means `strwidth()` layout math (label centering, legend box
 //! sizing, axis label offsets, etc.) matches R almost exactly, regardless
 //! of which backend later rasterizes the glyphs.

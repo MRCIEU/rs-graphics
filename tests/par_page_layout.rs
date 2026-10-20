@@ -56,7 +56,7 @@ fn par_mfcol_matches_device_mfcol() {
 
 #[test]
 fn settings_in_the_same_call_override_the_grid_defaults() {
-    let mut dev = Device::pdf(8.0, 6.0);
+    let mut dev = Device::new(PdfBackend::new(8.0, 6.0), Par::default());
     dev.par().mfrow(2, 2).draw();
     assert_eq!(dev.par.cex, 0.83);
     dev.par().cex(0.5).mex(1.5).mfrow(2, 2).draw();
@@ -76,6 +76,6 @@ fn with_keeps_the_grid() {
 #[test]
 #[should_panic(expected = "at least one row and one column")]
 fn zero_rows_panic_at_draw() {
-    let mut dev = Device::pdf(8.0, 6.0);
+    let mut dev = Device::new(PdfBackend::new(8.0, 6.0), Par::default());
     dev.par().mfrow(0, 2).draw();
 }

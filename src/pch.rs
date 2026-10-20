@@ -38,9 +38,9 @@ pub struct PchGeometry {
     /// Shapes filled solidly with `col`, no border (pch 15-18, for which
     /// R sets `gc->col = R_TRANWHITE`).
     pub filled_with_col: Vec<Shape>,
-    /// Shapes filled with `col` *and* stroked with `col` at `par(lwd)` (pch
-    /// 19 and 20, which keep `gc->col`), so the stroke makes them `lwd / 2`
-    /// larger in radius than pch 16.
+    /// Shapes filled with `col` *and* stroked with `col` at the symbol's
+    /// `lwd` (pch 19 and 20, which keep `gc->col`), so the stroke makes
+    /// them `lwd / 2` larger in radius than pch 16.
     pub filled_and_stroked_with_col: Vec<Shape>,
     /// Shapes filled with the symbol's background color (`bg`/`points(...,
     /// bg=)`) and stroked with `col` (the pch 21-25 family).

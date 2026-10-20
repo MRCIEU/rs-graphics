@@ -18,7 +18,9 @@
 //! field and documented there. `Option` fields take the value itself
 //! (`.las(1)`, `.main("Title")`); fields R recycles per element take one
 //! value or several (see [`Values`]); limits take two numbers
-//! (`.xlim(0.0, 10.0)`).
+//! (`.xlim(0.0, 10.0)`). Fields holding one of R's string-valued choices
+//! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
+//! `.order_h("decr")`); an invalid string panics, as R errors.
 
 use crate::color::{Color, ColorSpec};
 use crate::lty::LineType;
@@ -69,7 +71,7 @@ macro_rules! single_values {
 single_values!(ColorSpec: ColorSpec, Color, &str, String, &String, i32);
 single_values!(f64: f64);
 single_values!(i32: i32);
-single_values!(LineType: LineType);
+single_values!(LineType: LineType, &str, String, &String);
 
 /// A character `pch`, e.g. `'.'` or `'+'`.
 impl Values<i32> for char {
@@ -244,10 +246,12 @@ mod tests {
 
     #[test]
     fn calls_have_the_same_setters_and_with() {
+        use crate::backend::svg::SvgBackend;
         use crate::device::{AxisOptions, Device};
         use crate::graphics::Graphics;
+        use crate::par::Par;
 
-        let mut dev = Device::svg(4.0, 4.0);
+        let mut dev = Device::new(SvgBackend::new(4.0, 4.0), Par::default());
         let saved = AxisOptions::default().las(1).at([1.0, 2.0]).lwd(3.0);
 
         let call = dev.axis(2).las(2).tick(false);
@@ -260,5 +264,58 @@ mod tests {
         assert_eq!(call.opts.at, Some(vec![1.0, 2.0]));
         assert_eq!(call.opts.lwd, Some(0.5));
         assert_eq!(saved.lwd, Some(3.0));
+    }
+
+    #[test]
+    fn setters_take_r_strings() {
+        use crate::backend::{LineEnd, LineJoin};
+        use crate::device::{AxisOptions, LegendBty, LegendOptions, XyOptions};
+        use crate::highlevel::{BarplotOptions, BoxplotOptions, OrderH, PlotOptions, PlotType};
+        use crate::par::{AxisStyle, AxisType, ParOptions, Pty};
+
+        let xy = XyOptions::default().type_("b").lty("dashed");
+        assert_eq!(xy.type_, Some(PlotType::Both));
+        assert_eq!(xy.lty, Some(LineType::DASHED));
+        let p = PlotOptions::default().type_("h").xaxt("n");
+        assert_eq!(
+            (p.type_, p.xaxt),
+            (Some(PlotType::Histogram), Some(AxisType::None))
+        );
+        assert_eq!(AxisOptions::default().axt("n").axt, Some(AxisType::None));
+        assert_eq!(LegendOptions::default().bty("n").bty, Some(LegendBty::None));
+        assert_eq!(
+            BarplotOptions::default().order_h("decr").order_h,
+            OrderH::Decr
+        );
+        let b = BoxplotOptions::default()
+            .lty(["dashed", "dotted"])
+            .boxlty("44");
+        assert_eq!(b.lty, vec![LineType::DASHED, LineType::DOTTED]);
+        assert_eq!(b.boxlty, vec![LineType::parse("44").unwrap()]);
+        let par = ParOptions::default()
+            .xaxs("i")
+            .pty("s")
+            .lty(String::from("dotdash"))
+            .lend("butt")
+            .ljoin("mitre")
+            .yaxt("n");
+        assert_eq!(par.xaxs, Some(AxisStyle::Exact));
+        assert_eq!(par.pty, Some(Pty::Square));
+        assert_eq!(par.lty, Some(LineType::DOTDASH));
+        assert_eq!(par.lend, Some(LineEnd::Butt));
+        assert_eq!(par.ljoin, Some(LineJoin::Mitre));
+        assert_eq!(par.yaxt, Some(AxisType::None));
+    }
+
+    #[test]
+    #[should_panic(expected = "\"z\" is not a valid plot type")]
+    fn invalid_r_string_panics() {
+        let _ = crate::device::XyOptions::default().type_("z");
+    }
+
+    #[test]
+    #[should_panic(expected = "\"0x\" is not a valid line type")]
+    fn invalid_lty_string_panics() {
+        let _ = crate::device::XyOptions::default().lty("0x");
     }
 }

@@ -17,8 +17,8 @@
 //! let x = [1.0, 2.0, 3.0, 4.0, 5.0];
 //! let y = [2.1, 3.9, 6.2, 7.8, 10.1];
 //!
-//! // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); dev.off()
-//! let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
+//! // R: pdf("scatter.pdf"); plot(x, y, ...); abline(h = 6); dev.off()
+//! let mut dev = Device::pdf("scatter.pdf").open()?;
 //! dev.plot(&x, &y)
 //!     .pch(19)
 //!     .col("steelblue")
@@ -26,9 +26,9 @@
 //!     .xlab("x")
 //!     .ylab("y")
 //!     .draw();
-//! dev.abline().h(6.0).col("grey").lty(LineType::DASHED).draw();
-//! dev.save("scatter.pdf")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! dev.abline().h(6.0).col("grey").lty("dashed").draw();
+//! dev.close()?;
+//! # Ok::<(), std::io::Error>(())
 //! ```
 //!
 //! [`device::Device`] holds the page and `par()` state. Every R graphics
@@ -40,6 +40,24 @@
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
 //! [`prelude`] imports it all, including the trait.
 //!
+//! # Devices and files
+//!
+//! As in R, a device is opened for a file with R's arguments, which
+//! creates the file, and the file is written when the device is closed.
+//! [`Device::pdf`](device::Device::pdf), [`Device::svg`](device::Device::svg)
+//! and [`Device::png`](device::Device::png) (or
+//! [`Device::format`](device::Device::format), for a format chosen at run
+//! time) take the file and return a [`DeviceBuilder`](device::DeviceBuilder)
+//! for R's other arguments (`width` and `height` in inches, `pointsize`,
+//! `bg`, PNG's `res`, PDF's `compress`), with R's defaults; `.open()`
+//! opens the device and creates the file (so a bad path fails before any
+//! drawing), and [`close`](device::Device::close) (R's `dev.off()`)
+//! writes it. The format is always the constructor's, never the
+//! file name's (`Device::pdf("x.png")` writes a PDF, as R's `pdf()`).
+//! [`Device::new`](device::Device::new) takes a backend directly instead:
+//! for output kept in memory ([`finish`](device::Device::finish)) and
+//! backend options the builder doesn't cover.
+//!
 //! # High-level and low-level functions
 //!
 //! As in R, the high-level functions ([`plot`](graphics::Graphics::plot),
@@ -49,8 +67,8 @@
 //! which moves to the next panel of a multi-panel page (or to a new page).
 //! Everything else ([`points`](graphics::Graphics::points),
 //! [`axis`](graphics::Graphics::axis), [`legend`](graphics::Graphics::legend),
-//! ...) adds to the current plot. (`hist` and `boxplot` with `add` set
-//! add too, as R's `add = TRUE` does.)
+//! ...) adds to the current plot. (`hist`, `barplot` and `boxplot` with
+//! `add` set add too, as R's `add = TRUE` does.)
 //!
 //! # Multi-panel pages
 //!
@@ -65,18 +83,18 @@
 //! [`Device::set_new`](device::Device::set_new) draws over the current
 //! one.
 //!
-//! ```
+//! ```no_run
 //! use rs_graphics::prelude::*;
 //!
 //! let x = [1.0, 2.0, 3.0, 4.0];
-//! let mut dev = Device::pdf(8.0, 4.0);
+//! let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
 //! dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 //! dev.plot(&x, &[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
 //! dev.abline().coef(0.0, 4.0).draw(); // still panel 1
 //! dev.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
 //! dev.mtext("Two panels", 3).outer(true).line(0.5).draw();
-//! let pdf = dev.finish();
-//! # assert!(!pdf.is_empty());
+//! dev.close()?;
+//! # Ok::<(), std::io::Error>(())
 //! ```
 //!
 //! # Figures as values
@@ -89,17 +107,18 @@
 //! as often as needed and on any device. The output is identical to making
 //! the calls on the device.
 //!
-//! ```
+//! ```no_run
 //! use rs_graphics::prelude::*;
 //!
 //! let mut fig = Figure::new();
 //! fig.par().las(1).draw();
 //! fig.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).main("Recorded").draw();
 //!
-//! let mut dev = Device::pdf(8.0, 4.0);
+//! let mut dev = Device::pdf("figure.pdf").width(8.0).height(4.0).open()?;
 //! dev.mfrow(1, 2);
 //! dev.add_figure_at(1, 2, &fig); // right-hand panel
-//! # let _ = dev.finish();
+//! dev.close()?;
+//! # Ok::<(), std::io::Error>(())
 //! ```
 //!
 //! # Your own plots
@@ -109,7 +128,7 @@
 //! extension trait, which read like the built-in ones. Either way they
 //! work on a device and in a recorded `Figure`.
 //!
-//! ```
+//! ```no_run
 //! use rs_graphics::prelude::*;
 //!
 //! trait Diagnostic {
@@ -124,8 +143,10 @@
 //!     }
 //! }
 //!
-//! let mut dev = Device::svg(5.0, 5.0);
+//! let mut dev = Device::svg("diagnostic.svg").width(5.0).height(5.0).open()?;
 //! dev.obs_vs_exp(&[1.0, 2.0, 3.0], &[1.1, 1.9, 3.3]);
+//! dev.close()?;
+//! # Ok::<(), std::io::Error>(())
 //! ```
 
 #[doc(hidden)]

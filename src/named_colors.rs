@@ -6,8 +6,9 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Generated from r-source/src/library/grDevices/src/colors.c (ColorDataBase).
-// Do not edit by hand; see scripts/gen_colors.py.
+// Generated from r-source/src/library/grDevices/src/colors.c (ColorDataBase);
+// the generating script isn't kept. Regenerate from that table rather than
+// editing by hand.
 
 /// R's built-in named colors: (name, r, g, b), lowercase names, alpha always 255.
 pub static NAMED_COLORS: &[(&str, u8, u8, u8)] = &[

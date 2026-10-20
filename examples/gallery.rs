@@ -32,11 +32,15 @@ fn parse_data(text: &str) -> Vec<f64> {
 
 /// Renders `draw` to `gallery_output/<name>.{svg,pdf,png}`.
 fn save_gallery_plot(name: &str, width_in: f64, height_in: f64, draw: fn(&mut Device<AnyBackend>)) {
-    for ext in ["svg", "pdf", "png"] {
-        let path = format!("gallery_output/{name}.{ext}");
-        let mut dev = Device::for_path(&path, width_in, height_in, 300.0).expect("known format");
+    for format in ["svg", "pdf", "png"] {
+        let mut dev = Device::format(format, format!("gallery_output/{name}.{format}"))
+            .width(width_in)
+            .height(height_in)
+            .res(300.0)
+            .open()
+            .expect("open gallery file");
         draw(&mut dev);
-        dev.save(&path).expect("write gallery file");
+        dev.close().expect("write gallery file");
     }
     println!("wrote gallery_output/{name}.[svg|pdf|png]");
 }
@@ -129,9 +133,12 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .ylab("y");
     dev.plot(&x, &y).with(&opts).draw();
     let grey = ColorSpec::from("grey");
-    let dashed = LineType::DASHED;
-    let solid = LineType::SOLID;
-    dev.abline().h(1000.0).v(10.0).col(grey).lty(dashed).draw();
+    dev.abline()
+        .h(1000.0)
+        .v(10.0)
+        .col(grey)
+        .lty("dashed")
+        .draw();
     dev.abline().coef(2f64.log10(), 1.5).col(2).lwd(2.0).draw();
     dev.abline()
         .coef(2000.0, 20.0)
@@ -140,9 +147,9 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .lwd(2.0)
         .draw();
     let entries = vec![
-        LegendEntry::line("abline(log10(2), 1.5)", 2, 2.0, solid),
-        LegendEntry::line("abline(2000, 20, untf = TRUE)", 3, 2.0, solid),
-        LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, dashed),
+        LegendEntry::line("abline(log10(2), 1.5)", 2, 2.0, "solid"),
+        LegendEntry::line("abline(2000, 20, untf = TRUE)", 3, 2.0, "solid"),
+        LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, "dashed"),
     ];
     let o = LegendOptions::default().bg(Color::WHITE);
     dev.legend("topleft", &entries).with(&o).draw();
@@ -162,11 +169,11 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         .xlab("x")
         .ylab("value");
     dev.plot(&x, &sin).with(&opts).draw();
-    let cos_line = XyOptions::default().col(4).lwd(2.0).lty(LineType::DASHED);
+    let cos_line = XyOptions::default().col(4).lwd(2.0).lty("dashed");
     dev.lines(&x, &cos).with(&cos_line).draw();
     let entries = vec![
-        LegendEntry::line("sin(x)", 2, 2.0, LineType::SOLID),
-        LegendEntry::line("cos(x)", 4, 2.0, LineType::DASHED),
+        LegendEntry::line("sin(x)", 2, 2.0, "solid"),
+        LegendEntry::line("cos(x)", 4, 2.0, "dashed"),
     ];
     let o = LegendOptions::default().title("Functions");
     dev.legend("topright", &entries).with(&o).draw();
@@ -309,9 +316,13 @@ fn main() {
     save_gallery_plot("multipanel", 8.0, 6.0, draw_multipanel);
     save_gallery_plot("pch", 7.0, 6.0, draw_pch);
 
-    let mut dev = Device::pdf(6.0, 4.0);
+    let mut dev = Device::pdf("gallery_output/multipage.pdf")
+        .width(6.0)
+        .height(4.0)
+        .open()
+        .expect("open gallery file");
     draw_multipage(&mut dev);
-    dev.save("gallery_output/multipage.pdf").expect("write pdf");
+    dev.close().expect("write pdf");
     println!("wrote gallery_output/multipage.pdf (3 pages)");
 
     println!("\nGallery complete. See gallery_output/ for SVG/PDF/PNG output.");

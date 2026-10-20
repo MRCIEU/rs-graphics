@@ -14,11 +14,13 @@
 //! arguments; the call's chainable setters take R's other arguments, and
 //! `.draw()` runs it:
 //!
-//! ```
+//! ```no_run
 //! # use rs_graphics::prelude::*;
-//! let mut dev = Device::svg(5.0, 5.0);
+//! let mut dev = Device::svg("plot.svg").width(5.0).height(5.0).open()?;
 //! dev.plot(&[1.0, 2.0, 3.0], &[2.0, 4.0, 3.0]).pch(19).main("Title").draw();
-//! dev.abline().h(3.0).col("grey").lty(LineType::DASHED).draw();
+//! dev.abline().h(3.0).col("grey").lty("dashed").draw();
+//! dev.close()?;
+//! # Ok::<(), std::io::Error>(())
 //! ```
 //!
 //! The setters are those of the call's options struct ([`AblineOptions`]
@@ -26,9 +28,9 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::svg(5.0, 5.0);
+//! # let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
 //! # dev.plot_new();
-//! let grey = SegmentsOptions::default().col("grey").lty(LineType::DASHED);
+//! let grey = SegmentsOptions::default().col("grey").lty("dashed");
 //! dev.segments(&[0.1], &[0.2], &[0.9], &[0.2]).with(&grey).draw();
 //! dev.segments(&[0.1], &[0.8], &[0.9], &[0.8]).with(&grey).lwd(2.0).draw();
 //! ```
@@ -39,7 +41,7 @@
 //! ```compile_fail
 //! #![deny(unused_must_use)]
 //! # use rs_graphics::prelude::*;
-//! let mut dev = Device::svg(5.0, 5.0);
+//! let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
 //! dev.plot_new();
 //! dev.abline().h(0.5); // no `.draw()`: nothing drawn, and a warning
 //! ```
@@ -149,7 +151,8 @@ pub trait Graphics: sealed::Sealed + Sized {
 
     /// `barplot(height, ...)`; options in [`BarplotOptions`]. A high-level
     /// plot: it starts a new plot with [`plot_new`](Graphics::plot_new), so
-    /// on a multi-panel page it moves to the next panel. `heights` is a
+    /// on a multi-panel page it moves to the next panel, unless `add` (R's
+    /// `add = TRUE`), which draws the bars on the current plot. `heights` is a
     /// vector (one bar per value) or a matrix given as its columns (see
     /// [`BarHeights`]), drawn stacked unless `beside`.
     ///
@@ -158,6 +161,13 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// for overlaying annotations. For a matrix they are flattened
     /// column-major (for `beside`: one centre per bar, `nrow` per group;
     /// otherwise one per column).
+    ///
+    /// # Panics
+    /// At `.draw()`, as R errors: if `heights` is empty or a matrix's
+    /// columns are empty or of different lengths; if `names` has neither
+    /// one name per bar nor (for `beside`) one per column; and, with a log
+    /// value axis, if any `height + offset`, or a given limit of a log
+    /// axis, is <= 0.
     fn barplot(&mut self, heights: impl Into<BarHeights>) -> BarplotCall<'_, Self> {
         BarplotCall {
             target: self,
@@ -188,6 +198,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `pie(x, ...)`; options in [`PieOptions`]. A high-level plot: it
     /// starts a new plot with [`plot_new`](Graphics::plot_new), so on a
     /// multi-panel page it moves to the next panel.
+    ///
+    /// # Panics
+    /// At `.draw()`, if `x` is empty or has a negative or non-finite value
+    /// (R: "'x' values must be positive").
     fn pie<'a>(&'a mut self, x: &'a [f64]) -> PieCall<'a, Self> {
         PieCall {
             target: self,
@@ -411,7 +425,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::svg(5.0, 5.0);
+    /// # let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
     /// # dev.plot(&[1.0, 10.0], &[1.0, 30.0]).draw();
     /// let keys = [LegendEntry::point("observed", 1, 19)];
     /// dev.legend("topright", &keys).draw(); // legend("topright", ...)
@@ -455,10 +469,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `title(main=, sub=, xlab=, ylab=)`; options in [`TitleOptions`],
     /// each text or a plotmath expression, drawn in `C_title`'s order
     /// (main, sub, xlab, ylab) with `par(cex.main/col.main/font.main)`
-    /// etc. Text is placed by `GMtext()` (baseline on the line, nudged by
-    /// `yLineBias`); expressions by `GMathText()` (`main`: box centred on
-    /// its line) and `GMMathText()` (the others: box bottom on the nudged
-    /// line).
+    /// etc. Text `sub`, `xlab` and `ylab` are placed by `GMtext()`
+    /// (baseline on the line, nudged by `yLineBias`); text `main` is
+    /// centred on line `0.5 * mar[3]` (its baseline half the height of "M"
+    /// below it, no `yLineBias`). Expressions are placed by `GMathText()`
+    /// (`main`: box centred on its line) and `GMMathText()` (the others:
+    /// box bottom on the nudged line).
     fn title(&mut self) -> TitleCall<'_, Self> {
         TitleCall {
             target: self,
@@ -478,10 +494,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`mfrow`](ParCall::mfrow) and [`mfcol`](ParCall::mfcol), as in R's
     /// `par(mfrow = c(1, 2), oma = c(0, 0, 2, 0))`:
     ///
-    /// ```
+    /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// let mut dev = Device::pdf(8.0, 4.0);
+    /// let mut dev = Device::pdf("plot.pdf").width(8.0).height(4.0).open()?;
     /// dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
+    /// # Ok::<(), std::io::Error>(())
     /// ```
     ///
     /// A `Figure` is one panel, so it can't change how the page is split;

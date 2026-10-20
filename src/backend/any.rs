@@ -7,16 +7,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! [`AnyBackend`]: one type for all three output formats, chosen at run
-//! time (e.g. from a file name), so drawing code needs no generic `B`.
-
-use std::path::Path;
+//! time (e.g. from a command-line option), so drawing code needs no
+//! generic `B`. [`Device::format`](crate::device::Device::format) and
+//! [`Device::pdf`](crate::device::Device::pdf) & co. open devices on it.
 
 use super::pdf::PdfBackend;
 use super::raster::RasterBackend;
 use super::svg::SvgBackend;
 use super::{Backend, Stroke, TextStyle};
 use crate::color::Color;
-use crate::error::ParseValueError;
 use crate::geometry::{Point, Rect};
 
 /// An output format.
@@ -28,32 +27,31 @@ pub enum Format {
 }
 
 impl Format {
-    /// `"pdf"`, `"svg"` or `"png"`, ignoring case.
-    pub fn parse(extension: &str) -> Option<Format> {
-        match extension.to_ascii_lowercase().as_str() {
+    /// The format named `"pdf"`, `"svg"` or `"png"`, ignoring case;
+    /// `None` for anything else.
+    pub fn parse(name: &str) -> Option<Format> {
+        match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
             "svg" => Some(Format::Svg),
             "png" => Some(Format::Png),
             _ => None,
         }
     }
-
-    /// The format named by `path`'s extension (`plot.PDF` is PDF).
-    pub fn from_path(path: impl AsRef<Path>) -> Option<Format> {
-        path.as_ref()
-            .extension()
-            .and_then(|e| e.to_str())
-            .and_then(Format::parse)
-    }
 }
 
 crate::error::from_str_via_parse!(Format, "output format");
+crate::error::from_r_string!(Format, "output format", "\"pdf\", \"svg\" or \"png\"");
 
 /// A [`PdfBackend`], [`SvgBackend`] or [`RasterBackend`] (PNG) behind one
 /// type. Every [`Backend`] method is forwarded, so output is byte for
-/// byte that of the wrapped backend. To set backend options (a PDF
-/// background, PNG threads, ...), build the backend and convert it with
-/// `AnyBackend::from`.
+/// byte that of the wrapped backend. R's device options (size, `bg`,
+/// `res`, `compress`) are set when opening a device with
+/// [`Device::format`](crate::device::Device::format) or
+/// [`Device::pdf`](crate::device::Device::pdf) & co. For others (PNG
+/// threads, ...), build the backend, convert it with `AnyBackend::from`,
+/// and wrap it with [`Device::new`](crate::device::Device::new), which
+/// has no file: take its output with
+/// [`Device::finish`](crate::device::Device::finish).
 pub enum AnyBackend {
     Pdf(PdfBackend),
     Svg(SvgBackend),
@@ -71,25 +69,6 @@ impl AnyBackend {
                 AnyBackend::Png(RasterBackend::new(width_in, height_in, dpi, Color::WHITE))
             }
         }
-    }
-
-    /// As [`AnyBackend::new`], with the format taken from `path`'s
-    /// extension (`.pdf`, `.svg` or `.png`). Fails for any other
-    /// extension.
-    pub fn for_path(
-        path: impl AsRef<Path>,
-        width_in: f64,
-        height_in: f64,
-        dpi: f64,
-    ) -> Result<Self, ParseValueError> {
-        let path = path.as_ref();
-        let format = Format::from_path(path).ok_or_else(|| {
-            ParseValueError::new(
-                "output format (use .pdf, .svg or .png)",
-                &path.to_string_lossy(),
-            )
-        })?;
-        Ok(AnyBackend::new(format, width_in, height_in, dpi))
     }
 
     /// The wrapped backend's format.

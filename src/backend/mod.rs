@@ -50,6 +50,9 @@ pub enum LineEnd {
 }
 
 impl LineEnd {
+    /// R's `par(lend=)` names `"round"`, `"butt"` and `"square"`, or their
+    /// numeric codes as strings `"0"`, `"1"`, `"2"` (which R accepts only
+    /// as numbers); `None` otherwise.
     pub fn parse(spec: &str) -> Option<LineEnd> {
         match spec {
             "round" | "0" => Some(LineEnd::Round),
@@ -61,6 +64,7 @@ impl LineEnd {
 }
 
 crate::error::from_str_via_parse!(LineEnd, "line end");
+crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"square\"");
 
 /// Join style for strokes (`par(ljoin=)`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -71,6 +75,9 @@ pub enum LineJoin {
 }
 
 impl LineJoin {
+    /// R's `par(ljoin=)` names `"round"`, `"mitre"` and `"bevel"`, or
+    /// their numeric codes as strings `"0"`, `"1"`, `"2"` (which R accepts
+    /// only as numbers); `None` otherwise.
     pub fn parse(spec: &str) -> Option<LineJoin> {
         match spec {
             "round" | "0" => Some(LineJoin::Round),
@@ -82,6 +89,7 @@ impl LineJoin {
 }
 
 crate::error::from_str_via_parse!(LineJoin, "line join");
+crate::error::from_r_string!(LineJoin, "line join", "\"round\", \"mitre\" or \"bevel\"");
 
 /// Everything needed to stroke a path, mirroring R's graphics context
 /// (`R_GE_gcontext`) stroke-relevant fields.

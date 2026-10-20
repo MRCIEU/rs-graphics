@@ -122,8 +122,8 @@ impl SvgBackend {
     }
 
     /// The SVG document, gzip-compressed as for a `.svgz` file: several
-    /// times smaller (about 15x for big scatter plots) and compressed on all
-    /// cores. Inkscape, Illustrator and the like open `.svgz` files, but
+    /// times smaller (about 4-6x for big scatter plots) and compressed on
+    /// all cores. Inkscape, Illustrator and the like open `.svgz` files, but
     /// browsers only display them when served with `Content-Encoding: gzip`,
     /// so [`SvgBackend::finish`]'s plain SVG is the default.
     pub fn finish_svgz(self) -> Vec<u8> {

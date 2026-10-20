@@ -17,8 +17,10 @@
 //! "Out of scope" section of DEVELOPER.md) say what else isn't implemented.
 //!
 //! Each starts a new plot (moving to the next panel of a multi-panel
-//! page). They use only `Device`'s public API, like plots written outside
-//! the crate (see the crate docs).
+//! page), unless `add` is set (`hist`, `barplot`, `boxplot`). They are
+//! built from the same drawing calls as the public API (`plot_new`,
+//! `rect`, `axis`, `title`, ...), as plots written outside the crate are
+//! (see the crate docs).
 
 pub mod barplot;
 pub mod boxplot;
@@ -26,7 +28,7 @@ pub mod hist;
 pub mod pie;
 pub mod plot;
 
-pub use barplot::{BarHeights, BarplotOptions};
+pub use barplot::{BarHeights, BarplotOptions, OrderH};
 pub use boxplot::{BoxStats, BoxplotOptions, boxplot_stats};
 pub use hist::{HistOptions, HistResult};
 pub use pie::PieOptions;

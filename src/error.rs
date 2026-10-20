@@ -17,8 +17,8 @@ use std::fmt;
 /// [`PlotType`](crate::highlevel::PlotType),
 /// [`LegendKeyword`](crate::device::LegendKeyword),
 /// [`LegendBty`](crate::device::LegendBty),
-/// [`Format`](crate::backend::Format) and the `par()` enums, and by
-/// [`AnyBackend::for_path`](crate::backend::AnyBackend::for_path).
+/// [`OrderH`](crate::highlevel::OrderH),
+/// [`Format`](crate::backend::Format) and the `par()` enums.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {
     /// What was being parsed, e.g. `"colour"` or `"axis style"`.
@@ -57,3 +57,41 @@ macro_rules! from_str_via_parse {
     };
 }
 pub(crate) use from_str_via_parse;
+
+/// `impl From<&str>` (and `String`, `&String`) for `$ty` via its
+/// `parse(&str) -> Option<$ty>`, so setters taking `impl Into<$ty>` accept
+/// R's strings (`.order_h("decr")`). Panics on an invalid string, naming
+/// `$kind` and the accepted values `$valid`, as R errors.
+macro_rules! from_r_string {
+    ($ty:ident, $kind:literal, $valid:literal) => {
+        impl From<&str> for $ty {
+            #[doc = concat!("The string form of a [`", stringify!($ty), "`] (R's, where R has \
+                one), via [`", stringify!($ty), "::parse`].")]
+            ///
+            /// # Panics
+            #[doc = concat!("If `s` isn't one (as R errors); use [`",
+                        stringify!($ty), "::parse`] or `str::parse` to handle that yourself.")]
+            fn from(s: &str) -> Self {
+                match <$ty>::parse(s) {
+                    Some(v) => v,
+                    None => panic!(concat!("{:?} is not a valid ", $kind, "; use ", $valid), s),
+                }
+            }
+        }
+
+        impl From<String> for $ty {
+            /// As `From<&str>`.
+            fn from(s: String) -> Self {
+                <$ty>::from(s.as_str())
+            }
+        }
+
+        impl From<&String> for $ty {
+            /// As `From<&str>`.
+            fn from(s: &String) -> Self {
+                <$ty>::from(s.as_str())
+            }
+        }
+    };
+}
+pub(crate) use from_r_string;

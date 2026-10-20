@@ -22,7 +22,10 @@
 //!
 //! Not implemented: `density`/`angle` hatched fills,
 //! per-entry `cex`/`x.intersp`/`seg.len` recycling (these are scalars on
-//! [`LegendOptions`]), `text.width = NA`, and `adj`.
+//! [`LegendOptions`]), `text.width = NA`, `adj`, `box.lwd`/`box.lty`/
+//! `box.col` (always the `par()` values), `title.col`/`title.adj`/
+//! `title.font` (always `text.col`, 0.5 and `text.font`), and
+//! `plot = FALSE`.
 //!
 //! `par(cex)` scales everything as in `legend.R`: the character cell
 //! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and
@@ -183,6 +186,7 @@ impl LegendBty {
 }
 
 crate::error::from_str_via_parse!(LegendBty, "legend box type");
+crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
 
 /// One row (key + label) of a legend.
 #[derive(Clone, Debug)]
@@ -245,15 +249,16 @@ impl LegendEntry {
         }
     }
 
-    /// `legend(..., lty = lty, lwd = lwd, col = col)`.
+    /// `legend(..., lty = lty, lwd = lwd, col = col)`; `lty` is a
+    /// [`LineType`] or R's string (`"dashed"`).
     pub fn line(
         label: impl Into<Label>,
         col: impl Into<ColorSpec>,
         lwd: f64,
-        lty: LineType,
+        lty: impl Into<LineType>,
     ) -> Self {
         LegendEntry {
-            lty: Some(lty),
+            lty: Some(lty.into()),
             lwd: Some(lwd),
             ..Self::base(label, col.into())
         }
