@@ -94,8 +94,7 @@ High-level calls return what R's functions return.
 ```rust
 // R: pdf("panels.pdf", 8, 4); par(mfrow = c(1, 2), oma = c(0, 0, 2, 0))
 let mut dev = Device::pdf(8.0, 4.0);
-dev.mfrow(1, 2);
-dev.par().oma([0.0, 0.0, 2.0, 0.0]).draw();
+dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 
 let x = [4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7];
 let h = dev.hist(&x).col("lightblue").main("Histogram").draw(); // panel 1
@@ -113,8 +112,10 @@ dev.mtext("Two panels", 3).outer(true).line(0.5).font(2).draw();
 dev.save("panels.pdf")?;
 ```
 
-`dev.layout(..)` gives uneven panels (R's `layout()`), and
-`dev.mfg(row, col)` picks the next one.
+`par()` ends in `.draw()` like every other call, although it draws
+nothing: `.draw()` is what runs a call. `dev.mfrow(1, 2)` is a shortcut
+for `dev.par().mfrow(1, 2).draw()`. `dev.layout(..)` gives uneven panels
+(R's `layout()`), and `dev.mfg(row, col)` picks the next one.
 
 ### Reusing arguments
 
@@ -132,7 +133,8 @@ dev.abline().with(&grid).v([2.0, 4.0, 6.0, 8.0]).draw();
 A `Figure` records the same calls without a device, so you can build a
 figure (a plot and its margins, one panel of a page) once and draw it
 later, on any device and in any panel. The output is the same as making
-the calls on the device.
+the calls on the device. Page layout stays with the device: a figure is
+one panel, so its `par()` has no `mfrow` or `mfcol`.
 
 ```rust
 let dose = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
@@ -153,7 +155,7 @@ let keys = [
 fig.legend(LegendPos::Keyword(LegendKeyword::BottomRight), &keys).draw();
 
 let mut dev = Device::pdf(8.0, 8.0);
-dev.mfrow(2, 2);
+dev.par().mfrow(2, 2).draw();
 dev.add_figure_at(1, 1, &fig); // top left
 dev.add_figure_at(2, 2, &fig); // bottom right
 ```

@@ -54,8 +54,10 @@
 //!
 //! # Multi-panel pages
 //!
-//! [`Device::mfrow`](device::Device::mfrow),
-//! [`Device::mfcol`](device::Device::mfcol) and
+//! `par()`'s [`mfrow`](graphics::ParCall::mfrow) and
+//! [`mfcol`](graphics::ParCall::mfcol) (as in R, or the shortcuts
+//! [`Device::mfrow`](device::Device::mfrow) and
+//! [`Device::mfcol`](device::Device::mfcol)) and
 //! [`Device::layout`](device::Device::layout) split the page into panels;
 //! each high-level call (or `plot_new()`) fills the next one, and
 //! low-level calls after it draw in that panel.
@@ -68,11 +70,11 @@
 //!
 //! let x = [1.0, 2.0, 3.0, 4.0];
 //! let mut dev = Device::pdf(8.0, 4.0);
-//! dev.mfrow(1, 2);
+//! dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 //! dev.plot(&x, &[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
 //! dev.abline().coef(0.0, 4.0).draw(); // still panel 1
 //! dev.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
-//! dev.mtext("Two panels", 3).outer(true).line(-1.5).draw();
+//! dev.mtext("Two panels", 3).outer(true).line(0.5).draw();
 //! let pdf = dev.finish();
 //! # assert!(!pdf.is_empty());
 //! ```

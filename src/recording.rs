@@ -50,7 +50,8 @@
 //!   afterwards, so a figure's settings don't leak into the next one.
 //! - **What isn't recorded:** device queries (`usr()`, `plot_region()`,
 //!   `text_metrics()`, ...) and page layout (`mfrow`, `layout`, `fig`,
-//!   ...) are [`Device`] methods only.
+//!   ...) are [`Device`] methods only, and a figure's `par()` call has
+//!   no `mfrow`/`mfcol` setters (a figure is one panel).
 //! - **Data is copied** into the figure. For very large plots, draw on
 //!   the device directly.
 
@@ -60,7 +61,7 @@ use crate::device::{
     LegendOptions, LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions,
     SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
 };
-use crate::graphics::Graphics;
+use crate::graphics::{Graphics, ParGrid};
 use crate::highlevel::barplot::bar_layout;
 use crate::highlevel::boxplot::boxplot_all_stats;
 use crate::highlevel::hist::hist_bins;
@@ -207,7 +208,9 @@ impl Graphics for Figure {
     fn emit_title(&mut self, opts: TitleOptions) {
         self.calls.push(Call::Title(opts));
     }
-    fn emit_par(&mut self, opts: ParOptions) {
+    fn emit_par(&mut self, opts: ParOptions, grid: Option<ParGrid>) {
+        // Only a device's `par()` call has `mfrow`/`mfcol` setters.
+        debug_assert!(grid.is_none());
         self.calls.push(Call::Par(opts));
     }
 }
@@ -240,7 +243,7 @@ impl<B: Backend> Device<B> {
         for call in &fig.calls {
             match call {
                 Call::PlotNew => self.plot_new_impl(),
-                Call::Par(o) => self.emit_par(o.clone()),
+                Call::Par(o) => self.emit_par(o.clone(), None),
                 Call::Plot(x, y, o) => self.plot_impl(x, y, o),
                 Call::Hist(x, o) => {
                     self.hist_impl(x, o);

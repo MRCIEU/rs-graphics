@@ -349,7 +349,10 @@ macro_rules! par_options {
     ($($field:ident : $t:ty),* $(,)?) => {
         /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
         /// plus `new` (R's `par(new = TRUE)`, see
-        /// [`Device::set_new`](crate::device::Device::set_new)).
+        /// [`Device::set_new`](crate::device::Device::set_new)). R's
+        /// `mfrow`/`mfcol` aren't here: they change the device's page
+        /// layout, not `Par`, so only a device's `par()` call takes them
+        /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow)).
         #[derive(Clone, Debug, Default, PartialEq)]
         pub struct ParOptions {
             $(

@@ -384,7 +384,9 @@ impl<B: Backend> Device<B> {
     /// `par(mfrow = c(nrow, ncol))`: a grid of figures filled row by row.
     /// Like R, also sets `par(cex)` to 0.83 (2 x 2) or 0.66 (more than 2
     /// rows or columns) and `mex` to 1. The next `plot_new()` starts a new
-    /// page at the first figure.
+    /// page at the first figure. `dev.par().mfrow(nrow, ncol).draw()`
+    /// (see [`ParCall::mfrow`](crate::graphics::ParCall::mfrow)) does the
+    /// same, alongside other `par()` settings.
     ///
     /// # Panics
     /// If `nrow` or `ncol` is zero.
@@ -397,7 +399,10 @@ impl<B: Backend> Device<B> {
     }
 
     /// `par(mfcol = c(nrow, ncol))`: as [`Device::mfrow`] but filled
-    /// column by column.
+    /// column by column (also `dev.par().mfcol(nrow, ncol).draw()`).
+    ///
+    /// # Panics
+    /// If `nrow` or `ncol` is zero.
     pub fn mfcol(&mut self, nrow: usize, ncol: usize) {
         self.set_arrangement(Arrangement::Grid {
             nrow,

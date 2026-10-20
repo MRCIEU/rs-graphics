@@ -95,7 +95,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   [`plot_window`](Graphics::plot_window) next for other limits or
     ///   log axes.
     /// - **Which figure:** the next one in the order set by
-    ///   [`Device::mfrow`], [`Device::mfcol`], [`Device::layout`] or
+    ///   [`Device::mfrow`] / [`Device::mfcol`] (or `par()`'s
+    ///   [`mfrow`](ParCall::mfrow) / [`mfcol`](ParCall::mfcol)),
+    ///   [`Device::layout`] or
     ///   [`Device::mfg`] (one figure per page by default). After the last
     ///   figure, it wraps to figure 1 on a new page. The first call always
     ///   starts page one. After [`Device::fig`], the next call starts a
@@ -450,9 +452,29 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// in a recorded [`Figure`](crate::recording::Figure) it is the way to
     /// change them. As in R, `mar`, `oma`, `pty` and `plt` take effect at
     /// the next [`plot_new`](Graphics::plot_new).
+    ///
+    /// On a `Device`, the call also takes R's page layout parameters
+    /// [`mfrow`](ParCall::mfrow) and [`mfcol`](ParCall::mfcol), as in R's
+    /// `par(mfrow = c(1, 2), oma = c(0, 0, 2, 0))`:
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::pdf(8.0, 4.0);
+    /// dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
+    /// ```
+    ///
+    /// A `Figure` is one panel, so it can't change how the page is split;
+    /// its `par()` call has no such setters:
+    ///
+    /// ```compile_fail
+    /// # use rs_graphics::prelude::*;
+    /// let mut fig = Figure::new();
+    /// fig.par().mfrow(1, 2).draw(); // error: no method `mfrow`
+    /// ```
     fn par(&mut self) -> ParCall<'_, Self> {
         ParCall {
             target: self,
+            grid: None,
             opts: ParOptions::default(),
         }
     }
@@ -510,7 +532,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     #[doc(hidden)]
     fn emit_title(&mut self, opts: TitleOptions);
     #[doc(hidden)]
-    fn emit_par(&mut self, opts: ParOptions);
+    fn emit_par(&mut self, opts: ParOptions, grid: Option<ParGrid>);
 }
 
 impl<B: Backend> Graphics for Device<B> {
@@ -588,7 +610,14 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_title(&mut self, opts: TitleOptions) {
         self.title_impl(&opts)
     }
-    fn emit_par(&mut self, opts: ParOptions) {
+    fn emit_par(&mut self, opts: ParOptions, grid: Option<ParGrid>) {
+        // The grid first: it resets `cex` and `mex`, so values set in the
+        // same call win.
+        match grid {
+            Some(ParGrid::Rows(nrow, ncol)) => self.mfrow(nrow, ncol),
+            Some(ParGrid::Cols(nrow, ncol)) => self.mfcol(nrow, ncol),
+            None => {}
+        }
         opts.apply(&mut self.par);
         if let Some(new) = opts.new {
             self.set_new(new);
@@ -740,6 +769,43 @@ call!(
 call!(
     /// [`Graphics::par`]'s call.
     ParCall, ParOptions, emit_par -> (),
-    {},
-    |t, o| (o)
+    { grid: Option<ParGrid> },
+    |t, o| (o, grid)
 );
+
+/// A `par()` call's `mfrow`/`mfcol`, which only a [`Device`] takes.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ParGrid {
+    Rows(usize, usize),
+    Cols(usize, usize),
+}
+
+/// Page layout, which only a [`Device`] has: a [`Figure`] is one panel.
+///
+/// [`Figure`]: crate::recording::Figure
+impl<B: Backend> ParCall<'_, Device<B>> {
+    /// `par(mfrow = c(nrow, ncol))`: splits the page into a grid of
+    /// panels, filled row by row; the same as [`Device::mfrow`], which
+    /// describes it (it also sets `par(cex)` and `mex`). It is applied
+    /// before the call's other settings, so a `cex` or `mex` set in the
+    /// same call wins (in R, whichever argument comes last wins). Replaces
+    /// an earlier `mfrow`/`mfcol` in the call; kept by `.with()`.
+    ///
+    /// # Panics
+    /// At `.draw()`, if `nrow` or `ncol` is zero.
+    pub fn mfrow(mut self, nrow: usize, ncol: usize) -> Self {
+        self.grid = Some(ParGrid::Rows(nrow, ncol));
+        self
+    }
+
+    /// `par(mfcol = c(nrow, ncol))`: as [`mfrow`](ParCall::mfrow), but the
+    /// panels are filled column by column ([`Device::mfcol`]).
+    ///
+    /// # Panics
+    /// At `.draw()`, if `nrow` or `ncol` is zero.
+    pub fn mfcol(mut self, nrow: usize, ncol: usize) -> Self {
+        self.grid = Some(ParGrid::Cols(nrow, ncol));
+        self
+    }
+}

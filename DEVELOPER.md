@@ -63,7 +63,8 @@ usage, see [README.md](README.md).
   `user_to_inches`/`inches_to_user` convert between data units and
   device inches.
 - Multi-panel layouts (`src/layout.rs`, `Device::{mfrow, mfcol, layout,
-  mfg}`): `par(mfrow=)`/`par(mfcol=)` (incl. R's automatic `cex` of
+  mfg}`, and `mfrow`/`mfcol` on a device's `par()` call):
+  `par(mfrow=)`/`par(mfcol=)` (incl. R's automatic `cex` of
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
   `layout()` with spanning figures, relative / `lcm()` widths and
   heights, and `respect` (logical or matrix) - a port of `layoutRegions()`
@@ -327,6 +328,9 @@ against a real R installation by shelling out to `Rscript`:
   recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log axes), and
   `coef =` (a fitted `lm()` line, extra values ignored): every
   line's vertices, colour, width and dash pattern.
+- `tests/par_page_layout.rs` (no R needed) - `dev.par().mfrow(..)` /
+  `.mfcol(..)` give the same output as `Device::mfrow`/`mfcol`, a
+  `cex`/`mex` in the same call wins, and `.with()` keeps the grid.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
 - `tests/figure_legends_matches_r.rs` - recorded `Figure`s with legends
