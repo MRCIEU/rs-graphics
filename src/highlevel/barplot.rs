@@ -33,6 +33,7 @@ use crate::device::{
     TitleOptions,
 };
 use crate::error::{from_r_string, from_str_via_parse};
+use crate::numbers::{Num, Numbers};
 use crate::par::AxisStyle;
 use crate::plotmath::Label;
 
@@ -208,9 +209,10 @@ from_str_via_parse!(OrderH, "orderH");
 from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 
 /// The `height` argument of [`Graphics::barplot`](crate::graphics::Graphics::barplot): R's vector or matrix.
-/// Built with `.into()` from a vector of numbers (slice, array, `Vec`) or
-/// from a matrix given as its columns (`Vec<Vec<f64>>`, a slice or array of
-/// `Vec<f64>`).
+/// Built with `.into()` from a vector of numbers of any type (`f64` or
+/// integers; a slice, array or `Vec`, by reference or by value, or a
+/// range, see [`Numbers`]) or from a matrix given as its columns
+/// (`Vec<Vec<T>>`, a slice or array of `Vec<T>`).
 #[derive(Clone, Debug, PartialEq)]
 pub enum BarHeights {
     /// R's `vectorInput` case: one bar per value.
@@ -221,63 +223,65 @@ pub enum BarHeights {
     Matrix(Vec<Vec<f64>>),
 }
 
-impl From<Vec<f64>> for BarHeights {
-    fn from(v: Vec<f64>) -> Self {
-        BarHeights::Vector(v)
+impl<'a, N: Numbers<'a>> From<N> for BarHeights {
+    /// A vector of any numbers, by reference, or a range (see [`Numbers`]).
+    fn from(v: N) -> Self {
+        BarHeights::Vector(v.into_numbers().into_owned())
     }
 }
 
-impl From<&Vec<f64>> for BarHeights {
-    fn from(v: &Vec<f64>) -> Self {
-        BarHeights::Vector(v.clone())
+impl<T: Num> From<Vec<T>> for BarHeights {
+    /// A vector of any numbers, by value.
+    fn from(v: Vec<T>) -> Self {
+        BarHeights::Vector(v.into_iter().map(|h| h.to_f64()).collect())
     }
 }
 
-impl From<&[f64]> for BarHeights {
-    fn from(v: &[f64]) -> Self {
-        BarHeights::Vector(v.to_vec())
+impl<T: Num, const N: usize> From<[T; N]> for BarHeights {
+    /// A vector of any numbers, by value (`[3, 5, 2]`).
+    fn from(v: [T; N]) -> Self {
+        BarHeights::Vector(v.into_iter().map(|h| h.to_f64()).collect())
     }
 }
 
-impl<const N: usize> From<[f64; N]> for BarHeights {
-    fn from(v: [f64; N]) -> Self {
-        BarHeights::Vector(v.to_vec())
+fn columns<T: Num>(m: &[Vec<T>]) -> Vec<Vec<f64>> {
+    m.iter()
+        .map(|c| c.iter().map(|v| v.to_f64()).collect())
+        .collect()
+}
+
+impl<T: Num> From<Vec<Vec<T>>> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: Vec<Vec<T>>) -> Self {
+        BarHeights::Matrix(columns(&m))
     }
 }
 
-impl<const N: usize> From<&[f64; N]> for BarHeights {
-    fn from(v: &[f64; N]) -> Self {
-        BarHeights::Vector(v.to_vec())
+impl<T: Num> From<&Vec<Vec<T>>> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: &Vec<Vec<T>>) -> Self {
+        BarHeights::Matrix(columns(m))
     }
 }
 
-impl From<Vec<Vec<f64>>> for BarHeights {
-    fn from(m: Vec<Vec<f64>>) -> Self {
-        BarHeights::Matrix(m)
+impl<T: Num> From<&[Vec<T>]> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: &[Vec<T>]) -> Self {
+        BarHeights::Matrix(columns(m))
     }
 }
 
-impl From<&Vec<Vec<f64>>> for BarHeights {
-    fn from(m: &Vec<Vec<f64>>) -> Self {
-        BarHeights::Matrix(m.clone())
+impl<T: Num, const N: usize> From<[Vec<T>; N]> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: [Vec<T>; N]) -> Self {
+        BarHeights::Matrix(columns(&m))
     }
 }
 
-impl From<&[Vec<f64>]> for BarHeights {
-    fn from(m: &[Vec<f64>]) -> Self {
-        BarHeights::Matrix(m.to_vec())
-    }
-}
-
-impl<const N: usize> From<[Vec<f64>; N]> for BarHeights {
-    fn from(m: [Vec<f64>; N]) -> Self {
-        BarHeights::Matrix(m.to_vec())
-    }
-}
-
-impl<const N: usize> From<&[Vec<f64>; N]> for BarHeights {
-    fn from(m: &[Vec<f64>; N]) -> Self {
-        BarHeights::Matrix(m.to_vec())
+impl<T: Num, const N: usize> From<&[Vec<T>; N]> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: &[Vec<T>; N]) -> Self {
+        BarHeights::Matrix(columns(m))
     }
 }
 

@@ -359,7 +359,8 @@ impl<B: Backend> Device<B> {
     ///
     /// # Panics
     /// Unless `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1` (R's error).
-    pub fn fig(&mut self, fig: [f64; 4]) {
+    pub fn fig(&mut self, fig: [impl Into<f64>; 4]) {
+        let fig: [f64; 4] = fig.map(Into::into);
         let [x0, x1, y0, y1] = fig;
         assert!(
             0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0,
@@ -627,7 +628,8 @@ impl<B: Backend> Device<B> {
 
     /// Map a point in data units (not log10 on a log axis) to device
     /// inches.
-    pub fn user_to_inches(&self, x: f64, y: f64) -> Point {
+    pub fn user_to_inches(&self, x: impl Into<f64>, y: impl Into<f64>) -> Point {
+        let (x, y) = (x.into(), y.into());
         let ux = if self.xlog { x.log10() } else { x };
         let uy = if self.ylog { y.log10() } else { y };
         self.usr_to_inches(ux, uy)
@@ -1020,7 +1022,8 @@ impl<B: Backend> Device<B> {
     /// (after the backend's font-size rounding). The width is that of the
     /// widest line; the height is the ascent of "M" plus one line height
     /// (`par(lheight) * 1.2 * ps / 72` inches, times the cex) per `\n`.
-    pub fn text_metrics(&self, text: &str, font: i32, cex: f64) -> (f64, f64) {
+    pub fn text_metrics(&self, text: &str, font: i32, cex: impl Into<f64>) -> (f64, f64) {
+        let cex = cex.into();
         let face = self.par.font_face(font);
         let size = self.font_size_pt(cex);
         let width = text

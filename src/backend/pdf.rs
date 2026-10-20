@@ -66,7 +66,8 @@ struct LineState {
 }
 
 impl PdfBackend {
-    pub fn new(width_in: f64, height_in: f64) -> Self {
+    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
+        let (width_in, height_in) = (width_in.into(), height_in.into());
         PdfBackend {
             width_in,
             height_in,

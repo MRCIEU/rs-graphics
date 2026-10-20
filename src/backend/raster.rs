@@ -665,7 +665,13 @@ impl RasterBackend {
     /// `dpi` is pixels-per-inch (R's `png()` default is `72` for its
     /// pixel-dimension convention, i.e. `width_px = width_in * 72` unless
     /// `res=` is overridden; pass a higher `dpi` for sharper output).
-    pub fn new(width_in: f64, height_in: f64, dpi: f64, background: Color) -> Self {
+    pub fn new(
+        width_in: impl Into<f64>,
+        height_in: impl Into<f64>,
+        dpi: impl Into<f64>,
+        background: Color,
+    ) -> Self {
+        let (width_in, height_in, dpi) = (width_in.into(), height_in.into(), dpi.into());
         let w_px = (width_in * dpi).round().max(1.0) as u32;
         let h_px = (height_in * dpi).round().max(1.0) as u32;
         let mut canvas = Pixmap::new(w_px, h_px).expect("nonzero pixmap size");

@@ -38,7 +38,10 @@
 //! the call's chainable setters take R's other arguments, and `.draw()`
 //! runs it. To reuse a set of arguments, build its options struct
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
-//! [`prelude`] imports it all, including the trait.
+//! [`prelude`] imports it all, including the trait. As in R, numbers may
+//! be integers or floats: `dev.plot(1..=10, &y).cex(2).xlim(0, 12)` (data
+//! vectors are any [`Numbers`](numbers::Numbers); `f64` data is borrowed
+//! without copying).
 //!
 //! # Devices and files
 //!
@@ -162,6 +165,7 @@ pub mod layout;
 pub mod lty;
 #[doc(hidden)]
 pub mod named_colors;
+pub mod numbers;
 pub mod par;
 #[doc(hidden)]
 pub mod pch;

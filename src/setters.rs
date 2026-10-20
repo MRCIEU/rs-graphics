@@ -18,7 +18,8 @@
 //! field and documented there. `Option` fields take the value itself
 //! (`.las(1)`, `.main("Title")`); fields R recycles per element take one
 //! value or several (see [`Values`]); limits take two numbers
-//! (`.xlim(0.0, 10.0)`). Fields holding one of R's string-valued choices
+//! (`.xlim(0.0, 10.0)`). As in R, numbers may be integers or floats
+//! (`.cex(2)`, `.xlim(0, 10)`, `.mar([5, 4, 4, 2])`). Fields holding one of R's string-valued choices
 //! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
 //! `.order_h("decr")`); an invalid string panics, as R errors.
 
@@ -26,7 +27,8 @@ use crate::color::{Color, ColorSpec};
 use crate::lty::LineType;
 
 /// One value or several, for a field R recycles per element: `"red"`,
-/// `["red", "blue"]`, `vec![1.0, 2.0]`, `&cex[..]`, ...
+/// `["red", "blue"]`, `vec![1.0, 2.0]`, `&cex[..]`, `2`, `[1, 2]`, ...
+/// (numeric fields take `f64`, `f32`, `i32` or `u32` values).
 pub trait Values<T> {
     fn into_values(self) -> Vec<T>;
 }
@@ -69,7 +71,7 @@ macro_rules! single_values {
 }
 
 single_values!(ColorSpec: ColorSpec, Color, &str, String, &String, i32);
-single_values!(f64: f64);
+single_values!(f64: f64, f32, i32, u32);
 single_values!(i32: i32);
 single_values!(LineType: LineType, &str, String, &String);
 
@@ -85,7 +87,10 @@ impl Values<i32> for char {
 /// `Some`), `values` (`Vec<T>` recycled by R), `option_values`
 /// (`Option<Vec<T>>`), `list` (`Option<Vec<T>>` from any iterator of
 /// `Into<T>`, e.g. strings for `Label`s), `labels`
-/// (`Option<Vec<Option<Label>>>`) and `pair` (`Option<(f64, f64)>`).
+/// (`Option<Vec<Option<Label>>>`), `pair` (`Option<(f64, f64)>` from two
+/// numbers), `option_pair` (`Option<(f64, f64)>` from one
+/// [`Pair`](crate::numbers::Pair) tuple) and `array` (`Option<[f64; N]>`
+/// from an array of any numbers).
 ///
 /// `setters!(Struct => [CallA, CallB] { ... })` also gives each listed
 /// builder in [`crate::graphics`] the same setters (writing to its
@@ -169,8 +174,26 @@ macro_rules! setters {
     };
     (@one [$($p:ident)?] $ty:ident $field:ident pair $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        pub fn $field(mut self, a: f64, b: f64) -> Self {
-            self$(.$p)?.$field = Some((a, b));
+        pub fn $field(mut self, a: impl Into<f64>, b: impl Into<f64>) -> Self {
+            self$(.$p)?.$field = Some((a.into(), b.into()));
+            self
+        }
+    };
+    (@one [$($p:ident)?] $ty:ident $field:ident option_pair $t:ty) => {
+        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
+        pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
+            self$(.$p)?.$field = Some(value.into_pair());
+            self
+        }
+    };
+    (@one [$($p:ident)?] $ty:ident $field:ident array $t:ty) => {
+        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
+        pub fn $field<U: Into<f64>, const N: usize>(mut self, values: [U; N]) -> Self
+        where
+            [f64; N]: Into<$t>,
+        {
+            let values: [f64; N] = values.map(Into::into);
+            self$(.$p)?.$field = Some(values.into());
             self
         }
     };

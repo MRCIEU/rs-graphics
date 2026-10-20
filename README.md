@@ -52,7 +52,9 @@ chained setters take the others, and `.draw()` runs the call. Arguments
 you leave out get R's defaults (mostly the current `par()` values), and
 calls without `.draw()` draw nothing (the compiler warns). Every
 setter is documented on its options struct, e.g. `XyOptions` for
-`points()`.
+`points()`. As in R, numbers may be integers or floats:
+`dev.plot(1..=10, &y).cex(2).xlim(0, 12)` (`1..=10` is R's `1:10`), and
+data vectors may hold any number type.
 
 ### R side by side
 

@@ -31,6 +31,20 @@ pub enum LayoutSize {
     Cm(f64),
 }
 
+impl From<f64> for LayoutSize {
+    /// A relative size (R's plain number).
+    fn from(v: f64) -> Self {
+        LayoutSize::Relative(v)
+    }
+}
+
+impl From<i32> for LayoutSize {
+    /// A relative size (R's plain number).
+    fn from(v: i32) -> Self {
+        LayoutSize::Relative(v.into())
+    }
+}
+
 impl LayoutSize {
     fn value(self) -> f64 {
         match self {
@@ -142,18 +156,23 @@ impl Layout {
         })
     }
 
-    /// Column widths (`widths =`); padded with relative `1`s if shorter
-    /// than the number of columns, extra entries are ignored.
-    pub fn widths(mut self, widths: &[LayoutSize]) -> Layout {
-        let (w, cm) = pad_sizes(widths, self.ncol);
+    /// Column widths (`widths =`): numbers are relative sizes (`&[2, 1]`,
+    /// R's `widths = c(2, 1)`), or give [`LayoutSize`]s to mix in
+    /// absolute ones (`LayoutSize::Cm`, R's `lcm()`). Padded with relative
+    /// `1`s if shorter than the number of columns, extra entries are
+    /// ignored.
+    pub fn widths<S: Into<LayoutSize> + Copy>(mut self, widths: &[S]) -> Layout {
+        let widths: Vec<LayoutSize> = widths.iter().map(|&w| w.into()).collect();
+        let (w, cm) = pad_sizes(&widths, self.ncol);
         self.widths = w;
         self.cm_widths = cm;
         self
     }
 
     /// Row heights (`heights =`); see [`Layout::widths`].
-    pub fn heights(mut self, heights: &[LayoutSize]) -> Layout {
-        let (h, cm) = pad_sizes(heights, self.nrow);
+    pub fn heights<S: Into<LayoutSize> + Copy>(mut self, heights: &[S]) -> Layout {
+        let heights: Vec<LayoutSize> = heights.iter().map(|&h| h.into()).collect();
+        let (h, cm) = pad_sizes(&heights, self.nrow);
         self.heights = h;
         self.cm_heights = cm;
         self

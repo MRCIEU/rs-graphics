@@ -106,10 +106,10 @@ pub struct Stroke {
 }
 
 impl Stroke {
-    pub fn simple(color: Color, lwd: f64) -> Self {
+    pub fn simple(color: Color, lwd: impl Into<f64>) -> Self {
         Stroke {
             color,
-            lwd,
+            lwd: lwd.into(),
             lty: LineType::SOLID,
             lend: LineEnd::Round,
             ljoin: LineJoin::Round,
@@ -147,7 +147,8 @@ pub struct TextStyle {
 }
 
 impl TextStyle {
-    pub fn new(color: Color, face: FontFace, size_pt: f64) -> Self {
+    pub fn new(color: Color, face: FontFace, size_pt: impl Into<f64>) -> Self {
+        let size_pt = size_pt.into();
         TextStyle {
             color,
             face,

@@ -18,6 +18,7 @@ use crate::device::{
     TitleOptions, XyOptions,
 };
 use crate::lty::LineType;
+use crate::numbers::Numbers;
 use crate::plotmath::Label;
 
 /// Tukey's five-number summary (`fivenum()` in R's `stats` package):
@@ -55,7 +56,9 @@ pub struct BoxStats {
 /// `boxplot.stats(x, coef)`: five-number summary + whiskers extended to
 /// the most extreme non-outlying data point, +/- `coef * IQR` beyond the
 /// hinges defining an outlier.
-pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
+pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Into<f64>) -> BoxStats {
+    let (x, coef) = (x.into_numbers(), coef.into());
+    let x: &[f64] = &x;
     let n = x.iter().filter(|v| !v.is_nan()).count();
     let mut sorted: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());

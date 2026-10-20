@@ -159,8 +159,8 @@ crate::setters::setters!(PlotOptions => [PlotCall] {
     axes: value bool,
     xaxt: option AxisType,
     yaxt: option AxisType,
-    xaxp: option [f64; 3],
-    yaxp: option [f64; 3],
+    xaxp: array [f64; 3],
+    yaxp: array [f64; 3],
 });
 
 impl Default for PlotOptions {

@@ -35,6 +35,7 @@ use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Pair;
 
 use crate::plotmath::Label;
 
@@ -104,20 +105,48 @@ impl From<&String> for LegendPos {
     }
 }
 
-impl From<(f64, f64)> for LegendPos {
-    /// `(x, y)`: R's `legend(x, y)`, a point in user coordinates.
-    fn from((x, y): (f64, f64)) -> Self {
+impl<P: Pair> From<P> for LegendPos {
+    /// `(x, y)`: R's `legend(x, y)`, a point in user coordinates (any
+    /// [`Pair`], e.g. `(5, 20)`).
+    fn from(p: P) -> Self {
+        let (x, y) = p.into_pair();
         LegendPos::Xy(x, y)
     }
 }
 
-impl From<((f64, f64), (f64, f64))> for LegendPos {
-    /// `((xa, xb), (ya, yb))`: R's `legend(x = c(xa, xb), y = c(ya, yb))`,
-    /// two opposite corners of the box.
-    fn from(((xa, xb), (ya, yb)): ((f64, f64), (f64, f64))) -> Self {
-        LegendPos::Corners(xa, ya, xb, yb)
-    }
+/// `From<((xa, xb), (ya, yb))>` for each mix of `f64` and `i32`.
+macro_rules! corners {
+    ($(($a:ty, $b:ty, $c:ty, $d:ty)),*) => {
+        $(
+            impl From<(($a, $b), ($c, $d))> for LegendPos {
+                /// `((xa, xb), (ya, yb))`: R's `legend(x = c(xa, xb),
+                /// y = c(ya, yb))`, two opposite corners of the box.
+                fn from((x, y): (($a, $b), ($c, $d))) -> Self {
+                    let ((xa, xb), (ya, yb)) = (x.into_pair(), y.into_pair());
+                    LegendPos::Corners(xa, ya, xb, yb)
+                }
+            }
+        )*
+    };
 }
+corners!(
+    (f64, f64, f64, f64),
+    (f64, f64, f64, i32),
+    (f64, f64, i32, f64),
+    (f64, f64, i32, i32),
+    (f64, i32, f64, f64),
+    (f64, i32, f64, i32),
+    (f64, i32, i32, f64),
+    (f64, i32, i32, i32),
+    (i32, f64, f64, f64),
+    (i32, f64, f64, i32),
+    (i32, f64, i32, f64),
+    (i32, f64, i32, i32),
+    (i32, i32, f64, f64),
+    (i32, i32, f64, i32),
+    (i32, i32, i32, f64),
+    (i32, i32, i32, i32)
+);
 
 /// R's `"bottomright"`, `"bottom"`, ... keyword positions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -254,12 +283,12 @@ impl LegendEntry {
     pub fn line(
         label: impl Into<Label>,
         col: impl Into<ColorSpec>,
-        lwd: f64,
+        lwd: impl Into<f64>,
         lty: impl Into<LineType>,
     ) -> Self {
         LegendEntry {
             lty: Some(lty.into()),
-            lwd: Some(lwd),
+            lwd: Some(lwd.into()),
             ..Self::base(label, col.into())
         }
     }
@@ -346,7 +375,7 @@ crate::setters::setters!(LegendOptions => [LegendCall] {
     horiz: value bool,
     title: option Label,
     title_cex: option f64,
-    inset: option (f64, f64),
+    inset: option_pair (f64, f64),
     text_col: option ColorSpec,
     text_font: option i32,
     border: option ColorSpec,

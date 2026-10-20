@@ -27,6 +27,12 @@ usage, see [README.md](README.md).
   arguments are its setters, or an options struct passed with
   `.with(&opts)`, and `.draw()` runs it; the drawing code is in
   `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`).
+  Numbers may be integers, as in R: data vectors are any
+  `numbers::Numbers` (`&[f64]` borrowed as is; other number types,
+  ranges `1..=10`, converted once; `Groups` for `boxplot()`, `Pair` for
+  `(x, y)` arguments), and numeric setters take integers
+  (`src/setters.rs`; `array` kind for `mgp`/`xaxp`, `pair` kinds for
+  limits).
   `mtext()` (`Graphics::mtext` + `MtextOptions`, `src/device/mtext.rs`)
   takes the side as an argument, like `axis()`, and
   covers all four sides of the figure and outer (`oma`) margins with
@@ -372,6 +378,10 @@ against a real R installation by shelling out to `Rscript`:
   `add_figure`/`add_figure_at` give byte-identical output to direct calls
   (every kind of call, all backends, mixed in multi-panel pages), `par`
   is restored, and recorded results match the device's.
+- `tests/integer_args.rs` (no R needed) - integers wherever R takes
+  numbers (data vectors, ranges, recycled and single setters, limits,
+  arrays, pairs, `Layout` sizes, `fig()`, backend constructors) draw byte
+  for byte what the same `f64`s do, on a device and in a `Figure`.
 - `tests/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
   and `DeviceBuilder`: every option byte-identical to `Device::new` with
   the same settings, R's defaults, the format by name only (never the

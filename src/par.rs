@@ -43,14 +43,15 @@ impl<T: Copy> Sides<T> {
     }
 }
 
-impl<T> From<[T; 4]> for Sides<T> {
-    /// `[bottom, left, top, right]`, R's order for `mar = c(...)`.
-    fn from([bottom, left, top, right]: [T; 4]) -> Self {
+impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
+    /// `[bottom, left, top, right]`, R's order for `mar = c(...)`; any
+    /// numbers for a `Sides<f64>` (`[5, 4, 4, 2]`).
+    fn from([bottom, left, top, right]: [U; 4]) -> Self {
         Sides {
-            bottom,
-            left,
-            top,
-            right,
+            bottom: bottom.into(),
+            left: left.into(),
+            top: top.into(),
+            right: right.into(),
         }
     }
 }
@@ -350,7 +351,7 @@ impl Par {
 // `ParOptions`: every `Par` field as an `Option`, its `apply`, and its
 // setters (on `ParOptions` and `ParCall`), from one field list.
 macro_rules! par_options {
-    ($($field:ident : $t:ty),* $(,)?) => {
+    ($($field:ident : $kind:ident $t:ty),* $(,)?) => {
         /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
         /// plus `new` (R's `par(new = TRUE)`, see
         /// [`Device::set_new`](crate::device::Device::set_new)). R's
@@ -380,57 +381,57 @@ macro_rules! par_options {
         }
 
         $crate::setters::setters!(ParOptions => [ParCall] {
-            $($field: option $t,)*
+            $($field: $kind $t,)*
             new: option bool,
         });
     };
 }
 
 par_options!(
-    mar: Sides<f64>,
-    oma: Sides<f64>,
-    plt: Option<[f64; 4]>,
-    pty: Pty,
-    xaxs: AxisStyle,
-    yaxs: AxisStyle,
-    col: Color,
-    bg: Color,
-    fg: Color,
-    col_axis: Color,
-    col_lab: Color,
-    col_main: Color,
-    col_sub: Color,
-    palette: Vec<Color>,
-    lwd: f64,
-    lty: LineType,
-    lend: LineEnd,
-    ljoin: LineJoin,
-    lmitre: f64,
-    pch: i32,
-    ps: f64,
-    cex: f64,
-    mex: f64,
-    cex_axis: f64,
-    cex_lab: f64,
-    cex_main: f64,
-    cex_sub: f64,
-    font: i32,
-    font_axis: i32,
-    font_lab: i32,
-    font_main: i32,
-    font_sub: i32,
-    las: i32,
-    xaxt: AxisType,
-    yaxt: AxisType,
-    tcl: f64,
-    mgp: [f64; 3],
-    lab: [i32; 3],
-    xaxp: [f64; 3],
-    yaxp: [f64; 3],
-    lheight: f64,
-    adj: f64,
-    xpd: bool,
-    ann: bool,
+    mar: option Sides<f64>,
+    oma: option Sides<f64>,
+    plt: option Option<[f64; 4]>,
+    pty: option Pty,
+    xaxs: option AxisStyle,
+    yaxs: option AxisStyle,
+    col: option Color,
+    bg: option Color,
+    fg: option Color,
+    col_axis: option Color,
+    col_lab: option Color,
+    col_main: option Color,
+    col_sub: option Color,
+    palette: option Vec<Color>,
+    lwd: option f64,
+    lty: option LineType,
+    lend: option LineEnd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
+    pch: option i32,
+    ps: option f64,
+    cex: option f64,
+    mex: option f64,
+    cex_axis: option f64,
+    cex_lab: option f64,
+    cex_main: option f64,
+    cex_sub: option f64,
+    font: option i32,
+    font_axis: option i32,
+    font_lab: option i32,
+    font_main: option i32,
+    font_sub: option i32,
+    las: option i32,
+    xaxt: option AxisType,
+    yaxt: option AxisType,
+    tcl: option f64,
+    mgp: array [f64; 3],
+    lab: option [i32; 3],
+    xaxp: array [f64; 3],
+    yaxp: array [f64; 3],
+    lheight: option f64,
+    adj: option f64,
+    xpd: option bool,
+    ann: option bool,
 );
 
 #[cfg(test)]

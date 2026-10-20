@@ -12,7 +12,10 @@
 //!
 //! Each method starts a call for one R function, taking R's data
 //! arguments; the call's chainable setters take R's other arguments, and
-//! `.draw()` runs it:
+//! `.draw()` runs it. As in R, numbers may be integers or floats: data
+//! vectors are any [`Numbers`] (`&x`, `&[1, 2, 3]`, `1..=10` for R's
+//! `1:10`; `f64` data is borrowed without copying), and numeric setters
+//! take integers too (`.cex(2)`, `.xlim(0, 10)`):
 //!
 //! ```no_run
 //! # use rs_graphics::prelude::*;
@@ -46,6 +49,8 @@
 //! dev.abline().h(0.5); // no `.draw()`: nothing drawn, and a warning
 //! ```
 
+use std::borrow::Cow;
+
 use crate::backend::Backend;
 use crate::device::{
     AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendEntry, LegendLayout,
@@ -56,6 +61,7 @@ use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions,
 };
+use crate::numbers::{Groups, Numbers, Pair};
 use crate::par::ParOptions;
 use crate::plotmath::Label;
 
@@ -127,11 +133,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// options in [`PlotOptions`]. A high-level plot: it starts a new plot
     /// with [`plot_new`](Graphics::plot_new), so on a multi-panel page it
     /// moves to the next panel.
-    fn plot<'a>(&'a mut self, x: &'a [f64], y: &'a [f64]) -> PlotCall<'a, Self> {
+    fn plot<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> PlotCall<'a, Self> {
         PlotCall {
             target: self,
-            x,
-            y,
+            x: x.into_numbers(),
+            y: y.into_numbers(),
             opts: PlotOptions::default(),
         }
     }
@@ -141,10 +147,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// multi-panel page it moves to the next panel, unless `add` (R's
     /// `add = TRUE`), which draws the bars on the current plot. `.draw()`
     /// returns the bins and counts (R's `"histogram"` object).
-    fn hist<'a>(&'a mut self, x: &'a [f64]) -> HistCall<'a, Self> {
+    fn hist<'a>(&'a mut self, x: impl Numbers<'a>) -> HistCall<'a, Self> {
         HistCall {
             target: self,
-            x,
+            x: x.into_numbers(),
             opts: HistOptions::default(),
         }
     }
@@ -176,9 +182,10 @@ pub trait Graphics: sealed::Sealed + Sized {
         }
     }
 
-    /// `boxplot(x, ...)` where `x` is a slice of groups (R's
-    /// `list`/formula input reduced to its common case; a single group is
-    /// `boxplot(&[x])`); options in [`BoxplotOptions`]. A high-level plot:
+    /// `boxplot(x, ...)` where `x` is the groups (R's `list`/formula input
+    /// reduced to its common case): any [`Groups`], e.g. `&[a, b]` or
+    /// `&groups` for `Vec`s of numbers, `f64` or integer; a single group is
+    /// `boxplot(&[x])`. Options in [`BoxplotOptions`]. A high-level plot:
     /// it starts a new plot with [`plot_new`](Graphics::plot_new), so on a
     /// multi-panel page it moves to the next panel, unless `add` (R's
     /// `add = TRUE`), which draws the boxes on the current plot. `.draw()`
@@ -187,10 +194,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Panics
     /// If `groups` is empty, or `at` or `width` doesn't have one value per
     /// group (or a width isn't positive), as R errors.
-    fn boxplot<'a>(&'a mut self, groups: &'a [Vec<f64>]) -> BoxplotCall<'a, Self> {
+    fn boxplot<'a>(&'a mut self, groups: impl Groups<'a>) -> BoxplotCall<'a, Self> {
         BoxplotCall {
             target: self,
-            groups,
+            groups: groups.into_groups(),
             opts: BoxplotOptions::default(),
         }
     }
@@ -202,10 +209,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Panics
     /// At `.draw()`, if `x` is empty or has a negative or non-finite value
     /// (R: "'x' values must be positive").
-    fn pie<'a>(&'a mut self, x: &'a [f64]) -> PieCall<'a, Self> {
+    fn pie<'a>(&'a mut self, x: impl Numbers<'a>) -> PieCall<'a, Self> {
         PieCall {
             target: self,
-            x,
+            x: x.into_numbers(),
             opts: PieOptions::default(),
         }
     }
@@ -237,11 +244,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   R's `GAxisPars()`) from the new range and `par.lab`. Later calls
     ///   to `axis()` without `at` read them. Changing `par.lab` afterwards
     ///   doesn't change them, as in R.
-    fn plot_window(&mut self, xlim: (f64, f64), ylim: (f64, f64)) -> PlotWindowCall<'_, Self> {
+    fn plot_window(&mut self, xlim: impl Pair, ylim: impl Pair) -> PlotWindowCall<'_, Self> {
         PlotWindowCall {
             target: self,
-            xlim,
-            ylim,
+            xlim: xlim.into_pair(),
+            ylim: ylim.into_pair(),
             opts: PlotWindowOptions::default(),
         }
     }
@@ -249,11 +256,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `points(x, y, ...)`: R's `plot.xy(type = "p")` unless `type_` says
     /// otherwise; options in [`XyOptions`]. Points with a non-finite
     /// coordinate (including values <= 0 on a log axis) are skipped.
-    fn points<'a>(&'a mut self, x: &'a [f64], y: &'a [f64]) -> PointsCall<'a, Self> {
+    fn points<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> PointsCall<'a, Self> {
         PointsCall {
             target: self,
-            x,
-            y,
+            x: x.into_numbers(),
+            y: y.into_numbers(),
             opts: XyOptions::default(),
         }
     }
@@ -261,11 +268,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `lines(x, y, ...)`: R's `plot.xy(type = "l")` unless `type_` says
     /// otherwise; options in [`XyOptions`]. The polyline breaks at
     /// non-finite coordinates (R's `NA`, or values <= 0 on a log axis).
-    fn lines<'a>(&'a mut self, x: &'a [f64], y: &'a [f64]) -> LinesCall<'a, Self> {
+    fn lines<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> LinesCall<'a, Self> {
         LinesCall {
             target: self,
-            x,
-            y,
+            x: x.into_numbers(),
+            y: y.into_numbers(),
             opts: XyOptions::default(),
         }
     }
@@ -277,17 +284,17 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `C_segments`.
     fn segments<'a>(
         &'a mut self,
-        x0: &'a [f64],
-        y0: &'a [f64],
-        x1: &'a [f64],
-        y1: &'a [f64],
+        x0: impl Numbers<'a>,
+        y0: impl Numbers<'a>,
+        x1: impl Numbers<'a>,
+        y1: impl Numbers<'a>,
     ) -> SegmentsCall<'a, Self> {
         SegmentsCall {
             target: self,
-            x0,
-            y0,
-            x1,
-            y1,
+            x0: x0.into_numbers(),
+            y0: y0.into_numbers(),
+            x1: x1.into_numbers(),
+            y1: y1.into_numbers(),
             opts: SegmentsOptions::default(),
         }
     }
@@ -302,17 +309,17 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// also warns).
     fn arrows<'a>(
         &'a mut self,
-        x0: &'a [f64],
-        y0: &'a [f64],
-        x1: &'a [f64],
-        y1: &'a [f64],
+        x0: impl Numbers<'a>,
+        y0: impl Numbers<'a>,
+        x1: impl Numbers<'a>,
+        y1: impl Numbers<'a>,
     ) -> ArrowsCall<'a, Self> {
         ArrowsCall {
             target: self,
-            x0,
-            y0,
-            x1,
-            y1,
+            x0: x0.into_numbers(),
+            y0: y0.into_numbers(),
+            x1: x1.into_numbers(),
+            y1: y1.into_numbers(),
             opts: ArrowsOptions::default(),
         }
     }
@@ -323,17 +330,17 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// axis) are skipped, as in R.
     fn rect<'a>(
         &'a mut self,
-        xleft: &'a [f64],
-        ybottom: &'a [f64],
-        xright: &'a [f64],
-        ytop: &'a [f64],
+        xleft: impl Numbers<'a>,
+        ybottom: impl Numbers<'a>,
+        xright: impl Numbers<'a>,
+        ytop: impl Numbers<'a>,
     ) -> RectCall<'a, Self> {
         RectCall {
             target: self,
-            x0: xleft,
-            y0: ybottom,
-            x1: xright,
-            y1: ytop,
+            x0: xleft.into_numbers(),
+            y0: ybottom.into_numbers(),
+            x1: xright.into_numbers(),
+            y1: ytop.into_numbers(),
             opts: RectOptions::default(),
         }
     }
@@ -342,11 +349,15 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// per run of finite points (non-finite coordinates, R's `NA`,
     /// separate them), with `col`, `border` and `lty` recycled over the
     /// polygons, as `C_polygon`.
-    fn polygon<'a>(&'a mut self, x: &'a [f64], y: &'a [f64]) -> PolygonCall<'a, Self> {
+    fn polygon<'a>(
+        &'a mut self,
+        x: impl Numbers<'a>,
+        y: impl Numbers<'a>,
+    ) -> PolygonCall<'a, Self> {
         PolygonCall {
             target: self,
-            x,
-            y,
+            x: x.into_numbers(),
+            y: y.into_numbers(),
             opts: PolygonOptions::default(),
         }
     }
@@ -361,14 +372,14 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// vertically see [`TextOptions::vadj`].
     fn text<'a, L: Clone + Into<Label>>(
         &'a mut self,
-        x: &'a [f64],
-        y: &'a [f64],
+        x: impl Numbers<'a>,
+        y: impl Numbers<'a>,
         labels: &[L],
     ) -> TextCall<'a, Self> {
         TextCall {
             target: self,
-            x,
-            y,
+            x: x.into_numbers(),
+            y: y.into_numbers(),
             labels: labels.iter().cloned().map(Into::into).collect(),
             opts: TextOptions::default(),
         }
@@ -693,14 +704,14 @@ macro_rules! call {
 call!(
     /// [`Graphics::plot`]'s call.
     PlotCall, PlotOptions, emit_plot -> (),
-    { x: &'a [f64], y: &'a [f64] },
-    |t, o| (x, y, o)
+    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
+    |t, o| (&x, &y, o)
 );
 call!(
     /// [`Graphics::hist`]'s call.
     HistCall, HistOptions, emit_hist -> HistResult,
-    { x: &'a [f64] },
-    |t, o| (x, o)
+    { x: Cow<'a, [f64]> },
+    |t, o| (&x, o)
 );
 call!(
     /// [`Graphics::barplot`]'s call.
@@ -711,14 +722,14 @@ call!(
 call!(
     /// [`Graphics::boxplot`]'s call.
     BoxplotCall, BoxplotOptions, emit_boxplot -> Vec<BoxStats>,
-    { groups: &'a [Vec<f64>] },
-    |t, o| (groups, o)
+    { groups: Cow<'a, [Vec<f64>]> },
+    |t, o| (&groups, o)
 );
 call!(
     /// [`Graphics::pie`]'s call.
     PieCall, PieOptions, emit_pie -> (),
-    { x: &'a [f64] },
-    |t, o| (x, o)
+    { x: Cow<'a, [f64]> },
+    |t, o| (&x, o)
 );
 call!(
     /// [`Graphics::plot_window`]'s call.
@@ -729,44 +740,44 @@ call!(
 call!(
     /// [`Graphics::points`]'s call.
     PointsCall, XyOptions, emit_points -> (),
-    { x: &'a [f64], y: &'a [f64] },
-    |t, o| (x, y, o)
+    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
+    |t, o| (&x, &y, o)
 );
 call!(
     /// [`Graphics::lines`]'s call.
     LinesCall, XyOptions, emit_lines -> (),
-    { x: &'a [f64], y: &'a [f64] },
-    |t, o| (x, y, o)
+    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
+    |t, o| (&x, &y, o)
 );
 call!(
     /// [`Graphics::segments`]'s call.
     SegmentsCall, SegmentsOptions, emit_segments -> (),
-    { x0: &'a [f64], y0: &'a [f64], x1: &'a [f64], y1: &'a [f64] },
-    |t, o| (x0, y0, x1, y1, o)
+    { x0: Cow<'a, [f64]>, y0: Cow<'a, [f64]>, x1: Cow<'a, [f64]>, y1: Cow<'a, [f64]> },
+    |t, o| (&x0, &y0, &x1, &y1, o)
 );
 call!(
     /// [`Graphics::arrows`]'s call.
     ArrowsCall, ArrowsOptions, emit_arrows -> (),
-    { x0: &'a [f64], y0: &'a [f64], x1: &'a [f64], y1: &'a [f64] },
-    |t, o| (x0, y0, x1, y1, o)
+    { x0: Cow<'a, [f64]>, y0: Cow<'a, [f64]>, x1: Cow<'a, [f64]>, y1: Cow<'a, [f64]> },
+    |t, o| (&x0, &y0, &x1, &y1, o)
 );
 call!(
     /// [`Graphics::rect`]'s call.
     RectCall, RectOptions, emit_rect -> (),
-    { x0: &'a [f64], y0: &'a [f64], x1: &'a [f64], y1: &'a [f64] },
-    |t, o| (x0, y0, x1, y1, o)
+    { x0: Cow<'a, [f64]>, y0: Cow<'a, [f64]>, x1: Cow<'a, [f64]>, y1: Cow<'a, [f64]> },
+    |t, o| (&x0, &y0, &x1, &y1, o)
 );
 call!(
     /// [`Graphics::polygon`]'s call.
     PolygonCall, PolygonOptions, emit_polygon -> (),
-    { x: &'a [f64], y: &'a [f64] },
-    |t, o| (x, y, o)
+    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
+    |t, o| (&x, &y, o)
 );
 call!(
     /// [`Graphics::text`]'s call.
     TextCall, TextOptions, emit_text -> (),
-    { x: &'a [f64], y: &'a [f64], labels: Vec<Label> },
-    |t, o| (x, y, labels, o)
+    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]>, labels: Vec<Label> },
+    |t, o| (&x, &y, labels, o)
 );
 call!(
     /// [`Graphics::box_`]'s call.

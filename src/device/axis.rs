@@ -134,7 +134,7 @@ crate::setters::setters!(AxisOptions => [AxisCall] {
     cex_axis: option f64,
     col_axis: option ColorSpec,
     las: option i32,
-    axp: option [f64; 3],
+    axp: array [f64; 3],
     axt: option AxisType,
     tck: option f64,
     tcl: option f64,
