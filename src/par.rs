@@ -184,16 +184,35 @@ crate::error::from_r_string!(AxisType, "axis type", "\"s\" or \"n\"");
 #[derive(Clone, Debug)]
 pub struct Par {
     /// Margins in lines: bottom, left, top, right. Default `c(5.1, 4.1,
-    /// 4.1, 2.1)`. Applied at the next `plot_new()`.
+    /// 4.1, 2.1)`. Used unless `mai` is set. Applied at the next
+    /// `plot_new()`.
     pub mar: Sides<f64>,
-    /// Outer margins in lines. Default `c(0, 0, 0, 0)`. Applied at the
-    /// next `plot_new()`.
+    /// `par(mai)`: the margins in inches instead of lines; `None` (the
+    /// default) uses `mar`. Unlike `mar`, they don't change with `cex` or
+    /// `mex`. Applied at the next `plot_new()`.
+    pub mai: Option<Sides<f64>>,
+    /// Outer margins in lines. Default `c(0, 0, 0, 0)`. Used unless `omi`
+    /// or `omd` is set. Applied at the next `plot_new()`.
     pub oma: Sides<f64>,
+    /// `par(omi)`: the outer margins in inches; `None` (the default) uses
+    /// `oma`. Applied at the next `plot_new()`.
+    pub omi: Option<Sides<f64>>,
+    /// `par(omd = c(x0, x1, y0, y1))`: the inner region (the device less
+    /// the outer margins) as fractions of the device; `None` (the default)
+    /// uses `omi` or `oma`. Takes precedence over both. Applied at the
+    /// next `plot_new()`.
+    pub omd: Option<[f64; 4]>,
     /// `par(plt = c(x0, x1, y0, y1))`: the plot region as fractions of the
     /// figure region, instead of the figure less `mar`. `None` (the default)
-    /// uses `mar` and `pty`. Unlike R, setting `mar` or `pty` doesn't reset
-    /// it: set it back to `None`. Applied at the next `plot_new()`.
+    /// uses `mar` and `pty`. A `par()` call setting `mar`, `mai` or `pty`
+    /// resets it to `None`, as in R. Applied at the next `plot_new()`.
     pub plt: Option<[f64; 4]>,
+    /// `par(pin = c(width, height))`: the plot region's size in inches,
+    /// centred in the figure, instead of the figure less `mar`. `None`
+    /// (the default) uses `plt`, or `mar` and `pty`; takes precedence over
+    /// `plt`. A `par()` call setting `mar`, `mai`, `pty` or `plt` resets it
+    /// to `None`, as in R. Applied at the next `plot_new()`.
+    pub pin: Option<[f64; 2]>,
     /// `par(pty)`: [`Pty::Square`] makes the `mar`-based plot region
     /// square. Applied at the next `plot_new()`.
     pub pty: Pty,
@@ -336,8 +355,12 @@ impl Default for Par {
     fn default() -> Self {
         Par {
             mar: Sides::new(5.1, 4.1, 4.1, 2.1),
+            mai: None,
             oma: Sides::new(0.0, 0.0, 0.0, 0.0),
+            omi: None,
+            omd: None,
             plt: None,
+            pin: None,
             pty: Pty::Maximal,
             bty: Bty::O,
             xaxs: AxisStyle::Regular,
@@ -412,10 +435,54 @@ impl Par {
     }
 }
 
+impl ParOptions {
+    /// R keeps one unit per region (`mUnits`, `oUnits`, `pUnits`,
+    /// `defaultPlot`), and the one set last wins. A `par()` call setting
+    /// one form clears the others it replaces; when one call sets several,
+    /// the more specific wins (`mai` over `mar`, `omd` over `omi` over
+    /// `oma`, `pin` over `plt` over the margins).
+    fn apply_units(&self, par: &mut Par) {
+        // `mar`/`mai`/`pty` set `defaultPlot = TRUE`: the plot region
+        // comes from the margins again.
+        if (self.mar.is_some() || self.mai.is_some() || self.pty.is_some())
+            && self.plt.is_none()
+            && self.pin.is_none()
+        {
+            par.plt = None;
+            par.pin = None;
+        }
+        if self.plt.is_some() && self.pin.is_none() {
+            par.pin = None;
+        }
+        if self.mar.is_some() && self.mai.is_none() {
+            par.mai = None;
+        }
+        if self.oma.is_some() && self.omi.is_none() && self.omd.is_none() {
+            par.omi = None;
+            par.omd = None;
+        }
+        if self.omi.is_some() && self.omd.is_none() {
+            par.omd = None;
+        }
+    }
+
+    /// Whether this call sets the outer margins, which in R starts a new
+    /// page at the next `plot.new()` ("force eject of multiple figures").
+    pub(crate) fn sets_outer_margins(&self) -> bool {
+        self.oma.is_some() || self.omi.is_some() || self.omd.is_some()
+    }
+}
+
 // `ParOptions`: every `Par` field as an `Option`, its `apply`, and its
-// setters (on `ParOptions` and `ParCall`), from one field list.
+// setters (on `ParOptions` and `ParCall`), from the field lists: `Par`
+// fields of type `T` first, then (`optional:`) `Par` fields of type
+// `Option<T>` that a `par()` call can only set to `Some` (as R, which
+// resets them by setting the alternative, e.g. `mar` for `mai`).
 macro_rules! par_options {
-    ($($field:ident : $kind:ident $t:ty),* $(,)?) => {
+    (
+        $($field:ident : $kind:ident $t:ty),* $(,)?
+        ; optional: $($ofield:ident : $okind:ident $ot:ty),* $(,)?
+    ) => {
         /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
         /// plus `new` (R's `par(new = TRUE)`, see
         /// [`Device::set_new`](crate::device::Device::set_new)). R's
@@ -427,6 +494,10 @@ macro_rules! par_options {
             $(
                 #[doc = concat!("New value of [`Par::", stringify!($field), "`].")]
                 pub $field: Option<$t>,
+            )*
+            $(
+                #[doc = concat!("New value of [`Par::", stringify!($ofield), "`] (set to `Some`).")]
+                pub $ofield: Option<$ot>,
             )*
             /// `par(new = )`: draw the next plot over the current figure.
             pub new: Option<bool>,
@@ -441,11 +512,18 @@ macro_rules! par_options {
                         par.$field = v.clone();
                     }
                 )*
+                $(
+                    if let Some(v) = &self.$ofield {
+                        par.$ofield = Some(v.clone());
+                    }
+                )*
+                self.apply_units(par);
             }
         }
 
         $crate::setters::setters!(ParOptions => [ParCall] {
             $($field: $kind $t,)*
+            $($ofield: $okind $ot,)*
             new: option bool,
         });
     };
@@ -499,6 +577,11 @@ par_options!(
     adj: option f64,
     xpd: option bool,
     ann: option bool,
+    ; optional:
+    mai: option Sides<f64>,
+    omi: option Sides<f64>,
+    omd: array [f64; 4],
+    pin: array [f64; 2],
 );
 
 #[cfg(test)]

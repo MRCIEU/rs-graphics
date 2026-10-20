@@ -84,10 +84,17 @@ usage, see [README.md](README.md).
   heights, and `respect` (logical or matrix) - a port of `layoutRegions()`
   in `graphics.c`. `par(new = TRUE)` (`Device::set_new`) overlays the
   next plot on the current figure, e.g. for a second y axis.
-  `par(fig=)` (`Device::fig`) places a figure anywhere on the page,
-  `par(plt=)` (`Par::plt`) places the plot region within the figure, and
-  `par(pty = "s")` (`Par::pty`) makes it square - ports of
-  `mapFigureRegion()`/`mapPlotRegion()`.
+  `par(fig=)` (`Device::fig`) places a figure anywhere on the page and
+  `par(fin=)` (`Device::fin`) gives it a size in inches, `par(plt=)`
+  (`Par::plt`) places the plot region within the figure and `par(pin=)`
+  (`Par::pin`) gives it a size in inches, and `par(pty = "s")`
+  (`Par::pty`) makes it square - ports of `mapFigureRegion()`/
+  `mapPlotRegion()`/`updateFigureRegion()`/`updatePlotRegion()`.
+  Margins also come in inches (`mai`, `omi`) and the inner region as
+  device fractions (`omd`). As in R, the unit set last wins: a `par()`
+  call setting `mar` clears `mai` and puts the plot region back on the
+  margins (also `pty`), `oma` clears `omi`/`omd`, and setting the outer
+  margins starts a new page at the next `plot_new()` ("force eject").
 - R's built-in plotting characters `pch = 0..25` (`src/pch.rs`) plus
   character symbols (`pch = "."`, `"a"`, ...), line
   types `lty` (`src/lty.rs`; `LineType::SOLID`, `DASHED`, ... for R's
@@ -142,7 +149,6 @@ the corresponding `*.default` R function:
 
 To keep this a tractable "core functionality" port, the following R
 `graphics` features are **not implemented**: `split.screen()`,
-`par(fin=)`/`par(pin=)`,
 `persp()`/3D plotting,
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
 `image()`/raster images, `symbols()`, `smoothScatter()`,
@@ -411,6 +417,10 @@ against a real R installation by shelling out to `Rscript`:
   `plot.window()` (linear, log with each tick rule, reversed, `par(lab)`),
   and the ticks drawn with `xaxp`/`yaxp` changed afterwards, inline in
   `axis()` and in `plot()`.
+- `tests/margins_regions_matches_r.rs` - `mai` (also with `cex`, and
+  `mar` resetting it), `omi`/`omd` with outer `mtext()` (and `mfrow`),
+  `pin` (and `mar` resetting it), `pty` resetting `plt`, `fin`, and
+  `par(oma)` starting a new page: paths and text vs. R `pdf()`.
 - `tests/regions_matches_r.rs` - `par(pty = "s")` on wide and tall
   pages, `par(plt=)` (also over `pty`), and `par(fig=)` with `new = TRUE`,
   `oma` and after `mfrow`: every painted path and text item in order.

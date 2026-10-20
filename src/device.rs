@@ -139,10 +139,10 @@ pub struct Device<B: Backend> {
     arrangement: Arrangement,
     /// `par("mfg")`'s `currentFigure`, 1-based.
     current_figure: usize,
-    /// `par(fig)` (R's `defaultFigure = FALSE`): the figure region as
-    /// fractions `[x0, x1, y0, y1]` of the inner region, overriding the
-    /// arrangement until `mfrow`/`mfcol`/`layout` is called.
-    fig_nic: Option<[f64; 4]>,
+    /// `par(fig)` or `par(fin)` (R's `defaultFigure = FALSE`): one figure
+    /// region, overriding the arrangement until `mfrow`/`mfcol`/`layout`
+    /// is called.
+    fig_spec: Option<FigSpec>,
     /// `par("new")`, set by [`Device::set_new`] and [`Device::mfg`]: the
     /// next `plot_new()` reuses the current figure instead of advancing.
     /// Cleared by drawing (see [`Device::dirty`]), not by `plot_new()`.
@@ -155,6 +155,15 @@ pub struct Device<B: Backend> {
     /// The file created by [`DeviceBuilder::open`], which
     /// [`close`](Device::close) writes; `None` for [`Device::new`].
     file: Option<File>,
+}
+
+/// A figure region set with `fig()` or `fin()`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FigSpec {
+    /// `par(fig)`: fractions `[x0, x1, y0, y1]` of the inner region.
+    Nic([f64; 4]),
+    /// `par(fin)`: `[width, height]` in inches, centred.
+    Inches([f64; 2]),
 }
 
 /// Where drawing is clipped to: R's `xpd = FALSE` (plot region), `TRUE`
@@ -258,7 +267,7 @@ impl<B: Backend> Device<B> {
                 by_col: false,
             },
             current_figure: 1,
-            fig_nic: None,
+            fig_spec: None,
             hold_figure: false,
             used: false,
             start_ps: par_ps,
@@ -348,20 +357,49 @@ impl<B: Backend> Device<B> {
             self.height_in - omi.top,
         );
         self.inner = inner;
-        self.mar = self.par.mar;
-        let [fx0, fx1, fy0, fy1] = self.fig_nic.unwrap_or_else(|| {
-            self.arrangement
-                .figure_region_nic(self.current_figure, inner.width(), inner.height())
-        });
+        // Margins in lines, for `title()` (R's `updateFigureMargins()`
+        // converts `mai` to `mar`).
+        let lh = self.line_height_inches();
+        self.mar = match self.par.mai {
+            Some(m) => Sides::new(m.bottom / lh, m.left / lh, m.top / lh, m.right / lh),
+            None => self.par.mar,
+        };
+        let [fx0, fx1, fy0, fy1] = match self.fig_spec {
+            Some(FigSpec::Nic(fig)) => fig,
+            // `updateFigureRegion()`: `fin` centred in the inner region.
+            Some(FigSpec::Inches([w, h])) => {
+                let (nw, nh) = (w / inner.width(), h / inner.height());
+                [
+                    0.5 - nw / 2.0,
+                    0.5 + nw / 2.0,
+                    0.5 - nh / 2.0,
+                    0.5 + nh / 2.0,
+                ]
+            }
+            None => self.arrangement.figure_region_nic(
+                self.current_figure,
+                inner.width(),
+                inner.height(),
+            ),
+        };
         self.fig = Rect::new(
             inner.x0 + fx0 * inner.width(),
             inner.y0 + fy0 * inner.height(),
             inner.x0 + fx1 * inner.width(),
             inner.y0 + fy1 * inner.height(),
         );
-        self.plt = match self.par.plt {
+        self.plt = match (self.par.pin, self.par.plt) {
+            // `par(pin)`: that size in inches, centred in the figure
+            // (`updatePlotRegion()`).
+            (Some([w, h]), _) => {
+                let (cx, cy) = (
+                    0.5 * (self.fig.x0 + self.fig.x1),
+                    0.5 * (self.fig.y0 + self.fig.y1),
+                );
+                Rect::new(cx - w / 2.0, cy - h / 2.0, cx + w / 2.0, cy + h / 2.0)
+            }
             // `par(plt)`: fractions of the figure region.
-            Some([px0, px1, py0, py1]) => Rect::new(
+            (None, Some([px0, px1, py0, py1])) => Rect::new(
                 self.fig.x0 + px0 * self.fig.width(),
                 self.fig.y0 + py0 * self.fig.height(),
                 self.fig.x0 + px1 * self.fig.width(),
@@ -369,7 +407,7 @@ impl<B: Backend> Device<B> {
             ),
             // `mapPlotRegion()`: the figure less `mar`, made square about
             // its centre for `pty = "s"`.
-            None => {
+            (None, None) => {
                 let mai = self.mai();
                 let (mut x0, mut x1) = (self.fig.x0 + mai.left, self.fig.x1 - mai.right);
                 let (mut y0, mut y1) = (self.fig.y0 + mai.bottom, self.fig.y1 - mai.top);
@@ -410,7 +448,37 @@ impl<B: Backend> Device<B> {
             by_col: false,
         };
         self.current_figure = 1;
-        self.fig_nic = Some(fig);
+        self.fig_spec = Some(FigSpec::Nic(fig));
+        self.recompute_layout();
+    }
+
+    /// R's `currentFigure = lastFigure`: the next `plot_new()` starts a
+    /// new page (for `par(oma = )` and co.).
+    pub(crate) fn eject_page(&mut self) {
+        self.current_figure = self.arrangement.last_figure();
+    }
+
+    /// `par(fin = c(width, height))`: a single figure region of that size
+    /// in inches, centred in the inner region (R's `fUnits = INCHES`). As
+    /// [`Device::fig`]: the next `plot_new()` starts a new page unless
+    /// [`Device::set_new`]`(true)` follows, and `mfrow`/`mfcol`/`layout`
+    /// cancel it.
+    ///
+    /// # Panics
+    /// Unless both sizes are positive (R's error).
+    pub fn fin(&mut self, fin: [impl Into<f64>; 2]) {
+        let fin: [f64; 2] = fin.map(Into::into);
+        assert!(
+            fin.iter().all(|&v| v > 0.0 && v.is_finite()),
+            "invalid value specified for graphical parameter \"fin\""
+        );
+        self.arrangement = Arrangement::Grid {
+            nrow: 1,
+            ncol: 1,
+            by_col: false,
+        };
+        self.current_figure = 1;
+        self.fig_spec = Some(FigSpec::Inches(fin));
         self.recompute_layout();
     }
 
@@ -462,7 +530,7 @@ impl<B: Backend> Device<B> {
         // wraps round to figure 1 on a fresh page.
         self.current_figure = arrangement.last_figure();
         self.arrangement = arrangement;
-        self.fig_nic = None;
+        self.fig_spec = None;
         self.hold_figure = false;
         self.recompute_layout();
     }
@@ -735,15 +803,27 @@ impl<B: Backend> Device<B> {
         self.par.mex * self.par.cex * 1.2 * self.start_ps / 72.0
     }
 
-    /// `par("mai")`: `par.mar` in inches (bottom, left, top, right).
+    /// `par("mai")`: the margins in inches (bottom, left, top, right):
+    /// `par.mai` if set, else `par.mar` converted.
     pub fn mai(&self) -> Sides<f64> {
+        if let Some(mai) = self.par.mai {
+            return mai;
+        }
         let lh = self.line_height_inches();
         let m = self.par.mar;
         Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)
     }
 
-    /// `par("omi")`: `par.oma` in inches (bottom, left, top, right).
+    /// `par("omi")`: the outer margins in inches (bottom, left, top,
+    /// right), from `par.omd`, else `par.omi`, else `par.oma`.
     pub fn omi(&self) -> Sides<f64> {
+        if let Some([x0, x1, y0, y1]) = self.par.omd {
+            let (w, h) = (self.width_in, self.height_in);
+            return Sides::new(y0 * h, x0 * w, (1.0 - y1) * h, (1.0 - x1) * w);
+        }
+        if let Some(omi) = self.par.omi {
+            return omi;
+        }
         let lh = self.line_height_inches();
         let m = self.par.oma;
         Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)

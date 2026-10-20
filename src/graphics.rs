@@ -673,6 +673,11 @@ impl<B: Backend> Graphics for Device<B> {
             None => {}
         }
         opts.apply(&mut self.par);
+        // R's `par(oma/omi/omd = )`: "force eject of multiple figures",
+        // so the next `plot_new()` starts a new page.
+        if opts.sets_outer_margins() {
+            self.eject_page();
+        }
         if let Some(new) = opts.new {
             self.set_new(new);
         }
