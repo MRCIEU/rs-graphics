@@ -57,7 +57,9 @@ usage, see [README.md](README.md).
   (`Graphics::legend`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
   filled boxes and merged point+line keys, and returns R's `rect` and
-  `text` positions (`LegendLayout`, in `par("usr")` units).
+  `text` positions (`LegendLayout`, in `par("usr")` units). Positions are
+  written as in R (`"topright"` with `match.arg()` prefixes, `(x, y)`,
+  `((xa, xb), (ya, yb))`) or as `LegendPos` variants.
 - Coordinates: `Device::usr()` is R's `par("usr")` (log10 on log axes),
   `Device::xlog()`/`ylog()` tell which axes are logarithmic, and
   `user_to_inches`/`inches_to_user` convert between data units and

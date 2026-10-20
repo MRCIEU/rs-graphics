@@ -145,9 +145,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, dashed),
     ];
     let o = LegendOptions::default().bg(Color::WHITE);
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
-        .with(&o)
-        .draw();
+    dev.legend("topleft", &entries).with(&o).draw();
 }
 
 fn draw_legend<B: Backend>(dev: &mut Device<B>) {
@@ -171,9 +169,7 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         LegendEntry::line("cos(x)", 4, 2.0, LineType::DASHED),
     ];
     let o = LegendOptions::default().title("Functions");
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopRight), &entries)
-        .with(&o)
-        .draw();
+    dev.legend("topright", &entries).with(&o).draw();
 }
 
 fn draw_hist<B: Backend>(dev: &mut Device<B>) {

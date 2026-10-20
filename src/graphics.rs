@@ -395,19 +395,35 @@ pub trait Graphics: sealed::Sealed + Sized {
     }
 
     /// `legend(pos, legend, ...)`, a port of R's layout: one row per
-    /// [`LegendEntry`], placed by `pos` (coordinates or a keyword such as
-    /// `"topright"`); options in [`LegendOptions`]. On a [`Device`],
-    /// `.draw()` returns where the
-    /// box and labels went (R's return value, in `usr` units), or `None`
-    /// if `entries` is empty (R errors there).
+    /// [`LegendEntry`], placed by `pos`; options in [`LegendOptions`]. On
+    /// a [`Device`], `.draw()` returns where the box and labels went (R's
+    /// return value, in `usr` units), or `None` if `entries` is empty (R
+    /// errors there).
+    ///
+    /// `pos` is written as in R (see [`LegendPos`]): a keyword such as
+    /// `"topright"`, a point `(x, y)`, or two corners
+    /// `((xa, xb), (ya, yb))`:
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::svg(5.0, 5.0);
+    /// # dev.plot(&[1.0, 10.0], &[1.0, 30.0]).draw();
+    /// let keys = [LegendEntry::point("observed", 1, 19)];
+    /// dev.legend("topright", &keys).draw(); // legend("topright", ...)
+    /// dev.legend((5.0, 20.0), &keys).draw(); // legend(5, 20, ...)
+    /// ```
+    ///
+    /// # Panics
+    /// If `pos` is a string that isn't one of R's nine keywords (or a
+    /// unique prefix of one).
     fn legend<'a>(
         &'a mut self,
-        pos: LegendPos,
+        pos: impl Into<LegendPos>,
         entries: &'a [LegendEntry],
     ) -> LegendCall<'a, Self> {
         LegendCall {
             target: self,
-            pos,
+            pos: pos.into(),
             entries,
             opts: LegendOptions::default(),
         }
