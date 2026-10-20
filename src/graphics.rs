@@ -93,6 +93,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`Device::add_figure`]).
     type LegendResult;
 
+    /// What [`axis`](Graphics::axis)'s `.draw()` returns: the tick
+    /// positions (`Vec<f64>`) on a [`Device`], `()` on a
+    /// [`Figure`](crate::recording::Figure) (whose tick positions come from
+    /// [`Device::add_figure`]).
+    type AxisResult;
+
     /// `plot.new()`: moves to the next figure and sets up its figure and
     /// plot regions.
     ///
@@ -414,6 +420,16 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`AxisOptions`]. `side` is a [`Side`] or R's number for it (1 to
     /// 4).
     ///
+    /// On a [`Device`], `.draw()` returns R's value: the tick positions
+    /// (`at`, or the default ticks) in data units, sorted, with `NaN`
+    /// (R's `NA`) last, including ticks outside the plot that weren't
+    /// drawn; empty (R's `NULL`) when `at` is empty or the axis type is
+    /// `"n"`. So `let at = dev.axis(2).draw();` then
+    /// `dev.abline().h(at).col("grey").draw();` puts grid lines at the
+    /// ticks, as R's `abline(h = axis(2))`. On a
+    /// [`Figure`](crate::recording::Figure) it returns `()`; the positions
+    /// come from [`Device::add_figure`].
+    ///
     /// # Panics
     /// If `side` is a number other than 1 to 4 (here), or, at `.draw()`,
     /// if `labels` is given without `at` or their lengths differ (R's
@@ -585,7 +601,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     #[doc(hidden)]
     fn emit_box(&mut self, opts: BoxOptions);
     #[doc(hidden)]
-    fn emit_axis(&mut self, side: Side, opts: AxisOptions);
+    fn emit_axis(&mut self, side: Side, opts: AxisOptions) -> Self::AxisResult;
     #[doc(hidden)]
     fn emit_abline(&mut self, opts: AblineOptions);
     #[doc(hidden)]
@@ -605,6 +621,7 @@ pub trait Graphics: sealed::Sealed + Sized {
 
 impl<B: Backend> Graphics for Device<B> {
     type LegendResult = Option<LegendLayout>;
+    type AxisResult = Vec<f64>;
 
     fn plot_new(&mut self) {
         self.plot_new_impl()
@@ -658,7 +675,7 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_box(&mut self, opts: BoxOptions) {
         self.box_impl(&opts)
     }
-    fn emit_axis(&mut self, side: Side, opts: AxisOptions) {
+    fn emit_axis(&mut self, side: Side, opts: AxisOptions) -> Vec<f64> {
         self.axis_impl(side, &opts)
     }
     fn emit_abline(&mut self, opts: AblineOptions) {
@@ -811,7 +828,7 @@ call!(
 );
 call!(
     /// [`Graphics::axis`]'s call.
-    AxisCall, AxisOptions, emit_axis -> (),
+    AxisCall, AxisOptions, emit_axis -> G::AxisResult,
     { side: Side },
     |t, o| (side, o)
 );

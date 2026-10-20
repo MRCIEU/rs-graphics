@@ -162,10 +162,11 @@ fn four(x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64]) -> [Vec<f64>; 4] {
 
 impl crate::graphics::sealed::Sealed for Figure {}
 
-/// Records each call. `legend()`'s `.draw()` returns `()`: its layout
-/// comes from [`Device::add_figure`].
+/// Records each call. `legend()`'s and `axis()`'s `.draw()` return `()`:
+/// their results come from [`Device::add_figure`].
 impl Graphics for Figure {
     type LegendResult = ();
+    type AxisResult = ();
 
     fn plot_new(&mut self) {
         self.calls.push(Call::PlotNew);
@@ -256,6 +257,9 @@ pub struct FigureResult {
     /// What each of the figure's `legend()` calls returned on the device, in
     /// order (see [`Graphics::legend`]).
     pub legends: Vec<Option<LegendLayout>>,
+    /// What each of the figure's `axis()` calls returned on the device (its
+    /// tick positions), in order (see [`Graphics::axis`]).
+    pub axes: Vec<Vec<f64>>,
 }
 
 impl<B: Backend> Device<B> {
@@ -299,7 +303,10 @@ impl<B: Backend> Device<B> {
                 Call::Polygon(x, y, o) => self.polygon_impl(x, y, o),
                 Call::Text(x, y, labels, o) => self.text_impl(x, y, labels, o),
                 Call::Box(o) => self.box_impl(o),
-                Call::Axis(side, o) => self.axis_impl(*side, o),
+                Call::Axis(side, o) => {
+                    let at = self.axis_impl(*side, o);
+                    out.axes.push(at);
+                }
                 Call::Abline(o) => self.abline_impl(o),
                 Call::Legend(pos, entries, o) => {
                     let layout = self.legend_impl(*pos, entries, o);

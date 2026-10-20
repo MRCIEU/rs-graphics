@@ -360,6 +360,21 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "mgp",
+            r_par: "par(mgp = c(2, 0.7, 0.2))",
+            r: "axis(1, mgp = c(3, 0.3, 0)); axis(2); \
+                axis(3, mgp = c(3, 1.5, 0.5), line = 1); axis(4, mgp = c(3, 0.2, -0.5), pos = 9, las = 1)",
+            xlim: (0.0, 10.0),
+            setup: |p| p.mgp = [2.0, 0.7, 0.2],
+            draw: |d| {
+                d.axis(1).mgp([3.0, 0.3, 0.0]).draw();
+                // `par(mgp)` when not given inline.
+                d.axis(2).draw();
+                d.axis(3).mgp([3.0, 1.5, 0.5]).line(1).draw();
+                d.axis(4).mgp([3.0, 0.2, -0.5]).pos(9).las(1).draw();
+            },
+        },
+        Case {
             name: "na_labels_reversed",
             r_par: "",
             r: "axis(1, at = seq(0, 10, 0.5), labels = c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ'))",
@@ -602,4 +617,71 @@ fn axis_arguments_match_r() {
             assert!(close(&a.colour, &b.colour, 0.005), "colour differs. {ctx}");
         }
     }
+}
+
+/// `axis()`'s return value: R's `at` (or default ticks) sorted with `NA`
+/// last, `NULL` (empty here) for an empty `at` or `xaxt = "n"`, in data
+/// units on a log axis; and the same values from `Device::add_figure`.
+#[test]
+fn axis_returns_tick_positions_like_r() {
+    if !common::r_available() {
+        return;
+    }
+    let r = Command::new("Rscript")
+        .args([
+            "--vanilla",
+            "-e",
+            "pdf(NULL); p <- function(v) cat(paste(v, collapse = ','), '\n', sep = '')\n\
+             plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+             p(axis(1)); p(axis(2, at = c(Inf, 3, NA, -Inf, 1))); p(axis(3, at = c(12, 5, -3)))\n\
+             p(axis(4, at = numeric(0))); p(axis(1, xaxt = 'n')); p(axis(2, labels = FALSE, tick = FALSE))\n\
+             plot.new(); plot.window(c(1, 1000), c(1, 10), log = 'x')\n\
+             p(axis(1)); p(axis(3, at = c(100, 5, 2000)))",
+        ])
+        .output()
+        .expect("run Rscript");
+    assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+    let expected = String::from_utf8(r.stdout).unwrap();
+
+    fn scene<G: Graphics>(g: &mut G) -> Vec<G::AxisResult> {
+        g.plot_new();
+        g.plot_window((0, 10), (0, 10)).draw();
+        let mut out = vec![
+            g.axis(1).draw(),
+            g.axis(2)
+                // A negative NaN too (as `0.0 / 0.0` gives on x86), which a
+                // plain `total_cmp` sorts first.
+                .at([f64::INFINITY, -f64::NAN, 3.0, f64::NEG_INFINITY, 1.0])
+                .draw(),
+            g.axis(3).at([12, 5, -3]).draw(),
+            g.axis(4).at(Vec::<f64>::new()).draw(),
+            g.axis(1).axt("n").draw(),
+            g.axis(2).draw_labels(false).tick(false).draw(),
+        ];
+        g.plot_new();
+        g.plot_window((1, 1000), (1, 10)).xlog(true).draw();
+        out.push(g.axis(1).draw());
+        out.push(g.axis(3).at([100, 5, 2000]).draw());
+        out
+    }
+    let show = |v: &[f64]| {
+        v.iter()
+            .map(|x| match x {
+                x if x.is_nan() => "NA".to_string(),
+                x if x.is_infinite() => if *x > 0.0 { "Inf" } else { "-Inf" }.to_string(),
+                x => format!("{x}"),
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let device = || Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+    let mut dev = device();
+    let ours: String = scene(&mut dev).iter().map(|v| show(v) + "\n").collect();
+    assert_eq!(ours, expected);
+
+    let mut fig = Figure::new();
+    scene(&mut fig);
+    let replayed = device().add_figure(&fig);
+    let from_figure: String = replayed.axes.iter().map(|v| show(v) + "\n").collect();
+    assert_eq!(from_figure, expected);
 }

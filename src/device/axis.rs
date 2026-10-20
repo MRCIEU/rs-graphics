@@ -101,6 +101,9 @@ pub struct AxisOptions {
     /// inline `xaxp`/`yaxp`); `None`: `par(xaxp)` (sides 1, 3) or
     /// `par(yaxp)` (sides 2, 4).
     pub axp: Option<[f64; 3]>,
+    /// Margin lines for the axis title, labels and line (R's inline `mgp`;
+    /// only the labels and line are used here); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
     /// `AxisType::None` draws nothing (R's inline `xaxt`/`yaxt`); `None`:
     /// `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4).
     pub axt: Option<AxisType>,
@@ -135,6 +138,7 @@ crate::setters::setters!(AxisOptions => [AxisCall] {
     col_axis: option ColorSpec,
     las: option i32,
     axp: array [f64; 3],
+    mgp: array [f64; 3],
     axt: option AxisType,
     tck: option f64,
     tcl: option f64,
@@ -163,6 +167,7 @@ impl Default for AxisOptions {
             col_axis: None,
             las: None,
             axp: None,
+            mgp: None,
             axt: None,
             tck: None,
             tcl: None,
@@ -185,10 +190,11 @@ impl<B: Backend> Device<B> {
     /// Draws R's `axis()`; the public entry is
     /// [`Graphics::axis`](crate::graphics::Graphics::axis), whose docs
     /// describe it.
-    pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) {
+    pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) -> Vec<f64> {
         let side = side.into();
         let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);
+        let mgp = opts.mgp.unwrap_or(self.par.mgp);
         let perpendicular = if x_axis {
             las == 2 || las == 3
         } else {
@@ -199,7 +205,7 @@ impl<B: Backend> Device<B> {
         // `mgp[1]` is not taken relative to it.
         let (line, mut lineoff) = match opts.line {
             Some(l) if l.is_finite() => (l, 0.0),
-            _ => (self.par.mgp[2], self.par.mgp[2]),
+            _ => (mgp[2], mgp[2]),
         };
         let pos = opts.pos.filter(|p| p.is_finite());
         if pos.is_some() {
@@ -234,8 +240,11 @@ impl<B: Backend> Device<B> {
         // errors above, as in R).
         let axt = if x_axis { self.par.xaxt } else { self.par.yaxt };
         if opts.axt.unwrap_or(axt) == AxisType::None {
-            return;
+            return Vec::new();
         }
+        // R's return value: `at` sorted, `NA`s last.
+        let mut used = at.clone();
+        used.sort_by(|a, b| a.is_nan().cmp(&b.is_nan()).then(a.total_cmp(b)));
         // Sort by `at`, dropping non-finite positions (which sort last).
         let mut ticks: Vec<(f64, Option<&Label>)> = at
             .iter()
@@ -245,7 +254,7 @@ impl<B: Backend> Device<B> {
         ticks.sort_by(|a, b| a.0.total_cmp(&b.0));
         ticks.retain(|t| t.0.is_finite());
         if ticks.is_empty() {
-            return;
+            return used;
         }
         // From here on, positions are in `usr` units (log10 on a log axis;
         // values <= 0 become -inf or NaN, outside every limit below).
@@ -366,7 +375,7 @@ impl<B: Backend> Device<B> {
         }
 
         if !opts.draw_labels {
-            return;
+            return used;
         }
         let font = opts.font.unwrap_or(self.par.font_axis);
         let cex = opts.cex_axis.unwrap_or(self.par.cex_axis);
@@ -399,7 +408,7 @@ impl<B: Backend> Device<B> {
             (Side::Top, false) => (0.0, Y_LINE_BIAS),
             (Side::Right, false) => (90.0, 1.0 - Y_LINE_BIAS),
         };
-        let label_perp = axis_base + outward * (self.par.mgp[1] - lineoff + bias) * lh;
+        let label_perp = axis_base + outward * (mgp[1] - lineoff + bias) * lh;
 
         // Labels left to right (bottom to top), skipping those within `gap`
         // of the previous one.
@@ -459,6 +468,7 @@ impl<B: Backend> Device<B> {
                 tlast = temp + 0.5 * labw;
             }
         }
+        used
     }
 }
 
