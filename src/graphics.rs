@@ -386,7 +386,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     }
 
     /// `box(which, ...)`: outlines the plot region, figure, inner region
-    /// or the whole device; options in [`BoxOptions`]. Not clipped.
+    /// or the whole device; options in [`BoxOptions`]. Not clipped. For
+    /// the plot region, `bty` (or `par(bty)`) picks the sides, as R's
+    /// `GBox()`: `"o"` all four, `"l"`, `"7"`, `"c"`, `"u"`, `"]"`, or
+    /// `"n"` none.
     fn box_(&mut self) -> BoxCall<'_, Self> {
         BoxCall {
             target: self,
@@ -479,8 +482,9 @@ pub trait Graphics: sealed::Sealed + Sized {
 
     /// `title(main=, sub=, xlab=, ylab=)`; options in [`TitleOptions`],
     /// each text or a plotmath expression, drawn in `C_title`'s order
-    /// (main, sub, xlab, ylab) with `par(cex.main/col.main/font.main)`
-    /// etc. Text `sub`, `xlab` and `ylab` are placed by `GMtext()`
+    /// (main, sub, xlab, ylab) with `cex.main`/`col.main`/`font.main` and
+    /// the `sub` and `lab` ones: inline (`.cex_main(2)`), else `par()`'s.
+    /// Text `sub`, `xlab` and `ylab` are placed by `GMtext()`
     /// (baseline on the line, nudged by `yLineBias`); text `main` is
     /// centred on line `0.5 * mar[3]` (its baseline half the height of "M"
     /// below it, no `yLineBias`). Expressions are placed by `GMathText()`

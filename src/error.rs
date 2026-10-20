@@ -17,7 +17,7 @@ use std::fmt;
 /// [`PlotType`](crate::highlevel::PlotType),
 /// [`LegendKeyword`](crate::device::LegendKeyword),
 /// [`LegendBty`](crate::device::LegendBty),
-/// [`OrderH`](crate::highlevel::OrderH),
+/// [`OrderH`](crate::highlevel::OrderH), [`Bty`](crate::par::Bty),
 /// [`Format`](crate::backend::Format) and the `par()` enums.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {

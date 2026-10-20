@@ -37,6 +37,6 @@ pub use crate::highlevel::{
 pub use crate::layout::{Layout, LayoutSize};
 pub use crate::lty::LineType;
 pub use crate::numbers::{Groups, Numbers, Pair};
-pub use crate::par::{AxisStyle, AxisType, Par, ParOptions, Pty, Sides};
+pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides};
 pub use crate::plotmath::{Expression, Label};
 pub use crate::recording::{Figure, FigureResult};

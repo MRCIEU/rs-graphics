@@ -166,7 +166,9 @@ enum Clip {
     Device,
 }
 
-/// The labels of [`Graphics::title`](crate::graphics::Graphics::title); `None` draws nothing.
+/// The labels of [`Graphics::title`](crate::graphics::Graphics::title) (`None` draws
+/// nothing) and R's inline `cex.main`/`col.main`/`font.main` and the
+/// `sub` and `lab` ones (`None`: the `par()` value).
 #[derive(Clone, Debug, Default)]
 pub struct TitleOptions {
     /// Main title, above the plot.
@@ -177,6 +179,33 @@ pub struct TitleOptions {
     pub xlab: Option<Label>,
     /// y axis label.
     pub ylab: Option<Label>,
+    /// Size of `main`, relative to `par(cex)` (R's inline `cex.main`);
+    /// `None`: `par(cex.main)`.
+    pub cex_main: Option<f64>,
+    /// Colour of `main` (R's inline `col.main`); `None`:
+    /// `par(col.main)`.
+    pub col_main: Option<ColorSpec>,
+    /// Font of `main` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// inline `font.main`); `None`: `par(font.main)`.
+    pub font_main: Option<i32>,
+    /// Size of `sub`, relative to `par(cex)` (R's inline `cex.sub`);
+    /// `None`: `par(cex.sub)`.
+    pub cex_sub: Option<f64>,
+    /// Colour of `sub` (R's inline `col.sub`); `None`:
+    /// `par(col.sub)`.
+    pub col_sub: Option<ColorSpec>,
+    /// Font of `sub` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// inline `font.sub`); `None`: `par(font.sub)`.
+    pub font_sub: Option<i32>,
+    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's inline `cex.lab`);
+    /// `None`: `par(cex.lab)`.
+    pub cex_lab: Option<f64>,
+    /// Colour of `xlab` and `ylab` (R's inline `col.lab`); `None`:
+    /// `par(col.lab)`.
+    pub col_lab: Option<ColorSpec>,
+    /// Font of `xlab` and `ylab` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// inline `font.lab`); `None`: `par(font.lab)`.
+    pub font_lab: Option<i32>,
 }
 
 crate::setters::setters!(TitleOptions => [TitleCall] {
@@ -184,6 +213,15 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     sub: option Label,
     xlab: option Label,
     ylab: option Label,
+    cex_main: option f64,
+    col_main: option ColorSpec,
+    font_main: option i32,
+    cex_sub: option f64,
+    col_sub: option ColorSpec,
+    font_sub: option i32,
+    cex_lab: option f64,
+    col_lab: option ColorSpec,
+    font_lab: option i32,
 });
 
 impl<B: Backend> Device<B> {
@@ -1114,9 +1152,9 @@ impl<B: Backend> Device<B> {
                 0.5,
                 Some(0.5),
                 0.0,
-                ColorSpec::Color(self.par.col_main),
-                self.par.cex_main,
-                self.par.font_main,
+                opts.col_main.unwrap_or(ColorSpec::Color(self.par.col_main)),
+                opts.cex_main.unwrap_or(self.par.cex_main),
+                opts.font_main.unwrap_or(self.par.font_main),
             );
         }
         if let Some(sub) = &opts.sub {
@@ -1128,9 +1166,9 @@ impl<B: Backend> Device<B> {
                 0.5,
                 Some(0.0),
                 0.0,
-                ColorSpec::Color(self.par.col_sub),
-                self.par.cex_sub,
-                self.par.font_sub,
+                opts.col_sub.unwrap_or(ColorSpec::Color(self.par.col_sub)),
+                opts.cex_sub.unwrap_or(self.par.cex_sub),
+                opts.font_sub.unwrap_or(self.par.font_sub),
             );
         }
         if let Some(xlab) = &opts.xlab {
@@ -1142,9 +1180,9 @@ impl<B: Backend> Device<B> {
                 0.5,
                 Some(0.0),
                 0.0,
-                ColorSpec::Color(self.par.col_lab),
-                self.par.cex_lab,
-                self.par.font_lab,
+                opts.col_lab.unwrap_or(ColorSpec::Color(self.par.col_lab)),
+                opts.cex_lab.unwrap_or(self.par.cex_lab),
+                opts.font_lab.unwrap_or(self.par.font_lab),
             );
         }
         if let Some(ylab) = &opts.ylab {
@@ -1156,9 +1194,9 @@ impl<B: Backend> Device<B> {
                 0.5,
                 Some(0.0),
                 90.0,
-                ColorSpec::Color(self.par.col_lab),
-                self.par.cex_lab,
-                self.par.font_lab,
+                opts.col_lab.unwrap_or(ColorSpec::Color(self.par.col_lab)),
+                opts.cex_lab.unwrap_or(self.par.cex_lab),
+                opts.font_lab.unwrap_or(self.par.font_lab),
             );
         }
         self.par.xpd = saved_xpd;

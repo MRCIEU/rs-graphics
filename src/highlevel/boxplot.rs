@@ -118,7 +118,10 @@ pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Into<f64>) -> BoxStats 
 /// Like R's, the per-box values (`col`, `border`, `boxwex` and every
 /// `box*`/`med*`/`whisk*`/`staple*`/`out*` style) are recycled over the
 /// boxes. The style of each part falls back to the general `lty`, `lwd`,
-/// `pch`, `cex` and `bg` here, then to `par()`, as in `bxp()`.
+/// `pch`, `cex` and `bg` here, then to `par()`, as in `bxp()`. Of the
+/// title parameters, only the `cex.*` and `col.*` ones are passed to
+/// `title()`, as `bxp()` does (`font.main` and co. come from `par()`), and
+/// the frame follows `par(bty)` (`bxp()`'s `box()` takes no `bty`).
 #[derive(Clone, Debug)]
 pub struct BoxplotOptions {
     /// Group labels on the name axis (side 1, or 2 if `horizontal`);
@@ -169,6 +172,24 @@ pub struct BoxplotOptions {
     pub xlab: Option<Label>,
     /// y axis label; `None`: none.
     pub ylab: Option<Label>,
+    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+    /// to `title()`); `None`: `par(cex.main)`.
+    pub cex_main: Option<f64>,
+    /// Colour of `main` (R's `col.main`, passed to `title()`);
+    /// `None`: `par(col.main)`.
+    pub col_main: Option<ColorSpec>,
+    /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
+    /// to `title()`); `None`: `par(cex.sub)`.
+    pub cex_sub: Option<f64>,
+    /// Colour of `sub` (R's `col.sub`, passed to `title()`);
+    /// `None`: `par(col.sub)`.
+    pub col_sub: Option<ColorSpec>,
+    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
+    /// to `title()`); `None`: `par(cex.lab)`.
+    pub cex_lab: Option<f64>,
+    /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
+    /// `None`: `par(col.lab)`.
+    pub col_lab: Option<ColorSpec>,
     /// Draw the titles (R's `ann`); `None`: unless `add` (R's default
     /// `ann = !add`, not `par(ann)`).
     pub ann: Option<bool>,
@@ -271,6 +292,12 @@ crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
     sub: option Label,
     xlab: option Label,
     ylab: option Label,
+    cex_main: option f64,
+    col_main: option ColorSpec,
+    cex_sub: option f64,
+    col_sub: option ColorSpec,
+    cex_lab: option f64,
+    col_lab: option ColorSpec,
     ann: option bool,
     axes: value bool,
     notch: value bool,
@@ -326,6 +353,12 @@ impl Default for BoxplotOptions {
             sub: None,
             xlab: None,
             ylab: None,
+            cex_main: None,
+            col_main: None,
+            cex_sub: None,
+            col_sub: None,
+            cex_lab: None,
+            col_lab: None,
             ann: None,
             axes: true,
             notch: false,
@@ -662,6 +695,13 @@ impl<B: Backend> Device<B> {
                 sub: opts.sub.clone(),
                 xlab: opts.xlab.clone(),
                 ylab: opts.ylab.clone(),
+                cex_main: opts.cex_main,
+                col_main: opts.col_main,
+                cex_sub: opts.cex_sub,
+                col_sub: opts.col_sub,
+                cex_lab: opts.cex_lab,
+                col_lab: opts.col_lab,
+                ..TitleOptions::default()
             });
         }
 

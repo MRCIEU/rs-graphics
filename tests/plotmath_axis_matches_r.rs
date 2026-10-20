@@ -432,6 +432,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
             sub: Some(Label::math("sub[i]")),
             xlab: Some(Label::math("x[1] + x[2]")),
             ylab: Some(Label::math("-log[10](italic(p))")),
+            ..TitleOptions::default()
         })
         .draw();
     let mt = |line| MtextOptions {

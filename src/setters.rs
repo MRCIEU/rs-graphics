@@ -328,6 +328,17 @@ mod tests {
         assert_eq!(par.lend, Some(LineEnd::Butt));
         assert_eq!(par.ljoin, Some(LineJoin::Mitre));
         assert_eq!(par.yaxt, Some(AxisType::None));
+
+        use crate::device::BoxOptions;
+        use crate::par::Bty;
+        let par = ParOptions::default().bty("l").col_main("red");
+        assert_eq!(par.bty, Some(Bty::L));
+        assert_eq!(par.col_main, Some(Color::rgb(255, 0, 0)));
+        assert_eq!(BoxOptions::default().bty("]").bty, Some(Bty::Bracket));
+        assert_eq!(PlotOptions::default().bty("[").bty, Some(Bty::C));
+        assert_eq!(Bty::parse("7"), Some(Bty::Seven));
+        assert_eq!(Bty::parse("outline"), Some(Bty::O)); // first character, as R
+        assert_eq!(Bty::parse("x"), None);
     }
 
     #[test]

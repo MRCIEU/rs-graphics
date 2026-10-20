@@ -26,7 +26,11 @@ usage, see [README.md](README.md).
   returning a call (`dev.points(&x, &y).pch(19).draw()`): the other
   arguments are its setters, or an options struct passed with
   `.with(&opts)`, and `.draw()` runs it; the drawing code is in
-  `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`).
+  `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`;
+  `par(bty)`/`box_().bty(..)`/`plot().bty(..)` choose the sides of the
+  plot box as R's `GBox()`). `title()` and the high-level plots take R's
+  inline `cex.main`/`col.main`/`font.main` and the `sub`/`lab` ones
+  (`boxplot()` only `cex`/`col`, `pie()` only `main`, as R).
   Numbers may be integers, as in R: data vectors are any
   `numbers::Numbers` (`&[f64]` borrowed as is; other number types,
   ranges `1..=10`, converted once; `Groups` for `boxplot()`, `Pair` for
@@ -378,6 +382,11 @@ against a real R installation by shelling out to `Rscript`:
   `add_figure`/`add_figure_at` give byte-identical output to direct calls
   (every kind of call, all backends, mixed in multi-panel pages), `par`
   is restored, and recorded results match the device's.
+- `tests/bty_title_pars_matches_r.rs` - every `bty` (through `plot()`,
+  `par()`, `box(which = )` and `boxplot()`'s frame) and the inline title
+  parameters of `plot()`, `title()`, `hist()`, `barplot()`, `boxplot()`
+  and `pie()`: every painted path and every text item's string, origin,
+  font, size and colour vs. R `pdf()`.
 - `tests/integer_args.rs` (no R needed) - integers wherever R takes
   numbers (data vectors, ranges, recycled and single setters, limits,
   arrays, pairs, `Layout` sizes, `fig()`, backend constructors) draw byte

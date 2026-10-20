@@ -22,6 +22,7 @@ use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
 use crate::lty::LineType;
+use crate::par::Bty;
 use crate::plotmath::Label;
 
 /// `v[i]`, recycling `v`; `default` when `v` is empty.
@@ -246,6 +247,10 @@ pub struct BoxOptions {
     pub lty: Option<LineType>,
     /// `None`: `par(lwd)`.
     pub lwd: Option<f64>,
+    /// Which sides of the plot region to draw (R's inline `bty`); `None`:
+    /// `par(bty)`. Ignored for the other regions, which always get all
+    /// four sides (R's `GBox()`).
+    pub bty: Option<Bty>,
 }
 
 crate::setters::setters!(BoxOptions => [BoxCall] {
@@ -253,6 +258,7 @@ crate::setters::setters!(BoxOptions => [BoxCall] {
     col: option ColorSpec,
     lty: option LineType,
     lwd: option f64,
+    bty: option Bty,
 });
 
 /// Arguments of `plot.window()` besides the limits.
@@ -610,13 +616,43 @@ impl<B: Backend> Device<B> {
             opts.lwd.unwrap_or(self.par.lwd),
             opts.lty.unwrap_or(LineType::SOLID),
         );
-        let rect = match opts.which.unwrap_or_default() {
+        let which = opts.which.unwrap_or_default();
+        let rect = match which {
             BoxWhich::Plot => self.plt,
             BoxWhich::Figure => self.fig,
             BoxWhich::Inner => self.inner,
             BoxWhich::Outer => Rect::new(0.0, 0.0, self.width_in, self.height_in),
         };
         self.dirty();
-        self.backend.draw_rect(rect, None, Some(&stroke));
+        let bty = match which {
+            BoxWhich::Plot => opts.bty.unwrap_or(self.par.bty),
+            _ => Bty::O,
+        };
+        // `GBox()`'s corners, in its order: x[0..7] = bottom-left,
+        // bottom-right, top-right, top-left, then the first three again;
+        // each `bty` is a run of them.
+        let (x0, y0, x1, y1) = (rect.x0, rect.y0, rect.x1, rect.y1);
+        let corners = [
+            Point::new(x0, y0),
+            Point::new(x1, y0),
+            Point::new(x1, y1),
+            Point::new(x0, y1),
+            Point::new(x0, y0),
+            Point::new(x1, y0),
+            Point::new(x1, y1),
+        ];
+        let run = match bty {
+            Bty::O => {
+                self.backend.draw_rect(rect, None, Some(&stroke));
+                return;
+            }
+            Bty::N => return,
+            Bty::L => &corners[3..6],
+            Bty::Seven => &corners[1..4],
+            Bty::C => &corners[2..6],
+            Bty::Bracket => &corners[0..4],
+            Bty::U => &corners[3..7],
+        };
+        self.backend.draw_polyline(run, &stroke);
     }
 }

@@ -16,7 +16,7 @@ use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions};
 use crate::lty::LineType;
-use crate::par::AxisType;
+use crate::par::{AxisType, Bty};
 use crate::plotmath::Label;
 
 use super::data_range;
@@ -125,8 +125,38 @@ pub struct PlotOptions {
     pub xlab: Option<Label>,
     /// y axis label; `None`: none (see `xlab`).
     pub ylab: Option<Label>,
+    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+    /// to `title()`); `None`: `par(cex.main)`.
+    pub cex_main: Option<f64>,
+    /// Colour of `main` (R's `col.main`, passed to `title()`);
+    /// `None`: `par(col.main)`.
+    pub col_main: Option<ColorSpec>,
+    /// Font of `main` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
+    pub font_main: Option<i32>,
+    /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
+    /// to `title()`); `None`: `par(cex.sub)`.
+    pub cex_sub: Option<f64>,
+    /// Colour of `sub` (R's `col.sub`, passed to `title()`);
+    /// `None`: `par(col.sub)`.
+    pub col_sub: Option<ColorSpec>,
+    /// Font of `sub` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// `font.sub`, passed to `title()`); `None`: `par(font.sub)`.
+    pub font_sub: Option<i32>,
+    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
+    /// to `title()`); `None`: `par(cex.lab)`.
+    pub cex_lab: Option<f64>,
+    /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
+    /// `None`: `par(col.lab)`.
+    pub col_lab: Option<ColorSpec>,
+    /// Font of `xlab` and `ylab` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
+    pub font_lab: Option<i32>,
     /// Draw the axes and the box around the plot; default `true`.
     pub axes: bool,
+    /// Which sides of the box to draw (R's inline `bty`, passed to
+    /// `box()`); `None`: `par(bty)`.
+    pub bty: Option<Bty>,
     /// Inline `xaxt` (`plot(x, y, xaxt = "n")`): `AxisType::None` leaves
     /// out the x axis; `None`: `par(xaxt)`.
     pub xaxt: Option<AxisType>,
@@ -156,7 +186,17 @@ crate::setters::setters!(PlotOptions => [PlotCall] {
     sub: option Label,
     xlab: option Label,
     ylab: option Label,
+    cex_main: option f64,
+    col_main: option ColorSpec,
+    font_main: option i32,
+    cex_sub: option f64,
+    col_sub: option ColorSpec,
+    font_sub: option i32,
+    cex_lab: option f64,
+    col_lab: option ColorSpec,
+    font_lab: option i32,
     axes: value bool,
+    bty: option Bty,
     xaxt: option AxisType,
     yaxt: option AxisType,
     xaxp: array [f64; 3],
@@ -181,7 +221,17 @@ impl Default for PlotOptions {
             sub: None,
             xlab: None,
             ylab: None,
+            cex_main: None,
+            col_main: None,
+            font_main: None,
+            cex_sub: None,
+            col_sub: None,
+            font_sub: None,
+            cex_lab: None,
+            col_lab: None,
+            font_lab: None,
             axes: true,
+            bty: None,
             xaxt: None,
             yaxt: None,
             xaxp: None,
@@ -239,7 +289,11 @@ impl<B: Backend> Device<B> {
                 };
                 self.axis_impl(side, &o);
             }
-            self.box_impl(&BoxOptions::default());
+            // `localBox(...)`: `box()` with the inline `bty`.
+            self.box_impl(&BoxOptions {
+                bty: opts.bty,
+                ..BoxOptions::default()
+            });
         }
 
         if self.par.ann {
@@ -248,6 +302,15 @@ impl<B: Backend> Device<B> {
                 sub: opts.sub.clone(),
                 xlab: opts.xlab.clone(),
                 ylab: opts.ylab.clone(),
+                cex_main: opts.cex_main,
+                col_main: opts.col_main,
+                font_main: opts.font_main,
+                cex_sub: opts.cex_sub,
+                col_sub: opts.col_sub,
+                font_sub: opts.font_sub,
+                cex_lab: opts.cex_lab,
+                col_lab: opts.col_lab,
+                font_lab: opts.font_lab,
             });
         }
     }

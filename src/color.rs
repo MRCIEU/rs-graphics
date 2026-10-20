@@ -221,6 +221,11 @@ impl From<Option<Color>> for ColorSpec {
 }
 
 crate::error::from_str_via_parse!(Color, "colour");
+crate::error::from_r_string!(
+    Color,
+    "colour",
+    "a colour name, \"#RRGGBB\", \"#RRGGBBAA\" or \"transparent\""
+);
 
 /// R's `gray.colors(n)` (`start = 0.3`, `end = 0.9`, `gamma = 2.2`).
 pub fn gray_colors(n: usize) -> Vec<ColorSpec> {

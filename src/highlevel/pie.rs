@@ -47,6 +47,15 @@ pub struct PieOptions {
     /// Title, as for `plot()` (text or a plotmath expression); `None`:
     /// none. Drawn whatever `par(ann)` is, as in R.
     pub main: Option<Label>,
+    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+    /// to `title()`); `None`: `par(cex.main)`.
+    pub cex_main: Option<f64>,
+    /// Colour of `main` (R's `col.main`, passed to `title()`);
+    /// `None`: `par(col.main)`.
+    pub col_main: Option<ColorSpec>,
+    /// Font of `main` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
+    pub font_main: Option<i32>,
     /// Approximate number of polygon edges for a full circle; `None`: 200
     /// (R's default).
     pub edges: Option<usize>,
@@ -63,6 +72,9 @@ crate::setters::setters!(PieOptions => [PieCall] {
     col: values ColorSpec,
     border: option ColorSpec,
     main: option Label,
+    cex_main: option f64,
+    col_main: option ColorSpec,
+    font_main: option i32,
     edges: option usize,
     clockwise: value bool,
     init_angle: option f64,
@@ -76,6 +88,9 @@ impl Default for PieOptions {
             col: Vec::new(),
             border: None,
             main: None,
+            cex_main: None,
+            col_main: None,
+            font_main: None,
             edges: None,
             clockwise: false,
             init_angle: None,
@@ -193,6 +208,9 @@ impl<B: Backend> Device<B> {
         if let Some(main) = &opts.main {
             self.title_impl(&TitleOptions {
                 main: Some(main.clone()),
+                cex_main: opts.cex_main,
+                col_main: opts.col_main,
+                font_main: opts.font_main,
                 ..TitleOptions::default()
             });
         }

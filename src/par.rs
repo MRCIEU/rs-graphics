@@ -107,6 +107,54 @@ impl Pty {
 crate::error::from_str_via_parse!(Pty, "pty");
 crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 
+/// `par(bty)`: which sides of the plot region `box()` (and `plot()`'s
+/// frame) draws. As R's `GBox()`, it applies to the plot region only;
+/// `box(which = "figure")` and the others always draw all four sides.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum Bty {
+    /// `"o"`: all four sides (the default).
+    #[default]
+    O,
+    /// `"l"`: left and bottom.
+    L,
+    /// `"7"`: top and right.
+    Seven,
+    /// `"c"` (or `"["`): top, left and bottom.
+    C,
+    /// `"u"`: left, bottom and right.
+    U,
+    /// `"]"`: top, right and bottom.
+    Bracket,
+    /// `"n"`: none.
+    N,
+}
+
+impl Bty {
+    /// R's `bty` strings, read as R does from their first character:
+    /// `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"` (letters
+    /// in either case). `None` for anything else (R: "invalid value
+    /// specified for graphical parameter \"bty\"").
+    pub fn parse(s: &str) -> Option<Bty> {
+        match s.chars().next()? {
+            'o' | 'O' => Some(Bty::O),
+            'l' | 'L' => Some(Bty::L),
+            '7' => Some(Bty::Seven),
+            'c' | 'C' | '[' => Some(Bty::C),
+            'u' | 'U' => Some(Bty::U),
+            ']' => Some(Bty::Bracket),
+            'n' | 'N' => Some(Bty::N),
+            _ => None,
+        }
+    }
+}
+
+crate::error::from_str_via_parse!(Bty, "box type");
+crate::error::from_r_string!(
+    Bty,
+    "box type",
+    "one of \"o\", \"l\", \"7\", \"c\", \"u\", \"]\" or \"n\""
+);
+
 /// `par(xaxt/yaxt)`: whether `axis()` draws on that axis. R's `"s"`, `"l"`
 /// and `"t"` all mean [`AxisType::Standard`]; `"n"` suppresses the axis
 /// (`plot(x, y, xaxt = "n")` before a custom `axis(1, ...)`).
@@ -149,6 +197,9 @@ pub struct Par {
     /// `par(pty)`: [`Pty::Square`] makes the `mar`-based plot region
     /// square. Applied at the next `plot_new()`.
     pub pty: Pty,
+    /// `par(bty)`: which sides of the plot region `box()` and `plot()`'s
+    /// frame draw. Default [`Bty::O`] (all four).
+    pub bty: Bty,
     /// `par(xaxs)`: x axis range style; [`AxisStyle::Regular`] (`"r"`,
     /// the default) extends the range by 4% on each side,
     /// [`AxisStyle::Exact`] (`"i"`) uses it as given.
@@ -278,6 +329,7 @@ impl Default for Par {
             oma: Sides::new(0.0, 0.0, 0.0, 0.0),
             plt: None,
             pty: Pty::Maximal,
+            bty: Bty::O,
             xaxs: AxisStyle::Regular,
             yaxs: AxisStyle::Regular,
 
@@ -392,6 +444,7 @@ par_options!(
     oma: option Sides<f64>,
     plt: option Option<[f64; 4]>,
     pty: option Pty,
+    bty: option Bty,
     xaxs: option AxisStyle,
     yaxs: option AxisStyle,
     col: option Color,
