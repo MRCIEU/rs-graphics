@@ -21,28 +21,44 @@ use crate::plotmath::Label;
 
 use super::data_range;
 
-/// `plot(..., type = )`. Only the core types are implemented: `"p"`
-/// (points, the default), `"l"` (lines), `"b"` (both: points, with the
-/// lines between them stopping short of each point), `"c"` (those broken
-/// lines alone), `"o"` (overplotted: the line drawn straight through,
-/// points on top) and `"n"`
-/// (set up the axes/window but plot nothing, so points/lines can be added
-/// afterwards).
+/// `plot(..., type = )` (and `points()`/`lines()`'s `type`): every type
+/// R has. Lines (all but `"p"` and `"n"`) take the first `col`, `lwd`
+/// and `lty`, except `"h"`, whose lines recycle `col`. Lines break at
+/// `NA`s (and at values <= 0 on a log axis).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlotType {
+    /// `"p"`: points (`plot()`'s default).
     Points,
+    /// `"l"`: lines joining the points.
     Lines,
+    /// `"b"`: both, points with the lines between them stopping short of
+    /// each point.
     Both,
     /// `"c"`: the lines of `"b"` without the points.
     BrokenLines,
+    /// `"o"`: overplotted, the line drawn straight through with points on
+    /// top.
     Overplotted,
+    /// `"h"`: a vertical line from each point to y = 0, or to the bottom
+    /// of the plot on a log y axis ("histogram-like" or "high-density"
+    /// lines, e.g. `plot(table(x))`).
+    Histogram,
+    /// `"s"`: stair steps, moving across to each point's x, then up or
+    /// down to its y (so each y value holds until the next x, as an
+    /// empirical CDF or survival curve).
+    Steps,
+    /// `"S"`: the other steps, moving up or down to each point's y, then
+    /// across to its x.
+    StepsVerticalFirst,
+    /// `"n"`: nothing; `plot()` still sets up the window, axes and titles,
+    /// so points or lines can be added afterwards.
     None,
 }
 
 impl PlotType {
-    /// R's `type =` letters `"p"`, `"l"`, `"b"`, `"c"`, `"o"` and `"n"`.
-    /// `None` for anything else, including R's `"h"`, `"s"` and `"S"`,
-    /// which aren't implemented.
+    /// R's `type =` letters `"p"`, `"l"`, `"b"`, `"c"`, `"o"`, `"h"`,
+    /// `"s"`, `"S"` and `"n"`; `None` for anything else (R: "invalid plot
+    /// type").
     pub fn parse(s: &str) -> Option<PlotType> {
         match s {
             "p" => Some(PlotType::Points),
@@ -50,6 +66,9 @@ impl PlotType {
             "b" => Some(PlotType::Both),
             "c" => Some(PlotType::BrokenLines),
             "o" => Some(PlotType::Overplotted),
+            "h" => Some(PlotType::Histogram),
+            "s" => Some(PlotType::Steps),
+            "S" => Some(PlotType::StepsVerticalFirst),
             "n" => Some(PlotType::None),
             _ => None,
         }
@@ -63,12 +82,13 @@ crate::error::from_str_via_parse!(PlotType, "plot type");
 /// defaults, given for each.
 #[derive(Clone, Debug)]
 pub struct PlotOptions {
-    /// What to draw (R's `type`); `None`: points (`"p"`).
+    /// What to draw (R's `type`, see [`PlotType`]); `None`: points
+    /// (`"p"`).
     pub type_: Option<PlotType>,
     /// Plotting symbols, recycled per point; empty: `par(pch)`.
     pub pch: Vec<i32>,
-    /// Colours, recycled per point (lines use the first); empty:
-    /// `par(col)`.
+    /// Colours, recycled per point (lines use the first, except
+    /// `type = "h"`'s, one per point); empty: `par(col)`.
     pub col: Vec<ColorSpec>,
     /// Fill of symbols 21-25, recycled per point; empty: none (R's `NA`).
     pub bg: Vec<ColorSpec>,

@@ -12,6 +12,8 @@
 //! with outer margins (so the 0.83 multi-panel `cex` applies). Skipped if
 //! `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -19,14 +21,6 @@ use rs_graphics::color::ColorSpec;
 use rs_graphics::device::{Device, MtextOptions};
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// `(x, y, font size, rotation)` of every text matrix, in drawing order.
 fn text_origins(pdf: &str) -> Vec<(f64, f64, f64, f64)> {
@@ -104,8 +98,7 @@ fn r_arg<T: std::fmt::Display>(name: &str, v: Option<T>) -> String {
 
 #[test]
 fn mtext_placement_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let cases = cases();

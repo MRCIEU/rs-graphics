@@ -10,8 +10,9 @@
 //! making the same calls on the device: every kind of call, on all three
 //! backends, alone and mixed with direct calls in multi-panel pages, plus
 //! `add_figure_at`, `par` being restored, and the results recorded figures
-//! return. (Not an R cross-check: the direct calls are checked against R
-//! elsewhere.)
+//! return. Also that `legend()`'s R-style positions (`"topright"`,
+//! `(x, y)`, corners) draw the same as the `LegendPos` variants. (Not an R
+//! cross-check: the direct calls are checked against R elsewhere.)
 
 use rs_graphics::prelude::*;
 
@@ -286,4 +287,40 @@ fn recording_checks_arguments_like_the_device() {
         r.is_err(),
         "wrong number of names should panic when recorded"
     );
+}
+
+/// The legends drawn with R-style positions or with `LegendPos` variants.
+fn legends<G: Graphics>(g: &mut G, short: bool) {
+    let x = [1.0, 10.0];
+    g.plot(&x, &x).draw();
+    let keys = [LegendEntry::point("a", 1, 19)];
+    if short {
+        g.legend("bottomr", &keys).draw();
+        g.legend((5.0, 3.0), &keys).draw();
+        g.legend(((2.0, 4.0), (6.0, 9.0)), &keys).draw();
+    } else {
+        g.legend(LegendPos::Keyword(LegendKeyword::BottomRight), &keys)
+            .draw();
+        g.legend(LegendPos::Xy(5.0, 3.0), &keys).draw();
+        g.legend(LegendPos::Corners(2.0, 6.0, 4.0, 9.0), &keys)
+            .draw();
+    }
+}
+
+#[test]
+fn legend_shorthand_draws_the_same() {
+    let draw = |short: bool, record: bool| {
+        let mut dev = device(Format::Pdf);
+        if record {
+            let mut fig = Figure::new();
+            legends(&mut fig, short);
+            dev.add_figure(&fig);
+        } else {
+            legends(&mut dev, short);
+        }
+        dev.finish()
+    };
+    let long = draw(false, false);
+    assert_eq!(draw(true, false), long, "on a device");
+    assert_eq!(draw(true, true), long, "in a figure");
 }

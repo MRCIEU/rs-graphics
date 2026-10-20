@@ -170,8 +170,13 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `list`/formula input reduced to its common case; a single group is
     /// `boxplot(&[x])`); options in [`BoxplotOptions`]. A high-level plot:
     /// it starts a new plot with [`plot_new`](Graphics::plot_new), so on a
-    /// multi-panel page it moves to the next panel. `.draw()` returns each
-    /// group's statistics.
+    /// multi-panel page it moves to the next panel, unless `add` (R's
+    /// `add = TRUE`), which draws the boxes on the current plot. `.draw()`
+    /// returns each group's statistics.
+    ///
+    /// # Panics
+    /// If `groups` is empty, or `at` or `width` doesn't have one value per
+    /// group (or a width isn't positive), as R errors.
     fn boxplot<'a>(&'a mut self, groups: &'a [Vec<f64>]) -> BoxplotCall<'a, Self> {
         BoxplotCall {
             target: self,
@@ -395,19 +400,35 @@ pub trait Graphics: sealed::Sealed + Sized {
     }
 
     /// `legend(pos, legend, ...)`, a port of R's layout: one row per
-    /// [`LegendEntry`], placed by `pos` (coordinates or a keyword such as
-    /// `"topright"`); options in [`LegendOptions`]. On a [`Device`],
-    /// `.draw()` returns where the
-    /// box and labels went (R's return value, in `usr` units), or `None`
-    /// if `entries` is empty (R errors there).
+    /// [`LegendEntry`], placed by `pos`; options in [`LegendOptions`]. On
+    /// a [`Device`], `.draw()` returns where the box and labels went (R's
+    /// return value, in `usr` units), or `None` if `entries` is empty (R
+    /// errors there).
+    ///
+    /// `pos` is written as in R (see [`LegendPos`]): a keyword such as
+    /// `"topright"`, a point `(x, y)`, or two corners
+    /// `((xa, xb), (ya, yb))`:
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::svg(5.0, 5.0);
+    /// # dev.plot(&[1.0, 10.0], &[1.0, 30.0]).draw();
+    /// let keys = [LegendEntry::point("observed", 1, 19)];
+    /// dev.legend("topright", &keys).draw(); // legend("topright", ...)
+    /// dev.legend((5.0, 20.0), &keys).draw(); // legend(5, 20, ...)
+    /// ```
+    ///
+    /// # Panics
+    /// If `pos` is a string that isn't one of R's nine keywords (or a
+    /// unique prefix of one).
     fn legend<'a>(
         &'a mut self,
-        pos: LegendPos,
+        pos: impl Into<LegendPos>,
         entries: &'a [LegendEntry],
     ) -> LegendCall<'a, Self> {
         LegendCall {
             target: self,
-            pos,
+            pos: pos.into(),
             entries,
             opts: LegendOptions::default(),
         }

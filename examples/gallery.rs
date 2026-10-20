@@ -84,6 +84,34 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
     dev.plot(&x, &y).with(&opts).draw();
 }
 
+fn draw_types_h_s<B: Backend>(dev: &mut Device<B>) {
+    dev.par().mfrow(1, 2).draw();
+
+    // type = "h": counts as vertical lines.
+    let k: Vec<f64> = (0..=8).map(f64::from).collect();
+    let counts = [2.0, 5.0, 9.0, 14.0, 11.0, 7.0, 4.0, 2.0, 1.0];
+    dev.plot(&k, &counts)
+        .type_(PlotType::Histogram)
+        .lwd(4.0)
+        .col(4)
+        .main("plot(): type = \"h\"")
+        .xlab("k")
+        .ylab("count")
+        .draw();
+
+    // type = "s": an empirical CDF as stair steps.
+    let mut x = parse_data(include_str!("data/hist_x.txt"));
+    x.sort_by(f64::total_cmp);
+    let n = x.len() as f64;
+    let fx: Vec<f64> = (1..=x.len()).map(|i| i as f64 / n).collect();
+    dev.plot(&x, &fx)
+        .type_(PlotType::Steps)
+        .main("plot(): type = \"s\"")
+        .xlab("x")
+        .ylab("Fn(x)")
+        .draw();
+}
+
 fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
     let x: Vec<f64> = (0..=15).map(|i| 10f64.powf(i as f64 / 5.0)).collect();
     let y: Vec<f64> = x
@@ -117,9 +145,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, dashed),
     ];
     let o = LegendOptions::default().bg(Color::WHITE);
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
-        .with(&o)
-        .draw();
+    dev.legend("topleft", &entries).with(&o).draw();
 }
 
 fn draw_legend<B: Backend>(dev: &mut Device<B>) {
@@ -143,9 +169,7 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         LegendEntry::line("cos(x)", 4, 2.0, LineType::DASHED),
     ];
     let o = LegendOptions::default().title("Functions");
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopRight), &entries)
-        .with(&o)
-        .draw();
+    dev.legend("topright", &entries).with(&o).draw();
 }
 
 fn draw_hist<B: Backend>(dev: &mut Device<B>) {
@@ -272,6 +296,7 @@ fn main() {
     save_gallery_plot("plot_scatter", 6.0, 4.0, draw_scatter);
     save_gallery_plot("plot_line", 6.0, 4.0, draw_lineplot);
     save_gallery_plot("plot_log", 6.0, 4.0, draw_log);
+    save_gallery_plot("plot_h_s", 8.0, 4.0, draw_types_h_s);
     save_gallery_plot("abline_log", 6.0, 4.0, draw_abline_log);
     save_gallery_plot("legend", 6.0, 4.0, draw_legend);
     save_gallery_plot("hist", 6.0, 4.0, draw_hist);

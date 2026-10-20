@@ -1,22 +1,55 @@
-name: Rust
+name: CI
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  # Every test, including the R cross-checks (tests/*_matches_r.rs).
+  # RS_GRAPHICS_REQUIRE_R makes them fail, rather than skip, if Rscript
+  # is missing.
+  test:
     runs-on: ubuntu-latest
-
+    env:
+      RS_GRAPHICS_REQUIRE_R: "1"
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+      - name: R version
+        run: Rscript --version
+      - name: Build
+        run: cargo build --all-targets --locked
+      - name: Test
+        run: cargo test --locked
+
+  # The minimum supported Rust version (Cargo.toml's rust-version).
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --all-targets --locked
+
+  # Doc comments: broken intra-doc links and other rustdoc warnings fail.
+  docs:
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Docs
+        run: cargo doc --no-deps --locked

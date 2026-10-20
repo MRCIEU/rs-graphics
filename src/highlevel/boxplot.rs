@@ -8,8 +8,8 @@
 
 //! `boxplot(x, ...)`, ported from `boxplot.default`/`bxp`/`boxplot.stats`
 //! in `r-source/src/library/graphics/R/boxplot.R`, for a list of numeric
-//! groups drawn at positions `1, 2, ..., n`, vertical or `horizontal`, with
-//! `notch` and `varwidth`.
+//! groups: positions (`at`), widths, `notch`, `varwidth`, `horizontal`,
+//! `add`, `outline`, log axes and `bxp()`'s drawing parameters.
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
@@ -107,26 +107,55 @@ pub fn boxplot_stats(x: &[f64], coef: f64) -> BoxStats {
     }
 }
 
-/// Options for [`Graphics::boxplot`](crate::graphics::Graphics::boxplot), covering the subset of `boxplot.default`'s/
-/// `bxp`'s arguments this crate implements. Unset fields are R's
-/// defaults, given for each. Like `bxp()`, the boxes use `par(lty)` and
-/// `par(lwd)` (the median 3 times as wide), dashed whiskers, and
-/// `par(pch)` for outliers.
+/// Options for [`Graphics::boxplot`](crate::graphics::Graphics::boxplot):
+/// the arguments of R's `boxplot.default` and `bxp()`, including the
+/// drawing parameters R takes in `pars` or directly (`boxplot(x, medlwd =
+/// 2)`). Unset fields are R's defaults, given for each.
+///
+/// Like R's, the per-box values (`col`, `border`, `boxwex` and every
+/// `box*`/`med*`/`whisk*`/`staple*`/`out*` style) are recycled over the
+/// boxes. The style of each part falls back to the general `lty`, `lwd`,
+/// `pch`, `cex` and `bg` here, then to `par()`, as in `bxp()`.
 #[derive(Clone, Debug)]
 pub struct BoxplotOptions {
     /// Group labels on the name axis (side 1, or 2 if `horizontal`);
     /// `None` gives `1, 2, ...`. Only drawn when there's more than one
     /// box, matching R's `show.names <- n > 1`.
     pub names: Option<Vec<Label>>,
-    /// Box fill; `None`: `"lightgray"` (R's default).
-    pub col: Option<ColorSpec>,
-    /// Colour of the box outlines, median, whiskers, staples and
-    /// outliers; `None`: `par(fg)` (R's default).
-    pub border: Option<ColorSpec>,
+    /// Box fills (R's `col`, passed to `bxp()` as `boxfill`), recycled
+    /// over the boxes; empty: `"lightgray"`.
+    pub col: Vec<ColorSpec>,
+    /// Colours of the box outlines, median, whiskers, staples and
+    /// outliers, recycled over the boxes; empty: `par(fg)`.
+    pub border: Vec<ColorSpec>,
     /// Whiskers reach the most extreme point within `range` times the
     /// box length (IQR) of the box; points beyond are outliers. `None`:
     /// 1.5 (R's default).
     pub range: Option<f64>,
+    /// Box positions on the name axis, one per group; `None`: `1, 2,
+    /// ..., n`.
+    pub at: Option<Vec<f64>>,
+    /// Relative box widths, one per group (scaled so the widest is
+    /// `boxwex`); `None`: equal widths, or by group size with `varwidth`.
+    pub width: Option<Vec<f64>>,
+    /// Draw on the current plot (R's `add = TRUE`) instead of starting a
+    /// new one. Default `false`.
+    pub add: bool,
+    /// Draw outliers (and include them in the default value range).
+    /// Default `true`.
+    pub outline: bool,
+    /// Log x axis (R's `log = "x"`): the position axis, or the value axis
+    /// when `horizontal`. Default `false`.
+    pub xlog: bool,
+    /// Log y axis (R's `log = "y"`): the value axis, or the position axis
+    /// when `horizontal`. Default `false`.
+    pub ylog: bool,
+    /// Limits of the position axis; `None`: `range(at) + c(-0.5, 0.5)`.
+    pub xlim: Option<(f64, f64)>,
+    /// Limits of the value axis (also when `horizontal`, as in R);
+    /// `None`: the range of the statistics, plus the outliers (unless
+    /// `outline` is off) and the notches (with `notch`).
+    pub ylim: Option<(f64, f64)>,
     /// Main title, as for `plot()` (text or a plotmath expression);
     /// `None`: none.
     pub main: Option<Label>,
@@ -136,10 +165,11 @@ pub struct BoxplotOptions {
     pub xlab: Option<Label>,
     /// y axis label; `None`: none.
     pub ylab: Option<Label>,
-    /// Draw the titles (R's `ann`, which defaults to `TRUE`, not
-    /// `par(ann)`); default `true`.
-    pub ann: bool,
-    /// Draw the axes and the box around the plot; default `true`.
+    /// Draw the titles (R's `ann`); `None`: unless `add` (R's default
+    /// `ann = !add`, not `par(ann)`).
+    pub ann: Option<bool>,
+    /// Draw the axes and the box around the plot (also with `add`, as in
+    /// R); default `true`.
     pub axes: bool,
     /// Notched boxes: the box narrows to half its width at the median,
     /// between [`BoxStats::conf`]'s limits (R's `notch.frac = 0.5`).
@@ -151,52 +181,212 @@ pub struct BoxplotOptions {
     /// Horizontal boxes: group names on side 2, values on side 1. Default
     /// `false`.
     pub horizontal: bool,
+
+    /// Box widths, in units of the position axis (of its natural log on a
+    /// log axis); empty: 0.8 (R's `boxplot()` default, whatever `at` is).
+    pub boxwex: Vec<f64>,
+    /// Staple width as a fraction of the box width; empty: 0.5.
+    pub staplewex: Vec<f64>,
+    /// Width of the outlier lines (see `outlty`) as a fraction of the box
+    /// width; empty: 0.5.
+    pub outwex: Vec<f64>,
+
+    /// Default line type of the box, median and staples, and of the
+    /// whiskers; empty: `par(lty)` (the whiskers: dashed).
+    pub lty: Vec<LineType>,
+    /// Default line width of every part (the median: 3 times it); empty:
+    /// `par(lwd)`.
+    pub lwd: Vec<f64>,
+    /// Default outlier symbol; empty: `par(pch)`.
+    pub pch: Vec<i32>,
+    /// Default size of the median and outlier symbols; empty: 1.
+    pub cex: Vec<f64>,
+    /// Default fill of the median and outlier symbols (21 to 25); empty:
+    /// `par(bg)`.
+    pub bg: Vec<ColorSpec>,
+
+    /// Line type of the box outline; empty: `lty`.
+    pub boxlty: Vec<LineType>,
+    /// Line width of the box outline; empty: `lwd`.
+    pub boxlwd: Vec<f64>,
+    /// Colour of the box outline; empty: `border`.
+    pub boxcol: Vec<ColorSpec>,
+    /// Line type of the median; empty: `lty`.
+    pub medlty: Vec<LineType>,
+    /// Line width of the median; empty: 3 times `lwd`.
+    pub medlwd: Vec<f64>,
+    /// A symbol drawn at the median; empty: none.
+    pub medpch: Vec<i32>,
+    /// Size of the median symbol; empty: `cex`.
+    pub medcex: Vec<f64>,
+    /// Colour of the median line and symbol; empty: `border`.
+    pub medcol: Vec<ColorSpec>,
+    /// Fill of the median symbol; empty: `bg`.
+    pub medbg: Vec<ColorSpec>,
+    /// Line type of the whiskers; empty: `lty`, else dashed.
+    pub whisklty: Vec<LineType>,
+    /// Line width of the whiskers; empty: `lwd`.
+    pub whisklwd: Vec<f64>,
+    /// Colour of the whiskers; empty: `border`.
+    pub whiskcol: Vec<ColorSpec>,
+    /// Line type of the staples; empty: `lty`.
+    pub staplelty: Vec<LineType>,
+    /// Line width of the staples; empty: `lwd`.
+    pub staplelwd: Vec<f64>,
+    /// Colour of the staples; empty: `border`.
+    pub staplecol: Vec<ColorSpec>,
+    /// Line type of a short line across each outlier (`outwex` wide);
+    /// empty: blank (no line).
+    pub outlty: Vec<LineType>,
+    /// Line width of the outlier lines and symbols; empty: `lwd`.
+    pub outlwd: Vec<f64>,
+    /// Outlier symbol; empty: `pch`.
+    pub outpch: Vec<i32>,
+    /// Size of the outlier symbols; empty: `cex`.
+    pub outcex: Vec<f64>,
+    /// Colour of the outlier lines and symbols; empty: `border`.
+    pub outcol: Vec<ColorSpec>,
+    /// Fill of the outlier symbols; empty: `bg`.
+    pub outbg: Vec<ColorSpec>,
 }
 
 crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
     names: list Label,
-    col: option ColorSpec,
-    border: option ColorSpec,
+    col: values ColorSpec,
+    border: values ColorSpec,
     range: option f64,
+    at: option_values f64,
+    width: option_values f64,
+    add: value bool,
+    outline: value bool,
+    xlog: value bool,
+    ylog: value bool,
+    xlim: pair f64,
+    ylim: pair f64,
     main: option Label,
     sub: option Label,
     xlab: option Label,
     ylab: option Label,
-    ann: value bool,
+    ann: option bool,
     axes: value bool,
     notch: value bool,
     varwidth: value bool,
     horizontal: value bool,
+    boxwex: values f64,
+    staplewex: values f64,
+    outwex: values f64,
+    lty: values LineType,
+    lwd: values f64,
+    pch: values i32,
+    cex: values f64,
+    bg: values ColorSpec,
+    boxlty: values LineType,
+    boxlwd: values f64,
+    boxcol: values ColorSpec,
+    medlty: values LineType,
+    medlwd: values f64,
+    medpch: values i32,
+    medcex: values f64,
+    medcol: values ColorSpec,
+    medbg: values ColorSpec,
+    whisklty: values LineType,
+    whisklwd: values f64,
+    whiskcol: values ColorSpec,
+    staplelty: values LineType,
+    staplelwd: values f64,
+    staplecol: values ColorSpec,
+    outlty: values LineType,
+    outlwd: values f64,
+    outpch: values i32,
+    outcex: values f64,
+    outcol: values ColorSpec,
+    outbg: values ColorSpec,
 });
 
 impl Default for BoxplotOptions {
     fn default() -> Self {
         BoxplotOptions {
             names: None,
-            col: None,
-            border: None,
+            col: Vec::new(),
+            border: Vec::new(),
             range: None,
+            at: None,
+            width: None,
+            add: false,
+            outline: true,
+            xlog: false,
+            ylog: false,
+            xlim: None,
+            ylim: None,
             main: None,
             sub: None,
             xlab: None,
             ylab: None,
-            ann: true,
+            ann: None,
             axes: true,
             notch: false,
             varwidth: false,
             horizontal: false,
+            boxwex: Vec::new(),
+            staplewex: Vec::new(),
+            outwex: Vec::new(),
+            lty: Vec::new(),
+            lwd: Vec::new(),
+            pch: Vec::new(),
+            cex: Vec::new(),
+            bg: Vec::new(),
+            boxlty: Vec::new(),
+            boxlwd: Vec::new(),
+            boxcol: Vec::new(),
+            medlty: Vec::new(),
+            medlwd: Vec::new(),
+            medpch: Vec::new(),
+            medcex: Vec::new(),
+            medcol: Vec::new(),
+            medbg: Vec::new(),
+            whisklty: Vec::new(),
+            whisklwd: Vec::new(),
+            whiskcol: Vec::new(),
+            staplelty: Vec::new(),
+            staplelwd: Vec::new(),
+            staplecol: Vec::new(),
+            outlty: Vec::new(),
+            outlwd: Vec::new(),
+            outpch: Vec::new(),
+            outcex: Vec::new(),
+            outcol: Vec::new(),
+            outbg: Vec::new(),
         }
     }
 }
 
 /// Each group's statistics, as [`Graphics::boxplot`](crate::graphics::Graphics::boxplot) returns them. Needs no
-/// device, so a recorded figure can return the same result.
+/// device, so a recorded figure can return the same result. Checks the
+/// arguments as R does, so recording panics where drawing would.
 pub(crate) fn boxplot_all_stats(groups: &[Vec<f64>], opts: &BoxplotOptions) -> Vec<BoxStats> {
-    assert!(!groups.is_empty(), "boxplot: need at least one group");
+    let n = groups.len();
+    assert!(n > 0, "boxplot: need at least one group");
+    if let Some(at) = &opts.at {
+        assert!(
+            at.len() == n,
+            "boxplot: 'at' must have the same length as the number of groups, i.e. {n}"
+        );
+    }
+    if let Some(w) = &opts.width {
+        assert!(
+            w.len() == n && w.iter().all(|&v| v > 0.0),
+            "boxplot: invalid boxplot widths"
+        );
+    }
     groups
         .iter()
         .map(|g| boxplot_stats(g, opts.range.unwrap_or(1.5)))
         .collect()
+}
+
+/// R's `pcycle()`: `v`'s `i`-th value, recycled, or `None` if `v` is empty.
+fn cycle<T: Copy>(v: &[T], i: usize) -> Option<T> {
+    (!v.is_empty()).then(|| v[i % v.len()])
 }
 
 impl<B: Backend> Device<B> {
@@ -210,60 +400,74 @@ impl<B: Backend> Device<B> {
     ) -> Vec<BoxStats> {
         let n = groups.len();
         let stats = boxplot_all_stats(groups, opts);
-        let at: Vec<f64> = (1..=n).map(|i| i as f64).collect();
-        let xlim = (0.5, n as f64 + 0.5);
+        let at: Vec<f64> = opts
+            .at
+            .clone()
+            .unwrap_or_else(|| (1..=n).map(|i| i as f64).collect());
 
-        let mut ylo = f64::INFINITY;
-        let mut yhi = f64::NEG_INFINITY;
-        for s in &stats {
-            for &v in [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker]
-                .iter()
-                .chain(s.outliers.iter())
-            {
-                if v.is_finite() {
-                    ylo = ylo.min(v);
-                    yhi = yhi.max(v);
-                }
-            }
-        }
-        if opts.notch {
+        let ylim = opts.ylim.unwrap_or_else(|| {
+            let mut lo = f64::INFINITY;
+            let mut hi = f64::NEG_INFINITY;
             for s in &stats {
-                for v in [s.conf.0, s.conf.1] {
+                let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
+                let out = if opts.outline { &s.outliers[..] } else { &[] };
+                let conf = if opts.notch {
+                    vec![s.conf.0, s.conf.1]
+                } else {
+                    vec![]
+                };
+                for &v in five.iter().chain(out).chain(&conf) {
                     if v.is_finite() {
-                        ylo = ylo.min(v);
-                        yhi = yhi.max(v);
+                        lo = lo.min(v);
+                        hi = hi.max(v);
                     }
                 }
             }
-        }
-        let ylim = if ylo <= yhi { (ylo, yhi) } else { (0.0, 1.0) };
+            if lo <= hi { (lo, hi) } else { (0.0, 1.0) }
+        });
 
-        // R's default `boxwex = 0.8 * quantile(diff(sort(at)), 0.10)`; since
-        // `at = 1:n` the gaps are all `1`, so this is always `0.8`. Widths are
-        // halved for a single box, or scaled by `sqrt(n / max(n))` for
-        // `varwidth`.
-        let boxwex = 0.8;
+        if !opts.add {
+            let xlim = opts.xlim.unwrap_or_else(|| {
+                let finite = at.iter().copied().filter(|v| v.is_finite());
+                let lo = finite.clone().fold(f64::INFINITY, f64::min);
+                let hi = finite.fold(f64::NEG_INFINITY, f64::max);
+                (lo - 0.5, hi + 0.5)
+            });
+            self.plot_new_impl();
+            let window = PlotWindowOptions {
+                xlog: opts.xlog,
+                ylog: opts.ylog,
+                ..PlotWindowOptions::default()
+            };
+            if opts.horizontal {
+                self.plot_window_impl(ylim, xlim, &window);
+            } else {
+                self.plot_window_impl(xlim, ylim, &window);
+            }
+        }
+        // Whether the position axis is logarithmic (from the device, as R's
+        // `par()`, so it also holds with `add`).
+        let pos_log = if opts.horizontal {
+            self.ylog()
+        } else {
+            self.xlog()
+        };
+
+        // `boxplot()` passes `bxp()` `pars = list(boxwex = 0.8, ...)`, so
+        // `bxp()`'s own default (from the gaps between `at`) never applies.
+        let boxwex = |i: usize| cycle(&opts.boxwex, i).unwrap_or(0.8);
         let max_n = stats.iter().map(|s| s.n).max().unwrap_or(0) as f64;
-        let widths: Vec<f64> = stats
-            .iter()
-            .map(|s| {
-                if opts.varwidth {
-                    boxwex * (s.n as f64 / max_n).sqrt()
-                } else if n == 1 {
-                    0.5 * boxwex
-                } else {
-                    boxwex
+        let widths: Vec<f64> = (0..n)
+            .map(|i| match &opts.width {
+                Some(w) => {
+                    let max = w.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                    boxwex(i) * w[i] / max
                 }
+                None if opts.varwidth => boxwex(i) * (stats[i].n as f64 / max_n).sqrt(),
+                None if n == 1 => 0.5 * boxwex(i),
+                None => boxwex(i),
             })
             .collect();
-
-        self.plot_new_impl();
-        let window = PlotWindowOptions::default();
-        if opts.horizontal {
-            self.plot_window_impl(ylim, xlim, &window);
-        } else {
-            self.plot_window_impl(xlim, ylim, &window);
-        }
 
         // `bxp()`'s `xypolygon`/`xysegments`/`xypoints`: (position, value) in,
         // swapped for horizontal boxes.
@@ -275,94 +479,154 @@ impl<B: Backend> Device<B> {
                 (pos.to_vec(), val.to_vec())
             }
         };
-        let lwd = self.par.lwd;
-        let border = opts.border.unwrap_or(ColorSpec::Color(self.par.fg));
-        let fill = opts
-            .col
-            .unwrap_or_else(|| ColorSpec::Color(Color::parse("lightgray").unwrap()));
-        // bxp(): boxlty, medlty, staplelty = par(lty); whisklty "dashed".
-        let lty = self.par.lty;
+        // `xP()`: `x + w`, or `x * exp(w)` on a log position axis.
+        let xp = |x: f64, w: f64| if pos_log { x * w.exp() } else { x + w };
+
+        // `bxp()`'s per-box parameters (`pcycle`): the specific value, else
+        // the general one, else `par()`.
+        let par_lty = self.par.lty;
+        let par_lwd = self.par.lwd;
+        let par_pch = self.par.pch;
+        let par_bg = ColorSpec::Color(self.par.bg);
+        let fg = ColorSpec::Color(self.par.fg);
+        let lightgray = ColorSpec::Color(Color::parse("lightgray").unwrap());
+        let lty = |i| cycle(&opts.lty, i);
+        let lwd = |i| cycle(&opts.lwd, i).unwrap_or(par_lwd);
+        let cex = |i| cycle(&opts.cex, i).unwrap_or(1.0);
+        let bg = |i| cycle(&opts.bg, i).unwrap_or(par_bg);
+        let border = |i| cycle(&opts.border, i).unwrap_or(fg);
         let notch_frac = if opts.notch { 0.5 } else { 1.0 };
         for (i, s) in stats.iter().enumerate() {
             let x = at[i];
-            let half = widths[i] / 2.0;
+            let wid = widths[i] / 2.0;
             let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
             if five.iter().any(|v| v.is_nan()) {
                 continue;
             }
-            // In `bxp()`'s order: box fill, median, whiskers, staples, then the
-            // box border on top, then outliers.
+            let line = |col: ColorSpec, lty: LineType, lwd: f64| SegmentsOptions {
+                col: vec![col],
+                lty: vec![lty],
+                lwd: vec![lwd],
+                ..SegmentsOptions::default()
+            };
+            // In `bxp()`'s order: box fill, median (line, then symbol),
+            // whiskers, staples, then the box border on top, then outliers.
             let (box_pos, box_val): (Vec<f64>, Vec<f64>) = if opts.notch {
                 let (c0, c1) = s.conf;
                 let f = notch_frac;
                 (
                     [-1.0, 1.0, 1.0, f, 1.0, 1.0, -1.0, -1.0, -f, -1.0]
                         .iter()
-                        .map(|w| x + half * w)
+                        .map(|w| xp(x, wid * w))
                         .collect(),
                     vec![s.q1, s.q1, c0, s.median, c1, s.q3, s.q3, c1, s.median, c0],
                 )
             } else {
                 (
-                    vec![x - half, x + half, x + half, x - half],
+                    [-1.0, 1.0, 1.0, -1.0]
+                        .iter()
+                        .map(|w| xp(x, wid * w))
+                        .collect(),
                     vec![s.q1, s.q1, s.q3, s.q3],
                 )
             };
             let (bx, by) = xy(&box_pos, &box_val);
             let box_fill = PolygonOptions {
-                col: vec![fill],
+                col: vec![cycle(&opts.col, i).unwrap_or(lightgray)],
                 border: vec![ColorSpec::None],
                 lty: vec![LineType::BLANK],
-                lwd: Some(lwd),
                 ..PolygonOptions::default()
             };
             self.polygon_impl(&bx, &by, &box_fill);
-            // medlwd = 3 * par(lwd), with `lend = 1` (butt), "to avoid
-            // overlap": round ends would reach past the box sides. With a
-            // notch it spans only the notch.
-            let wntch = notch_frac * half;
+
+            // The median, with `lend = 1` (butt), "to avoid overlap": round
+            // ends would reach past the box sides. With a notch it spans
+            // only the notch.
+            let medcol = cycle(&opts.medcol, i).unwrap_or(border(i));
+            let wntch = notch_frac * wid;
             let lend = std::mem::replace(&mut self.par.lend, LineEnd::Butt);
-            let (mx, my) = xy(&[x - wntch, x + wntch], &[s.median, s.median]);
-            let line = |lwd: f64, lty: LineType| SegmentsOptions {
-                col: vec![border],
-                lty: vec![lty],
-                lwd: vec![lwd],
-                ..SegmentsOptions::default()
-            };
-            let median = line(3.0 * lwd, lty);
+            let (mx, my) = xy(&[xp(x, -wntch), xp(x, wntch)], &[s.median, s.median]);
+            let median = line(
+                medcol,
+                cycle(&opts.medlty, i).or(lty(i)).unwrap_or(par_lty),
+                cycle(&opts.medlwd, i).unwrap_or(3.0 * lwd(i)),
+            );
             self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
             self.par.lend = lend;
+            if let Some(pch) = cycle(&opts.medpch, i) {
+                let (px, py) = xy(&[x], &[s.median]);
+                let symbol = XyOptions {
+                    pch: vec![pch],
+                    cex: vec![cycle(&opts.medcex, i).unwrap_or(cex(i))],
+                    col: vec![medcol],
+                    bg: vec![cycle(&opts.medbg, i).unwrap_or(bg(i))],
+                    ..XyOptions::default()
+                };
+                self.points_impl(&px, &py, &symbol);
+            }
+
             // Whiskers run from their ends to the hinges (which matters for
-            // where the dashes fall); whisklty = "dashed". Then the staples
-            // (staplewex = 0.5).
+            // where the dashes fall), then the staples.
             let ends = [(s.lower_whisker, s.q1), (s.upper_whisker, s.q3)];
+            let whisker = line(
+                cycle(&opts.whiskcol, i).unwrap_or(border(i)),
+                cycle(&opts.whisklty, i)
+                    .or(lty(i))
+                    .unwrap_or(LineType::DASHED),
+                cycle(&opts.whisklwd, i).unwrap_or(lwd(i)),
+            );
             for &(w, h) in &ends {
                 let (sx, sy) = xy(&[x, x], &[w, h]);
-                let dashed = line(lwd, LineType::DASHED);
-                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &dashed);
+                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &whisker);
             }
-            let cap = half * 0.5;
+            let cap = wid * cycle(&opts.staplewex, i).unwrap_or(0.5);
+            let staple = line(
+                cycle(&opts.staplecol, i).unwrap_or(border(i)),
+                cycle(&opts.staplelty, i).or(lty(i)).unwrap_or(par_lty),
+                cycle(&opts.staplelwd, i).unwrap_or(lwd(i)),
+            );
             for &(w, _) in &ends {
-                let (sx, sy) = xy(&[x - cap, x + cap], &[w, w]);
-                let staple = line(lwd, lty);
+                let (sx, sy) = xy(&[xp(x, -cap), xp(x, cap)], &[w, w]);
                 self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &staple);
             }
             let box_border = PolygonOptions {
                 col: vec![ColorSpec::None],
-                border: vec![border],
-                lty: vec![lty],
-                lwd: Some(lwd),
+                border: vec![cycle(&opts.boxcol, i).unwrap_or(border(i))],
+                lty: vec![cycle(&opts.boxlty, i).or(lty(i)).unwrap_or(par_lty)],
+                lwd: Some(cycle(&opts.boxlwd, i).unwrap_or(lwd(i))),
                 ..PolygonOptions::default()
             };
             self.polygon_impl(&bx, &by, &box_border);
-            if !s.outliers.is_empty() {
+
+            if opts.outline && !s.outliers.is_empty() {
+                let outcol = cycle(&opts.outcol, i).unwrap_or(border(i));
+                let outlwd = cycle(&opts.outlwd, i).unwrap_or(lwd(i));
+                // A line across each outlier; blank (nothing) by default. R
+                // computes its ends as `x -/+ w` even on a log position axis;
+                // we use `xP()`, as for every other part.
+                let outlty = cycle(&opts.outlty, i).unwrap_or(LineType::BLANK);
+                if outlty != LineType::BLANK {
+                    let half = wid * cycle(&opts.outwex, i).unwrap_or(0.5);
+                    let k = s.outliers.len();
+                    let (x0, y0) = xy(&vec![xp(x, -half); k], &s.outliers);
+                    let (x1, y1) = xy(&vec![xp(x, half); k], &s.outliers);
+                    self.segments_impl(&x0, &y0, &x1, &y1, &line(outcol, outlty, outlwd));
+                }
                 let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
                 let (ox, oy) = xy(&pos, &s.outliers);
-                // outpch = par(pch). (R's outcex = par(cex) is then
-                // multiplied by par(cex) again, squaring it; we apply it
-                // once, as for any point.)
+                // R's default `outcex = par(cex)` is then multiplied by
+                // par(cex) again, squaring it; we apply it once, as for any
+                // point.
                 let outliers = XyOptions {
-                    col: vec![border],
+                    pch: vec![
+                        cycle(&opts.outpch, i)
+                            .or(cycle(&opts.pch, i))
+                            .unwrap_or(par_pch),
+                    ],
+                    cex: vec![cycle(&opts.outcex, i).unwrap_or(cex(i))],
+                    col: vec![outcol],
+                    bg: vec![cycle(&opts.outbg, i).unwrap_or(bg(i))],
+                    lwd: vec![outlwd],
                     ..XyOptions::default()
                 };
                 self.points_impl(&ox, &oy, &outliers);
@@ -388,7 +652,7 @@ impl<B: Backend> Device<B> {
             self.axis_impl(value_side, &AxisOptions::default());
         }
 
-        if opts.ann {
+        if opts.ann.unwrap_or(!opts.add) {
             self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),

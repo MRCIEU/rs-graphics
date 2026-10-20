@@ -12,6 +12,8 @@
 //! boxes, `cex`/`intersp`, `par(cex)` and corner-pair positioning. Skipped if
 //! `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -23,14 +25,6 @@ use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
 use rs_graphics::graphics::Graphics;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// `(x, y)` of every text matrix, sorted.
 fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
@@ -305,8 +299,7 @@ fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: (f64
 
 #[test]
 fn legend_layout_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let cases = cases();
@@ -393,8 +386,7 @@ fn legend_layout_matches_r() {
 /// On log axes R's return value is in `usr` units (log10), as ours.
 #[test]
 fn legend_return_value_on_log_axes_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let script = "pdf(NULL, width = 6, height = 4)\n\

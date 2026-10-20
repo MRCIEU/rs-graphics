@@ -14,6 +14,8 @@
 //! the AFM's Standard Encoding codes, where 177 is `endash`). Skipped if
 //! `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -21,14 +23,6 @@ use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// `(x, y, string bytes)` of every text-showing operation, in drawing order.
 /// Handles both `(...) Tj` and R's kerned `[(...) n (...)] TJ` (whose string
@@ -94,8 +88,7 @@ const LABELS: &[&str] = &["beta ± 1SE", "café crème", "Größe ×2", "© 1999
 
 #[test]
 fn latin1_text_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

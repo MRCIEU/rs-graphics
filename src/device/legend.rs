@@ -38,16 +38,82 @@ use crate::plotmath::Label;
 use super::{Clip, Device};
 
 /// Where to put a legend: R's `legend(x, y)` forms.
+///
+/// [`legend()`](crate::graphics::Graphics::legend) takes anything that
+/// converts into one, so positions can be written as in R:
+///
+/// | R | Rust shorthand | Variant |
+/// |---|---|---|
+/// | `legend("topright", ...)` | `"topright"` (or `LegendKeyword::TopRight`) | [`Keyword`](LegendPos::Keyword) |
+/// | `legend(5, 20, ...)` | `(5.0, 20.0)` | [`Xy`](LegendPos::Xy) |
+/// | `legend(c(5, 15), c(10, 20), ...)` | `((5.0, 15.0), (10.0, 20.0))` | [`Corners`](LegendPos::Corners) |
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LegendPos {
-    /// A single point in user coordinates; anchored by `xjust`/`yjust`
-    /// (default: the top-left corner of the legend box).
+    /// A single point `(x, y)` in user coordinates; anchored by
+    /// `xjust`/`yjust` (default: the top-left corner of the legend box).
     Xy(f64, f64),
-    /// Two opposite corners of the legend box, in user coordinates (R's
-    /// `nx == 2` case): the box is stretched to fit exactly.
+    /// Two opposite corners of the legend box, `(xa, ya, xb, yb)` in user
+    /// coordinates (R's `nx == 2` case): the box is stretched to fit
+    /// exactly.
     Corners(f64, f64, f64, f64),
     /// One of R's nine keyword positions, relative to the plot region.
     Keyword(LegendKeyword),
+}
+
+impl From<LegendKeyword> for LegendPos {
+    fn from(k: LegendKeyword) -> Self {
+        LegendPos::Keyword(k)
+    }
+}
+
+impl From<&str> for LegendPos {
+    /// One of R's keywords, matched like R's `match.arg()`
+    /// ([`LegendKeyword::parse`]: the full name, or a unique prefix such
+    /// as `"topr"`).
+    ///
+    /// # Panics
+    /// If `s` is not a keyword or is an ambiguous prefix (R errors too);
+    /// use [`LegendKeyword::parse`] or `str::parse` to handle that
+    /// yourself.
+    fn from(s: &str) -> Self {
+        match LegendKeyword::parse(s) {
+            Some(k) => LegendPos::Keyword(k),
+            None => panic!(
+                "legend: {s:?} is not a legend position; use one of \
+                 \"bottomright\", \"bottom\", \"bottomleft\", \"left\", \
+                 \"topleft\", \"top\", \"topright\", \"right\" or \"center\""
+            ),
+        }
+    }
+}
+
+impl From<String> for LegendPos {
+    /// As `From<&str>`.
+    fn from(s: String) -> Self {
+        LegendPos::from(s.as_str())
+    }
+}
+
+impl From<&String> for LegendPos {
+    /// As `From<&str>`.
+    fn from(s: &String) -> Self {
+        LegendPos::from(s.as_str())
+    }
+}
+
+impl From<(f64, f64)> for LegendPos {
+    /// `(x, y)`: R's `legend(x, y)`, a point in user coordinates.
+    fn from((x, y): (f64, f64)) -> Self {
+        LegendPos::Xy(x, y)
+    }
+}
+
+impl From<((f64, f64), (f64, f64))> for LegendPos {
+    /// `((xa, xb), (ya, yb))`: R's `legend(x = c(xa, xb), y = c(ya, yb))`,
+    /// two opposite corners of the box.
+    fn from(((xa, xb), (ya, yb)): ((f64, f64), (f64, f64))) -> Self {
+        LegendPos::Corners(xa, ya, xb, yb)
+    }
 }
 
 /// R's `"bottomright"`, `"bottom"`, ... keyword positions.
@@ -591,6 +657,44 @@ impl<B: Backend> Device<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn positions_convert_like_r() {
+        let p = |p: LegendPos| p;
+        assert_eq!(
+            p("topright".into()),
+            LegendPos::Keyword(LegendKeyword::TopRight)
+        );
+        assert_eq!(
+            p("topr".into()),
+            LegendPos::Keyword(LegendKeyword::TopRight)
+        );
+        assert_eq!(
+            p(String::from("center").into()),
+            LegendPos::Keyword(LegendKeyword::Center)
+        );
+        assert_eq!(
+            p(LegendKeyword::Left.into()),
+            LegendPos::Keyword(LegendKeyword::Left)
+        );
+        assert_eq!(p((5.0, 20.0).into()), LegendPos::Xy(5.0, 20.0));
+        assert_eq!(
+            p(((5.0, 15.0), (10.0, 20.0)).into()),
+            LegendPos::Corners(5.0, 10.0, 15.0, 20.0)
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "\"middle\" is not a legend position")]
+    fn unknown_keyword_panics() {
+        let _ = LegendPos::from("middle");
+    }
+
+    #[test]
+    #[should_panic(expected = "\"to\" is not a legend position")]
+    fn ambiguous_prefix_panics() {
+        let _ = LegendPos::from("to");
+    }
 
     #[test]
     fn keyword_parsing_is_like_match_arg() {

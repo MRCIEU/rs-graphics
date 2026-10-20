@@ -14,6 +14,8 @@
 //! and origin) with an uncompressed R `pdf()`. Skipped if `Rscript` isn't
 //! available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -23,14 +25,6 @@ use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
 use rs_graphics::graphics::Graphics;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
@@ -181,8 +175,7 @@ fn close(a: &[f64], b: &[f64]) -> bool {
 
 #[test]
 fn start_ps_sizes_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

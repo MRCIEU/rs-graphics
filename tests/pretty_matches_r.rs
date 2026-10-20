@@ -17,17 +17,11 @@
 //! This test is skipped (not failed) if `Rscript` isn't on `PATH`, so it
 //! stays portable for contributors without R installed.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::pretty::ge_pretty;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 fn r_xaxp(lo: f64, up: f64, ndiv: i32) -> (f64, f64, i32) {
     let script = format!(
@@ -57,8 +51,7 @@ fn r_xaxp(lo: f64, up: f64, ndiv: i32) -> (f64, f64, i32) {
 
 #[test]
 fn ge_pretty_matches_r_xaxp() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
 

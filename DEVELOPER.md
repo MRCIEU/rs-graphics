@@ -57,7 +57,9 @@ usage, see [README.md](README.md).
   (`Graphics::legend`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
   filled boxes and merged point+line keys, and returns R's `rect` and
-  `text` positions (`LegendLayout`, in `par("usr")` units).
+  `text` positions (`LegendLayout`, in `par("usr")` units). Positions are
+  written as in R (`"topright"` with `match.arg()` prefixes, `(x, y)`,
+  `((xa, xb), (ya, yb))`) or as `LegendPos` variants.
 - Coordinates: `Device::usr()` is R's `par("usr")` (log10 on log axes),
   `Device::xlog()`/`ylog()` tell which axes are logarithmic, and
   `user_to_inches`/`inches_to_user` convert between data units and
@@ -89,7 +91,7 @@ usage, see [README.md](README.md).
 
 **High-level plots** (`src/highlevel/`), each a fairly direct port of
 the corresponding `*.default` R function:
-- `plot()` - scatter/line plots (`type = "p"/"l"/"b"/"c"/"o"/"n"`).
+- `plot()` - scatter/line plots (every `type`: `"p"/"l"/"b"/"c"/"o"/"h"/"s"/"S"/"n"`).
 - `hist()` - histograms, including R's Sturges'-rule default binning and
   `add = TRUE`.
 - `barplot()` - vectors and matrices (one method; a matrix is given as
@@ -97,7 +99,10 @@ the corresponding `*.default` R function:
   `horiz`, with `legend.text`, `space`, `width`, `xlim`/`ylim`.
 - `boxplot()` - Tukey boxplots (via `fivenum()`, not `quantile()` -
   see [Design notes](#design-notes)), including the 1.5*IQR outlier rule,
-  `notch`, `varwidth` and `horizontal`.
+  `notch`, `varwidth`, `horizontal`, `at`, `width`, `add`, `outline`, log
+  axes, `xlim`/`ylim` and `bxp()`'s drawing parameters (`boxwex`,
+  `staplewex`, `outwex`, `lty`/`lwd`/`pch`/`cex`/`bg` and the `box*`,
+  `med*`, `whisk*`, `staple*` and `out*` styles).
 - `pie()` - pie charts.
 
 **Backends** (`src/backend/`):
@@ -131,8 +136,7 @@ To keep this a tractable "core functionality" port, the following R
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
 fonts, the plotmath constructs listed above, and interactive input
 (`identify()`/`locator()`). `barplot()` doesn't
-support `density`/`angle` hatching, `offset`, or `add`, and
-`boxplot()` doesn't support `at`/`width`/`add` or `pars`. These would all be
+support `density`/`angle` hatching, `offset`, or `add`. These would be
 reasonable follow-ups but are left for future work.
 
 ## Design notes
@@ -220,7 +224,7 @@ A few fidelity-relevant decisions worth calling out:
 
 ```sh
 cargo run --example gallery
-# -> gallery_output/{plot_scatter,plot_line,plot_log,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,boxplot_horizontal,pie,multipanel,pch}.{svg,pdf,png}
+# -> gallery_output/{plot_scatter,plot_line,plot_log,plot_h_s,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,boxplot_horizontal,pie,multipanel,pch}.{svg,pdf,png}
 #    and gallery_output/multipage.pdf (3 pages)
 ```
 
@@ -235,6 +239,9 @@ style:
 Rscript examples/gen_reference.R
 # -> reference_output/{...}.{pdf,png} (and .svg, if your R has cairo support)
 ```
+
+R's `svg()` needs cairo, which on macOS needs XQuartz; without it the
+script says so and skips the SVGs.
 
 To use different sample data, rerun `Rscript examples/gen_data.R` and then
 both of the commands above.
@@ -262,6 +269,10 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/boxplot_draw_matches_r.rs` - every painted path of `boxplot()`
   in drawing order (vertices, fill/stroke, colours, width, cap, dashes),
   incl. `notch`, `varwidth`, `horizontal` and all three together.
+- `tests/boxplot_extras_matches_r.rs` - `boxplot()`'s `at`/`width`,
+  `outline = FALSE`, drawing parameters, outlier lines, `add = TRUE`, log
+  value and position axes, and `xlim`/`ylim` with `horizontal`: every
+  painted path and every text item vs. R `pdf()`.
 - `tests/barplot_matches_r.rs` - bar rectangles and text origins vs. an
   uncompressed R `pdf()` for vector, stacked, `beside`, and `horiz`
   scenarios.
@@ -318,6 +329,11 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
   segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
   axis, and `type = "c"` (the same lines, no points).
+- `tests/plot_type_h_s_matches_r.rs` - `type = "h"` (lines from y = 0, or
+  the bottom of the plot on a log y axis; colours recycled, `NA` colours
+  and values skipped) and `"s"`/`"S"` steps (broken at `NA`, log axes,
+  `lty`/`lwd`) in `plot()`, `lines()` and `points()`: every stroked
+  path's vertices, colour, width and dash.
 - `tests/log_plots_matches_r.rs` - `segments()` with ends <= 0 or `NA` on
   log axes, `abline()` on log-log and log-x plots
   (`h`/`v`, `a`/`b`, `untf`, `xpd = TRUE`), `hist()` with `log = "x"`/`"y"`,
@@ -374,7 +390,24 @@ against a real R installation by shelling out to `Rscript`:
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but
 for any change touching layout, tick placement, or text metrics, please
-run with R available if you can.
+run with R available if you can. Setting `RS_GRAPHICS_REQUIRE_R=1` makes
+them fail instead of skipping (`tests/common/mod.rs`).
+
+### Continuous integration
+
+`.github/workflows/rust.yml` runs on pushes and pull requests to `main`
+(and by hand, from the Actions tab), on Ubuntu:
+
+- **test** - installs the current R release (`r-lib/actions/setup-r`)
+  and runs `cargo test` with `RS_GRAPHICS_REQUIRE_R=1`, so every R
+  cross-check runs;
+- **msrv** - builds everything with Rust 1.85, `Cargo.toml`'s
+  `rust-version`;
+- **docs** - `cargo doc` with rustdoc warnings (e.g. broken intra-doc
+  links) as errors.
+
+All three use `--locked`, so commit `Cargo.lock` changes. Clippy and
+rustfmt aren't checked: the code base isn't clean under either yet.
 
 ## Licence notices
 

@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         LegendEntry::point("observed", "steelblue", 19),
         LegendEntry::line("threshold", "grey", 1.0, LineType::DASHED),
     ];
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &keys).draw();
+    dev.legend("topleft", &keys).draw();
     dev.save("scatter.pdf")?;
     Ok(())
 }
@@ -76,7 +76,7 @@ let keys = [
     LegendEntry::point("control", 1, 19),
     LegendEntry::point("treated", 2, 19),
 ];
-dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &keys).draw();
+dev.legend("topleft", &keys).draw();
 // R: dev.off()
 dev.save("points.png")?;
 ```
@@ -152,7 +152,7 @@ let keys = [
     LegendEntry::point("observed", 1, 1),
     LegendEntry::line("fitted", "red", 1.0, LineType::SOLID),
 ];
-fig.legend(LegendPos::Keyword(LegendKeyword::BottomRight), &keys).draw();
+fig.legend("bottomright", &keys).draw();
 
 let mut dev = Device::pdf(8.0, 8.0);
 dev.par().mfrow(2, 2).draw();

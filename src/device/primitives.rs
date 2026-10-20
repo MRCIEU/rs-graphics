@@ -46,12 +46,13 @@ fn recycled_len(lens: &[usize]) -> usize {
 /// Arguments of `points()` and `lines()`, both R's `plot.xy()`.
 #[derive(Clone, Debug, Default)]
 pub struct XyOptions {
-    /// R's `type`: `None` is `"p"` for `points()` and `"l"` for `lines()`.
+    /// R's `type` (see [`PlotType`]): `None` is `"p"` for `points()` and
+    /// `"l"` for `lines()`.
     pub type_: Option<PlotType>,
     /// Plotting symbols, recycled per point; empty: `par(pch)`.
     pub pch: Vec<i32>,
-    /// Colours, recycled per point (lines use the first); empty:
-    /// `par(col)`.
+    /// Colours, recycled per point (lines use the first, except
+    /// `type = "h"`'s, one per point); empty: `par(col)`.
     pub col: Vec<ColorSpec>,
     /// Fill of symbols 21-25, recycled per point; empty: none (R's `NA`).
     pub bg: Vec<ColorSpec>,
@@ -336,7 +337,8 @@ impl<B: Backend> Device<B> {
         self.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Lines), opts);
     }
 
-    /// `C_plotXY` for `type` `"p"`, `"l"`, `"b"`, `"c"`, `"o"` and `"n"`.
+    /// `C_plotXY`: the lines for `type`, then the points for `"p"`, `"b"`
+    /// and `"o"`.
     fn plot_xy(&mut self, x: &[f64], y: &[f64], type_: PlotType, opts: &XyOptions) {
         let clip = self.clip_for(opts.xpd);
         let line = || {
@@ -363,6 +365,15 @@ impl<B: Backend> Device<B> {
                 let (col, lwd, lty) = line();
                 self.polyline_xy(x, y, col, lwd, lty, clip);
                 self.xy_points(x, y, opts, clip);
+            }
+            PlotType::Histogram => {
+                let (_, lwd, lty) = line();
+                self.histogram_xy(x, y, &opts.col, lwd, lty, clip);
+            }
+            PlotType::Steps | PlotType::StepsVerticalFirst => {
+                let (col, lwd, lty) = line();
+                let vertical_first = type_ == PlotType::StepsVerticalFirst;
+                self.steps_xy(x, y, vertical_first, col, lwd, lty, clip);
             }
             PlotType::None => {}
         }

@@ -12,6 +12,8 @@
 //! a skipped `NA` segment and a zero-length arrow (drawn without heads).
 //! Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -19,14 +21,6 @@ use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// Every stroked/filled `m`/`l` path's vertices, in drawing order (clips
 /// and rectangles are skipped).
@@ -78,8 +72,7 @@ fn r_vec(v: &[f64]) -> String {
 
 #[test]
 fn arrows_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

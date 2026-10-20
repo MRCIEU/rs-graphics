@@ -14,6 +14,8 @@
 //! `main` is included: our PDF backend replicates R's pdf-device font-size
 //! rounding (`floor(cex * ps + 0.5)`, so `cex.main = 1.2` is 14pt, not 14.4pt).
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -21,14 +23,6 @@ use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// All `(a, b, c, d, x, y)` text matrices (`... Tm`) in an uncompressed PDF.
 fn text_matrices(pdf: &str) -> Vec<[f64; 6]> {
@@ -76,8 +70,7 @@ fn sgn(v: f64) -> i32 {
 
 #[test]
 fn axis_and_label_text_positions_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
 

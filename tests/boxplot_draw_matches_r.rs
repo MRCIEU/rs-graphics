@@ -14,6 +14,8 @@
 //! Covers `notch`, `varwidth` and `horizontal`. Axes are off, so only the
 //! boxes themselves are compared. Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -22,14 +24,6 @@ use rs_graphics::device::Device;
 use rs_graphics::highlevel::BoxplotOptions;
 use rs_graphics::par::Par;
 use rs_graphics::graphics::Graphics;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 const PAGE_W: f64 = 6.0;
 const PAGE_H: f64 = 4.0;
@@ -144,8 +138,8 @@ fn draw_ours(c: &Case) -> String {
     };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     let opts = BoxplotOptions {
-        col: Some(ColorSpec::Color(Color::parse(c.col).unwrap())),
-        border: Some(ColorSpec::Color(Color::parse(c.border).unwrap())),
+        col: vec![ColorSpec::Color(Color::parse(c.col).unwrap())],
+        border: vec![ColorSpec::Color(Color::parse(c.border).unwrap())],
         axes: false,
         notch: c.notch,
         varwidth: c.varwidth,
@@ -315,8 +309,7 @@ fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
 
 #[test]
 fn boxplot_drawing_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

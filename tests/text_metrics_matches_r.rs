@@ -12,20 +12,14 @@
 //! `cexbase` of a 2x2 `mfrow`. Strings avoid kerning pairs that R's `pdf()` skips (the
 //! `KPend` bug we don't copy). Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
 use rs_graphics::par::Par;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 struct Case {
     text: &'static str,
@@ -89,8 +83,7 @@ const CASES: &[Case] = &[
 
 #[test]
 fn text_metrics_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let r_str = |s: &str| s.replace('\n', "\\n");

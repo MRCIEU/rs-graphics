@@ -11,20 +11,14 @@
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
 use rs_graphics::par::Par;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 fn r_hist(data: &[f64]) -> (Vec<f64>, Vec<f64>) {
     let values: Vec<String> = data.iter().map(|v| format!("{v:.17}")).collect();
@@ -63,8 +57,7 @@ fn r_hist(data: &[f64]) -> (Vec<f64>, Vec<f64>) {
 
 #[test]
 fn breaks_and_counts_match_r_sturges() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
 

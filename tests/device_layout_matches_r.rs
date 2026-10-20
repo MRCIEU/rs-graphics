@@ -10,20 +10,14 @@
 //! against R's own `par("pin")`/`par("mai")`/`par("usr")` on a `pdf()`
 //! device. Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 fn r_par_values(width: f64, height: f64, ps: f64, xlim: (f64, f64), ylim: (f64, f64)) -> Vec<f64> {
     let script = format!(
@@ -52,8 +46,7 @@ fn r_par_values(width: f64, height: f64, ps: f64, xlim: (f64, f64), ylim: (f64, 
 
 #[test]
 fn plot_region_and_usr_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
 

@@ -12,17 +12,11 @@
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::highlevel::boxplot::boxplot_stats;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 fn r_boxplot_stats(data: &[f64]) -> (Vec<f64>, Vec<f64>) {
     let values: Vec<String> = data.iter().map(|v| format!("{v:.17}")).collect();
@@ -64,8 +58,7 @@ fn r_boxplot_stats(data: &[f64]) -> (Vec<f64>, Vec<f64>) {
 
 #[test]
 fn stats_match_r_boxplot_stats() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
 

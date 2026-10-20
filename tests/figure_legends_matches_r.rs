@@ -16,6 +16,8 @@
 //! `FigureResult::legends` entry with R's `legend()` return value.
 //! Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::prelude::*;
@@ -44,14 +46,6 @@ fit <- function(label, ...) {
     key(label, ...)
 }
 "#;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 fn keys() -> [LegendEntry; 2] {
     [
@@ -302,8 +296,7 @@ fn drawn_rects(pdf: &str) -> Vec<[f64; 4]> {
 
 #[test]
 fn figure_legends_in_panels_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

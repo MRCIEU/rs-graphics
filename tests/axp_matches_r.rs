@@ -13,6 +13,8 @@
 //! origins, and every two-point stroke, vs. an uncompressed R `pdf()`).
 //! Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -20,14 +22,6 @@ use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
@@ -61,8 +55,7 @@ const WINDOWS: &[Window] = &[
 
 #[test]
 fn axp_values_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let mut script = String::from("pdf(NULL)\n");
@@ -202,8 +195,7 @@ fn extract(pdf: &str) -> (Vec<Label>, Vec<Vec<f64>>) {
 
 #[test]
 fn axp_ticks_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();
