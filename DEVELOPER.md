@@ -238,6 +238,9 @@ Rscript examples/gen_reference.R
 # -> reference_output/{...}.{pdf,png} (and .svg, if your R has cairo support)
 ```
 
+R's `svg()` needs cairo, which on macOS needs XQuartz; without it the
+script says so and skips the SVGs.
+
 To use different sample data, rerun `Rscript examples/gen_data.R` and then
 both of the commands above.
 

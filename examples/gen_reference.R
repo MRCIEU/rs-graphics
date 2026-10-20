@@ -22,21 +22,40 @@ read_vec <- function(name) {
   scan(file.path("examples", "data", paste0(name, ".txt")), quiet = TRUE)
 }
 
+# R's svg() needs cairo (on macOS, cairo needs XQuartz). Without it, the
+# SVG references are skipped. `capabilities("cairo")` can say TRUE even
+# when cairo fails to load, so try opening the device: when svg() fails it
+# opens nothing (and the plot would go to Rplots.pdf instead).
+have_svg <- local({
+  n <- length(dev.list())
+  suppressWarnings(try(svg(tempfile(fileext = ".svg")), silent = TRUE))
+  opened <- length(dev.list()) > n
+  if (opened) invisible(dev.off())
+  opened
+})
+if (!have_svg) {
+  cat("R has no cairo support: skipping the SVG references",
+      "(on macOS, install XQuartz to enable svg()).\n")
+}
+
 save_all <- function(name, width, height, draw) {
   pdf(file.path("reference_output", paste0(name, ".pdf")), width = width, height = height)
   draw()
   dev.off()
 
-  svg(file.path("reference_output", paste0(name, ".svg")), width = width, height = height)
-  draw()
-  dev.off()
+  if (have_svg) {
+    svg(file.path("reference_output", paste0(name, ".svg")), width = width, height = height)
+    draw()
+    dev.off()
+  }
 
   png(file.path("reference_output", paste0(name, ".png")), width = width, height = height,
       units = "in", res = 300)
   draw()
   dev.off()
 
-  cat(sprintf("wrote reference_output/%s.{pdf,svg,png}\n", name))
+  cat(sprintf("wrote reference_output/%s.{%s}\n", name,
+              if (have_svg) "pdf,svg,png" else "pdf,png"))
 }
 
 save_all("plot_scatter", 6, 4, function() {
