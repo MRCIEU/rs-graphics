@@ -193,6 +193,24 @@ fn cases() -> Vec<Case> {
                     .draw();
             },
         },
+        Case {
+            name: "title_adj",
+            r: "plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                par(adj = 0); title(main = 'M', sub = 'S', xlab = 'X', ylab = 'Y')\n\
+                title(main = 'N', xlab = 'W', ylab = 'Z', adj = 1)\n\
+                par(adj = 0.5); title(sub = 'T', adj = 0.25)\n\
+                title(main = expression(alpha^2), adj = 0.75)",
+            ours: |d| {
+                d.plot_new();
+                d.plot_window((0, 10), (0, 10)).draw();
+                d.par().adj(0).draw();
+                d.title().main("M").sub("S").xlab("X").ylab("Y").draw();
+                d.title().main("N").xlab("W").ylab("Z").adj(1).draw();
+                d.par().adj(0.5).draw();
+                d.title().sub("T").adj(0.25).draw();
+                d.title().main(Label::math("alpha^2")).adj(0.75).draw();
+            },
+        },
     ]
 }
 

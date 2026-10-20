@@ -209,6 +209,10 @@ pub struct TitleOptions {
     /// Font of `xlab` and `ylab` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
     /// inline `font.lab`); `None`: `par(font.lab)`.
     pub font_lab: Option<i32>,
+    /// Where each title sits along its side of the plot region, and how
+    /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
+    /// right (top) (R's inline `adj`); `None`: `par(adj)`.
+    pub adj: Option<f64>,
 }
 
 crate::setters::setters!(TitleOptions => [TitleCall] {
@@ -225,6 +229,7 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     cex_lab: option f64,
     col_lab: option ColorSpec,
     font_lab: option i32,
+    adj: option f64,
 });
 
 impl<B: Backend> Device<B> {
@@ -1207,8 +1212,11 @@ impl<B: Backend> Device<B> {
     /// describe it.
     pub(crate) fn title_impl(&mut self, opts: &TitleOptions) {
         let lh = self.line_height_inches();
-        let x_mid = (self.plt.x0 + self.plt.x1) / 2.0;
-        let y_mid = (self.plt.y0 + self.plt.y1) / 2.0;
+        // `C_title`: every title sits at `adj` (NPC) along its side and is
+        // justified by `adj` (`GMtext` uses `par(adj)` in all cases).
+        let adj = opts.adj.unwrap_or(self.par.adj);
+        let x_at = self.plt.x0 + adj * self.plt.width();
+        let y_at = self.plt.y0 + adj * self.plt.height();
         // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
         // `GMtext` nudges the line by `yLineBias` (see `line_bias`).
         if let Some(main) = &opts.main {
@@ -1217,9 +1225,9 @@ impl<B: Backend> Device<B> {
             let y = self.plt.y1 + 0.5 * self.mar.top * lh;
             self.draw_label(
                 Xpd::Figure,
-                Point::new(x_mid, y),
+                Point::new(x_at, y),
                 main,
-                0.5,
+                adj,
                 Some(0.5),
                 0.0,
                 opts.col_main.unwrap_or(ColorSpec::Color(self.par.col_main)),
@@ -1232,9 +1240,9 @@ impl<B: Backend> Device<B> {
             let y = self.plt.y0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
-                Point::new(x_mid, y),
+                Point::new(x_at, y),
                 sub,
-                0.5,
+                adj,
                 Some(0.0),
                 0.0,
                 opts.col_sub.unwrap_or(ColorSpec::Color(self.par.col_sub)),
@@ -1247,9 +1255,9 @@ impl<B: Backend> Device<B> {
             let y = self.plt.y0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
-                Point::new(x_mid, y),
+                Point::new(x_at, y),
                 xlab,
-                0.5,
+                adj,
                 Some(0.0),
                 0.0,
                 opts.col_lab.unwrap_or(ColorSpec::Color(self.par.col_lab)),
@@ -1262,9 +1270,9 @@ impl<B: Backend> Device<B> {
             let x = self.plt.x0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
-                Point::new(x, y_mid),
+                Point::new(x, y_at),
                 ylab,
-                0.5,
+                adj,
                 Some(0.0),
                 90.0,
                 opts.col_lab.unwrap_or(ColorSpec::Color(self.par.col_lab)),
