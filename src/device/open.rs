@@ -60,7 +60,7 @@ crate::setters::setters!(DeviceBuilder {
     bg: option ColorSpec,
     res: option f64,
     compress: option bool,
-});
+}; no_setter: format, file);
 
 impl DeviceBuilder {
     /// Opens the device and creates (or empties) its file, as R's `pdf()`

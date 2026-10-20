@@ -96,15 +96,26 @@ impl Values<i32> for char {
 /// `setters!(Struct => [CallA, CallB] { ... })` also gives each listed
 /// builder in [`crate::graphics`] the same setters (writing to its
 /// `opts`), plus `with(&Struct)`.
+///
+/// Every field of the struct needs a line: a field without one is a
+/// compile error at the `setters!` call. A field that deliberately has no
+/// setter (set by a constructor) is named after the braces:
+/// `setters!(Struct { ... }; no_setter: a, b)`.
 macro_rules! setters {
-    ($ty:ident $body:tt) => {
-        $crate::setters::setters!(@opts $ty $body);
+    ($ty:ident $body:tt $(; no_setter: $($skip:ident),+ $(,)?)?) => {
+        $crate::setters::setters!(@opts $ty $body [$($($skip),+)?]);
     };
     ($ty:ident => [$($call:ident),+ $(,)?] $body:tt) => {
-        $crate::setters::setters!(@opts $ty $body);
+        $crate::setters::setters!(@opts $ty $body []);
         $( $crate::setters::setters!(@call $ty $call $body); )+
     };
-    (@opts $ty:ident { $($field:ident : $kind:ident $t:ty),* $(,)? }) => {
+    (@opts $ty:ident { $($field:ident : $kind:ident $t:ty),* $(,)? } [$($skip:ident),*]) => {
+        // Every field has a setter line (or is listed after `no_setter:`):
+        // this pattern names them all, with no `..`, so a field added to the
+        // struct without one is a compile error here.
+        const _: fn(&$ty) = |s| {
+            let $ty { $($field: _,)* $($skip: _,)* } = s;
+        };
         // R's argument names, such as `sub` (a subtitle) and `add`, win over
         // clippy's wish to keep `std::ops` method names free.
         #[allow(clippy::should_implement_trait)]

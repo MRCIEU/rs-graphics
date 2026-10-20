@@ -397,6 +397,11 @@ impl Backend for PdfBackend {
         self.background
     }
 
+    /// R's `pdf()` works in big points.
+    fn device_unit_inches(&self) -> f64 {
+        1.0 / 72.0
+    }
+
     fn new_page(&mut self) {
         let page = std::mem::take(&mut self.content);
         if self.started {

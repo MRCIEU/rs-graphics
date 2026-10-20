@@ -505,6 +505,12 @@ macro_rules! par_options {
         $($field:ident : $kind:ident $t:ty),* $(,)?
         ; optional: $($ofield:ident : $okind:ident $ot:ty),* $(,)?
     ) => {
+        // Every `Par` field is in one of the lists: this pattern names them
+        // all, with no `..`, so a `Par` field added without a line here is a
+        // compile error.
+        const _: fn(&Par) = |p| {
+            let Par { $($field: _,)* $($ofield: _,)* } = p;
+        };
         /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
         /// plus `new` (R's `par(new = TRUE)`). R's `mfrow`/`mfcol`/`mfg`/
         /// `fig`/`fin` aren't here: they change the device's page layout,

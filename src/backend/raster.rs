@@ -1253,6 +1253,14 @@ impl Backend for RasterBackend {
         1.0 / self.dpi
     }
 
+    /// Unrounded, as R's cairo/Quartz `png()`.
+    fn effective_font_size(&self, requested_pt: f64) -> f64 {
+        requested_pt
+    }
+
+    /// A new page's background is painted over the old one.
+    fn new_page(&mut self) {}
+
     fn push_clip(&mut self, rect: Rect) {
         let (x0, y1) = self.to_px(Point::new(rect.x0, rect.y1));
         let (x1, y0) = self.to_px(Point::new(rect.x1, rect.y0));

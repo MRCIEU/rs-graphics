@@ -272,6 +272,21 @@ impl Backend for SvgBackend {
         (self.width_in, self.height_in)
     }
 
+    /// Big points, as R's `svg()`.
+    fn device_unit_inches(&self) -> f64 {
+        1.0 / 72.0
+    }
+
+    /// Unrounded, as R's cairo `svg()`.
+    fn effective_font_size(&self, requested_pt: f64) -> f64 {
+        requested_pt
+    }
+
+    /// White, as R's `svg()`.
+    fn default_bg(&self) -> Color {
+        Color::WHITE
+    }
+
     fn new_page(&mut self) {
         self.body.clear();
         self.pending = None;
