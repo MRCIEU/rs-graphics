@@ -19,7 +19,10 @@ use crate::device::{
 };
 use crate::lty::LineType;
 use crate::numbers::Numbers;
+use crate::par::AxisType;
 use crate::plotmath::Label;
+
+use super::InlineAxis;
 
 /// Tukey's five-number summary (`fivenum()` in R's `stats` package):
 /// `[min, lower hinge, median, upper hinge, max]`. This is *not* the same
@@ -273,6 +276,27 @@ pub struct BoxplotOptions {
     pub outcol: Vec<ColorSpec>,
     /// Fill of the outlier symbols; empty: `bg`.
     pub outbg: Vec<ColorSpec>,
+    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+    /// `None`: `par(las)`.
+    pub las: Option<i32>,
+    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+    pub cex_axis: Option<f64>,
+    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+    pub col_axis: Option<ColorSpec>,
+    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
+    /// R's default.
+    pub gap_axis: Option<f64>,
+    /// `AxisType::None` leaves out the x axis (R's `xaxt`, which `bxp()`
+    /// passes to its axes); `None`: `par(xaxt)`.
+    pub xaxt: Option<AxisType>,
+    /// As `xaxt`, for the y axis; `None`: `par(yaxt)`.
+    pub yaxt: Option<AxisType>,
+    /// The default ticks of the x axis (R's `xaxp`; used by the value axis
+    /// when `horizontal`); `None`: `par(xaxp)`.
+    pub xaxp: Option<[f64; 3]>,
+    /// As `xaxp`, for the y axis; `None`: `par(yaxp)`.
+    pub yaxp: Option<[f64; 3]>,
 }
 
 crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
@@ -332,6 +356,14 @@ crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
     outcex: values f64,
     outcol: values ColorSpec,
     outbg: values ColorSpec,
+    las: option i32,
+    cex_axis: option f64,
+    col_axis: option ColorSpec,
+    gap_axis: option f64,
+    xaxt: option AxisType,
+    yaxt: option AxisType,
+    xaxp: array [f64; 3],
+    yaxp: array [f64; 3],
 });
 
 impl Default for BoxplotOptions {
@@ -393,6 +425,14 @@ impl Default for BoxplotOptions {
             outcex: Vec::new(),
             outcol: Vec::new(),
             outbg: Vec::new(),
+            las: None,
+            cex_axis: None,
+            col_axis: None,
+            gap_axis: None,
+            xaxt: None,
+            yaxt: None,
+            xaxp: None,
+            yaxp: None,
         }
     }
 }
@@ -675,6 +715,27 @@ impl<B: Backend> Device<B> {
         // then the title, then the frame.
         let (name_side, value_side) = if opts.horizontal { (2, 1) } else { (1, 2) };
         if opts.axes {
+            // `bxp()` passes only these of its `pars` to the axes, with
+            // `xaxt`/`xaxp` reaching the x axis and `yaxt`/`yaxp` the y axis.
+            let inline = InlineAxis {
+                las: opts.las,
+                cex_axis: opts.cex_axis,
+                col_axis: opts.col_axis,
+                gap_axis: opts.gap_axis,
+                ..InlineAxis::default()
+            };
+            let side_pars = |side: i32| {
+                let (axt, axp) = if side == 1 {
+                    (opts.xaxt, opts.xaxp)
+                } else {
+                    (opts.yaxt, opts.yaxp)
+                };
+                AxisOptions {
+                    axt,
+                    axp,
+                    ..AxisOptions::default()
+                }
+            };
             if n > 1 {
                 let labels = opts
                     .names
@@ -683,11 +744,11 @@ impl<B: Backend> Device<B> {
                 let names = AxisOptions {
                     at: Some(at.clone()),
                     labels: Some(labels.into_iter().map(Some).collect()),
-                    ..AxisOptions::default()
+                    ..side_pars(name_side)
                 };
-                self.axis_impl(name_side, &names);
+                self.axis_impl(name_side, &inline.apply(names));
             }
-            self.axis_impl(value_side, &AxisOptions::default());
+            self.axis_impl(value_side, &inline.apply(side_pars(value_side)));
         }
 
         if opts.ann.unwrap_or(!opts.add) {

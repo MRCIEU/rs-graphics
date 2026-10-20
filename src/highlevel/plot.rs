@@ -19,7 +19,7 @@ use crate::lty::LineType;
 use crate::par::{AxisType, Bty};
 use crate::plotmath::Label;
 
-use super::data_range;
+use super::{InlineAxis, data_range};
 
 /// `plot(..., type = )` (and `points()`/`lines()`'s `type`): every type
 /// R has. Lines (all but `"p"` and `"n"`) take the first `col`, `lwd`
@@ -168,6 +168,24 @@ pub struct PlotOptions {
     pub xaxp: Option<[f64; 3]>,
     /// Inline `yaxp`, as `xaxp`; `None`: `par(yaxp)`.
     pub yaxp: Option<[f64; 3]>,
+    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+    /// `None`: `par(las)`.
+    pub las: Option<i32>,
+    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+    pub cex_axis: Option<f64>,
+    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+    pub col_axis: Option<ColorSpec>,
+    /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
+    pub font_axis: Option<i32>,
+    /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
+    /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
+    /// Tick length as a fraction of the plot region (R's inline `tck`);
+    /// `None`: `par(tck)`.
+    pub tck: Option<f64>,
+    /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
+    pub tcl: Option<f64>,
 }
 
 crate::setters::setters!(PlotOptions => [PlotCall] {
@@ -201,6 +219,13 @@ crate::setters::setters!(PlotOptions => [PlotCall] {
     yaxt: option AxisType,
     xaxp: array [f64; 3],
     yaxp: array [f64; 3],
+    las: option i32,
+    cex_axis: option f64,
+    col_axis: option ColorSpec,
+    font_axis: option i32,
+    mgp: array [f64; 3],
+    tck: option f64,
+    tcl: option f64,
 });
 
 impl Default for PlotOptions {
@@ -236,6 +261,13 @@ impl Default for PlotOptions {
             yaxt: None,
             xaxp: None,
             yaxp: None,
+            las: None,
+            cex_axis: None,
+            col_axis: None,
+            font_axis: None,
+            mgp: None,
+            tck: None,
+            tcl: None,
         }
     }
 }
@@ -280,14 +312,25 @@ impl<B: Backend> Device<B> {
         self.points_impl(x, y, &xy);
 
         if opts.axes {
-            // `localAxis()`: `axis(side, ...)` with the `par()` defaults.
+            // `localAxis()`: `axis(side, ...)` with the inline axis pars
+            // (`col`, `lwd`, ... are the points', so they don't reach it).
+            let inline = InlineAxis {
+                las: opts.las,
+                cex_axis: opts.cex_axis,
+                col_axis: opts.col_axis,
+                font_axis: opts.font_axis,
+                mgp: opts.mgp,
+                tck: opts.tck,
+                tcl: opts.tcl,
+                gap_axis: None,
+            };
             for (side, axt, axp) in [(1, opts.xaxt, opts.xaxp), (2, opts.yaxt, opts.yaxp)] {
                 let o = AxisOptions {
                     axt,
                     axp,
                     ..AxisOptions::default()
                 };
-                self.axis_impl(side, &o);
+                self.axis_impl(side, &inline.apply(o));
             }
             // `localBox(...)`: `box()` with the inline `bty`.
             self.box_impl(&BoxOptions {
@@ -312,6 +355,7 @@ impl<B: Backend> Device<B> {
                 col_lab: opts.col_lab,
                 font_lab: opts.font_lab,
                 adj: None,
+                mgp: opts.mgp,
             });
         }
     }

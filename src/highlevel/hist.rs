@@ -19,6 +19,8 @@ use crate::device::{AxisOptions, Device, PlotWindowOptions, RectOptions, TitleOp
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
+use super::InlineAxis;
+
 /// Sturges' rule (`nclass.Sturges()`): `ceiling(log2(length(x)) + 1)`.
 fn nclass_sturges(n: usize) -> i32 {
     if n == 0 {
@@ -120,6 +122,27 @@ pub struct HistOptions {
     /// plot, window, title or axes (so `main`/`xlab`/`ylab`/`axes`/`xlog`/
     /// `ylog` are ignored). Default `false`.
     pub add: bool,
+    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+    /// `None`: `par(las)`.
+    pub las: Option<i32>,
+    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+    pub cex_axis: Option<f64>,
+    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+    pub col_axis: Option<ColorSpec>,
+    /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
+    pub font_axis: Option<i32>,
+    /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
+    /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
+    /// Tick length as a fraction of the plot region (R's inline `tck`);
+    /// `None`: `par(tck)`.
+    pub tck: Option<f64>,
+    /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
+    pub tcl: Option<f64>,
+    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
+    /// R's default.
+    pub gap_axis: Option<f64>,
 }
 
 crate::setters::setters!(HistOptions => [HistCall] {
@@ -141,6 +164,14 @@ crate::setters::setters!(HistOptions => [HistCall] {
     xlog: value bool,
     ylog: value bool,
     add: value bool,
+    las: option i32,
+    cex_axis: option f64,
+    col_axis: option ColorSpec,
+    font_axis: option i32,
+    mgp: array [f64; 3],
+    tck: option f64,
+    tcl: option f64,
+    gap_axis: option f64,
 });
 
 impl Default for HistOptions {
@@ -164,6 +195,14 @@ impl Default for HistOptions {
             xlog: false,
             ylog: false,
             add: false,
+            las: None,
+            cex_axis: None,
+            col_axis: None,
+            font_axis: None,
+            mgp: None,
+            tck: None,
+            tcl: None,
+            gap_axis: None,
         }
     }
 }
@@ -298,12 +337,24 @@ impl<B: Backend> Device<B> {
                     cex_lab: opts.cex_lab,
                     col_lab: opts.col_lab,
                     font_lab: opts.font_lab,
+                    mgp: opts.mgp,
                     ..TitleOptions::default()
                 });
             }
 
             if opts.axes {
-                self.axis_impl(1, &AxisOptions::default());
+                // `axis(1, ...)`, `axis(2, at = yt, ...)`.
+                let inline = InlineAxis {
+                    las: opts.las,
+                    cex_axis: opts.cex_axis,
+                    col_axis: opts.col_axis,
+                    font_axis: opts.font_axis,
+                    mgp: opts.mgp,
+                    tck: opts.tck,
+                    tcl: opts.tcl,
+                    gap_axis: opts.gap_axis,
+                };
+                self.axis_impl(1, &inline.apply(AxisOptions::default()));
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
                 let yticks = if freq {
                     self.default_ticks(2)
@@ -317,7 +368,7 @@ impl<B: Backend> Device<B> {
                     at: Some(yticks),
                     ..AxisOptions::default()
                 };
-                self.axis_impl(2, &y_axis);
+                self.axis_impl(2, &inline.apply(y_axis));
             }
         }
 

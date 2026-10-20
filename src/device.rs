@@ -213,6 +213,9 @@ pub struct TitleOptions {
     /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
     /// right (top) (R's inline `adj`); `None`: `par(adj)`.
     pub adj: Option<f64>,
+    /// Margin lines for `xlab`/`ylab` (`mgp[0]`) and `sub` (`mgp[0] + 1`)
+    /// (R's inline `mgp`); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
 }
 
 crate::setters::setters!(TitleOptions => [TitleCall] {
@@ -230,6 +233,7 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     col_lab: option ColorSpec,
     font_lab: option i32,
     adj: option f64,
+    mgp: array [f64; 3],
 });
 
 impl<B: Backend> Device<B> {
@@ -1215,6 +1219,7 @@ impl<B: Backend> Device<B> {
         // `C_title`: every title sits at `adj` (NPC) along its side and is
         // justified by `adj` (`GMtext` uses `par(adj)` in all cases).
         let adj = opts.adj.unwrap_or(self.par.adj);
+        let mgp = opts.mgp.unwrap_or(self.par.mgp);
         let x_at = self.plt.x0 + adj * self.plt.width();
         let y_at = self.plt.y0 + adj * self.plt.height();
         // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
@@ -1236,7 +1241,7 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(sub) = &opts.sub {
-            let line = self.par.mgp[0] + 1.0 + self.line_bias(Side::Bottom, true);
+            let line = mgp[0] + 1.0 + self.line_bias(Side::Bottom, true);
             let y = self.plt.y0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
@@ -1251,7 +1256,7 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(xlab) = &opts.xlab {
-            let line = self.par.mgp[0] + self.line_bias(Side::Bottom, true);
+            let line = mgp[0] + self.line_bias(Side::Bottom, true);
             let y = self.plt.y0 - line * lh;
             self.draw_label(
                 Xpd::Figure,
@@ -1266,7 +1271,7 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(ylab) = &opts.ylab {
-            let line = self.par.mgp[0] + self.line_bias(Side::Left, true);
+            let line = mgp[0] + self.line_bias(Side::Left, true);
             let x = self.plt.x0 - line * lh;
             self.draw_label(
                 Xpd::Figure,

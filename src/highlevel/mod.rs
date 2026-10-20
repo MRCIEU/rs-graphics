@@ -54,3 +54,36 @@ pub(crate) fn data_range(xs: &[f64]) -> (f64, f64) {
         (lo, hi)
     }
 }
+
+/// R's inline axis parameters that a high-level plot passes through its
+/// `...` to `axis()` (`las = 1`, `cex.axis = 0.8`, ...); `None` is the
+/// `par()` value. Each plot copies its own fields in, and only those R
+/// lets through (e.g. `bxp()` drops `mgp`).
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct InlineAxis {
+    pub las: Option<i32>,
+    pub cex_axis: Option<f64>,
+    pub col_axis: Option<crate::color::ColorSpec>,
+    pub font_axis: Option<i32>,
+    pub mgp: Option<[f64; 3]>,
+    pub tck: Option<f64>,
+    pub tcl: Option<f64>,
+    pub gap_axis: Option<f64>,
+}
+
+impl InlineAxis {
+    /// `opts` with these parameters filled in where `opts` leaves them unset.
+    pub(crate) fn apply(&self, opts: crate::device::AxisOptions) -> crate::device::AxisOptions {
+        crate::device::AxisOptions {
+            las: opts.las.or(self.las),
+            cex_axis: opts.cex_axis.or(self.cex_axis),
+            col_axis: opts.col_axis.or(self.col_axis),
+            font: opts.font.or(self.font_axis),
+            mgp: opts.mgp.or(self.mgp),
+            tck: opts.tck.or(self.tck),
+            tcl: opts.tcl.or(self.tcl),
+            gap_axis: opts.gap_axis.or(self.gap_axis),
+            ..opts
+        }
+    }
+}

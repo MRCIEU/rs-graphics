@@ -211,6 +211,82 @@ fn cases() -> Vec<Case> {
                 d.title().main(Label::math("alpha^2")).adj(0.75).draw();
             },
         },
+        Case {
+            name: "plot_inline_axis_pars",
+            r: "par(mfrow = c(1, 2))\n\
+                plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\
+                     mgp = c(2, 0.6, 0), tck = 0.02, xlab = 'X', ylab = 'Y')\n\
+                plot(x, y, tcl = -0.2, las = 2, ann = FALSE)",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                d.plot(&X, &Y)
+                    .las(1)
+                    .cex_axis(0.8)
+                    .col_axis("blue")
+                    .font_axis(2)
+                    .mgp([2.0, 0.6, 0.0])
+                    .tck(0.02)
+                    .xlab("X")
+                    .ylab("Y")
+                    .draw();
+                d.plot(&X, &Y).tcl(-0.2).las(2).draw();
+            },
+        },
+        Case {
+            name: "hist_barplot_inline_axis_pars",
+            r: "par(mfrow = c(1, 2))\n\
+                hist(h, las = 1, cex.axis = 1.2, mgp = c(2.5, 0.8, 0), tcl = 0.3, gap.axis = 3,\n\
+                     main = 'M', xlab = 'X', ylab = 'Y')\n\
+                barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), las = 2, cex.axis = 0.7,\n\
+                        col.axis = 'red', mgp = c(2, 0.5, 0), ylab = 'Y')",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                d.hist(&H)
+                    .las(1)
+                    .cex_axis(1.2)
+                    .mgp([2.5, 0.8, 0.0])
+                    .tcl(0.3)
+                    .gap_axis(3)
+                    .main("M")
+                    .xlab("X")
+                    .ylab("Y")
+                    .draw();
+                d.barplot([3, 5, 2])
+                    .names(["a", "b", "c"])
+                    .las(2)
+                    .cex_axis(0.7)
+                    .col_axis("red")
+                    .mgp([2.0, 0.5, 0.0])
+                    .ylab("Y")
+                    .draw();
+            },
+        },
+        Case {
+            name: "boxplot_inline_axis_pars",
+            r: "par(mfrow = c(1, 2))\n\
+                boxplot(list(a = c(1, 2, 3, 9), b = c(2, 3, 4)), las = 2, cex.axis = 1.3,\n\
+                        col.axis = 'darkgreen', yaxt = 'n')\n\
+                boxplot(list(a = c(1, 2, 3, 9), b = c(2, 3, 4)), horizontal = TRUE, las = 1,\n\
+                        xaxp = c(0, 10, 2), gap.axis = 0)",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                let groups = [vec![1.0, 2.0, 3.0, 9.0], vec![2.0, 3.0, 4.0]];
+                d.boxplot(&groups)
+                    .names(["a", "b"])
+                    .las(2)
+                    .cex_axis(1.3)
+                    .col_axis("darkgreen")
+                    .yaxt("n")
+                    .draw();
+                d.boxplot(&groups)
+                    .names(["a", "b"])
+                    .horizontal(true)
+                    .las(1)
+                    .xaxp([0, 10, 2])
+                    .gap_axis(0)
+                    .draw();
+            },
+        },
     ]
 }
 

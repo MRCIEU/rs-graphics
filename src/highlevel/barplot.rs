@@ -37,6 +37,8 @@ use crate::numbers::{Num, Numbers};
 use crate::par::{AxisStyle, Xpd};
 use crate::plotmath::Label;
 
+use super::InlineAxis;
+
 /// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
 /// `barplot.default`'s arguments this crate implements. Unset fields are
 /// R's defaults, given for each.
@@ -142,6 +144,27 @@ pub struct BarplotOptions {
     pub font_lab: Option<i32>,
     /// Draw the value axis; default `true`.
     pub axes: bool,
+    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+    /// `None`: `par(las)`.
+    pub las: Option<i32>,
+    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+    pub cex_axis: Option<f64>,
+    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+    pub col_axis: Option<ColorSpec>,
+    /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
+    pub font_axis: Option<i32>,
+    /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
+    /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
+    /// Tick length as a fraction of the plot region (R's inline `tck`);
+    /// `None`: `par(tck)`.
+    pub tck: Option<f64>,
+    /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
+    pub tcl: Option<f64>,
+    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
+    /// R's default.
+    pub gap_axis: Option<f64>,
 }
 
 crate::setters::setters!(BarplotOptions => [BarplotCall] {
@@ -177,6 +200,14 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     col_lab: option ColorSpec,
     font_lab: option i32,
     axes: value bool,
+    las: option i32,
+    cex_axis: option f64,
+    col_axis: option ColorSpec,
+    font_axis: option i32,
+    mgp: array [f64; 3],
+    tck: option f64,
+    tcl: option f64,
+    gap_axis: option f64,
 });
 
 impl Default for BarplotOptions {
@@ -214,6 +245,14 @@ impl Default for BarplotOptions {
             col_lab: None,
             font_lab: None,
             axes: true,
+            las: None,
+            cex_axis: None,
+            col_axis: None,
+            font_axis: None,
+            mgp: None,
+            tck: None,
+            tcl: None,
+            gap_axis: None,
         }
     }
 }
@@ -638,6 +677,18 @@ impl<B: Backend> Device<B> {
             }
         }
 
+        // R passes `...` to both axes; the value axis gets `cex.axis`, the
+        // names axis `cex.names` instead.
+        let inline = InlineAxis {
+            las: opts.las,
+            cex_axis: None,
+            col_axis: opts.col_axis,
+            font_axis: opts.font_axis,
+            mgp: opts.mgp,
+            tck: opts.tck,
+            tcl: opts.tcl,
+            gap_axis: opts.gap_axis,
+        };
         if let (Some(names), Some(at)) = (&opts.names, names_at) {
             // `axis(side, at = at, labels = names.arg, lty = 0)`: names only.
             let names = AxisOptions {
@@ -646,7 +697,7 @@ impl<B: Backend> Device<B> {
                 tick: false,
                 ..AxisOptions::default()
             };
-            self.axis_impl(if horiz { 2 } else { 1 }, &names);
+            self.axis_impl(if horiz { 2 } else { 1 }, &inline.apply(names));
         }
 
         if let Some(labels) = &opts.legend_text {
@@ -693,11 +744,19 @@ impl<B: Backend> Device<B> {
                 col_lab: opts.col_lab,
                 font_lab: opts.font_lab,
                 adj: None,
+                mgp: opts.mgp,
             });
         }
 
         if opts.axes {
-            self.axis_impl(if horiz { 1 } else { 2 }, &AxisOptions::default());
+            let value_axis = InlineAxis {
+                cex_axis: opts.cex_axis,
+                ..inline
+            };
+            self.axis_impl(
+                if horiz { 1 } else { 2 },
+                &value_axis.apply(AxisOptions::default()),
+            );
         }
 
         w_m
