@@ -58,7 +58,7 @@ fn cases() -> Vec<Case> {
             name: "fin_too_wide",
             size: (7.0, 7.0),
             r: "par(fin = c(10, 3))",
-            rust: |d| d.fin([10, 3]),
+            rust: |d| d.par().fin([10, 3]).draw(),
         },
         Case {
             name: "fin_with_omi_beyond_device",
@@ -66,7 +66,7 @@ fn cases() -> Vec<Case> {
             r: "par(omi = c(4, 0, 4, 0)); par(fin = c(3, 3))",
             rust: |d| {
                 d.par().omi([4, 0, 4, 0]).draw();
-                d.fin([3, 3]);
+                d.par().fin([3, 3]).draw();
             },
         },
         Case {

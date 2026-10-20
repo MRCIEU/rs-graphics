@@ -55,7 +55,7 @@ fn draw_ours(c: &Case) -> String {
     let mut d = Device::new(backend, Par::default());
     d.plot_new();
     if let Some(bg) = c.par_bg {
-        d.par.bg = Color::parse(bg).unwrap();
+        d.par().bg(Color::parse(bg).unwrap()).draw();
     }
     d.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
     let zero = ColorSpec::Index(0);

@@ -23,8 +23,8 @@ fn draw(change_margins: bool) -> Vec<u8> {
     d.plot_new();
     d.plot_window((0.0, 10.0), (0.0, 10.0)).draw();
     if change_margins {
-        d.par.mar = Sides::from([2.0, 2.0, 8.0, 1.0]);
-        d.par.oma = Sides::from([3.0, 0.0, 0.0, 2.0]);
+        d.par().mar(Sides::from([2.0, 2.0, 8.0, 1.0])).draw();
+        d.par().oma(Sides::from([3.0, 0.0, 0.0, 2.0])).draw();
     }
     d.points(&[5.0], &[5.0]).draw();
     d.title().main("Main").xlab("x").draw();

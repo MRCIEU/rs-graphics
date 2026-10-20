@@ -13,8 +13,8 @@
 //! `par(cex)` is R's `cexbase` (assigning it resets the per-call `cex` to
 //! 1), so `cex` here scales both text *and* the "line" unit that margins
 //! are measured in, exactly as `mapNDC2Dev()` does (`yNDCPerLine = mex *
-//! cexbase * cra[1] / ...`). Multi-panel layouts
-//! (`Device::mfrow()`/`mfcol()`/`layout()`) set `cex` (0.83 for 2 x 2, 0.66
+//! cexbase * cra[1] / ...`). Multi-panel layouts (`par()`'s `mfrow`/
+//! `mfcol`, and `Device::layout()`) set `cex` (0.83 for 2 x 2, 0.66
 //! beyond that) and `mex` just as R's `par(mfrow=)` does.
 
 use crate::afm::FontFace;
@@ -506,11 +506,11 @@ macro_rules! par_options {
         ; optional: $($ofield:ident : $okind:ident $ot:ty),* $(,)?
     ) => {
         /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
-        /// plus `new` (R's `par(new = TRUE)`, see
-        /// [`Device::set_new`](crate::device::Device::set_new)). R's
-        /// `mfrow`/`mfcol` aren't here: they change the device's page
-        /// layout, not `Par`, so only a device's `par()` call takes them
-        /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow)).
+        /// plus `new` (R's `par(new = TRUE)`). R's `mfrow`/`mfcol`/`mfg`/
+        /// `fig`/`fin` aren't here: they change the device's page layout,
+        /// not `Par`, so only a device's `par()` call takes them
+        /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow) and
+        /// co.).
         #[derive(Clone, Debug, Default, PartialEq)]
         pub struct ParOptions {
             $(
@@ -521,7 +521,13 @@ macro_rules! par_options {
                 #[doc = concat!("New value of [`Par::", stringify!($ofield), "`] (set to `Some`).")]
                 pub $ofield: Option<$ot>,
             )*
-            /// `par(new = )`: draw the next plot over the current figure.
+            /// `par(new = )`: with `true`, the next `plot_new()` draws into
+            /// the current figure without advancing or clearing it, so a
+            /// second plot can be overlaid on the first (e.g. with its own
+            /// `plot_window()` and an axis on side 4). As in R, drawing
+            /// anything (other than `mtext(outer = TRUE)`) resets it to
+            /// `false`, `plot_new()` itself does not, and it is ignored (R
+            /// warns) before anything is plotted.
             pub new: Option<bool>,
         }
 

@@ -25,7 +25,7 @@
 //!
 //! // ...and draw it later, as often as needed.
 //! let mut dev = Device::pdf("plot.pdf").width(8.0).height(4.0).open()?;
-//! dev.mfrow(1, 2);
+//! dev.par().mfrow(1, 2).draw();
 //! dev.add_figure(&fig); // panel 1
 //! dev.add_figure(&fig); // panel 2
 //! dev.close()?;
@@ -93,7 +93,7 @@ use crate::device::{
     LegendOptions, LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions,
     SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
 };
-use crate::graphics::{Graphics, ParGrid};
+use crate::graphics::{Graphics, ParPage};
 use crate::highlevel::barplot::bar_layout;
 use crate::highlevel::boxplot::boxplot_all_stats;
 use crate::highlevel::hist::hist_bins;
@@ -243,9 +243,9 @@ impl Graphics for Figure {
     fn emit_title(&mut self, opts: TitleOptions) {
         self.calls.push(Call::Title(opts));
     }
-    fn emit_par(&mut self, opts: ParOptions, grid: Option<ParGrid>) {
-        // Only a device's `par()` call has `mfrow`/`mfcol` setters.
-        debug_assert!(grid.is_none());
+    fn emit_par(&mut self, opts: ParOptions, page: ParPage) {
+        // Only a device's `par()` call has page layout setters.
+        debug_assert!(page.is_empty());
         self.calls.push(Call::Par(opts));
     }
 }
@@ -282,7 +282,7 @@ impl<B: Backend> Device<B> {
         for call in &fig.calls {
             match call {
                 Call::PlotNew => self.plot_new_impl(),
-                Call::Par(o) => self.emit_par(o.clone(), None),
+                Call::Par(o) => self.emit_par(o.clone(), ParPage::default()),
                 Call::Plot(x, y, o) => self.plot_impl(x, y, o),
                 Call::Hist(x, o) => {
                     self.hist_impl(x, o);
@@ -325,7 +325,7 @@ impl<B: Backend> Device<B> {
     /// c(row, col))` before it), for a figure that starts with a
     /// high-level call or `plot_new()`. On a device with nothing drawn yet
     /// it first starts the page, since R ignores `mfg` until then (the
-    /// same as `plot_new()`, then `mfg(row, col)`).
+    /// same as `plot_new()`, then `par(mfg = c(row, col))`).
     ///
     /// # Panics
     /// If `row` or `col` is outside the arrangement.
@@ -333,7 +333,7 @@ impl<B: Backend> Device<B> {
         if !self.is_used() {
             self.plot_new_impl();
         }
-        self.mfg(row, col);
+        self.par().mfg(row, col).draw();
         self.add_figure(fig)
     }
 }

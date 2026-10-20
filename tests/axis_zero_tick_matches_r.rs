@@ -78,7 +78,7 @@ fn zero_ticks_match_r() {
     let r_pdf = String::from_utf8_lossy(&std::fs::read(&pdf_path).unwrap()).into_owned();
 
     let mut dev = Device::new(PdfBackend::new(15.0, 5.0).with_compression(false), Par::default());
-    dev.mfrow(1, 3);
+    dev.par().mfrow(1, 3).draw();
     let black = ColorSpec::Color(Color::BLACK);
     for &(xlim, ylim) in RANGES {
         dev.plot_new();

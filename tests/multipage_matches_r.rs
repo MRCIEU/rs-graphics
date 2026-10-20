@@ -68,7 +68,7 @@ fn cases() -> Vec<Case> {
             pages: 2,
             r: "par(mfrow = c(1, 2)); pl(3, 'A'); pl(4, 'B'); pl(5, 'C')",
             draw: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 pl(d, 3, "A");
                 pl(d, 4, "B");
                 pl(d, 5, "C");
@@ -82,10 +82,10 @@ fn cases() -> Vec<Case> {
                 par(fig = c(0.5, 1, 0, 1), new = TRUE); pl(5, 'right')",
             draw: |d| {
                 pl(d, 3, "whole");
-                d.fig([0.0, 0.5, 0.0, 1.0]);
+                d.par().fig([0.0, 0.5, 0.0, 1.0]).draw();
                 pl(d, 4, "left");
-                d.fig([0.5, 1.0, 0.0, 1.0]);
-                d.set_new(true);
+                d.par().fig([0.5, 1.0, 0.0, 1.0]).draw();
+                d.par().new(true).draw();
                 pl(d, 5, "right");
             },
         },

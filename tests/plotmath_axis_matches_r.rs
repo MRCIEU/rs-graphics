@@ -454,14 +454,14 @@ fn plotmath_title_mtext_text_legend_match_r() {
             ..mt(Some(0.5))
         })
         .draw();
-    d.par.las = 1;
+    d.par().las(1).draw();
     d.mtext(Label::math("gamma[k]"), 2)
         .with(&MtextOptions {
             at: Some(8.0),
             ..mt(Some(3.0))
         })
         .draw();
-    d.par.las = 0;
+    d.par().las(0).draw();
     let black = ColorSpec::Index(1);
     d.text(&[2.0], &[8.0], &[Label::math("x^2 + y^2 == r^2")])
         .with(&TextOptions {
@@ -610,7 +610,7 @@ fn plotmath_high_level_titles_match_r() {
         PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
         Par::default(),
     );
-    d.mfrow(2, 3);
+    d.par().mfrow(2, 3).draw();
     let x: Vec<f64> = (1..=10).map(f64::from).collect();
     let y: Vec<f64> = x.iter().map(|v| v * v).collect();
     d.plot(&x, &y)

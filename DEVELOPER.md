@@ -83,10 +83,10 @@ usage, see [README.md](README.md).
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
   `layout()` with spanning figures, relative / `lcm()` widths and
   heights, and `respect` (logical or matrix) - a port of `layoutRegions()`
-  in `graphics.c`. `par(new = TRUE)` (`Device::set_new`) overlays the
+  in `graphics.c`. `par(new = TRUE)` (`ParOptions::new`) overlays the
   next plot on the current figure, e.g. for a second y axis.
-  `par(fig=)` (`Device::fig`) places a figure anywhere on the page and
-  `par(fin=)` (`Device::fin`) gives it a size in inches, `par(plt=)`
+  `par(fig=)` (`ParCall::fig`) places a figure anywhere on the page and
+  `par(fin=)` (`ParCall::fin`) gives it a size in inches, `par(plt=)`
   (`Par::plt`) places the plot region within the figure and `par(pin=)`
   (`Par::pin`) gives it a size in inches, and `par(pty = "s")`
   (`Par::pty`) makes it square - ports of `mapFigureRegion()`/
@@ -221,8 +221,8 @@ A few fidelity-relevant decisions worth calling out:
   (R recycles `offset` over the whole matrix of stacked sums there).
 - **Pages.** PDF output has one page per R page, as R's `pdf()` does: a
   new page starts at each `plot_new()` on a one-figure page, when a
-  multi-figure page wraps round, and after `fig()` without
-  `set_new(true)`. SVG and PNG hold a single page, so a new page
+  multi-figure page wraps round, and after `par(fig = )` without
+  `new = TRUE`. SVG and PNG hold a single page, so a new page
   replaces the old one (SVG) or is painted over it (PNG); R would write
   numbered files (`png("plot%03d.png")`), which isn't implemented.
 - **Page background.** As in R, `par("bg")` starts as the device's
@@ -375,9 +375,10 @@ against a real R installation by shelling out to `Rscript`:
   recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log axes), and
   `coef =` (a fitted `lm()` line, extra values ignored): every
   line's vertices, colour, width and dash pattern.
-- `tests/par_page_layout.rs` (no R needed) - `dev.par().mfrow(..)` /
-  `.mfcol(..)` give the same output as `Device::mfrow`/`mfcol`, a
-  `cex`/`mex` in the same call wins, and `.with()` keeps the grid.
+- `tests/par_page_layout.rs` (no R needed) - a device's `par()` page
+  layout arguments: one call gives the same output as separate calls, the
+  last grid wins, a `cex`/`mex` in the same call wins, `fig`/`fin`/`mfg`
+  are applied before `new`, and `.with()` keeps the grid.
 - `tests/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
 - `tests/figure_legends_matches_r.rs` - recorded `Figure`s with legends

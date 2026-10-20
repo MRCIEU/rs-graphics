@@ -154,18 +154,18 @@ fn layout_fig_and_backends_take_integers() {
         dev.layout(layout);
         dev.plot(&[1.0, 2.0], &[1.0, 2.0]).draw();
         if ints {
-            dev.fig([0, 1, 0, 1]);
+            dev.par().fig([0, 1, 0, 1]).draw();
         } else {
-            dev.fig([0.0, 1.0, 0.0, 1.0]);
+            dev.par().fig([0.0, 1.0, 0.0, 1.0]).draw();
         }
-        dev.set_new(true);
+        dev.par().new(true).draw();
         dev.plot(&[1.0, 2.0], &[2.0, 1.0]).draw();
         dev.finish()
     };
     assert!(render(true) == render(false));
     // Mixed integers and floats in one array literal are floats.
     let mut dev = Device::new(SvgBackend::new(5, 5), Par::default());
-    dev.fig([0.0, 0.5, 0.0, 1.0]);
+    dev.par().fig([0.0, 0.5, 0.0, 1.0]).draw();
     let raster = RasterBackend::new(2, 2, 72, Color::WHITE);
     assert!(!Device::new(raster, Par::default()).finish().is_empty());
 }

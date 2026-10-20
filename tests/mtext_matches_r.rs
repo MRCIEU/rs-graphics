@@ -144,11 +144,11 @@ fn mtext_placement_matches_r() {
         ..Par::default()
     };
     let mut dev = Device::new(PdfBackend::new(8.0, 6.0).with_compression(false), par);
-    dev.mfrow(2, 2);
+    dev.par().mfrow(2, 2).draw();
     dev.plot_new();
     dev.plot_window((0.0, 10.0), (0.0, 5.0)).draw();
     for c in &cases {
-        dev.par.las = c.las;
+        dev.par().las(c.las).draw();
         dev.mtext(c.text, c.side)
             .with(&MtextOptions {
                 line: Some(c.line),

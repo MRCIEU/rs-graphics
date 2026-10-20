@@ -229,7 +229,7 @@ fn cases() -> Vec<Case> {
             name: "par_cex",
             r: r#"par(cex = 1.5); legend("topright", legend=c("alpha","beta gamma"), pch=1:2, lty=1, cex=0.8, title="Key")"#,
             run: |d| {
-                d.par.cex = 1.5;
+                d.par().cex(1.5).draw();
                 let e = vec![
                     LegendEntry::point("alpha", black(), 1)
                         .lwd(1.0)

@@ -122,7 +122,7 @@ fn draw_ours(c: &Case) -> String {
     let bg = c
         .bg
         .map_or(ColorSpec::None, |b| ColorSpec::Color(Color::parse(b).unwrap()));
-    dev.par.lwd = c.lwd;
+    dev.par().lwd(c.lwd).draw();
     for pch in 0..26 {
         let (x, y) = pch_pos(pch);
         dev.points(&[x], &[y])
@@ -135,7 +135,7 @@ fn draw_ours(c: &Case) -> String {
             })
             .draw();
     }
-    dev.par.lwd = 1.0;
+    dev.par().lwd(1.0).draw();
     for (i, &ch) in CHARS.iter().enumerate() {
         let (x, y) = char_pos(i);
         dev.points(&[x], &[y])

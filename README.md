@@ -124,9 +124,11 @@ dev.close()?;
 ```
 
 `par()` ends in `.draw()` like every other call, although it draws
-nothing: `.draw()` is what runs a call. `dev.mfrow(1, 2)` is a shortcut
-for `dev.par().mfrow(1, 2).draw()`. `dev.layout(..)` gives uneven panels
-(R's `layout()`), and `dev.mfg(row, col)` picks the next one.
+nothing: `.draw()` is what runs a call. It is the one way to change
+graphical parameters, including R's page layout ones (`mfrow`, `mfcol`,
+`mfg`, `fig`, `fin`, `new`); `dev.current_par()` reads them.
+`dev.layout(..)` gives uneven panels (R's `layout()`), and
+`dev.par().mfg(row, col).draw()` picks the next one.
 
 ### Reusing arguments
 

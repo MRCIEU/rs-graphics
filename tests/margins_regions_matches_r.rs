@@ -136,7 +136,7 @@ fn cases() -> Vec<Case> {
             name: "fin",
             r: "par(fin = c(5, 4)); plot(x, y, main = 'title', xlab = 'xlab', ylab = 'ylab')",
             ours: |d| {
-                d.fin([5, 4]);
+                d.par().fin([5, 4]).draw();
                 titled(d);
             },
         },

@@ -132,7 +132,7 @@ fn text_metrics_match_r() {
         };
         let mut dev = Device::new(PdfBackend::new(7.0, 6.0), par);
         if c.mfrow {
-            dev.mfrow(2, 2);
+            dev.par().mfrow(2, 2).draw();
         }
         dev.plot_new();
         let (w, h) = dev.text_metrics(c.text, c.font, c.cex);

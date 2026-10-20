@@ -186,15 +186,15 @@ fn a_plot_can_be_added_many_times_and_mixed_with_direct_calls() {
         // mfrow(2, 2): direct, recorded, recorded again, then a recorded
         // plot placed with add_figure_at - against all direct, with mfg.
         let mut a = device(format);
-        a.mfrow(2, 2);
+        a.par().mfrow(2, 2).draw();
         scatter(&mut a);
         bars(&mut a);
         scatter(&mut a);
-        a.mfg(1, 2);
+        a.par().mfg(1, 2).draw();
         bars(&mut a);
 
         let mut b = device(format);
-        b.mfrow(2, 2);
+        b.par().mfrow(2, 2).draw();
         scatter(&mut b);
         b.add_figure(&bars_fig);
         b.add_figure(&fig);
@@ -208,13 +208,13 @@ fn add_figure_at_on_a_fresh_device_starts_the_page_first() {
     // R ignores par(mfg) until something is drawn, so add_figure_at opens
     // the page as plot_new() would, then picks the panel.
     let mut a = device(Format::Pdf);
-    a.mfrow(2, 2);
+    a.par().mfrow(2, 2).draw();
     a.plot_new();
-    a.mfg(2, 1);
+    a.par().mfg(2, 1).draw();
     pie(&mut a);
 
     let mut b = device(Format::Pdf);
-    b.mfrow(2, 2);
+    b.par().mfrow(2, 2).draw();
     b.add_figure_at(2, 1, &recorded(pie::<Figure>));
     assert!(a.finish() == b.finish());
 }
@@ -222,14 +222,14 @@ fn add_figure_at_on_a_fresh_device_starts_the_page_first() {
 #[test]
 fn add_figure_restores_par() {
     let mut dev = device(Format::Pdf);
-    let before = format!("{:?}", dev.par);
+    let before = format!("{:?}", dev.current_par());
     dev.add_figure(&recorded(scatter::<Figure>)); // sets mar and las
-    assert_eq!(format!("{:?}", dev.par), before);
+    assert_eq!(format!("{:?}", dev.current_par()), before);
 
     // Drawn directly, the same calls leave par changed.
     let mut direct = device(Format::Pdf);
     scatter(&mut direct);
-    assert_eq!(direct.par.las, 1);
+    assert_eq!(direct.current_par().las, 1);
 }
 
 #[test]

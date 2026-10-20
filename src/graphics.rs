@@ -108,15 +108,14 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   default ticks, so you can draw straight away. Call
     ///   [`plot_window`](Graphics::plot_window) next for other limits or
     ///   log axes.
-    /// - **Which figure:** the next one in the order set by
-    ///   [`Device::mfrow`] / [`Device::mfcol`] (or `par()`'s
-    ///   [`mfrow`](ParCall::mfrow) / [`mfcol`](ParCall::mfcol)),
-    ///   [`Device::layout`] or
-    ///   [`Device::mfg`] (one figure per page by default). After the last
-    ///   figure, it wraps to figure 1 on a new page. The first call always
-    ///   starts page one. After [`Device::fig`], the next call starts a
-    ///   new page unless `set_new(true)` comes first.
-    /// - **`par(new = TRUE)`:** after [`Device::set_new`]`(true)` it stays
+    /// - **Which figure:** the next one in the order set by `par()`'s
+    ///   [`mfrow`](ParCall::mfrow) / [`mfcol`](ParCall::mfcol),
+    ///   [`Device::layout`] or `par()`'s [`mfg`](ParCall::mfg) (one figure
+    ///   per page by default). After the last figure, it wraps to figure 1
+    ///   on a new page. The first call always starts page one. After
+    ///   `par()`'s [`fig`](ParCall::fig) or [`fin`](ParCall::fin), the next
+    ///   call starts a new page unless `new(true)` is set too.
+    /// - **`par(new = TRUE)`:** after `dev.par().new(true).draw()` it stays
     ///   in the current figure and draws over it. The flag is not cleared
     ///   here; any drawing clears it, as in R.
     /// - **Regions:** figure and plot regions are computed now from
@@ -551,15 +550,20 @@ pub trait Graphics: sealed::Sealed + Sized {
 
     /// `par(...)`: changes graphical parameters; options in
     /// [`ParOptions`] (each a [`Par`](crate::par::Par) field, plus `new`
-    /// for R's `par(new = TRUE)`). On a [`Device`] it is the same as
-    /// assigning `dev.par.<field>` (and [`Device::set_new`] for `new`);
-    /// in a recorded [`Figure`](crate::recording::Figure) it is the way to
-    /// change them. As in R, `mar`, `oma`, `pty` and `plt` take effect at
-    /// the next [`plot_new`](Graphics::plot_new).
+    /// for R's `par(new = TRUE)`). It is the one way to change them, on a
+    /// [`Device`] and in a recorded [`Figure`](crate::recording::Figure);
+    /// read the current values with [`Device::current_par`]. As in R,
+    /// setting one unit of a region clears the others (`mar` clears `mai`,
+    /// `pin` and `plt`, `oma` clears `omi` and `omd`, ...), setting
+    /// `oma`/`omi`/`omd` makes the next plot start a new page, and `mar`,
+    /// `oma`, `pty` and `plt` take effect at the next
+    /// [`plot_new`](Graphics::plot_new).
     ///
     /// On a `Device`, the call also takes R's page layout parameters
-    /// [`mfrow`](ParCall::mfrow) and [`mfcol`](ParCall::mfcol), as in R's
-    /// `par(mfrow = c(1, 2), oma = c(0, 0, 2, 0))`:
+    /// [`mfrow`](ParCall::mfrow), [`mfcol`](ParCall::mfcol),
+    /// [`mfg`](ParCall::mfg), [`fig`](ParCall::fig) and
+    /// [`fin`](ParCall::fin), as in R's `par(mfrow = c(1, 2), oma = c(0,
+    /// 0, 2, 0))`:
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
@@ -579,7 +583,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     fn par(&mut self) -> ParCall<'_, Self> {
         ParCall {
             target: self,
-            grid: None,
+            page: ParPage::default(),
             opts: ParOptions::default(),
         }
     }
@@ -637,7 +641,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     #[doc(hidden)]
     fn emit_title(&mut self, opts: TitleOptions);
     #[doc(hidden)]
-    fn emit_par(&mut self, opts: ParOptions, grid: Option<ParGrid>);
+    fn emit_par(&mut self, opts: ParOptions, page: ParPage);
 }
 
 impl<B: Backend> Graphics for Device<B> {
@@ -716,13 +720,23 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_title(&mut self, opts: TitleOptions) {
         self.title_impl(&opts)
     }
-    fn emit_par(&mut self, opts: ParOptions, grid: Option<ParGrid>) {
-        // The grid first: it resets `cex` and `mex`, so values set in the
-        // same call win.
-        match grid {
+    fn emit_par(&mut self, opts: ParOptions, page: ParPage) {
+        // The page layout first: a grid resets `cex` and `mex`, so values
+        // set in the same call win; `fig`/`fin` replace the grid, and `mfg`
+        // picks a panel of it.
+        match page.grid {
             Some(ParGrid::Rows(nrow, ncol)) => self.mfrow(nrow, ncol),
             Some(ParGrid::Cols(nrow, ncol)) => self.mfcol(nrow, ncol),
             None => {}
+        }
+        if let Some(fig) = page.fig {
+            self.fig(fig);
+        }
+        if let Some(fin) = page.fin {
+            self.fin(fin);
+        }
+        if let Some((row, col)) = page.mfg {
+            self.mfg(row, col);
         }
         opts.apply(&mut self.par);
         // R's `par(oma/omi/omd = )`: "force eject of multiple figures",
@@ -889,14 +903,29 @@ call!(
 call!(
     /// [`Graphics::par`]'s call.
     ParCall, ParOptions, emit_par -> (),
-    { grid: Option<ParGrid> },
-    |t, o| (o, grid)
+    { page: ParPage },
+    |t, o| (o, page)
 );
 
-/// A `par()` call's `mfrow`/`mfcol`, which only a [`Device`] takes.
+/// A `par()` call's page layout arguments (`mfrow`/`mfcol`, `mfg`, `fig`,
+/// `fin`), which only a [`Device`] takes.
 #[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ParPage {
+    pub(crate) grid: Option<ParGrid>,
+    pub(crate) mfg: Option<(usize, usize)>,
+    pub(crate) fig: Option<[f64; 4]>,
+    pub(crate) fin: Option<[f64; 2]>,
+}
+
+impl ParPage {
+    pub(crate) fn is_empty(&self) -> bool {
+        *self == ParPage::default()
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ParGrid {
+pub(crate) enum ParGrid {
     Rows(usize, usize),
     Cols(usize, usize),
 }
@@ -906,26 +935,72 @@ pub enum ParGrid {
 /// [`Figure`]: crate::recording::Figure
 impl<B: Backend> ParCall<'_, Device<B>> {
     /// `par(mfrow = c(nrow, ncol))`: splits the page into a grid of
-    /// panels, filled row by row; the same as [`Device::mfrow`], which
-    /// describes it (it also sets `par(cex)` and `mex`). It is applied
-    /// before the call's other settings, so a `cex` or `mex` set in the
-    /// same call wins (in R, whichever argument comes last wins). Replaces
-    /// an earlier `mfrow`/`mfcol` in the call; kept by `.with()`.
+    /// panels, filled row by row. As in R, it also sets `par(cex)` to 0.83
+    /// (2 x 2) or 0.66 (more than 2 rows or columns) and `mex` to 1, and
+    /// the next `plot_new()` starts a new page at the first panel. It
+    /// replaces `fig`/`fin` and [`Device::layout`].
+    ///
+    /// In one call the page layout is applied first, in the order grid,
+    /// `fig`, `fin`, `mfg`, then the other settings, then `new`: so a `cex`
+    /// or `mex` set in the same call wins (in R, whichever argument comes
+    /// last wins). Replaces an earlier `mfrow`/`mfcol` in the call; kept by
+    /// `.with()`.
     ///
     /// # Panics
     /// At `.draw()`, if `nrow` or `ncol` is zero.
     pub fn mfrow(mut self, nrow: usize, ncol: usize) -> Self {
-        self.grid = Some(ParGrid::Rows(nrow, ncol));
+        self.page.grid = Some(ParGrid::Rows(nrow, ncol));
         self
     }
 
     /// `par(mfcol = c(nrow, ncol))`: as [`mfrow`](ParCall::mfrow), but the
-    /// panels are filled column by column ([`Device::mfcol`]).
+    /// panels are filled column by column.
     ///
     /// # Panics
     /// At `.draw()`, if `nrow` or `ncol` is zero.
     pub fn mfcol(mut self, nrow: usize, ncol: usize) -> Self {
-        self.grid = Some(ParGrid::Cols(nrow, ncol));
+        self.page.grid = Some(ParGrid::Cols(nrow, ncol));
+        self
+    }
+
+    /// `par(mfg = c(row, col))`: makes the panel at (`row`, `col`)
+    /// (1-based) the one the next `plot_new()` draws into, without
+    /// advancing or starting a new page. As in R, the panel number is
+    /// derived from the `mfrow`/`mfcol` ordering even under `layout()`,
+    /// and it has no effect before anything has been plotted: the first
+    /// `plot_new()` always starts at panel 1 (see
+    /// [`add_figure_at`](Device::add_figure_at), which handles that).
+    ///
+    /// # Panics
+    /// At `.draw()`, if `row`/`col` are outside the current arrangement.
+    pub fn mfg(mut self, row: usize, col: usize) -> Self {
+        self.page.mfg = Some((row, col));
+        self
+    }
+
+    /// `par(fig = c(x0, x1, y0, y1))`: a single figure region, as fractions
+    /// of the inner region (the device less `par(oma)`), for placing plots
+    /// anywhere on the page. As in R, the next `plot_new()` starts a new
+    /// page unless `new` is set (`.fig(..).new(true)` adds a plot to the
+    /// current page), `par(cex)` is left as it is, and `mfrow`/`mfcol`/
+    /// [`Device::layout`] replace it.
+    ///
+    /// # Panics
+    /// At `.draw()`, unless `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1`
+    /// (R's error).
+    pub fn fig(mut self, fig: [impl Into<f64>; 4]) -> Self {
+        self.page.fig = Some(fig.map(Into::into));
+        self
+    }
+
+    /// `par(fin = c(width, height))`: a single figure region of that size
+    /// in inches, centred in the inner region. Otherwise as
+    /// [`fig`](ParCall::fig).
+    ///
+    /// # Panics
+    /// At `.draw()`, unless both sizes are positive (R's error).
+    pub fn fin(mut self, fin: [impl Into<f64>; 2]) -> Self {
+        self.page.fin = Some(fin.map(Into::into));
         self
     }
 }

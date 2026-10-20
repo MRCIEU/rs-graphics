@@ -119,7 +119,7 @@ fn cases() -> Vec<Case> {
                        col = c('red', NA))\n\
                 arrows(1, 9, 1, 7)",
             draw: |d| {
-                d.par.fg = Color::parse("blue").unwrap();
+                d.par().fg(Color::parse("blue").unwrap()).draw();
                 let solid_dashed = SegmentsOptions {
                     lty: vec![LineType::SOLID, LineType::DASHED],
                     lwd: vec![1.0, 4.0],
@@ -157,7 +157,7 @@ fn cases() -> Vec<Case> {
                 polygon(c(1, 2, 3, NA, 5, 6, 7, NA, 8, 9, 9), c(5, 8, 5, NA, 5, 8, 5, NA, 6, 6, 9),\n\
                         col = c('orange', NA, 'cyan'), border = c(1, 2), lty = c(1, 2, 3))",
             draw: |d| {
-                d.par.fg = Color::parse("darkgreen").unwrap();
+                d.par().fg(Color::parse("darkgreen").unwrap()).draw();
                 let three = RectOptions {
                     col: vec!["grey".into(), ColorSpec::None],
                     border: vec!["red".into(), "blue".into(), ColorSpec::None],
@@ -220,7 +220,7 @@ fn cases() -> Vec<Case> {
                     ..TextOptions::default()
                 };
                 d.text(&[3.0], &[3.0], &["rot"]).with(&rot).draw();
-                d.par.adj = 1.0;
+                d.par().adj(1.0).draw();
                 d.text(&[5.0], &[7.0], &["right"]).draw();
             },
         },
@@ -230,10 +230,10 @@ fn cases() -> Vec<Case> {
                 plot.new(); box(); box('figure', col = 'red')\n\
                 box('inner', lty = 2, lwd = 2); box('outer', col = 'blue')",
             draw: |d| {
-                d.par.oma = Sides::from([1.0, 2.0, 1.0, 1.0]);
-                d.par.lty = LineType::DOTTED;
-                d.par.col = Color::parse("darkred").unwrap();
-                d.mfrow(1, 2);
+                d.par().oma(Sides::from([1.0, 2.0, 1.0, 1.0])).draw();
+                d.par().lty(LineType::DOTTED).draw();
+                d.par().col(Color::parse("darkred").unwrap()).draw();
+                d.par().mfrow(1, 2).draw();
                 d.plot_new();
                 d.box_().draw();
                 d.box_()
@@ -268,13 +268,13 @@ fn cases() -> Vec<Case> {
                 plot(c(1, 3), c(2, 5), pch = 19, ann = FALSE)",
             draw: |d| {
                 let red = Color::parse("red").unwrap();
-                d.par.fg = red;
-                d.par.col = red;
-                d.par.col_axis = Color::parse("blue").unwrap();
-                d.par.cex_axis = 1.3;
-                d.par.font_axis = 2;
-                d.par.las = 1;
-                d.par.ann = false;
+                d.par().fg(red).draw();
+                d.par().col(red).draw();
+                d.par().col_axis(Color::parse("blue").unwrap()).draw();
+                d.par().cex_axis(1.3).draw();
+                d.par().font_axis(2).draw();
+                d.par().las(1).draw();
+                d.par().ann(false).draw();
                 d.plot(&[1.0, 3.0], &[2.0, 5.0]).pch(19).draw();
             },
         },
@@ -291,13 +291,13 @@ fn cases() -> Vec<Case> {
                 boxplot(list(1:5, c(2, 4, 6)), main = 'X')\n\
                 pie(c(1, 2, 3), labels = c('a', 'b'))",
             draw: |d| {
-                d.mfrow(2, 2);
+                d.par().mfrow(2, 2).draw();
                 let red = Color::parse("red").unwrap();
-                d.par.fg = red;
-                d.par.col = red;
-                d.par.ann = false;
-                d.par.lty = LineType::DOTTED;
-                d.par.lwd = 2.0;
+                d.par().fg(red).draw();
+                d.par().col(red).draw();
+                d.par().ann(false).draw();
+                d.par().lty(LineType::DOTTED).draw();
+                d.par().lwd(2.0).draw();
                 d.hist(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 7.0])
                     .breaks([0.0, 2.0, 3.0, 8.0])
                     .main("H")
@@ -316,10 +316,10 @@ fn cases() -> Vec<Case> {
                 boxplot(list(c(1, 2, 3, 4, 5, 12)))",
             draw: |d| {
                 let blue = Color::parse("blue").unwrap();
-                d.par.pch = 2;
-                d.par.lty = LineType::DASHED;
-                d.par.fg = blue;
-                d.par.col = blue;
+                d.par().pch(2).draw();
+                d.par().lty(LineType::DASHED).draw();
+                d.par().fg(blue).draw();
+                d.par().col(blue).draw();
                 d.boxplot(&[vec![1.0, 2.0, 3.0, 4.0, 5.0, 12.0]]).draw();
             },
         },

@@ -195,7 +195,7 @@ fn cases() -> Vec<Case> {
                         ..AblineOptions::default()
                     })
                     .draw();
-                d.par.xpd = Xpd::Figure;
+                d.par().xpd(Xpd::Figure).draw();
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![5.0],
@@ -345,11 +345,11 @@ fn cases() -> Vec<Case> {
                 plot(c(1, 1e6), c(1, 50), log = 'xy', axes = FALSE, ann = FALSE); \
                 axis(3); axis(4)",
             draw: |d| {
-                d.par.lab = [10, 3, 7];
+                d.par().lab([10, 3, 7]).draw();
                 let o = PlotOptions { xlab: Some("x".into()), ylab: Some("y".into()), ..Default::default() };
                 d.plot(&[0.0, 1.0], &[0.0, 1.0]).with(&o).draw();
-                d.set_new(true);
-                d.par.lab = [2, 12, 7];
+                d.par().new(true).draw();
+                d.par().lab([2, 12, 7]).draw();
                 let o = PlotOptions { xlog: true, ylog: true, axes: false, ..Default::default() };
                 d.plot(&[1.0, 1e6], &[1.0, 50.0]).with(&o).draw();
                 let fg = ColorSpec::Index(1);

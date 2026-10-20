@@ -120,7 +120,7 @@ fn cases() -> Vec<Case> {
             log: "",
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
-                d.par.lend = LineEnd::Square;
+                d.par().lend(LineEnd::Square).draw();
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![2.0, 4.0],
@@ -129,7 +129,7 @@ fn cases() -> Vec<Case> {
                         ..Default::default()
                     })
                     .draw();
-                d.par.lend = LineEnd::Butt;
+                d.par().lend(LineEnd::Butt).draw();
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![6.0, 8.0],
@@ -162,9 +162,9 @@ fn cases() -> Vec<Case> {
             log: "xy",
             lims: ((1.0, 100.0), (0.5, 500.0)),
             draw: |d| {
-                d.par.col = Color::parse("grey40").unwrap();
-                d.par.lty = LineType::from_code(2);
-                d.par.lwd = 2.0;
+                d.par().col(Color::parse("grey40").unwrap()).draw();
+                d.par().lty(LineType::from_code(2)).draw();
+                d.par().lwd(2.0).draw();
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![1.0, 10.0, 100.0],

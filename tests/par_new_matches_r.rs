@@ -83,7 +83,7 @@ fn cases() -> Vec<Case> {
             setup: |p| p.mar = Sides::new(5.0, 4.0, 4.0, 5.0),
             draw: |d| {
                 pl(d, &squares(), Some("Two scales"), true);
-                d.set_new(true);
+                d.par().new(true).draw();
                 let opts = PlotOptions {
                     type_: Some(PlotType::Lines),
                     axes: false,
@@ -106,9 +106,9 @@ fn cases() -> Vec<Case> {
                 pl(x, 'B'); pl(sqrt(x), 'C')",
             setup: |_| {},
             draw: |d| {
-                d.mfrow(2, 2);
+                d.par().mfrow(2, 2).draw();
                 pl(d, &squares(), Some("A"), true);
-                d.set_new(true);
+                d.par().new(true).draw();
                 let rev: Vec<f64> = squares().into_iter().rev().collect();
                 pl(d, &rev, None, false);
                 pl(d, &xs(), Some("B"), true);
@@ -123,9 +123,9 @@ fn cases() -> Vec<Case> {
                 pl(x, 'B')",
             setup: |_| {},
             draw: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 pl(d, &squares(), Some("A"), true);
-                d.set_new(true);
+                d.par().new(true).draw();
                 d.plot_new();
                 d.plot_new();
                 d.plot_window((0.0, 20.0), (0.0, 1.0)).draw();
@@ -140,9 +140,9 @@ fn cases() -> Vec<Case> {
                 pl(falling(), 'B')",
             setup: |_| {},
             draw: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 pl(d, &squares(), Some("A"), true);
-                d.set_new(true);
+                d.par().new(true).draw();
                 let black = ColorSpec::Index(1);
                 d.points(&[5.0], &[50.0])
                     .with(&XyOptions {
@@ -162,9 +162,9 @@ fn cases() -> Vec<Case> {
                 pl(falling(), axes = FALSE); pl(x, 'B')",
             setup: |p| p.oma = Sides::new(0.0, 0.0, 2.0, 0.0),
             draw: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 pl(d, &squares(), Some("A"), true);
-                d.set_new(true);
+                d.par().new(true).draw();
                 let o = MtextOptions {
                     outer: true,
                     ..Default::default()
@@ -181,8 +181,8 @@ fn cases() -> Vec<Case> {
                 pl(x^2, 'A'); pl(x, 'B')",
             setup: |_| {},
             draw: |d| {
-                d.mfrow(1, 2);
-                d.set_new(true);
+                d.par().mfrow(1, 2).draw();
+                d.par().new(true).draw();
                 assert!(!d.is_new());
                 pl(d, &squares(), Some("A"), true);
                 pl(d, &xs(), Some("B"), true);

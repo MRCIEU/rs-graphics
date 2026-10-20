@@ -51,7 +51,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(2, 4)); for (b in c('o', 'l', '7', 'c', 'u', ']', 'n', '[')) \
                 plot(x, y, ann = FALSE, bty = b)",
             ours: |d| {
-                d.mfrow(2, 4);
+                d.par().mfrow(2, 4).draw();
                 for b in ["o", "l", "7", "c", "u", "]", "n", "["] {
                     d.plot(&X, &Y).bty(b).draw();
                 }
@@ -135,7 +135,7 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), main = 'title', sub = 'sub', xlab = 'xlab', ylab = 'ylab', \
                 font.main = 1, col.sub = 'blue', cex.sub = 1.3, col.lab = 'grey40')",
             ours: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 d.hist(&H)
                     .main("title")
                     .xlab("xlab")

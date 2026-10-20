@@ -84,7 +84,8 @@ fn axp_values_match_r() {
                 ..PlotWindowOptions::default()
             })
             .draw();
-        let ours: Vec<f64> = dev.par.xaxp.iter().chain(&dev.par.yaxp).copied().collect();
+        let p = dev.current_par();
+        let ours: Vec<f64> = p.xaxp.iter().chain(&p.yaxp).copied().collect();
         let ok = ours
             .iter()
             .zip(&want)
@@ -114,8 +115,8 @@ fn cases() -> Vec<Case> {
                         ..PlotWindowOptions::default()
                     })
                     .draw();
-                d.par.xaxp = [0.0, 10.0, 2.0];
-                d.par.yaxp = [1.0, 1000.0, 2.0];
+                d.par().xaxp([0.0, 10.0, 2.0]).draw();
+                d.par().yaxp([1.0, 1000.0, 2.0]).draw();
                 d.axis(1).draw();
                 d.axis(2).draw();
                 let o = AxisOptions { axp: Some([2.0, 8.0, 3.0]), ..Default::default() };
@@ -138,7 +139,7 @@ fn cases() -> Vec<Case> {
                 };
                 d.plot(&x, &x).with(&o).draw();
                 // Like R, `par()` keeps what `plot.window()` computed.
-                assert_eq!(d.par.xaxp, [2.0, 10.0, 4.0]);
+                assert_eq!(d.current_par().xaxp, [2.0, 10.0, 4.0]);
             },
         },
     ]

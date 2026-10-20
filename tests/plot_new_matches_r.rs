@@ -70,7 +70,7 @@ fn cases() -> Vec<Case> {
                     })
                     .draw();
                 axes(d, &[1, 2]);
-                d.set_new(true);
+                d.par().new(true).draw();
                 d.plot_new();
                 axes(d, &[3, 4]);
             },
@@ -79,8 +79,8 @@ fn cases() -> Vec<Case> {
             name: "xaxs_i",
             r: "par(xaxs = 'i', yaxs = 'i'); plot.new(); points(0.25, 0.75); axis(1); axis(2)",
             draw: |d| {
-                d.par.xaxs = AxisStyle::Exact;
-                d.par.yaxs = AxisStyle::Exact;
+                d.par().xaxs(AxisStyle::Exact).draw();
+                d.par().yaxs(AxisStyle::Exact).draw();
                 d.plot_new();
                 d.points(&[0.25], &[0.75])
                     .with(&XyOptions {

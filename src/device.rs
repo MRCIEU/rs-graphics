@@ -112,12 +112,11 @@ const Y_LINE_BIAS: f64 = 0.2;
 /// the [`Graphics`](crate::graphics::Graphics) methods.
 pub struct Device<B: Backend> {
     backend: B,
-    /// R's `par()` state. Set it with
-    /// [`par()`](crate::graphics::Graphics::par) calls or directly. As in
-    /// R, the margins and plot-region settings (`mar`, `oma`, `pty`,
-    /// `plt`, ...) take effect at the next `plot_new()`; the page layout
-    /// (`mfrow`, `layout`, `fig`) is device state, not part of `Par`.
-    pub par: Par,
+    /// R's `par()` state: changed by
+    /// [`par()`](crate::graphics::Graphics::par) calls, read with
+    /// [`Device::current_par`]. The page layout (`mfrow`, `layout`,
+    /// `fig`, ...) is device state, not part of `Par`.
+    pub(crate) par: Par,
     width_in: f64,
     height_in: f64,
     /// Inner region (the device minus the outer margins), as of the last
@@ -146,7 +145,7 @@ pub struct Device<B: Backend> {
     /// region, overriding the arrangement until `mfrow`/`mfcol`/`layout`
     /// is called.
     fig_spec: Option<FigSpec>,
-    /// `par("new")`, set by [`Device::set_new`] and [`Device::mfg`]: the
+    /// `par("new")`, set by `par(new = )` and `par(mfg = )`: the
     /// next `plot_new()` reuses the current figure instead of advancing.
     /// Cleared by drawing (see [`Device::dirty`]), not by `plot_new()`.
     hold_figure: bool,
@@ -433,17 +432,8 @@ impl<B: Backend> Device<B> {
         self.region_error = region_error([fx0, fx1, fy0, fy1], plt_nfc);
     }
 
-    /// `par(fig = c(x0, x1, y0, y1))`: a single figure region, as fractions
-    /// of the inner region (the device less `par(oma)`), for placing plots
-    /// anywhere on the page. As in R, the next `plot_new()` starts a new
-    /// page unless [`Device::set_new`]`(true)` is called after this (to
-    /// add a plot to the current page), `par(cex)` is left as it is, and
-    /// `mfrow`/`mfcol`/`layout` cancel it.
-    ///
-    /// # Panics
-    /// Unless `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1` (R's error).
-    pub fn fig(&mut self, fig: [impl Into<f64>; 4]) {
-        let fig: [f64; 4] = fig.map(Into::into);
+    /// `par(fig = )`; see [`ParCall::fig`](crate::graphics::ParCall::fig).
+    pub(crate) fn fig(&mut self, fig: [f64; 4]) {
         let [x0, x1, y0, y1] = fig;
         assert!(
             0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0,
@@ -465,16 +455,9 @@ impl<B: Backend> Device<B> {
         self.current_figure = self.arrangement.last_figure();
     }
 
-    /// `par(fin = c(width, height))`: a single figure region of that size
-    /// in inches, centred in the inner region (R's `fUnits = INCHES`). As
-    /// [`Device::fig`]: the next `plot_new()` starts a new page unless
-    /// [`Device::set_new`]`(true)` follows, and `mfrow`/`mfcol`/`layout`
-    /// cancel it.
-    ///
-    /// # Panics
-    /// Unless both sizes are positive (R's error).
-    pub fn fin(&mut self, fin: [impl Into<f64>; 2]) {
-        let fin: [f64; 2] = fin.map(Into::into);
+    /// `par(fin = )` (R's `fUnits = INCHES`); see
+    /// [`ParCall::fin`](crate::graphics::ParCall::fin).
+    pub(crate) fn fin(&mut self, fin: [f64; 2]) {
         assert!(
             fin.iter().all(|&v| v > 0.0 && v.is_finite()),
             "invalid value specified for graphical parameter \"fin\""
@@ -489,16 +472,9 @@ impl<B: Backend> Device<B> {
         self.recompute_layout();
     }
 
-    /// `par(mfrow = c(nrow, ncol))`: a grid of figures filled row by row.
-    /// Like R, also sets `par(cex)` to 0.83 (2 x 2) or 0.66 (more than 2
-    /// rows or columns) and `mex` to 1. The next `plot_new()` starts a new
-    /// page at the first figure. `dev.par().mfrow(nrow, ncol).draw()`
-    /// (see [`ParCall::mfrow`](crate::graphics::ParCall::mfrow)) does the
-    /// same, alongside other `par()` settings.
-    ///
-    /// # Panics
-    /// If `nrow` or `ncol` is zero.
-    pub fn mfrow(&mut self, nrow: usize, ncol: usize) {
+    /// `par(mfrow = )`; see
+    /// [`ParCall::mfrow`](crate::graphics::ParCall::mfrow).
+    pub(crate) fn mfrow(&mut self, nrow: usize, ncol: usize) {
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
@@ -506,12 +482,9 @@ impl<B: Backend> Device<B> {
         });
     }
 
-    /// `par(mfcol = c(nrow, ncol))`: as [`Device::mfrow`] but filled
-    /// column by column (also `dev.par().mfcol(nrow, ncol).draw()`).
-    ///
-    /// # Panics
-    /// If `nrow` or `ncol` is zero.
-    pub fn mfcol(&mut self, nrow: usize, ncol: usize) {
+    /// `par(mfcol = )`; see
+    /// [`ParCall::mfcol`](crate::graphics::ParCall::mfcol).
+    pub(crate) fn mfcol(&mut self, nrow: usize, ncol: usize) {
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
@@ -520,8 +493,10 @@ impl<B: Backend> Device<B> {
     }
 
     /// `layout(mat, widths, heights, respect)`: see [`Layout`]. Sets
-    /// `par(cex)`/`mex` like [`Device::mfrow`] does, based on the layout
-    /// matrix's dimensions.
+    /// `par(cex)`/`mex` like `par(mfrow = )`
+    /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow)) does, based on
+    /// the layout matrix's dimensions, and replaces `mfrow`/`mfcol` and
+    /// `fig`/`fin`.
     pub fn layout(&mut self, layout: Layout) {
         self.set_arrangement(Arrangement::Layout(layout));
     }
@@ -542,17 +517,8 @@ impl<B: Backend> Device<B> {
         self.recompute_layout();
     }
 
-    /// `par(mfg = c(row, col))`: makes the figure at (`row`, `col`)
-    /// (1-based) the one the next `plot_new()` draws into, without
-    /// advancing or starting a new page. As in R, the figure number is
-    /// derived from the `mfrow`/`mfcol` ordering even under `layout()`,
-    /// and it has no effect before anything has been plotted: the first
-    /// `plot_new()` always starts at figure 1 (see
-    /// [`add_figure_at`](Device::add_figure_at), which handles that).
-    ///
-    /// # Panics
-    /// If `row`/`col` are outside the current arrangement.
-    pub fn mfg(&mut self, row: usize, col: usize) {
+    /// `par(mfg = )`; see [`ParCall::mfg`](crate::graphics::ParCall::mfg).
+    pub(crate) fn mfg(&mut self, row: usize, col: usize) {
         let (nrow, ncol) = (self.arrangement.nrow(), self.arrangement.ncol());
         assert!(
             (1..=nrow).contains(&row) && (1..=ncol).contains(&col),
@@ -568,13 +534,8 @@ impl<B: Backend> Device<B> {
         self.recompute_layout();
     }
 
-    /// `par(new = new)`: with `true`, the next `plot_new()` draws into the
-    /// current figure without advancing or clearing it, so a second plot
-    /// can be overlaid on the first (e.g. with its own `plot_window()` and
-    /// an axis on side 4). As in R, drawing anything (other than
-    /// `mtext(outer = TRUE)`) resets it to `false`, `plot_new()` itself
-    /// does not, and it is ignored (R warns) before anything is plotted.
-    pub fn set_new(&mut self, new: bool) {
+    /// `par(new = )`; see [`ParOptions::new`](crate::par::ParOptions::new).
+    pub(crate) fn set_new(&mut self, new: bool) {
         if self.used {
             self.hold_figure = new;
         }
@@ -583,6 +544,13 @@ impl<B: Backend> Device<B> {
     /// Whether anything has been plotted yet.
     pub(crate) fn is_used(&self) -> bool {
         self.used
+    }
+
+    /// R's `par()` values as they are now (R's `par("cex")` is
+    /// `dev.current_par().cex`). Change them with
+    /// [`par()`](crate::graphics::Graphics::par).
+    pub fn current_par(&self) -> &Par {
+        &self.par
     }
 
     /// `par("new")`.

@@ -76,15 +76,14 @@
 //! # Multi-panel pages
 //!
 //! `par()`'s [`mfrow`](graphics::ParCall::mfrow) and
-//! [`mfcol`](graphics::ParCall::mfcol) (as in R, or the shortcuts
-//! [`Device::mfrow`](device::Device::mfrow) and
-//! [`Device::mfcol`](device::Device::mfcol)) and
+//! [`mfcol`](graphics::ParCall::mfcol), as in R, and
 //! [`Device::layout`](device::Device::layout) split the page into panels;
 //! each high-level call (or `plot_new()`) fills the next one, and
-//! low-level calls after it draw in that panel.
-//! [`Device::mfg`](device::Device::mfg) picks the next panel, and
-//! [`Device::set_new`](device::Device::set_new) draws over the current
-//! one.
+//! low-level calls after it draw in that panel. `par()`'s
+//! [`mfg`](graphics::ParCall::mfg) picks the next panel,
+//! [`fig`](graphics::ParCall::fig) and [`fin`](graphics::ParCall::fin)
+//! place a single figure anywhere on the page, and `new(true)` draws over
+//! the current one.
 //!
 //! ```no_run
 //! use rs_graphics::prelude::*;
@@ -118,7 +117,7 @@
 //! fig.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).main("Recorded").draw();
 //!
 //! let mut dev = Device::pdf("figure.pdf").width(8.0).height(4.0).open()?;
-//! dev.mfrow(1, 2);
+//! dev.par().mfrow(1, 2).draw();
 //! dev.add_figure_at(1, 2, &fig); // right-hand panel
 //! dev.close()?;
 //! # Ok::<(), std::io::Error>(())

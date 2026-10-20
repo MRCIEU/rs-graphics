@@ -57,7 +57,7 @@ fn svg_and_png_pages_are_filled() {
 
     let grey = Color::rgb(200, 200, 200);
     let dev = Device::new(RasterBackend::new(1.0, 1.0, 10.0, grey), Par::default());
-    assert_eq!(dev.par.bg, grey);
+    assert_eq!(dev.current_par().bg, grey);
 }
 
 /// Draws a recognisable mark on page one, wraps to page two, draws another.

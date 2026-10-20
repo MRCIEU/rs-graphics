@@ -304,7 +304,7 @@ fn cases() -> Vec<Case> {
             setup: |_| {},
             draw: |d| {
                 d.axis(3).draw();
-                d.par.xpd = Xpd::Figure;
+                d.par().xpd(Xpd::Figure).draw();
                 // Letters, not negative numbers: R's `pdf()` draws `-` as
                 // the wider `/minus` glyph, which we deliberately don't.
                 let o = AxisOptions {

@@ -46,7 +46,7 @@ fn r_script(start: f64, ps: f64, path: &str) -> String {
 fn draw_ours(start: f64, ps: f64) -> String {
     let par = Par { ps: start, ..Par::default() };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
-    dev.par.ps = ps;
+    dev.par().ps(ps).draw();
     let opts = PlotOptions {
         type_: Some(PlotType::Both),
         xlab: Some("x".into()),

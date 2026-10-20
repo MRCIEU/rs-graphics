@@ -252,7 +252,7 @@ fn draw_pie<B: Backend>(dev: &mut Device<B>) {
 /// A chart of every plotting symbol: `pch = 0:25` (with `col`, `bg`) plus
 /// some character symbols, each labelled underneath.
 fn draw_pch<B: Backend>(dev: &mut Device<B>) {
-    dev.par.mar = Sides::new(0.5, 0.5, 2.5, 0.5);
+    dev.par().mar([0.5, 0.5, 2.5, 0.5]).draw();
     dev.plot_new();
     dev.plot_window((0.5, 7.5), (-0.2, 5.4)).draw();
     let symbol = |pch: i32| XyOptions::default().pch(pch).col("blue").bg("red").cex(2.0);

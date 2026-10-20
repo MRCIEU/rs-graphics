@@ -20,8 +20,8 @@
 //! coordinate flip - only a inches-to-points scale (`1 in = 72 pt`).
 //!
 //! Like R's `pdf()`, each new page the device starts (each `plot_new()`
-//! on a one-figure page, a multi-figure page wrapping round, `fig()`
-//! without `set_new(true)`) is a new PDF page, sharing the font objects.
+//! on a one-figure page, a multi-figure page wrapping round, `par(fig = )`
+//! without `new = TRUE`) is a new PDF page, sharing the font objects.
 //! Like R's `pdf()` (`compress = TRUE`), each page's content stream is
 //! Flate-compressed by default; see [`PdfBackend::with_compression`].
 

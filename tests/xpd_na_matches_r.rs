@@ -46,7 +46,7 @@ fn cases() -> Vec<Case> {
                 lines(c(1, 14), c(1, 6)); points(c(9, 12), c(3, 4), pch = 19)\n\
                 text(10, 2, 'abc')",
             ours: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 d.plot(&X, &Y).draw();
                 d.par().xpd(Xpd::Device).draw();
                 d.lines(&[1, 14], &[1, 6]).draw();
@@ -60,7 +60,7 @@ fn cases() -> Vec<Case> {
                 abline(h = 3, v = 2, col = 'red')\n\
                 axis(3, at = c(-4, 0, 3, 8, 12))",
             ours: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 d.plot(&X, &Y).draw();
                 d.par().xpd(Xpd::Device).draw();
                 d.abline().h(3).v(2).col("red").draw();
@@ -73,7 +73,7 @@ fn cases() -> Vec<Case> {
                 text(11, 3, 'abc', xpd = NA); text(11, 4, 'sum', xpd = TRUE)\n\
                 legend(8, 5, legend = c('abc', 'sum'), pch = 1:2, xpd = NA)",
             ours: |d| {
-                d.mfrow(1, 2);
+                d.par().mfrow(1, 2).draw();
                 d.plot(&X, &Y).draw();
                 d.text(&[11], &[3], &["abc"]).xpd(Xpd::Device).draw();
                 d.text(&[11], &[4], &["sum"]).xpd(true).draw();

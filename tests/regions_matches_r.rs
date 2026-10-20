@@ -87,10 +87,10 @@ fn cases() -> Vec<Case> {
                 par(fig = c(0.6, 1, 0.3, 1), new = TRUE); pl(5, 'right')",
             setup: |_| {},
             draw: |d| {
-                d.fig([0.0, 0.6, 0.0, 1.0]);
+                d.par().fig([0.0, 0.6, 0.0, 1.0]).draw();
                 pl(d, 10, "left");
-                d.fig([0.6, 1.0, 0.3, 1.0]);
-                d.set_new(true);
+                d.par().fig([0.6, 1.0, 0.3, 1.0]).draw();
+                d.par().new(true).draw();
                 pl(d, 5, "right");
             },
         },
@@ -100,7 +100,7 @@ fn cases() -> Vec<Case> {
             r: "par(oma = c(2, 3, 1, 1), fig = c(0.1, 0.9, 0.2, 0.9)); pl(10, 'oma')",
             setup: |p| p.oma = Sides::new(2.0, 3.0, 1.0, 1.0),
             draw: |d| {
-                d.fig([0.1, 0.9, 0.2, 0.9]);
+                d.par().fig([0.1, 0.9, 0.2, 0.9]).draw();
                 pl(d, 10, "oma");
             },
         },
@@ -111,10 +111,10 @@ fn cases() -> Vec<Case> {
                 par(fig = c(0.5, 1, 0, 0.5), new = TRUE); pl(5, 'inset')",
             setup: |_| {},
             draw: |d| {
-                d.mfrow(2, 2);
+                d.par().mfrow(2, 2).draw();
                 pl(d, 10, "A");
-                d.fig([0.5, 1.0, 0.0, 0.5]);
-                d.set_new(true);
+                d.par().fig([0.5, 1.0, 0.0, 0.5]).draw();
+                d.par().new(true).draw();
                 pl(d, 5, "inset");
             },
         },
@@ -299,7 +299,7 @@ fn regions_match_r() {
 fn fig_without_new_starts_a_new_page() {
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), Par::default());
     pl(&mut dev, 10, "first");
-    dev.fig([0.5, 1.0, 0.5, 1.0]);
+    dev.par().fig([0.5, 1.0, 0.5, 1.0]).draw();
     pl(&mut dev, 3, "second");
     let out = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
     // Two pages: "first" on page one, "second" on page two.
@@ -311,5 +311,5 @@ fn fig_without_new_starts_a_new_page() {
 #[should_panic(expected = "invalid value specified for graphical parameter \"fig\"")]
 fn fig_must_be_ordered_fractions() {
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-    dev.fig([0.5, 0.2, 0.0, 1.0]);
+    dev.par().fig([0.5, 0.2, 0.0, 1.0]).draw();
 }
