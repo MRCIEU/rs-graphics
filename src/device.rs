@@ -132,6 +132,11 @@ pub struct Device<B: Backend> {
     /// R's error for invalid regions as of the last layout (see
     /// `region_error()`), raised by `plot_new()`.
     region_error: Option<&'static str>,
+    /// `par(cex)` as of the last layout (R's `cexbase` in `xNDCPerChar`,
+    /// set by `mapNDC2Dev()` at `plot.new()` and region changes, not by a
+    /// later `par(cex = )`): the size of R's `CHARS` unit, e.g. `text()`'s
+    /// `offset`.
+    pub(crate) layout_cex: f64,
     /// `(x0, x1, y0, y1)` in "user" coordinates - already log10-
     /// transformed if `xlog`/`ylog` is set, matching `par("usr")`.
     usr: (f64, f64, f64, f64),
@@ -273,6 +278,7 @@ impl<B: Backend> Device<B> {
             fig: Rect::new(0.0, 0.0, width_in, height_in),
             plt: Rect::new(0.0, 0.0, width_in, height_in),
             region_error: None,
+            layout_cex: 1.0,
             usr: (0.0, 1.0, 0.0, 1.0),
             xlog: false,
             ylog: false,
@@ -362,6 +368,7 @@ impl<B: Backend> Device<B> {
     }
 
     fn recompute_layout(&mut self) {
+        self.layout_cex = self.par.cex;
         // Inner region: the device minus the outer margins; figures are
         // fractions (NIC) of it.
         let omi = self.omi();

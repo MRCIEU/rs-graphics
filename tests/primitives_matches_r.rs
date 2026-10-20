@@ -359,6 +359,28 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "text_pos",
+            r: "plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                text(c(2, 4, 6, 8), 5, c('a', 'b', 'c', 'd'), pos = 1:4)\n\
+                text(5, 8, 'e', pos = 3, offset = 1.5, cex = 2)\n\
+                par(cex = 0.8)\n\
+                text(c(3, 7), 2, c('f', 'g'), pos = c(2, 4), srt = 30)\n\
+                text(5, 3, expression(x^2), pos = 4)",
+            draw: |d| {
+                window(d);
+                d.text(&[2, 4, 6, 8], &[5], &["a", "b", "c", "d"])
+                    .pos([1, 2, 3, 4])
+                    .draw();
+                d.text(&[5], &[8], &["e"]).pos(3).offset(1.5).cex(2).draw();
+                d.par().cex(0.8).draw();
+                d.text(&[3, 7], &[2], &["f", "g"])
+                    .pos([2, 4])
+                    .srt(30)
+                    .draw();
+                d.text(&[5], &[3], &[Label::math("x^2")]).pos(4).draw();
+            },
+        },
+        Case {
             name: "text_nonfinite",
             r: "plot.new(); plot.window(c(1, 100), c(0, 10), log = 'x')\n\
                 text(c(NA, 10, 0, 50, -1, 20), c(2, 3, 4, 5, 6, NA), c('a', 'b', 'c', 'd', 'e', 'f'),\n\
@@ -679,4 +701,12 @@ fn primitives_match_r() {
             assert!(close(&a.fill, &b.fill, 0.005), "colour differs. {ctx}");
         }
     }
+}
+
+#[test]
+#[should_panic(expected = "invalid 'pos' value")]
+fn text_pos_outside_1_to_4_panics_like_r() {
+    let mut d = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+    window(&mut d);
+    d.text(&[5], &[5], &["a"]).pos(5).draw();
 }

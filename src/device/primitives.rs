@@ -220,6 +220,13 @@ pub struct TextOptions {
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's `pos`, recycled per label: put the label below (1), to the left
+    /// of (2), above (3) or to the right of (4) its point, `offset` away;
+    /// overrides `adj`/`vadj`. Empty: none.
+    pub pos: Vec<i32>,
+    /// With `pos`, the distance from the point in character widths (R's
+    /// `offset`); `None`: 0.5.
+    pub offset: Option<f64>,
 }
 
 crate::setters::setters!(TextOptions => [TextCall] {
@@ -230,7 +237,14 @@ crate::setters::setters!(TextOptions => [TextCall] {
     col: values ColorSpec,
     font: values i32,
     xpd: option Xpd,
+    pos: values i32,
+    offset: option f64,
 });
+
+/// The device's `yCharOffset`: how far up the text's height to put the
+/// point for `text(pos = 2 or 4)` (0.3333 on R's pdf, cairo and Quartz
+/// devices).
+const Y_CHAR_OFFSET: f64 = 0.3333;
 
 /// Which region `box()` outlines.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -594,6 +608,15 @@ impl<B: Backend> Device<B> {
         let n = recycled_len(&[x.len(), y.len()]);
         let clip = self.clip_for(opts.xpd);
         let hadj = opts.adj.unwrap_or(self.par.adj);
+        assert!(
+            opts.pos.iter().all(|p| (1..=4).contains(p)),
+            "invalid 'pos' value"
+        );
+        // `offset` characters, as `GConvertXUnits(offset, CHARS, INCHES)`
+        // before any label's own `cex`: the character height (R's
+        // `cra[1]`) times `par(cex)` as of the last layout (see
+        // `layout_cex`).
+        let offset = opts.offset.unwrap_or(0.5) * self.layout_cex * 1.2 * self.start_ps / 72.0;
         let (col, font) = (ColorSpec::Color(self.par.col), self.par.font);
         for i in 0..n {
             let label: Label = if labels.is_empty() {
@@ -607,12 +630,23 @@ impl<B: Backend> Device<B> {
             if !(p.x.is_finite() && p.y.is_finite()) {
                 continue;
             }
+            let (p, hadj, vadj) = match opts.pos.get(i % opts.pos.len().max(1)) {
+                Some(1) => (
+                    Point::new(p.x, p.y - offset),
+                    0.5,
+                    Some(1.0 - (0.5 - Y_CHAR_OFFSET)),
+                ),
+                Some(2) => (Point::new(p.x - offset, p.y), 1.0, Some(Y_CHAR_OFFSET)),
+                Some(3) => (Point::new(p.x, p.y + offset), 0.5, Some(0.0)),
+                Some(4) => (Point::new(p.x + offset, p.y), 0.0, Some(Y_CHAR_OFFSET)),
+                _ => (p, hadj, opts.vadj),
+            };
             self.draw_label(
                 clip,
                 p,
                 &label,
                 hadj,
-                opts.vadj,
+                vadj,
                 opts.srt.unwrap_or(self.par.srt),
                 pick(&opts.col, i, col),
                 pick(&opts.cex, i, 1.0),
