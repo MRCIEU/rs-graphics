@@ -262,6 +262,27 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "barplot_names_axis",
+            r: "par(mfrow = c(1, 2))\n\
+                barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), cex.names = 1.5, axis.lty = 1,\n\
+                        cex.axis = 0.7)\n\
+                barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), axisnames = FALSE, horiz = TRUE)",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                d.barplot([3, 5, 2])
+                    .names(["a", "b", "c"])
+                    .cex_names(1.5)
+                    .axis_lty("solid")
+                    .cex_axis(0.7)
+                    .draw();
+                d.barplot([3, 5, 2])
+                    .names(["a", "b", "c"])
+                    .axisnames(false)
+                    .horiz(true)
+                    .draw();
+            },
+        },
+        Case {
             name: "boxplot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 boxplot(list(a = c(1, 2, 3, 9), b = c(2, 3, 4)), las = 2, cex.axis = 1.3,\n\

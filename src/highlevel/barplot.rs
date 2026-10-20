@@ -14,11 +14,12 @@
 //! `beside`, vertical or
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
 //! `gray.colors(nrow)`), `names.arg`, `legend.text` (and `args.legend`),
-//! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH` and `add`.
+//! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH`, `add`,
+//! `axisnames`, `cex.names`, `axis.lty` and R's inline axis parameters
+//! (`las`, `cex.axis`, ...).
 //!
 //! Not supported: hatched fills (`density`/`angle`), `xpd` (always
-//! `TRUE`, R's default), `axisnames`, `cex.axis`/`cex.names`, `axis.lty`,
-//! `plot = FALSE` and `panel.first`/`panel.last`.
+//! `TRUE`, R's default), `plot = FALSE` and `panel.first`/`panel.last`.
 //!
 //! **R bug not copied:** for stacked bars R works out the default value
 //! axis limits with `offset` recycled over every element of the matrix of
@@ -33,6 +34,7 @@ use crate::device::{
     TitleOptions,
 };
 use crate::error::{from_r_string, from_str_via_parse};
+use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
 use crate::par::{AxisStyle, Xpd};
 use crate::plotmath::Label;
@@ -144,6 +146,13 @@ pub struct BarplotOptions {
     pub font_lab: Option<i32>,
     /// Draw the value axis; default `true`.
     pub axes: bool,
+    /// Draw the names (R's `axisnames`); default `true`.
+    pub axisnames: bool,
+    /// Size of the names (R's `cex.names`); `None`: `par(cex.axis)`.
+    pub cex_names: Option<f64>,
+    /// Line type of the names axis's line and ticks (R's `axis.lty`);
+    /// `None`: R's 0, none drawn.
+    pub axis_lty: Option<LineType>,
     /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
     /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
     /// `None`: `par(las)`.
@@ -200,6 +209,9 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     col_lab: option ColorSpec,
     font_lab: option i32,
     axes: value bool,
+    axisnames: value bool,
+    cex_names: option f64,
+    axis_lty: option LineType,
     las: option i32,
     cex_axis: option f64,
     col_axis: option ColorSpec,
@@ -245,6 +257,9 @@ impl Default for BarplotOptions {
             col_lab: None,
             font_lab: None,
             axes: true,
+            axisnames: true,
+            cex_names: None,
+            axis_lty: None,
             las: None,
             cex_axis: None,
             col_axis: None,
@@ -689,12 +704,17 @@ impl<B: Backend> Device<B> {
             tcl: opts.tcl,
             gap_axis: opts.gap_axis,
         };
-        if let (Some(names), Some(at)) = (&opts.names, names_at) {
-            // `axis(side, at = at, labels = names.arg, lty = 0)`: names only.
+        if let (true, Some(names), Some(at)) = (opts.axisnames, &opts.names, names_at) {
+            // `axis(side, at = at, labels = names.arg, lty = axis.lty,
+            // cex.axis = cex.names, ...)`: with R's default `axis.lty = 0`,
+            // the names only.
+            let lty = opts.axis_lty.filter(|&l| l != LineType::BLANK);
             let names = AxisOptions {
                 at: Some(at),
                 labels: Some(names.iter().cloned().map(Some).collect()),
-                tick: false,
+                tick: lty.is_some(),
+                lty,
+                cex_axis: opts.cex_names,
                 ..AxisOptions::default()
             };
             self.axis_impl(if horiz { 2 } else { 1 }, &inline.apply(names));
