@@ -426,6 +426,10 @@ against a real R installation by shelling out to `Rscript`:
   `mar` resetting it), `omi`/`omd` with outer `mtext()` (and `mfrow`),
   `pin` (and `mar` resetting it), `pty` resetting `plt`, `fin`, and
   `par(oma)` starting a new page: paths and text vs. R `pdf()`.
+- `tests/xy_lengths_matches_r.rs` - `plot()`/`points()`/`lines()`/
+  `polygon()` with `x` and `y` of different lengths panic with R's
+  `xy.coords()` message (on a device and in a `Figure`); `text()`
+  recycles, as R.
 - `tests/region_errors_matches_r.rs` - `plot_new()`'s panics with R's
   messages ("figure margins too large", "figure region too large", "plot
   region too large") for small pages, large `oma`/`mai`, many panels,

@@ -151,11 +151,16 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// options in [`PlotOptions`]. A high-level plot: it starts a new plot
     /// with [`plot_new`](Graphics::plot_new), so on a multi-panel page it
     /// moves to the next panel.
+    ///
+    /// # Panics
+    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
+    /// 'y' lengths differ").
     fn plot<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> PlotCall<'a, Self> {
+        let (x, y) = xy_coords(x, y);
         PlotCall {
             target: self,
-            x: x.into_numbers(),
-            y: y.into_numbers(),
+            x,
+            y,
             opts: PlotOptions::default(),
         }
     }
@@ -274,11 +279,16 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `points(x, y, ...)`: R's `plot.xy(type = "p")` unless `type_` says
     /// otherwise; options in [`XyOptions`]. Points with a non-finite
     /// coordinate (including values <= 0 on a log axis) are skipped.
+    ///
+    /// # Panics
+    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
+    /// 'y' lengths differ").
     fn points<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> PointsCall<'a, Self> {
+        let (x, y) = xy_coords(x, y);
         PointsCall {
             target: self,
-            x: x.into_numbers(),
-            y: y.into_numbers(),
+            x,
+            y,
             opts: XyOptions::default(),
         }
     }
@@ -286,11 +296,16 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `lines(x, y, ...)`: R's `plot.xy(type = "l")` unless `type_` says
     /// otherwise; options in [`XyOptions`]. The polyline breaks at
     /// non-finite coordinates (R's `NA`, or values <= 0 on a log axis).
+    ///
+    /// # Panics
+    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
+    /// 'y' lengths differ").
     fn lines<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> LinesCall<'a, Self> {
+        let (x, y) = xy_coords(x, y);
         LinesCall {
             target: self,
-            x: x.into_numbers(),
-            y: y.into_numbers(),
+            x,
+            y,
             opts: XyOptions::default(),
         }
     }
@@ -367,15 +382,20 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// per run of finite points (non-finite coordinates, R's `NA`,
     /// separate them), with `col`, `border` and `lty` recycled over the
     /// polygons, as `C_polygon`.
+    ///
+    /// # Panics
+    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
+    /// 'y' lengths differ").
     fn polygon<'a>(
         &'a mut self,
         x: impl Numbers<'a>,
         y: impl Numbers<'a>,
     ) -> PolygonCall<'a, Self> {
+        let (x, y) = xy_coords(x, y);
         PolygonCall {
             target: self,
-            x: x.into_numbers(),
-            y: y.into_numbers(),
+            x,
+            y,
             opts: PolygonOptions::default(),
         }
     }
@@ -713,6 +733,15 @@ impl<B: Backend> Graphics for Device<B> {
             self.set_new(new);
         }
     }
+}
+
+/// R's `xy.coords()` check for `plot()`, `points()`, `lines()` and
+/// `polygon()`: `x` and `y` of one length (R doesn't recycle them there,
+/// unlike `text()`).
+fn xy_coords<'a>(x: impl Numbers<'a>, y: impl Numbers<'a>) -> (Cow<'a, [f64]>, Cow<'a, [f64]>) {
+    let (x, y) = (x.into_numbers(), y.into_numbers());
+    assert!(x.len() == y.len(), "'x' and 'y' lengths differ");
+    (x, y)
 }
 
 /// Declares a call: its struct (target, data fields, options) and its
