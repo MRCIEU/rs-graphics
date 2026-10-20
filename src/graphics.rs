@@ -149,7 +149,8 @@ pub trait Graphics: sealed::Sealed + Sized {
 
     /// `barplot(height, ...)`; options in [`BarplotOptions`]. A high-level
     /// plot: it starts a new plot with [`plot_new`](Graphics::plot_new), so
-    /// on a multi-panel page it moves to the next panel. `heights` is a
+    /// on a multi-panel page it moves to the next panel, unless `add` (R's
+    /// `add = TRUE`), which draws the bars on the current plot. `heights` is a
     /// vector (one bar per value) or a matrix given as its columns (see
     /// [`BarHeights`]), drawn stacked unless `beside`.
     ///

@@ -96,7 +96,8 @@ the corresponding `*.default` R function:
   `add = TRUE`.
 - `barplot()` - vectors and matrices (one method; a matrix is given as
   its columns, `Vec<Vec<f64>>`), stacked or `beside`, vertical or
-  `horiz`, with `legend.text`, `space`, `width`, `xlim`/`ylim`.
+  `horiz`, with `legend.text` and `args.legend`, `space`, `width`,
+  `xlim`/`ylim`, `offset`, `orderH` and `add = TRUE`.
 - `boxplot()` - Tukey boxplots (via `fivenum()`, not `quantile()` -
   see [Design notes](#design-notes)), including the 1.5*IQR outlier rule,
   `notch`, `varwidth`, `horizontal`, `at`, `width`, `add`, `outline`, log
@@ -136,7 +137,7 @@ To keep this a tractable "core functionality" port, the following R
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
 fonts, the plotmath constructs listed above, and interactive input
 (`identify()`/`locator()`). `barplot()` doesn't
-support `density`/`angle` hatching, `offset`, or `add`. These would be
+support `density`/`angle` hatching. These would be
 reasonable follow-ups but are left for future work.
 
 ## Design notes
@@ -193,7 +194,9 @@ A few fidelity-relevant decisions worth calling out:
   table is intentionally not replicated in `src/afm.rs` (documented
   there, with a tolerance-based test instead of an exact-match one).
   Likewise `barplot()`'s legend on a log value axis goes in the top-right
-  corner as intended, not where R's use of log10 `par("usr")` puts it.
+  corner as intended, not where R's use of log10 `par("usr")` puts it,
+  and its default limits for stacked bars use each column's `offset`
+  (R recycles `offset` over the whole matrix of stacked sums there).
 - **Pages.** PDF output has one page per R page, as R's `pdf()` does: a
   new page starts at each `plot_new()` on a one-figure page, when a
   multi-figure page wraps round, and after `fig()` without
@@ -276,6 +279,10 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/barplot_matches_r.rs` - bar rectangles and text origins vs. an
   uncompressed R `pdf()` for vector, stacked, `beside`, and `horiz`
   scenarios.
+- `tests/barplot_extras_matches_r.rs` - `barplot()`'s `offset` (vector,
+  `beside`, stacked), `orderH`, `add = TRUE` (with `ann` off by default)
+  and `args.legend` (keyword position, `bty`, `inset`, `ncol`, `title`,
+  `xjust`): every painted path and every text item vs. R `pdf()`.
 - `tests/layout_matches_r.rs` - bar rectangles and text origins for
   `mfrow`/`mfcol`/`mfg`/`oma`/`par(cex)` and `layout()` (spanning,
   `lcm()`, `respect`) vs. an uncompressed R `pdf()`.

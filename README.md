@@ -88,7 +88,8 @@ extension. `dev.finish()` returns the file's bytes instead of saving.
 ### Several panels on a page
 
 As in R, each high-level call (`plot`, `hist`, `barplot`, `boxplot`,
-`pie`) starts the next panel, and the calls after it draw in that panel.
+`pie`) starts the next panel (unless it's given `add`), and the calls
+after it draw in that panel.
 High-level calls return what R's functions return.
 
 ```rust

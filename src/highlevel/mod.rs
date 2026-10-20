@@ -26,7 +26,7 @@ pub mod hist;
 pub mod pie;
 pub mod plot;
 
-pub use barplot::{BarHeights, BarplotOptions};
+pub use barplot::{BarHeights, BarplotOptions, OrderH};
 pub use boxplot::{BoxStats, BoxplotOptions, boxplot_stats};
 pub use hist::{HistOptions, HistResult};
 pub use pie::PieOptions;

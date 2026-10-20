@@ -13,11 +13,16 @@
 //! case) and a matrix (see [`BarHeights`]) drawn either stacked or
 //! `beside`, vertical or
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
-//! `gray.colors(nrow)`), `names.arg`, `legend.text`, `xlim`/`ylim`, and log
-//! axes (`xlog`/`ylog`).
+//! `gray.colors(nrow)`), `names.arg`, `legend.text` (and `args.legend`),
+//! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH` and `add`.
 //!
-//! Not supported: hatched fills (`density`/`angle`), `offset`, `orderH`,
-//! `add`, `args.legend`.
+//! Not supported: hatched fills (`density`/`angle`).
+//!
+//! **R bug not copied:** for stacked bars R works out the default value
+//! axis limits with `offset` recycled over every element of the matrix of
+//! stacked sums instead of once per column (so `offset = c(0, 10, 0)` on a
+//! 3-column matrix gives limits that cut off the bars it draws). We use
+//! each column's own offset, as R does when drawing the bars.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec, gray_colors};
@@ -25,6 +30,7 @@ use crate::device::{
     AxisOptions, Device, LegendEntry, LegendOptions, LegendPos, PlotWindowOptions, RectOptions,
     TitleOptions,
 };
+use crate::error::from_str_via_parse;
 use crate::par::AxisStyle;
 use crate::plotmath::Label;
 
@@ -58,6 +64,16 @@ pub struct BarplotOptions {
     /// Matrix only: legend labels, one per row (R's `legend.text`);
     /// `None`: no legend.
     pub legend_text: Option<Vec<Label>>,
+    /// Where the legend goes (R's `args.legend = list(x = .., y = ..)`),
+    /// e.g. `"topleft"` or `(x, y)`; `None`: 0.1 inch in from the top-right
+    /// corner of the plot region, as R.
+    pub legend_pos: Option<LegendPos>,
+    /// The rest of R's `args.legend`: every field set here overrides
+    /// barplot's choice for the legend (`xjust = yjust = 1`, otherwise
+    /// `legend()`'s defaults), e.g. `bty`, `inset`, `ncol`, `cex`, `title`.
+    /// The labels and fill colours always come from `legend_text` and
+    /// `col`. Default: no overrides.
+    pub args_legend: LegendOptions,
     /// x limits; `None`: from the bars.
     pub xlim: Option<(f64, f64)>,
     /// y limits; `None`: from the bars.
@@ -68,6 +84,21 @@ pub struct BarplotOptions {
     pub xlog: bool,
     /// Log y axis (R's `log = "y"`); default `false`. See `xlog`.
     pub ylog: bool,
+    /// Shifts each bar along the value axis (R's `offset`): recycled over
+    /// the bars of a vector, the rows of a `beside` matrix, or the columns
+    /// (stacks) of a stacked one. Empty: 0 (R's default).
+    pub offset: Vec<f64>,
+    /// Stacked bars only: the order of the segments within each stack (R's
+    /// `orderH`); each segment keeps its row's colour. Default
+    /// [`OrderH::None`] (row order).
+    pub order_h: OrderH,
+    /// Draw on the current plot instead of starting a new one (R's
+    /// `add = TRUE`): no new plot or panel, no new coordinates; the names,
+    /// legend and axis are still drawn. Default `false`.
+    pub add: bool,
+    /// Draw the titles (R's `ann`); `None`: `par(ann)`, unless `add` (R's
+    /// default `ann = !add && par("ann")`).
+    pub ann: Option<bool>,
     /// Main title, as for `plot()` (text or a plotmath expression);
     /// `None`: none. Titles are drawn when `par(ann)` is true, as in R.
     pub main: Option<Label>,
@@ -90,10 +121,16 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     beside: value bool,
     horiz: value bool,
     legend_text: list Label,
+    legend_pos: option LegendPos,
+    args_legend: value LegendOptions,
     xlim: pair f64,
     ylim: pair f64,
     xlog: value bool,
     ylog: value bool,
+    offset: values f64,
+    order_h: value OrderH,
+    add: value bool,
+    ann: option bool,
     main: option Label,
     sub: option Label,
     xlab: option Label,
@@ -112,10 +149,16 @@ impl Default for BarplotOptions {
             beside: false,
             horiz: false,
             legend_text: None,
+            legend_pos: None,
+            args_legend: LegendOptions::default(),
             xlim: None,
             ylim: None,
             xlog: false,
             ylog: false,
+            offset: Vec::new(),
+            order_h: OrderH::None,
+            add: false,
+            ann: None,
             main: None,
             sub: None,
             xlab: None,
@@ -124,6 +167,40 @@ impl Default for BarplotOptions {
         }
     }
 }
+
+/// R's `orderH` for stacked bars: the order of the segments within each
+/// stack.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum OrderH {
+    /// `"none"`: in row order (the default).
+    #[default]
+    None,
+    /// `"incr"`: smallest segment at the base.
+    Incr,
+    /// `"decr"`: largest segment at the base.
+    Decr,
+}
+
+impl OrderH {
+    /// `"none"`, `"incr"` or `"decr"`, or a unique prefix of one (R's
+    /// `match.arg()`); `None` for anything else.
+    pub fn parse(s: &str) -> Option<OrderH> {
+        let all = [
+            ("none", OrderH::None),
+            ("incr", OrderH::Incr),
+            ("decr", OrderH::Decr),
+        ];
+        let mut hits = all
+            .iter()
+            .filter(|(name, _)| !s.is_empty() && name.starts_with(s));
+        match (hits.next(), hits.next()) {
+            (Some(&(_, o)), None) => Some(o),
+            _ => None,
+        }
+    }
+}
+
+from_str_via_parse!(OrderH, "orderH");
 
 /// The `height` argument of [`Graphics::barplot`](crate::graphics::Graphics::barplot): R's vector or matrix.
 /// Built with `.into()` from a vector of numbers (slice, array, `Vec`) or
@@ -288,6 +365,18 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
         w_l[k] = w_m[k] - width_v[k] / 2.0;
     }
 
+    // `offset`, recycled to the length of `width`: one per row (beside)
+    // or per column (stacked). `offset_of(i, j)` is that of row i, column j.
+    let offset = if opts.offset.is_empty() {
+        vec![0.0]
+    } else {
+        recycle(&opts.offset, base_n)
+    };
+    let offset_of = |i: usize, j: usize| {
+        let k = if beside { i } else { j };
+        offset[k % offset.len()]
+    };
+
     // --- log scale in the data direction: where bars start ---
     let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
     let rectbase = if log_dat {
@@ -297,8 +386,15 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
             .copied()
             .filter(|h| !h.is_nan())
             .fold(f64::INFINITY, f64::min);
+        let min_h_off = columns
+            .iter()
+            .enumerate()
+            .flat_map(|(j, c)| c.iter().enumerate().map(move |(i, &h)| (i, j, h)))
+            .map(|(i, j, h)| h + offset_of(i, j))
+            .filter(|h| !h.is_nan())
+            .fold(f64::INFINITY, f64::min);
         assert!(
-            min_h > 0.0,
+            min_h_off > 0.0,
             "barplot: log scale error: at least one 'height + offset' value <= 0"
         );
         for (log, lim, name) in [
@@ -325,32 +421,50 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
     let mut bars: Vec<(usize, f64, f64, usize)> = Vec::new();
     let mut extent_lo = f64::INFINITY;
     let mut extent_hi = f64::NEG_INFINITY;
-    let mut note = |h: f64| {
-        // `range(rAdj, height)` with `rAdj = 0.9 * height` on a log value
-        // axis, else `-0.01 * height`.
-        let adj = if log_dat { 0.9 * h } else { -0.01 * h };
-        extent_lo = extent_lo.min(adj).min(h);
-        extent_hi = extent_hi.max(adj).max(h);
+    let mut note = |h: f64, off: f64| {
+        // `range(rAdj, height + offset)` with `rAdj = offset + 0.9 * height`
+        // on a log value axis, else `offset - 0.01 * height`.
+        let adj = off + if log_dat { 0.9 * h } else { -0.01 * h };
+        extent_lo = extent_lo.min(adj).min(h + off);
+        extent_hi = extent_hi.max(adj).max(h + off);
     };
     if beside {
         for (j, col) in columns.iter().enumerate() {
             for (i, &h) in col.iter().enumerate() {
                 let k = j * nr + i;
-                bars.push((k, rectbase, h, k));
-                note(h);
+                let off = offset_of(i, j);
+                bars.push((k, rectbase + off, h + off, k));
+                note(h, off);
             }
         }
     } else {
         // `rbind(rectbase, apply(height, 2, cumsum))`: the first segment
-        // starts at `rectbase`, the sums themselves start from 0.
-        note(rectbase);
+        // starts at `rectbase`, the sums themselves start from 0. With
+        // `orderH`, each column's segments are summed in sorted order
+        // (`order()`: stable, NaN last) and keep their row's colour.
         for (j, col) in columns.iter().enumerate() {
+            let off = offset_of(0, j);
+            note(rectbase, off);
+            let mut rows: Vec<usize> = (0..nr).collect();
+            if opts.order_h != OrderH::None {
+                let decr = opts.order_h == OrderH::Decr;
+                rows.sort_by(|&a, &b| {
+                    let (x, y) = (col[a], col[b]);
+                    match (x.is_nan(), y.is_nan()) {
+                        (true, true) => std::cmp::Ordering::Equal,
+                        (true, false) => std::cmp::Ordering::Greater,
+                        (false, true) => std::cmp::Ordering::Less,
+                        _ if decr => y.partial_cmp(&x).unwrap(),
+                        _ => x.partial_cmp(&y).unwrap(),
+                    }
+                });
+            }
             let mut acc = 0.0;
-            for (i, &h) in col.iter().enumerate() {
-                let base = if i == 0 { rectbase } else { acc };
-                acc += h;
-                bars.push((j, base, acc, i));
-                note(acc);
+            for (n, &i) in rows.iter().enumerate() {
+                let base = if n == 0 { rectbase } else { acc };
+                acc += col[i];
+                bars.push((j, base + off, acc + off, i));
+                note(acc, off);
             }
         }
     }
@@ -430,21 +544,23 @@ impl<B: Backend> Device<B> {
 
         // barplot() temporarily sets the *value* axis to `"i"` (exact fit, no
         // 4% padding), leaving the categorical axis at its regular setting.
-        let (saved_xaxs, saved_yaxs) = (self.par.xaxs, self.par.yaxs);
-        if horiz {
-            self.par.xaxs = AxisStyle::Exact;
-        } else {
-            self.par.yaxs = AxisStyle::Exact;
+        if !opts.add {
+            let (saved_xaxs, saved_yaxs) = (self.par.xaxs, self.par.yaxs);
+            if horiz {
+                self.par.xaxs = AxisStyle::Exact;
+            } else {
+                self.par.yaxs = AxisStyle::Exact;
+            }
+            self.plot_new_impl();
+            let window = PlotWindowOptions {
+                xlog: opts.xlog,
+                ylog: opts.ylog,
+                ..PlotWindowOptions::default()
+            };
+            self.plot_window_impl(xlim, ylim, &window);
+            self.par.xaxs = saved_xaxs;
+            self.par.yaxs = saved_yaxs;
         }
-        self.plot_new_impl();
-        let window = PlotWindowOptions {
-            xlog: opts.xlog,
-            ylog: opts.ylog,
-            ..PlotWindowOptions::default()
-        };
-        self.plot_window_impl(xlim, ylim, &window);
-        self.par.xaxs = saved_xaxs;
-        self.par.yaxs = saved_yaxs;
 
         // R draws everything with `par(xpd = TRUE)`.
         let saved_xpd = self.par.xpd;
@@ -483,23 +599,26 @@ impl<B: Backend> Device<B> {
             if (horiz && beside) || (!horiz && !beside) {
                 entries.reverse();
             }
-            // 0.1 inch in from the top-right corner of the plot region. (On a
-            // log axis R passes the log10 `par("usr")` values to `legend()` as
-            // data, which puts the legend near the bottom; we don't copy that.)
-            let (ux0, ux1, uy0, uy1) = self.usr();
-            let plt = self.plot_region();
-            let data = |v: f64, log: bool| if log { 10f64.powf(v) } else { v };
-            let x = data(ux1 - 0.1 * (ux1 - ux0) / plt.width(), opts.xlog);
-            let y = data(uy1 - 0.1 * (uy1 - uy0) / plt.height(), opts.ylog);
-            let lopts = LegendOptions {
-                xjust: Some(1.0),
-                yjust: Some(1.0),
-                ..LegendOptions::default()
-            };
-            self.legend_impl(LegendPos::Xy(x, y), &entries, &lopts);
+            // By default 0.1 inch in from the top-right corner of the plot
+            // region. (On a log axis R passes the log10 `par("usr")` values
+            // to `legend()` as data, which puts the legend near the bottom;
+            // we don't copy that.)
+            let pos = opts.legend_pos.unwrap_or_else(|| {
+                let (ux0, ux1, uy0, uy1) = self.usr();
+                let plt = self.plot_region();
+                let data = |v: f64, log: bool| if log { 10f64.powf(v) } else { v };
+                let x = data(ux1 - 0.1 * (ux1 - ux0) / plt.width(), self.xlog());
+                let y = data(uy1 - 0.1 * (uy1 - uy0) / plt.height(), self.ylog());
+                LegendPos::Xy(x, y)
+            });
+            // `args.legend1[names(args.legend)] <- args.legend`.
+            let mut lopts = opts.args_legend.clone();
+            lopts.xjust.get_or_insert(1.0);
+            lopts.yjust.get_or_insert(1.0);
+            self.legend_impl(pos, &entries, &lopts);
         }
 
-        if self.par.ann {
+        if opts.ann.unwrap_or(!opts.add && self.par.ann) {
             self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),
@@ -514,5 +633,22 @@ impl<B: Backend> Device<B> {
 
         self.par.xpd = saved_xpd;
         w_m
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn order_h_parses_like_match_arg() {
+        assert_eq!(OrderH::parse("none"), Some(OrderH::None));
+        assert_eq!(OrderH::parse("incr"), Some(OrderH::Incr));
+        assert_eq!(OrderH::parse("d"), Some(OrderH::Decr));
+        assert_eq!(OrderH::parse("in"), Some(OrderH::Incr));
+        assert_eq!(OrderH::parse(""), None);
+        assert_eq!(OrderH::parse("increasing"), None);
+        assert_eq!("decr".parse::<OrderH>(), Ok(OrderH::Decr));
+        assert!("up".parse::<OrderH>().is_err());
     }
 }

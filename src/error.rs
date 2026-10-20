@@ -17,6 +17,7 @@ use std::fmt;
 /// [`PlotType`](crate::highlevel::PlotType),
 /// [`LegendKeyword`](crate::device::LegendKeyword),
 /// [`LegendBty`](crate::device::LegendBty),
+/// [`OrderH`](crate::highlevel::OrderH),
 /// [`Format`](crate::backend::Format) and the `par()` enums, and by
 /// [`AnyBackend::for_path`](crate::backend::AnyBackend::for_path).
 #[derive(Clone, Debug, PartialEq, Eq)]
