@@ -35,6 +35,9 @@ pub struct PieOptions {
     /// ...`. An empty text label, or a missing one (fewer labels than
     /// slices, R's `NA`), draws no label or tick for its slice.
     pub labels: Option<Vec<Label>>,
+    /// Rotation of the labels in degrees, counterclockwise (R's `srt`,
+    /// passed to `text()`); `None`: `par(srt)`.
+    pub srt: Option<f64>,
     /// Pie radius in user units, where the plot region's shorter side
     /// spans `[-1, 1]` before the usual 4% axis extension; `None`: 0.8
     /// (R's default).
@@ -68,6 +71,7 @@ pub struct PieOptions {
 
 crate::setters::setters!(PieOptions => [PieCall] {
     labels: list Label,
+    srt: option f64,
     radius: option f64,
     col: values ColorSpec,
     border: option ColorSpec,
@@ -84,6 +88,7 @@ impl Default for PieOptions {
     fn default() -> Self {
         PieOptions {
             labels: None,
+            srt: None,
             radius: None,
             col: Vec::new(),
             border: None,
@@ -199,6 +204,7 @@ impl<B: Backend> Device<B> {
                 let at = TextOptions {
                     adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
                     xpd: Some(true),
+                    srt: opts.srt,
                     ..TextOptions::default()
                 };
                 self.text_impl(&[1.1 * px], &[1.1 * py], std::slice::from_ref(label), &at);

@@ -9,9 +9,9 @@
 //! Cross-checks `par(tck)` (small, `1` for a grid, an inline `axis(tck =)`
 //! overriding it, and `par(tck = NA)` resetting it) and `par(srt)` (on
 //! `text()` with an inline `srt` overriding it and axis labels not
-//! rotated, on `pie()` labels, and on `legend()` labels and title, which R
-//! draws with `text()`) against a real R `pdf()` device's uncompressed
-//! output. Compares every painted path in order and every text item's
+//! rotated, on `pie()` labels, also with `pie(srt = )` over it, and on
+//! `legend()` labels and title, which R draws with `text()`) against a
+//! real R `pdf()` device's uncompressed output. Compares every painted path in order and every text item's
 //! string, origin, font, size, fill colour and rotation. Skipped if
 //! `Rscript` isn't available.
 
@@ -94,6 +94,14 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().srt(30).draw();
                 d.pie(&[1, 2, 3]).labels(["a", "b", "c"]).draw();
+            },
+        },
+        Case {
+            name: "pie_inline_srt",
+            r: "par(srt = 30); pie(c(1, 2, 3), labels = c('a', 'b', 'c'), srt = -45)",
+            ours: |d| {
+                d.par().srt(30).draw();
+                d.pie(&[1, 2, 3]).labels(["a", "b", "c"]).srt(-45).draw();
             },
         },
         Case {
