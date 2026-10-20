@@ -578,7 +578,14 @@ impl<B: Backend> Device<B> {
         opts: &BarplotOptions,
     ) -> Vec<f64> {
         let layout = bar_layout(&heights.into(), opts);
-        self.draw_barplot(layout, opts)
+        // R's `opar <- par(yaxs = "i")` (`xaxs` when `horiz`), then
+        // `par(xpd = TRUE)`, restored `on.exit`.
+        let mut dev = self.par_scope(|now, saved| {
+            now.xaxs = saved.xaxs;
+            now.yaxs = saved.yaxs;
+            now.xpd = saved.xpd;
+        });
+        dev.draw_barplot(layout, opts)
     }
 
     /// Draws `layout`; returns its bar centres.
@@ -596,15 +603,15 @@ impl<B: Backend> Device<B> {
         } = layout;
         let horiz = opts.horiz;
 
-        // barplot() temporarily sets the *value* axis to `"i"` (exact fit, no
-        // 4% padding), leaving the categorical axis at its regular setting.
+        // barplot() sets the *value* axis to `"i"` (exact fit, no 4%
+        // padding), leaving the categorical axis at its regular setting;
+        // `barplot_impl` restores it.
+        if horiz {
+            self.par.xaxs = AxisStyle::Exact;
+        } else {
+            self.par.yaxs = AxisStyle::Exact;
+        }
         if !opts.add {
-            let (saved_xaxs, saved_yaxs) = (self.par.xaxs, self.par.yaxs);
-            if horiz {
-                self.par.xaxs = AxisStyle::Exact;
-            } else {
-                self.par.yaxs = AxisStyle::Exact;
-            }
             self.plot_new_impl();
             let window = PlotWindowOptions {
                 xlog: opts.xlog,
@@ -612,12 +619,10 @@ impl<B: Backend> Device<B> {
                 ..PlotWindowOptions::default()
             };
             self.plot_window_impl(xlim, ylim, &window);
-            self.par.xaxs = saved_xaxs;
-            self.par.yaxs = saved_yaxs;
         }
 
-        // R draws everything with `par(xpd = TRUE)`.
-        let saved_xpd = self.par.xpd;
+        // R draws everything with `par(xpd = TRUE)` (restored by
+        // `barplot_impl`).
         self.par.xpd = Xpd::Figure;
 
         for &(k, base, top, ci) in &bars {
@@ -694,7 +699,6 @@ impl<B: Backend> Device<B> {
             self.axis_impl(if horiz { 1 } else { 2 }, &AxisOptions::default());
         }
 
-        self.par.xpd = saved_xpd;
         w_m
     }
 }

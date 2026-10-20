@@ -324,3 +324,40 @@ fn legend_shorthand_draws_the_same() {
     assert_eq!(draw(true, false), long, "on a device");
     assert_eq!(draw(true, true), long, "in a figure");
 }
+
+/// `par` comes back after `add_figure` even when a recorded call panics
+/// (here `abline()` with a non-finite `coef`) and the panic is caught.
+#[test]
+fn add_figure_restores_par_after_a_panic() {
+    let mut fig = Figure::new();
+    fig.par().cex(2).las(1).draw();
+    fig.plot(&[1, 2], &[1, 2]).draw();
+    fig.abline().coef(f64::NAN, 1).draw();
+    let mut dev = device(Format::Pdf);
+    let before = format!("{:?}", dev.current_par());
+    let hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        dev.add_figure(&fig);
+    }));
+    std::panic::set_hook(hook);
+    assert!(caught.is_err());
+    assert_eq!(format!("{:?}", dev.current_par()), before);
+}
+
+/// `barplot()` and `legend(xpd = )` change `par` only for the call, as R's
+/// `on.exit(par(opar))`.
+#[test]
+fn barplot_and_legend_restore_their_par_changes() {
+    let mut dev = device(Format::Pdf);
+    dev.barplot([3, 5, 2]).draw();
+    dev.barplot([3, 5, 2]).horiz(true).draw();
+    let p = dev.current_par();
+    assert_eq!(
+        (p.xaxs, p.yaxs, p.xpd),
+        (AxisStyle::Regular, AxisStyle::Regular, Xpd::Plot)
+    );
+    let keys = [LegendEntry::point("a", 1, 1)];
+    dev.legend("topright", &keys).xpd(Xpd::Device).draw();
+    assert_eq!(dev.current_par().xpd, Xpd::Plot);
+}

@@ -106,12 +106,13 @@ impl DeviceBuilder {
         if let Some(ps) = self.pointsize {
             par.ps = ps;
         }
-        // The SVG backend has no background of its own: the page is
-        // painted in `par(bg)`.
-        if let Some(c) = bg {
-            par.bg = c;
-        }
         let mut dev = Device::new(backend, par);
+        // The SVG backend has no background of its own: the page is
+        // painted in `par(bg)`. Set after `Device::new`, which takes a
+        // white `par.bg` as "not set" and uses the backend's default.
+        if let Some(c) = bg {
+            dev.par.bg = c;
+        }
         dev.file = Some(file);
         Ok(dev)
     }

@@ -534,7 +534,7 @@ macro_rules! par_options {
         impl ParOptions {
             /// Sets the given fields of `par` (all but `new`, which is
             /// device state).
-            pub fn apply(&self, par: &mut Par) {
+            pub(crate) fn apply(&self, par: &mut Par) {
                 $(
                     if let Some(v) = &self.$field {
                         par.$field = v.clone();

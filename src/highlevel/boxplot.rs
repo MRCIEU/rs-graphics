@@ -581,15 +581,16 @@ impl<B: Backend> Device<B> {
             // only the notch.
             let medcol = cycle(&opts.medcol, i).unwrap_or(border(i));
             let wntch = notch_frac * wid;
-            let lend = std::mem::replace(&mut self.par.lend, LineEnd::Butt);
             let (mx, my) = xy(&[xp(x, -wntch), xp(x, wntch)], &[s.median, s.median]);
-            let median = line(
-                medcol,
-                cycle(&opts.medlty, i).or(lty(i)).unwrap_or(par_lty),
-                cycle(&opts.medlwd, i).unwrap_or(3.0 * lwd(i)),
-            );
+            let median = SegmentsOptions {
+                lend: Some(LineEnd::Butt),
+                ..line(
+                    medcol,
+                    cycle(&opts.medlty, i).or(lty(i)).unwrap_or(par_lty),
+                    cycle(&opts.medlwd, i).unwrap_or(3.0 * lwd(i)),
+                )
+            };
             self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
-            self.par.lend = lend;
             if let Some(pch) = cycle(&opts.medpch, i) {
                 let (px, py) = xy(&[x], &[s.median]);
                 let symbol = XyOptions {

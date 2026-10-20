@@ -143,6 +143,26 @@ fn backgrounds() {
     );
 }
 
+/// An explicit `.bg()` is the device's `par(bg)` on every format, also
+/// white (which `Device::new` would otherwise take as "not set" and replace
+/// by the backend's default).
+#[test]
+fn explicit_background_is_kept() {
+    for format in ["pdf", "svg", "png"] {
+        for bg in ["white", "yellow"] {
+            let dev = Device::format(format, temp(&format!("bg.{format}")))
+                .bg(bg)
+                .open()
+                .unwrap();
+            assert_eq!(
+                dev.current_par().bg,
+                Color::parse(bg).unwrap(),
+                "{format}, bg {bg}"
+            );
+        }
+    }
+}
+
 #[test]
 fn compress_is_pdf_only_and_res_png_only() {
     assert_eq!(

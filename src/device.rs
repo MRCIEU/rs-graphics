@@ -31,6 +31,7 @@
 use crate::afm::{self};
 use std::fs::File;
 use std::io::Write;
+use std::ops::{Deref, DerefMut};
 
 use crate::backend::{Backend, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
@@ -1090,13 +1091,6 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `rect()` variant taking a rectangle already in device inches. Not
-    /// clipped.
-    pub fn rect_inches(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
-        self.dirty();
-        self.backend.draw_rect(rect, fill, stroke);
-    }
-
     fn stroke_of(&self, color: Color, lwd: f64, lty: LineType) -> Stroke {
         Stroke {
             color,
@@ -1212,8 +1206,6 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::title`](crate::graphics::Graphics::title), whose docs
     /// describe it.
     pub(crate) fn title_impl(&mut self, opts: &TitleOptions) {
-        let saved_xpd = self.par.xpd;
-        self.par.xpd = Xpd::Figure;
         let lh = self.line_height_inches();
         let x_mid = (self.plt.x0 + self.plt.x1) / 2.0;
         let y_mid = (self.plt.y0 + self.plt.y1) / 2.0;
@@ -1280,13 +1272,6 @@ impl<B: Backend> Device<B> {
                 opts.font_lab.unwrap_or(self.par.font_lab),
             );
         }
-        self.par.xpd = saved_xpd;
-    }
-
-    /// Direct access to the backend. Drawing through it isn't clipped,
-    /// doesn't follow `par()`, and doesn't reset `par(new)`.
-    pub fn backend_mut(&mut self) -> &mut B {
-        &mut self.backend
     }
 }
 
@@ -1341,6 +1326,48 @@ pub(crate) fn format_axis_labels(vals: &[f64]) -> Vec<String> {
             }
         })
         .collect()
+}
+
+/// A temporary change to a device's `par`, as R's `op <- par(...);
+/// on.exit(par(op))`: `restore` copies the changed fields back from the
+/// saved `par` when the scope ends, also after an early return or a panic.
+/// Derefs to the device.
+pub(crate) struct ParScope<'a, B: Backend> {
+    dev: &'a mut Device<B>,
+    saved: Par,
+    restore: fn(&mut Par, &Par),
+}
+
+impl<B: Backend> Device<B> {
+    /// Starts a [`ParScope`]; `restore` copies back what the caller is
+    /// about to change.
+    pub(crate) fn par_scope(&mut self, restore: fn(&mut Par, &Par)) -> ParScope<'_, B> {
+        let saved = self.par.clone();
+        ParScope {
+            dev: self,
+            saved,
+            restore,
+        }
+    }
+}
+
+impl<B: Backend> Deref for ParScope<'_, B> {
+    type Target = Device<B>;
+    fn deref(&self) -> &Device<B> {
+        self.dev
+    }
+}
+
+impl<B: Backend> DerefMut for ParScope<'_, B> {
+    fn deref_mut(&mut self) -> &mut Device<B> {
+        self.dev
+    }
+}
+
+impl<B: Backend> Drop for ParScope<'_, B> {
+    fn drop(&mut self) {
+        (self.restore)(&mut self.dev.par, &self.saved);
+    }
 }
 
 /// `GNewPlot()`'s checks (`graphics.c`), in its order: R's error message

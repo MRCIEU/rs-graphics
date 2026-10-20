@@ -17,7 +17,7 @@
 //! than the plot region); `None` uses `par(xpd)`.
 
 use super::{Device, Xpd};
-use crate::backend::Backend;
+use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
@@ -90,6 +90,9 @@ pub struct SegmentsOptions {
     pub lty: Vec<LineType>,
     /// Recycled per segment; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
+    /// R's inline `lend`: how the segments end (`"round"`, `"butt"`,
+    /// `"square"`); `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
@@ -100,6 +103,7 @@ crate::setters::setters!(SegmentsOptions => [SegmentsCall] {
     col: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
+    lend: option LineEnd,
     xpd: option Xpd,
 });
 
@@ -447,7 +451,10 @@ impl<B: Backend> Device<B> {
             let Some(c) = self.resolve(pick(&opts.col, i, fg)) else {
                 continue;
             };
-            let stroke = self.stroke_of(c, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty));
+            let mut stroke = self.stroke_of(c, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty));
+            if let Some(lend) = opts.lend {
+                stroke.lend = lend;
+            }
             self.backend.draw_line(p0, p1, &stroke);
         }
         self.pop_clip();

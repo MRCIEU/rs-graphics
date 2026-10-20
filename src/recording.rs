@@ -277,46 +277,45 @@ impl<B: Backend> Device<B> {
     /// Where the recorded calls would panic on the device (e.g. `abline()`
     /// with a non-finite `coef`).
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
-        let saved = self.par.clone();
+        // `par` comes back afterwards, also if a recorded call panics.
+        let mut dev = self.par_scope(|now, saved| *now = saved.clone());
         let mut out = FigureResult::default();
+        // Each call goes through the same `emit_*` as a device's `.draw()`.
         for call in &fig.calls {
+            let d = &mut *dev;
             match call {
-                Call::PlotNew => self.plot_new_impl(),
-                Call::Par(o) => self.emit_par(o.clone(), ParPage::default()),
-                Call::Plot(x, y, o) => self.plot_impl(x, y, o),
+                Call::PlotNew => d.plot_new(),
+                Call::Par(o) => d.emit_par(o.clone(), ParPage::default()),
+                Call::Plot(x, y, o) => d.emit_plot(x, y, o.clone()),
                 Call::Hist(x, o) => {
-                    self.hist_impl(x, o);
+                    d.emit_hist(x, o.clone());
                 }
                 Call::Barplot(h, o) => {
-                    self.barplot_impl(h.clone(), o);
+                    d.emit_barplot(h.clone(), o.clone());
                 }
                 Call::Boxplot(g, o) => {
-                    self.boxplot_impl(g, o);
+                    d.emit_boxplot(g, (**o).clone());
                 }
-                Call::Pie(x, o) => self.pie_impl(x, o),
-                Call::PlotWindow(xlim, ylim, o) => self.plot_window_impl(*xlim, *ylim, o),
-                Call::Points(x, y, o) => self.points_impl(x, y, o),
-                Call::Lines(x, y, o) => self.lines_impl(x, y, o),
-                Call::Segments([x0, y0, x1, y1], o) => self.segments_impl(x0, y0, x1, y1, o),
-                Call::Arrows([x0, y0, x1, y1], o) => self.arrows_impl(x0, y0, x1, y1, o),
-                Call::Rect([x0, y0, x1, y1], o) => self.rect_impl(x0, y0, x1, y1, o),
-                Call::Polygon(x, y, o) => self.polygon_impl(x, y, o),
-                Call::Text(x, y, labels, o) => self.text_impl(x, y, labels, o),
-                Call::Box(o) => self.box_impl(o),
-                Call::Axis(side, o) => {
-                    let at = self.axis_impl(*side, o);
-                    out.axes.push(at);
-                }
-                Call::Abline(o) => self.abline_impl(o),
+                Call::Pie(x, o) => d.emit_pie(x, o.clone()),
+                Call::PlotWindow(xlim, ylim, o) => d.emit_plot_window(*xlim, *ylim, o.clone()),
+                Call::Points(x, y, o) => d.emit_points(x, y, o.clone()),
+                Call::Lines(x, y, o) => d.emit_lines(x, y, o.clone()),
+                Call::Segments([x0, y0, x1, y1], o) => d.emit_segments(x0, y0, x1, y1, o.clone()),
+                Call::Arrows([x0, y0, x1, y1], o) => d.emit_arrows(x0, y0, x1, y1, o.clone()),
+                Call::Rect([x0, y0, x1, y1], o) => d.emit_rect(x0, y0, x1, y1, o.clone()),
+                Call::Polygon(x, y, o) => d.emit_polygon(x, y, o.clone()),
+                Call::Text(x, y, labels, o) => d.emit_text(x, y, labels.clone(), o.clone()),
+                Call::Box(o) => d.emit_box(o.clone()),
+                Call::Axis(side, o) => out.axes.push(d.emit_axis(*side, o.clone())),
+                Call::Abline(o) => d.emit_abline(o.clone()),
                 Call::Legend(pos, entries, o) => {
-                    let layout = self.legend_impl(*pos, entries, o);
-                    out.legends.push(layout);
+                    out.legends.push(d.emit_legend(*pos, entries, o.clone()))
                 }
-                Call::Mtext(text, side, o) => self.mtext_impl(text.clone(), *side, o),
-                Call::Title(o) => self.title_impl(o),
+                Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), *side, o.clone()),
+                Call::Title(o) => d.emit_title(o.clone()),
             }
         }
-        self.par = saved;
+        drop(dev);
         out
     }
 

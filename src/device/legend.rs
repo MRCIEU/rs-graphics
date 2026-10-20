@@ -442,13 +442,13 @@ impl<B: Backend> Device<B> {
         if entries.is_empty() {
             return None;
         }
-        let saved_xpd = self.par.xpd;
+        // R's `legend(xpd = )` sets `par(xpd)` for the call and restores it
+        // `on.exit`.
+        let mut dev = self.par_scope(|now, saved| now.xpd = saved.xpd);
         if let Some(xpd) = opts.xpd {
-            self.par.xpd = xpd;
+            dev.par.xpd = xpd;
         }
-        let layout = self.draw_legend(pos, entries, opts);
-        self.par.xpd = saved_xpd;
-        Some(layout)
+        Some(dev.draw_legend(pos, entries, opts))
     }
 
     fn draw_legend(
