@@ -242,7 +242,7 @@ pub fn ge_pretty(lo_in: f64, up_in: f64, ndiv_in: i32) -> (f64, f64, i32) {
 /// Convenience wrapper returning the actual tick values, mirroring what
 /// `axis()` / `axTicks()` would show for a default (`n = 5`) linear axis.
 ///
-/// Ticks are placed as `CreateAtVector()` (`plot.c`) does for a linear
+/// Ticks are placed as `CreateAtVector()` (`main/plot.c`) does for a linear
 /// axis: `lo + (i / ndiv) * (up - lo)`, with any tick closer to zero than
 /// `|up - lo| / (100 * ndiv)` set to exactly 0 (otherwise e.g. -0.2..0.4
 /// would get a `2.775558e-17` tick).
@@ -263,7 +263,7 @@ pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
         .collect()
 }
 
-/// `GAxisPars()` (`graphics.c`): `par("xaxp")`/`par("yaxp")` for a `usr`
+/// `GAxisPars()` (`main/graphics.c`): `par("xaxp")`/`par("yaxp")` for a `usr`
 /// range `min..max` (log10 units on a log axis; may be decreasing) and
 /// `n = par("lab")` intervals: `[first tick, last tick, intervals]`.
 ///
@@ -335,7 +335,7 @@ pub fn axis_pars(min: f64, max: f64, n: i32, log: bool) -> [f64; 3] {
     if swap { [axp[1], axp[0], axp[2]] } else { axp }
 }
 
-/// `CreateAtVector()` (`plot.c`): the default tick values, in data units,
+/// `CreateAtVector()` (`main/plot.c`): the default tick values, in data units,
 /// for `axp` (see [`axis_pars`]) on an axis whose `usr` range in data units
 /// is `umin..umax`, with `nint = par("lab")` intervals (used for powers of
 /// ten on a log axis, every few decades so there are about `nint`).

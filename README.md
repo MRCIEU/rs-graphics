@@ -221,7 +221,8 @@ dev.obs_vs_exp(&[1.0, 2.0, 3.0], &[1.2, 1.9, 3.4]);
 
 GPL-3.0-or-later (see [LICENSE](LICENSE)). This crate ports R's own
 algorithms closely enough that it's derived from `r-source`, which is
-GPL-2.0-or-later, so it is licensed under version 3 of the GPL, as R's
+GPL-2.0-or-later (one translated file, `src/main/plot.c`,
+GPL-3.0-or-later), so it is licensed under version 3 of the GPL, as R's
 "or later" terms allow. Programs that use rs-graphics must therefore be
 distributed under GPL-3.0 (or a later version).
 
