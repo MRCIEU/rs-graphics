@@ -340,6 +340,23 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "text_nonfinite",
+            r: "plot.new(); plot.window(c(1, 100), c(0, 10), log = 'x')\n\
+                text(c(NA, 10, 0, 50, -1, 20), c(2, 3, 4, 5, 6, NA), c('a', 'b', 'c', 'd', 'e', 'f'),\n\
+                     col = c('red', 'blue', 'green', 'orange', 'purple', 'black'))",
+            draw: |d| {
+                d.plot_new();
+                d.plot_window((1, 100), (0, 10)).xlog(true).draw();
+                d.text(
+                    &[f64::NAN, 10.0, 0.0, 50.0, -1.0, 20.0],
+                    &[2.0, 3.0, 4.0, 5.0, 6.0, f64::NAN],
+                    &["a", "b", "c", "d", "e", "f"],
+                )
+                .col(["red", "blue", "green", "orange", "purple", "black"])
+                .draw();
+            },
+        },
+        Case {
             name: "asp",
             r: "plot.new(); plot.window(c(0, 10), c(0, 2), asp = 1); rect(0, 0, 10, 2)\n\
                 plot.window(c(1, 100), c(0, 2), log = 'x', asp = 1); rect(1, 0, 100, 2, border = 'red')",

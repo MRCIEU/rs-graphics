@@ -407,7 +407,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// R's default, the indices `"1"`, `"2"`, .... Placement follows
     /// `GEText()`/`GEMathText()`: horizontally `adj` of the width;
     /// vertically see [`TextOptions::vadj`]; rotated by `srt`, else
-    /// `par(srt)`.
+    /// `par(srt)`. A label at a non-finite position (R's `NA`, or a value
+    /// <= 0 on a log axis) is skipped, as in R.
     fn text<'a, L: Clone + Into<Label>>(
         &'a mut self,
         x: impl Numbers<'a>,

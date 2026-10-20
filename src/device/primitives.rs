@@ -600,6 +600,11 @@ impl<B: Backend> Device<B> {
                 labels[i % labels.len()].clone().into()
             };
             let p = self.user_to_inches(x[i % x.len()], y[i % y.len()]);
+            // As `C_text`: a label at a non-finite position (`NA`, or <= 0
+            // on a log axis) is skipped; the others keep their index.
+            if !(p.x.is_finite() && p.y.is_finite()) {
+                continue;
+            }
             self.draw_label(
                 clip,
                 p,
