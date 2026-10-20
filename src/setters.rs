@@ -89,8 +89,9 @@ impl Values<i32> for char {
 /// `Into<T>`, e.g. strings for `Label`s), `labels`
 /// (`Option<Vec<Option<Label>>>`), `pair` (`Option<(f64, f64)>` from two
 /// numbers), `option_pair` (`Option<(f64, f64)>` from one
-/// [`Pair`](crate::numbers::Pair) tuple) and `array` (`Option<[f64; N]>`
-/// from an array of any numbers).
+/// [`Pair`](crate::numbers::Pair) tuple), `array` (`Option<[f64; N]>`
+/// from an array of any numbers) and `na` (`Option<Option<f64>>`, R's
+/// `NA`-able number, from one number; `f64::NAN` is `NA`).
 ///
 /// `setters!(Struct => [CallA, CallB] { ... })` also gives each listed
 /// builder in [`crate::graphics`] the same setters (writing to its
@@ -183,6 +184,14 @@ macro_rules! setters {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
         pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
             self$(.$p)?.$field = Some(value.into_pair());
+            self
+        }
+    };
+    (@one [$($p:ident)?] $ty:ident $field:ident na $t:ty) => {
+        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`]; `f64::NAN` is R's `NA`.")]
+        pub fn $field(mut self, value: impl Into<f64>) -> Self {
+            let v: f64 = value.into();
+            self$(.$p)?.$field = Some(v.is_finite().then_some(v));
             self
         }
     };

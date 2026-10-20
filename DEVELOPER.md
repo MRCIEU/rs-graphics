@@ -382,6 +382,10 @@ against a real R installation by shelling out to `Rscript`:
   `add_figure`/`add_figure_at` give byte-identical output to direct calls
   (every kind of call, all backends, mixed in multi-panel pages), `par`
   is restored, and recorded results match the device's.
+- `tests/tck_srt_matches_r.rs` - `par(tck)` (incl. `1` for a grid, an
+  inline `axis(tck =)` over it, `NA` resetting it) and `par(srt)` on
+  `text()`, `pie()` labels and `legend()` labels/title (R draws them
+  with `text()`): paths and text (incl. rotation) vs. R `pdf()`.
 - `tests/bty_title_pars_matches_r.rs` - every `bty` (through `plot()`,
   `par()`, `box(which = )` and `boxplot()`'s frame) and the inline title
   parameters of `plot()`, `title()`, `hist()`, `barplot()`, `boxplot()`

@@ -369,7 +369,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// are ignored; R truncates them with a warning). Empty `labels` are
     /// R's default, the indices `"1"`, `"2"`, .... Placement follows
     /// `GEText()`/`GEMathText()`: horizontally `adj` of the width;
-    /// vertically see [`TextOptions::vadj`].
+    /// vertically see [`TextOptions::vadj`]; rotated by `srt`, else
+    /// `par(srt)`.
     fn text<'a, L: Clone + Into<Label>>(
         &'a mut self,
         x: impl Numbers<'a>,

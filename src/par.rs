@@ -287,8 +287,18 @@ pub struct Par {
     /// `par(yaxt)`: see `xaxt`.
     pub yaxt: AxisType,
     /// Tick mark length in margin lines (negative = outward; R's default
-    /// is -0.5).
+    /// is -0.5). Used when `tck` is `None`.
     pub tcl: f64,
+    /// `par(tck)`: tick length as a fraction of the plot region (of its
+    /// height for an x axis if above 0.5, so `1` draws grid lines, else of
+    /// its smaller side); positive points inwards. Overrides `tcl`.
+    /// `None` (R's default `NA`): use `tcl`. The `par()` setter takes a
+    /// number; `f64::NAN` sets it back to `NA`.
+    pub tck: Option<f64>,
+    /// `par(srt)`: default string rotation of `text()` (and so of
+    /// `legend()` and `pie()` labels, which R draws with `text()`), in
+    /// degrees counterclockwise. Default 0.
+    pub srt: f64,
     /// Margin line positions for axis title/labels/line, `c(3, 1, 0)` by
     /// default.
     pub mgp: [f64; 3],
@@ -369,6 +379,8 @@ impl Default for Par {
             xaxt: AxisType::Standard,
             yaxt: AxisType::Standard,
             tcl: -0.5,
+            tck: None,
+            srt: 0.0,
             mgp: [3.0, 1.0, 0.0],
             lab: [5, 5, 7],
             xaxp: [0.0, 1.0, 5.0],
@@ -477,6 +489,8 @@ par_options!(
     xaxt: option AxisType,
     yaxt: option AxisType,
     tcl: option f64,
+    tck: na Option<f64>,
+    srt: option f64,
     mgp: array [f64; 3],
     lab: option [i32; 3],
     xaxp: array [f64; 3],

@@ -18,7 +18,8 @@
 //! it returns ([`LegendLayout`]) back to user coordinates. Reversed axes
 //! (`xlim = c(hi, lo)`) are not handled.
 //!
-//! Labels and the title may be plotmath expressions (`Label::math`).
+//! Labels and the title may be plotmath expressions (`Label::math`). As
+//! R draws them with `text()`, they are rotated by `par(srt)`.
 //!
 //! Not implemented: `density`/`angle` hatched fills,
 //! per-entry `cex`/`x.intersp`/`seg.len` recycling (these are scalars on
@@ -652,7 +653,17 @@ impl<B: Backend> Device<B> {
         };
         if let Some(t) = title {
             let anchor = Point::new(left + w * 0.5, top - ymaxtitle);
-            self.draw_label(clip, anchor, t, 0.5, Some(0.0), 0.0, text_col, tcex, font);
+            self.draw_label(
+                clip,
+                anchor,
+                t,
+                0.5,
+                Some(0.0),
+                self.par.srt,
+                text_col,
+                tcex,
+                font,
+            );
         }
         let mut text_x = Vec::with_capacity(n);
         let mut text_y = Vec::with_capacity(n);
@@ -668,7 +679,7 @@ impl<B: Backend> Device<B> {
                 label,
                 0.0,
                 Some(0.5),
-                0.0,
+                self.par.srt,
                 text_col,
                 cex,
                 font,

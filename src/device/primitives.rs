@@ -197,7 +197,8 @@ pub struct TextOptions {
     /// `None` (R's `NA`, the default) centres the text's ink, or an
     /// expression's box, on it.
     pub vadj: Option<f64>,
-    /// Rotation in degrees, counterclockwise (R's `srt`); `None`: 0.
+    /// Rotation in degrees, counterclockwise (R's `srt`); `None`:
+    /// `par(srt)` (0 by default).
     pub srt: Option<f64>,
     /// Recycled per label, times `par(cex)`; empty: 1.
     pub cex: Vec<f64>,
@@ -596,7 +597,7 @@ impl<B: Backend> Device<B> {
                 &label,
                 hadj,
                 opts.vadj,
-                opts.srt.unwrap_or(0.0),
+                opts.srt.unwrap_or(self.par.srt),
                 pick(&opts.col, i, col),
                 pick(&opts.cex, i, 1.0),
                 pick(&opts.font, i, font),

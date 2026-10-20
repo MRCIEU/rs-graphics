@@ -106,8 +106,8 @@ pub struct AxisOptions {
     pub axt: Option<AxisType>,
     /// Tick length as a fraction of the plot region (of its height for an
     /// x axis if above 0.5, else of its smaller side); positive points
-    /// inwards. Overrides `tcl`. `None` (R's `par(tck)` default `NA`): use
-    /// `tcl`.
+    /// inwards. Overrides `tcl`. `None`: `par(tck)`, which is `NA` by
+    /// default, meaning `tcl` is used.
     pub tck: Option<f64>,
     /// Tick length in margin lines; negative points outwards. `None`:
     /// `par(tcl)`.
@@ -321,7 +321,7 @@ impl<B: Backend> Device<B> {
             let lty = opts.lty.unwrap_or(LineType::SOLID);
             let lwd_ticks = opts.lwd_ticks.unwrap_or(lwd);
             // Signed tick length in inches, positive inwards.
-            let len = match opts.tck.filter(|t| t.is_finite()) {
+            let len = match opts.tck.or(self.par.tck).filter(|t| t.is_finite()) {
                 Some(tck) => {
                     let (w, h) = (self.plt.width(), self.plt.height());
                     if tck > 0.5 {
