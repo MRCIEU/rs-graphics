@@ -49,9 +49,8 @@ impl LineType {
     /// `"dashed"`, ...) or 2, 4, 6 or 8 hex digits (1-9, A-F; no zeros),
     /// each a segment length in `lwd` units, e.g. `"42"` or `"1343"`. One
     /// extra form: a single digit is a numeric code (`"2"` =
-    /// [`LineType::from_code`]`(2)`, so `"7"` to `"9"` behave as
-    /// `from_code` does), which R rejects as a string. `None` for anything
-    /// R rejects.
+    /// [`LineType::from_code`]`(2)`; `"7"` to `"9"` recycle as it does),
+    /// which R rejects as a string. `None` for anything R rejects.
     pub fn parse(spec: &str) -> Option<LineType> {
         let s = spec.trim();
         if s.len() == 1 {
@@ -80,22 +79,25 @@ impl LineType {
         }
         // Cache literal patterns as owned data isn't possible for a
         // `&'static` slice without leaking; literal lty strings are rare
-        // enough in practice that we resolve them through `from_code`
-        // instead, by re-packing into the same nibble encoding R uses.
+        // enough in practice that we re-pack them into the same nibble
+        // encoding R uses and resolve that.
         let mut code: i32 = 0;
         for (i, c) in s.chars().enumerate() {
             let nibble = c.to_digit(16).unwrap() as i32;
             code |= nibble << (4 * i);
         }
-        Some(Self::from_code(code))
+        Some(Self::from_packed_nibbles(code))
     }
 
-    /// Resolve R's small-integer `lty` codes (`0` = blank, `1` = solid,
-    /// `2..=6` the named dash patterns); any other value is read as R's
-    /// internal packed-nibble encoding of a dash pattern. Unlike R, which
-    /// recycles codes above 6 (`7` is solid, `8` dashed, ...) and rejects
-    /// negative ones, so `from_code(7)` is the pattern `[7]`.
+    /// R's numeric `lty` codes: `0` = blank, `1` = solid, `2..=6` the named
+    /// dash patterns. Codes above 6 recycle as in R's `GE_LTYpar`
+    /// (`(code - 1) % 6 + 1`: `7` is solid, `8` dashed, ...).
+    ///
+    /// # Panics
+    /// If `code` is negative (R: "invalid line type").
     pub fn from_code(code: i32) -> LineType {
+        assert!(code >= 0, "invalid line type: lty code {code} is negative");
+        let code = if code > 0 { (code - 1) % 6 + 1 } else { 0 };
         match code {
             0 => LineType::BLANK,
             1 => LineType::SOLID,
@@ -104,7 +106,7 @@ impl LineType {
             4 => LineType::DOTDASH,
             5 => LineType::LONGDASH,
             6 => LineType::TWODASH,
-            _ => LineType::from_packed_nibbles(code),
+            _ => unreachable!("lty code recycled to 0..=6"),
         }
     }
 
@@ -180,8 +182,8 @@ impl Default for LineType {
 }
 
 impl From<i32> for LineType {
-    /// R's numeric `lty` codes `0..=6`, as [`LineType::from_code`] (which
-    /// also explains other values).
+    /// R's numeric `lty` codes, as [`LineType::from_code`] (codes above 6
+    /// recycle; a negative code panics).
     fn from(code: i32) -> Self {
         LineType::from_code(code)
     }
@@ -243,5 +245,24 @@ mod tests {
     #[test]
     fn solid_has_no_dash_pattern() {
         assert_eq!(LineType::from_code(1).dash_lengths_pt(1.0, false), None);
+    }
+
+    #[test]
+    fn codes_above_6_recycle_as_r() {
+        // R (pdf()): lty 7 and 13 are solid, 8 dashed, 12 twodash.
+        assert_eq!(LineType::from_code(7), LineType::SOLID);
+        assert_eq!(LineType::from_code(8), LineType::DASHED);
+        assert_eq!(LineType::from_code(12), LineType::TWODASH);
+        assert_eq!(LineType::from_code(13), LineType::SOLID);
+        assert_eq!(LineType::from(8), LineType::DASHED);
+        assert_eq!(LineType::parse("7"), Some(LineType::SOLID));
+        // Hex strings are still patterns, not codes.
+        assert_eq!(LineType::parse("77"), Some(LineType::Pattern(&[7, 7])));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid line type")]
+    fn negative_code_panics() {
+        let _ = LineType::from_code(-1);
     }
 }

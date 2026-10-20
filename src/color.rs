@@ -14,8 +14,7 @@
 //! (meaning "don't draw"). This module mirrors that model closely enough
 //! that [`Color::parse`] accepts the same strings R's `col2rgb()`/graphics
 //! code would accept, except numeric strings such as `"2"` (R's palette
-//! indices; use [`ColorSpec::Index`]) and names with spaces in them (R
-//! ignores spaces, so `"light blue"` is `"lightblue"` there).
+//! indices; use [`ColorSpec::Index`]).
 
 use crate::named_colors::NAMED_COLORS;
 
@@ -46,8 +45,8 @@ impl Color {
     /// `"NA"`/empty => `None`; `"transparent"` => white with alpha 0 (R's
     /// `#FFFFFF00`); `"#rgb"`, `"#rgba"`, `"#rrggbb"`,
     /// `"#rrggbbaa"` hex forms; or one of R's 657 built-in named colors
-    /// (case-insensitive, matching the `colors()` database; unlike R,
-    /// spaces inside a name aren't ignored).
+    /// (case-insensitive and ignoring spaces, as R's `StrMatch()`:
+    /// `"Light Blue"` is `"lightblue"`).
     pub fn parse(spec: &str) -> Option<Color> {
         let s = spec.trim();
         if s.is_empty() || s.eq_ignore_ascii_case("NA") {
@@ -59,7 +58,12 @@ impl Color {
         if let Some(hex) = s.strip_prefix('#') {
             return Self::parse_hex(hex);
         }
-        let lower = s.to_ascii_lowercase();
+        // R's `StrMatch()` compares names ignoring case and spaces.
+        let lower: String = s
+            .chars()
+            .filter(|&c| c != ' ')
+            .map(|c| c.to_ascii_lowercase())
+            .collect();
         NAMED_COLORS
             .iter()
             .find(|(name, ..)| *name == lower)
@@ -133,8 +137,8 @@ pub const DEFAULT_PALETTE: [Color; 8] = [
 
 /// A resolvable color specification: either an explicit color, a palette
 /// index (R's small-integer colors, 1-based; indices above the palette
-/// length recycle as in R, negative ones, an error in R, wrap around), or
-/// "no color" (R's `NA`).
+/// length recycle as in R, and a negative one panics when resolved, as R
+/// errors), or "no color" (R's `NA`).
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ColorSpec {
     None,
@@ -147,11 +151,17 @@ impl ColorSpec {
     /// fully transparent colours (R's devices skip those). Index 0 is the
     /// background colour in R, which this doesn't know; use
     /// [`Par::resolve_color`](crate::par::Par::resolve_color) for that.
+    ///
+    /// # Panics
+    /// For a negative index (R: "numerical color values must be >= 0").
     pub fn resolve(self, palette: &[Color]) -> Option<Color> {
         let c = match self {
             ColorSpec::None => None,
             ColorSpec::Color(c) => Some(c),
             ColorSpec::Index(0) => None,
+            ColorSpec::Index(i) if i < 0 => {
+                panic!("numerical color values must be >= 0, found {i}")
+            }
             ColorSpec::Index(i) => {
                 if palette.is_empty() {
                     return None;
@@ -288,5 +298,24 @@ mod tests {
         assert_eq!(hex(&gray_colors(1)[0]), "#4D4D4D");
         let g3: Vec<String> = gray_colors(3).iter().map(hex).collect();
         assert_eq!(g3, ["#4D4D4D", "#AEAEAE", "#E6E6E6"]);
+    }
+
+    #[test]
+    fn names_ignore_spaces_as_r() {
+        // R: col2rgb(c("light blue", "Dark Red", " dark red")).
+        let light_blue = Some(Color::rgb(173, 216, 230));
+        assert_eq!(Color::parse("light blue"), light_blue);
+        assert_eq!(Color::parse("Light Blue"), light_blue);
+        let dark_red = Some(Color::rgb(139, 0, 0));
+        assert_eq!(Color::parse("Dark Red"), dark_red);
+        assert_eq!(Color::parse(" dark red"), dark_red);
+        assert_eq!(Color::parse("dark  red"), dark_red);
+        assert_eq!(Color::parse("dark redd"), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "numerical color values must be >= 0, found -1")]
+    fn negative_index_panics() {
+        let _ = ColorSpec::Index(-1).resolve(&DEFAULT_PALETTE);
     }
 }
