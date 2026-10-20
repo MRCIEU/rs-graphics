@@ -124,6 +124,18 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   paints over it. The page is then filled with `par.bg`, unless
     ///   that is fully transparent, which it is by default on PDF (as R's
     ///   `pdf()`).
+    ///
+    /// # Panics
+    /// With R's message when the regions don't fit: "figure margins too
+    /// large" (the margins leave no room for the plot region, e.g. on a
+    /// small page, with many panels or with large `oma`), "figure region
+    /// too large" (`fin()` or `layout()` cm sizes beyond the inner region),
+    /// "plot region too large" (`par(pin)` or `par(plt)` beyond the
+    /// figure). Every high-level plot starts with `plot_new()`, so they
+    /// panic the same way (on a [`Figure`](crate::recording::Figure), when
+    /// it is added to a device). As R's `plot.new()`, it first moves back
+    /// to the previous figure, so after fixing the cause (if the panic is
+    /// caught) the next call retries the same figure.
     fn plot_new(&mut self);
 
     // ---- high-level plots ----

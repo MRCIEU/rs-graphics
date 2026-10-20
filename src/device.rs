@@ -129,6 +129,9 @@ pub struct Device<B: Backend> {
     fig: Rect,
     /// Plot region (figure region minus `mar` margins).
     plt: Rect,
+    /// R's error for invalid regions as of the last layout (see
+    /// `region_error()`), raised by `plot_new()`.
+    region_error: Option<&'static str>,
     /// `(x0, x1, y0, y1)` in "user" coordinates - already log10-
     /// transformed if `xlog`/`ylog` is set, matching `par("usr")`.
     usr: (f64, f64, f64, f64),
@@ -249,6 +252,7 @@ impl<B: Backend> Device<B> {
             mar: Sides::new(0.0, 0.0, 0.0, 0.0),
             fig: Rect::new(0.0, 0.0, width_in, height_in),
             plt: Rect::new(0.0, 0.0, width_in, height_in),
+            region_error: None,
             usr: (0.0, 1.0, 0.0, 1.0),
             xlog: false,
             ylog: false,
@@ -379,7 +383,9 @@ impl<B: Backend> Device<B> {
             inner.x0 + fx1 * inner.width(),
             inner.y0 + fy1 * inner.height(),
         );
-        self.plt = match (self.par.pin, self.par.plt) {
+        // Corners as computed, before `Rect::new` sorts them, so that
+        // `region_error()` sees margins that cross.
+        let [x0, x1, y0, y1] = match (self.par.pin, self.par.plt) {
             // `par(pin)`: that size in inches, centred in the figure
             // (`updatePlotRegion()`).
             (Some([w, h]), _) => {
@@ -387,15 +393,15 @@ impl<B: Backend> Device<B> {
                     0.5 * (self.fig.x0 + self.fig.x1),
                     0.5 * (self.fig.y0 + self.fig.y1),
                 );
-                Rect::new(cx - w / 2.0, cy - h / 2.0, cx + w / 2.0, cy + h / 2.0)
+                [cx - w / 2.0, cx + w / 2.0, cy - h / 2.0, cy + h / 2.0]
             }
             // `par(plt)`: fractions of the figure region.
-            (None, Some([px0, px1, py0, py1])) => Rect::new(
+            (None, Some([px0, px1, py0, py1])) => [
                 self.fig.x0 + px0 * self.fig.width(),
-                self.fig.y0 + py0 * self.fig.height(),
                 self.fig.x0 + px1 * self.fig.width(),
+                self.fig.y0 + py0 * self.fig.height(),
                 self.fig.y0 + py1 * self.fig.height(),
-            ),
+            ],
             // `mapPlotRegion()`: the figure less `mar`, made square about
             // its centre for `pty = "s"`.
             (None, None) => {
@@ -412,9 +418,19 @@ impl<B: Backend> Device<B> {
                         (y0, y1) = (c - 0.5 * w, c + 0.5 * w);
                     }
                 }
-                Rect::new(x0, y0, x1, y1)
+                [x0, x1, y0, y1]
             }
         };
+        self.plt = Rect::new(x0, y0, x1, y1);
+        // The plot region as fractions of the figure (R's NFC `plt`).
+        let (fw, fh) = (self.fig.width(), self.fig.height());
+        let plt_nfc = [
+            (x0 - self.fig.x0) / fw,
+            (x1 - self.fig.x0) / fw,
+            (y0 - self.fig.y0) / fh,
+            (y1 - self.fig.y0) / fh,
+        ];
+        self.region_error = region_error([fx0, fx1, fy0, fy1], plt_nfc);
     }
 
     /// `par(fig = c(x0, x1, y0, y1))`: a single figure region, as fractions
@@ -607,6 +623,15 @@ impl<B: Backend> Device<B> {
                     None,
                 );
             }
+        }
+        if let Some(msg) = self.region_error {
+            // R's `invalidError()`: back to the previous figure, so the
+            // next `plot_new()` retries this one.
+            self.current_figure -= 1;
+            if self.current_figure < 1 {
+                self.current_figure = self.arrangement.last_figure();
+            }
+            panic!("{msg}");
         }
         // `C_plot_new`: linear axes, `GScale(0, 1)` on both.
         self.set_window((0.0, 1.0), (0.0, 1.0), false, false);
@@ -1332,12 +1357,61 @@ pub(crate) fn format_axis_labels(vals: &[f64]) -> Vec<String> {
         .collect()
 }
 
+/// `GNewPlot()`'s checks (`graphics.c`), in its order: R's error message
+/// when the figure region `fig` (fractions of the inner region) or the plot
+/// region `plt` (fractions of the figure) is invalid. Region sizes are
+/// absolute, as R's unit conversions take them, so outer margins wider
+/// than the device leave a small figure whose margins don't fit ("figure
+/// margins too large").
+fn region_error(fig: [f64; 4], plt: [f64; 4]) -> Option<&'static str> {
+    let eps = f64::from(f32::EPSILON);
+    let within = |r: [f64; 4]| r[0] > -eps && r[1] < 1.0 + eps && r[2] > -eps && r[3] < 1.0 + eps;
+    let ordered = |r: [f64; 4]| r[0] < r[1] && r[2] < r[3];
+    if !ordered(fig) {
+        Some("outer margins too large (figure region too small)")
+    } else if !within(fig) {
+        Some("figure region too large")
+    } else if !ordered(plt) {
+        Some("figure margins too large")
+    } else if !within(plt) {
+        Some("plot region too large")
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::format_axis_labels;
 
     fn f(v: &[f64]) -> Vec<String> {
         format_axis_labels(v)
+    }
+
+    #[test]
+    fn region_errors_follow_r_order() {
+        use super::region_error;
+        let ok = [0.0, 1.0, 0.0, 1.0];
+        let plt = [0.2, 0.8, 0.2, 0.8];
+        assert_eq!(region_error(ok, plt), None);
+        // `GNewPlot()` checks the figure before the plot region, and order
+        // before extent; R's absolute unit sizes make the first one hard to
+        // reach from `par()`, so it's checked here.
+        assert_eq!(
+            region_error([0.6, 0.4, -1.0, 2.0], [0.8, 0.2, 0.0, 2.0]),
+            Some("outer margins too large (figure region too small)")
+        );
+        assert_eq!(
+            region_error([-1.0, 2.0, 0.0, 1.0], [0.8, 0.2, 0.0, 2.0]),
+            Some("figure region too large")
+        );
+        assert_eq!(
+            region_error(ok, [0.8, 0.2, 0.0, 2.0]),
+            Some("figure margins too large")
+        );
+        assert_eq!(region_error(ok, [0.0, 2.0, 0.0, 1.0]), Some("plot region too large"));
+        // R's FLT_EPSILON tolerance at the edges.
+        assert_eq!(region_error([-1e-9, 1.0 + 1e-9, 0.0, 1.0], [-1e-9, 1.0, 0.0, 1.0]), None);
     }
 
     #[test]

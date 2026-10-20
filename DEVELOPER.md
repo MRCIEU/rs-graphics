@@ -426,6 +426,11 @@ against a real R installation by shelling out to `Rscript`:
   `mar` resetting it), `omi`/`omd` with outer `mtext()` (and `mfrow`),
   `pin` (and `mar` resetting it), `pty` resetting `plt`, `fin`, and
   `par(oma)` starting a new page: paths and text vs. R `pdf()`.
+- `tests/region_errors_matches_r.rs` - `plot_new()`'s panics with R's
+  messages ("figure margins too large", "figure region too large", "plot
+  region too large") for small pages, large `oma`/`mai`, many panels,
+  `fin`, `pin`, `plt` and `lcm()` layouts, cases that just fit, and the
+  figure counter after an error (retrying the same figure, as R).
 - `tests/regions_matches_r.rs` - `par(pty = "s")` on wide and tall
   pages, `par(plt=)` (also over `pty`), and `par(fig=)` with `new = TRUE`,
   `oma` and after `mfrow`: every painted path and text item in order.
