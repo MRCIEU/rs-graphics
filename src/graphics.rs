@@ -170,8 +170,13 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `list`/formula input reduced to its common case; a single group is
     /// `boxplot(&[x])`); options in [`BoxplotOptions`]. A high-level plot:
     /// it starts a new plot with [`plot_new`](Graphics::plot_new), so on a
-    /// multi-panel page it moves to the next panel. `.draw()` returns each
-    /// group's statistics.
+    /// multi-panel page it moves to the next panel, unless `add` (R's
+    /// `add = TRUE`), which draws the boxes on the current plot. `.draw()`
+    /// returns each group's statistics.
+    ///
+    /// # Panics
+    /// If `groups` is empty, or `at` or `width` doesn't have one value per
+    /// group (or a width isn't positive), as R errors.
     fn boxplot<'a>(&'a mut self, groups: &'a [Vec<f64>]) -> BoxplotCall<'a, Self> {
         BoxplotCall {
             target: self,

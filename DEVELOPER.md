@@ -99,7 +99,10 @@ the corresponding `*.default` R function:
   `horiz`, with `legend.text`, `space`, `width`, `xlim`/`ylim`.
 - `boxplot()` - Tukey boxplots (via `fivenum()`, not `quantile()` -
   see [Design notes](#design-notes)), including the 1.5*IQR outlier rule,
-  `notch`, `varwidth` and `horizontal`.
+  `notch`, `varwidth`, `horizontal`, `at`, `width`, `add`, `outline`, log
+  axes, `xlim`/`ylim` and `bxp()`'s drawing parameters (`boxwex`,
+  `staplewex`, `outwex`, `lty`/`lwd`/`pch`/`cex`/`bg` and the `box*`,
+  `med*`, `whisk*`, `staple*` and `out*` styles).
 - `pie()` - pie charts.
 
 **Backends** (`src/backend/`):
@@ -133,8 +136,7 @@ To keep this a tractable "core functionality" port, the following R
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
 fonts, the plotmath constructs listed above, and interactive input
 (`identify()`/`locator()`). `barplot()` doesn't
-support `density`/`angle` hatching, `offset`, or `add`, and
-`boxplot()` doesn't support `at`/`width`/`add` or `pars`. These would all be
+support `density`/`angle` hatching, `offset`, or `add`. These would be
 reasonable follow-ups but are left for future work.
 
 ## Design notes
@@ -267,6 +269,10 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/boxplot_draw_matches_r.rs` - every painted path of `boxplot()`
   in drawing order (vertices, fill/stroke, colours, width, cap, dashes),
   incl. `notch`, `varwidth`, `horizontal` and all three together.
+- `tests/boxplot_extras_matches_r.rs` - `boxplot()`'s `at`/`width`,
+  `outline = FALSE`, drawing parameters, outlier lines, `add = TRUE`, log
+  value and position axes, and `xlim`/`ylim` with `horizontal`: every
+  painted path and every text item vs. R `pdf()`.
 - `tests/barplot_matches_r.rs` - bar rectangles and text origins vs. an
   uncompressed R `pdf()` for vector, stacked, `beside`, and `horiz`
   scenarios.

@@ -105,7 +105,8 @@ enum Call {
     Plot(Vec<f64>, Vec<f64>, PlotOptions),
     Hist(Vec<f64>, HistOptions),
     Barplot(BarHeights, BarplotOptions),
-    Boxplot(Vec<Vec<f64>>, BoxplotOptions),
+    // Boxed: `BoxplotOptions` is much larger than the other options.
+    Boxplot(Vec<Vec<f64>>, Box<BoxplotOptions>),
     Pie(Vec<f64>, PieOptions),
     PlotWindow((f64, f64), (f64, f64), PlotWindowOptions),
     Points(Vec<f64>, Vec<f64>, XyOptions),
@@ -152,7 +153,8 @@ impl Graphics for Figure {
     }
     fn emit_boxplot(&mut self, groups: &[Vec<f64>], opts: BoxplotOptions) -> Vec<BoxStats> {
         let stats = boxplot_all_stats(groups, &opts);
-        self.calls.push(Call::Boxplot(groups.to_vec(), opts));
+        self.calls
+            .push(Call::Boxplot(groups.to_vec(), Box::new(opts)));
         stats
     }
     fn emit_pie(&mut self, x: &[f64], opts: PieOptions) {

@@ -49,8 +49,8 @@
 //! which moves to the next panel of a multi-panel page (or to a new page).
 //! Everything else ([`points`](graphics::Graphics::points),
 //! [`axis`](graphics::Graphics::axis), [`legend`](graphics::Graphics::legend),
-//! ...) adds to the current plot. (`hist` with `add` set adds too, as R's
-//! `hist(add = TRUE)` does.)
+//! ...) adds to the current plot. (`hist` and `boxplot` with `add` set
+//! add too, as R's `add = TRUE` does.)
 //!
 //! # Multi-panel pages
 //!
