@@ -58,6 +58,15 @@ save_all("plot_log", 6, 4, function() {
        xlab = "x", ylab = "2 * x^1.5")
 })
 
+save_all("plot_h_s", 8, 4, function() {
+  par(mfrow = c(1, 2))
+  plot(0:8, c(2, 5, 9, 14, 11, 7, 4, 2, 1), type = "h", lwd = 4, col = 4,
+       main = 'plot(): type = "h"', xlab = "k", ylab = "count")
+  x <- sort(read_vec("hist_x"))
+  plot(x, seq_along(x) / length(x), type = "s", main = 'plot(): type = "s"',
+       xlab = "x", ylab = "Fn(x)")
+})
+
 save_all("abline_log", 6, 4, function() {
   x <- 10^((0:15) / 5)
   y <- 2 * x^1.5 * 10^(0.15 * sin(3 * (0:15)))

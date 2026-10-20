@@ -89,7 +89,7 @@ usage, see [README.md](README.md).
 
 **High-level plots** (`src/highlevel/`), each a fairly direct port of
 the corresponding `*.default` R function:
-- `plot()` - scatter/line plots (`type = "p"/"l"/"b"/"c"/"o"/"n"`).
+- `plot()` - scatter/line plots (every `type`: `"p"/"l"/"b"/"c"/"o"/"h"/"s"/"S"/"n"`).
 - `hist()` - histograms, including R's Sturges'-rule default binning and
   `add = TRUE`.
 - `barplot()` - vectors and matrices (one method; a matrix is given as
@@ -220,7 +220,7 @@ A few fidelity-relevant decisions worth calling out:
 
 ```sh
 cargo run --example gallery
-# -> gallery_output/{plot_scatter,plot_line,plot_log,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,boxplot_horizontal,pie,multipanel,pch}.{svg,pdf,png}
+# -> gallery_output/{plot_scatter,plot_line,plot_log,plot_h_s,abline_log,legend,hist,barplot,barplot_stacked,barplot_beside,boxplot,boxplot_horizontal,pie,multipanel,pch}.{svg,pdf,png}
 #    and gallery_output/multipage.pdf (3 pages)
 ```
 
@@ -318,6 +318,11 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
   segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
   axis, and `type = "c"` (the same lines, no points).
+- `tests/plot_type_h_s_matches_r.rs` - `type = "h"` (lines from y = 0, or
+  the bottom of the plot on a log y axis; colours recycled, `NA` colours
+  and values skipped) and `"s"`/`"S"` steps (broken at `NA`, log axes,
+  `lty`/`lwd`) in `plot()`, `lines()` and `points()`: every stroked
+  path's vertices, colour, width and dash.
 - `tests/log_plots_matches_r.rs` - `segments()` with ends <= 0 or `NA` on
   log axes, `abline()` on log-log and log-x plots
   (`h`/`v`, `a`/`b`, `untf`, `xpd = TRUE`), `hist()` with `log = "x"`/`"y"`,

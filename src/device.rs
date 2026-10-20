@@ -900,6 +900,95 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
+    /// `type = "h"`: a vertical line from each point to y = 0 (on a log
+    /// y axis, to the bottom of the plot), colours recycled per point and
+    /// lines in a missing or transparent colour skipped. A port of
+    /// `C_plotXY`'s `case 'h'`.
+    fn histogram_xy(
+        &mut self,
+        xs: &[f64],
+        ys: &[f64],
+        col: &[ColorSpec],
+        lwd: f64,
+        lty: LineType,
+        clip: Clip,
+    ) {
+        let default = [ColorSpec::Color(self.par.col)];
+        let col = if col.is_empty() { &default[..] } else { col };
+        // R keeps `usr` in data units internally, so on a log axis its
+        // lower y limit is the bottom of the plot.
+        let (ux0, _, uy0, _) = self.usr;
+        let base = if self.ylog {
+            self.usr_to_inches(ux0, uy0).y
+        } else {
+            self.usr_to_inches(ux0, 0.0).y
+        };
+        self.push_clip_region(clip);
+        for (i, (&x, &y)) in xs.iter().zip(ys).enumerate() {
+            let p = self.user_to_inches(x, y);
+            if !p.x.is_finite() || !p.y.is_finite() {
+                continue;
+            }
+            let Some(c) = self.resolve(col[i % col.len()]) else {
+                continue;
+            };
+            let stroke = self.stroke_of(c, lwd, lty);
+            self.backend.draw_line(Point::new(p.x, base), p, &stroke);
+        }
+        self.pop_clip();
+    }
+
+    /// `type = "s"` (`vertical_first` false: across, then up or down) and
+    /// `"S"` (up or down, then across): a staircase through the points,
+    /// one polyline per run of finite points. A port of `C_plotXY`'s
+    /// `case 's'` and `case 'S'`.
+    #[allow(clippy::too_many_arguments)]
+    fn steps_xy(
+        &mut self,
+        xs: &[f64],
+        ys: &[f64],
+        vertical_first: bool,
+        col: ColorSpec,
+        lwd: f64,
+        lty: LineType,
+        clip: Clip,
+    ) {
+        let Some(col) = self.resolve(col) else {
+            return;
+        };
+        let stroke = self.stroke_of(col, lwd, lty);
+        self.push_clip_region(clip);
+        let mut run: Vec<Point> = Vec::new();
+        let mut old: Option<Point> = None;
+        for (&x, &y) in xs.iter().zip(ys) {
+            let p = self.user_to_inches(x, y);
+            let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
+            match (old, p) {
+                (Some(a), Some(b)) => {
+                    if run.is_empty() {
+                        run.push(a);
+                    }
+                    run.push(if vertical_first {
+                        Point::new(a.x, b.y)
+                    } else {
+                        Point::new(b.x, a.y)
+                    });
+                    run.push(b);
+                }
+                (_, None) if !run.is_empty() => {
+                    self.backend.draw_polyline(&run, &stroke);
+                    run.clear();
+                }
+                _ => {}
+            }
+            old = p;
+        }
+        if !run.is_empty() {
+            self.backend.draw_polyline(&run, &stroke);
+        }
+        self.pop_clip();
+    }
+
     /// `rect()` variant taking a rectangle already in device inches. Not
     /// clipped.
     pub fn rect_inches(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
