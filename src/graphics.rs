@@ -426,7 +426,7 @@ pub trait Graphics: sealed::Sealed + Sized {
         }
     }
 
-    /// `abline(a, b, h, v, untf, col, lty, lwd)`; options in
+    /// `abline(a, b, h, v, untf, col, lty, lwd, xpd)`; options in
     /// [`AblineOptions`]: `.a(1).b(2)`, or `.coef(1, 2)` (R's `coef = `,
     /// which wins over `a`/`b`). For R's `abline(reg = )`, pass the
     /// model's intercept and slope.

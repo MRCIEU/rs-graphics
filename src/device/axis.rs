@@ -263,7 +263,7 @@ impl<B: Backend> Device<B> {
         } else {
             (self.usr.2, self.usr.3)
         };
-        let (left, right) = self.xpd_limits(x_axis);
+        let (left, right) = self.xpd_limits(x_axis, self.par.xpd);
         let (left, right) = (left.min(right), left.max(right));
         let eps = if right == left {
             0.5 * FLT_EPSILON

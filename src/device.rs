@@ -785,9 +785,9 @@ impl<B: Backend> Device<B> {
     }
 
     /// R's `getxlimits()`/`getylimits()` in `usr` units: the `usr` range
-    /// with `par(xpd = FALSE)`, else the figure region's (`TRUE`) or the
+    /// for `xpd = FALSE`, else the figure region's (`TRUE`) or the
     /// device's (`NA`) extent along the axis.
-    fn xpd_limits(&self, x_axis: bool) -> (f64, f64) {
+    fn xpd_limits(&self, x_axis: bool, xpd: Xpd) -> (f64, f64) {
         let (u0, u1, p0, p1, f0, f1, d1) = if x_axis {
             let (u0, u1, ..) = self.usr;
             (u0, u1, self.plt.x0, self.plt.x1, self.fig.x0, self.fig.x1, self.width_in)
@@ -796,7 +796,7 @@ impl<B: Backend> Device<B> {
             (u0, u1, self.plt.y0, self.plt.y1, self.fig.y0, self.fig.y1, self.height_in)
         };
         let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
-        match self.par.xpd {
+        match xpd {
             Xpd::Plot => (u0, u1),
             Xpd::Figure => (to_usr(f0), to_usr(f1)),
             Xpd::Device => (to_usr(0.0), to_usr(d1)),

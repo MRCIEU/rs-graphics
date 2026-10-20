@@ -8,8 +8,9 @@
 
 //! `abline()`: a port of `C_abline` (`plot.c`).
 //!
-//! Lines span `getxlimits`/`getylimits` (the plot region, or the figure
-//! region with `par(xpd = TRUE)`) and are clipped to the `par(xpd)` region.
+//! Lines span `getxlimits`/`getylimits` (the plot region, the figure
+//! region with `xpd = TRUE`, or the device with `xpd = NA`; inline or
+//! from `par(xpd)`) and are clipped to the same region.
 //! On log axes `h`/`v` are data values, and the `a`/`b` line is straight on
 //! the page (`untf = FALSE`) or `y = a + b * x` in data units (`untf =
 //! TRUE`).
@@ -18,6 +19,7 @@ use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::geometry::Point;
 use crate::lty::LineType;
+use crate::par::Xpd;
 
 use super::Device;
 
@@ -48,6 +50,11 @@ pub struct AblineOptions {
     pub lty: Vec<LineType>,
     /// Line widths, recycled over the lines; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
+    /// R's inline `xpd`: how far the lines run and where they are clipped
+    /// (the plot region for [`Xpd::Plot`], the figure region for
+    /// [`Xpd::Figure`], the whole device for [`Xpd::Device`]; the setter
+    /// also takes `false`/`true`); `None`: `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(AblineOptions => [AblineCall] {
@@ -60,6 +67,7 @@ crate::setters::setters!(AblineOptions => [AblineCall] {
     col: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
+    xpd: option Xpd,
 });
 
 impl AblineOptions {
@@ -111,13 +119,14 @@ impl<B: Backend> Device<B> {
             };
             dev.resolve(col).map(|c| dev.stroke_of(c, lwd, lty))
         };
-        self.push_clip_for(self.par.xpd);
-        let (x0, x1) = self.xpd_limits(true);
-        let (y0, y1) = self.xpd_limits(false);
+        let xpd = opts.xpd.unwrap_or(self.par.xpd);
+        self.push_clip_for(xpd);
+        let (x0, x1) = self.xpd_limits(true, xpd);
+        let (y0, y1) = self.xpd_limits(false, xpd);
         if let Some((a, b)) = line {
             if let Some(stroke) = style(self, 0) {
                 if opts.untf && (self.xlog || self.ylog) {
-                    if let Some(pts) = self.untf_points(a, b) {
+                    if let Some(pts) = self.untf_points(a, b, xpd) {
                         self.backend.draw_polyline(&pts, &stroke);
                     }
                 } else {
@@ -153,9 +162,9 @@ impl<B: Backend> Device<B> {
     /// spaced in `log10(x)` on a log x axis), with the ends where x or y is
     /// <= 0 on a log axis dropped; `None` if nothing is left or a point
     /// can't be placed.
-    fn untf_points(&self, a: f64, b: f64) -> Option<Vec<Point>> {
+    fn untf_points(&self, a: f64, b: f64, xpd: Xpd) -> Option<Vec<Point>> {
         const NS: usize = 100;
-        let (l0, l1) = self.xpd_limits(true);
+        let (l0, l1) = self.xpd_limits(true, xpd);
         let data = |v: f64| if self.xlog { 10f64.powf(v) } else { v };
         let (mut x0, x1) = (data(l0), data(l1));
         let mut xx = vec![0.0; NS + 1];

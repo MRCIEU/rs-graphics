@@ -10,8 +10,9 @@
 //! `pdf()` device's uncompressed output, on a two-panel page where the
 //! figure and the device differ: `par(xpd = NA)` for lines, points and
 //! text reaching into the other panel, `abline()` spanning the device,
-//! `axis()` ticks outside the figure, inline `xpd = NA` on `text()` and
-//! `legend()`, and `TRUE` next to `NA`. Compares every painted path and
+//! `axis()` ticks outside the figure, inline `xpd = NA` on `text()`,
+//! `legend()` and `abline()` (also `TRUE`, `FALSE` over `par(xpd)` and
+//! `untf` on a log axis), and `TRUE` next to `NA`. Compares every painted path and
 //! text item, with the clip rectangle in effect for each. Skipped if
 //! `Rscript` isn't available.
 
@@ -93,6 +94,35 @@ fn cases() -> Vec<Case> {
                 d.abline().h(2).col("blue").draw();
                 d.par().xpd(Xpd::Device).draw();
                 d.abline().h(4).col("red").draw();
+            },
+        },
+        Case {
+            name: "inline_xpd_abline",
+            r: "par(mfrow = c(1, 2)); plot(x, y, ann = FALSE)\n\
+                abline(h = 2, xpd = TRUE, col = 'blue'); abline(v = 3, xpd = NA, col = 'red')\n\
+                abline(a = 1, b = 0.5, xpd = NA); abline(h = 4)\n\
+                par(xpd = TRUE); abline(h = 1.5, xpd = FALSE, col = 'grey'); par(xpd = FALSE)\n\
+                plot(x, y, log = 'x', ann = FALSE)\n\
+                abline(a = 1, b = 0.5, untf = TRUE, xpd = NA, col = 'green')",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                d.plot(&X, &Y).draw();
+                d.abline().h(2).xpd(true).col("blue").draw();
+                d.abline().v(3).xpd(Xpd::Device).col("red").draw();
+                d.abline().a(1).b(0.5).xpd(Xpd::Device).draw();
+                // Inline `xpd` doesn't change `par(xpd)`.
+                d.abline().h(4).draw();
+                d.par().xpd(true).draw();
+                d.abline().h(1.5).xpd(false).col("grey").draw();
+                d.par().xpd(false).draw();
+                d.plot(&X, &Y).xlog(true).draw();
+                d.abline()
+                    .a(1)
+                    .b(0.5)
+                    .untf(true)
+                    .xpd(Xpd::Device)
+                    .col("green")
+                    .draw();
             },
         },
     ]
