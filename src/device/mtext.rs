@@ -45,7 +45,7 @@ pub struct MtextOptions {
     /// side, otherwise justified at the end nearest the plot (1 on sides 1
     /// and 2, 0 on sides 3 and 4).
     pub adj: Option<f64>,
-    /// Justification across the text; `None`: depends on `side`/`par(las)`
+    /// Justification across the text; `None`: depends on `side` and `las`
     /// (0, i.e. baseline on the line, for `las = 0`).
     pub padj: Option<f64>,
     /// `None`: 1. Unlike most text, *not* scaled by `par(cex)` (so neither
@@ -55,6 +55,11 @@ pub struct MtextOptions {
     pub col: Option<ColorSpec>,
     /// `None`: `par(font)`.
     pub font: Option<i32>,
+    /// Text orientation (R's inline `las`, through `mtext()`'s `...`): 0
+    /// parallel to the side, 1 horizontal, 2 perpendicular to the side, 3
+    /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
+    /// `None`: `par(las)`.
+    pub las: Option<i32>,
 }
 
 crate::setters::setters!(MtextOptions => [MtextCall] {
@@ -66,6 +71,7 @@ crate::setters::setters!(MtextOptions => [MtextCall] {
     cex: option f64,
     col: option ColorSpec,
     font: option i32,
+    las: option i32,
 });
 
 /// `ComputeAdjValue()`.
@@ -112,7 +118,7 @@ impl<B: Backend> Device<B> {
     ) {
         let text = text.into();
         let side = side.into();
-        let las = self.par.las;
+        let las = opts.las.unwrap_or(self.par.las);
         let adj = opts.adj.unwrap_or_else(|| default_adj(side, las));
         let padj = opts.padj.unwrap_or_else(|| default_padj(side, las));
         let horizontal_side = side.is_horizontal();

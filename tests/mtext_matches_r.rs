@@ -125,6 +125,8 @@ fn mtext_placement_matches_r() {
             c.las
         ));
     }
+    // Inline `las` doesn't change `par(las)`; without it, `par(las)` applies.
+    script.push_str("par(las = 1); mtext('par las', side = 2, line = 2.5)\n");
     script.push_str("invisible(dev.off())\n");
     let script_path = dir.join("rs_graphics_mtext.R");
     std::fs::write(&script_path, script).unwrap();
@@ -148,7 +150,6 @@ fn mtext_placement_matches_r() {
     dev.plot_new();
     dev.plot_window((0.0, 10.0), (0.0, 5.0)).draw();
     for c in &cases {
-        dev.par().las(c.las).draw();
         dev.mtext(c.text, c.side)
             .with(&MtextOptions {
                 line: Some(c.line),
@@ -159,21 +160,25 @@ fn mtext_placement_matches_r() {
                 cex: c.cex,
                 col: None::<ColorSpec>,
                 font: c.font,
+                las: Some(c.las),
             })
             .draw();
     }
+    assert_eq!(dev.current_par().las, 0);
+    dev.par().las(1).draw();
+    dev.mtext("par las", 2).line(2.5).draw();
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 
     let (r, o) = (text_origins(&r_pdf), text_origins(&ours));
     assert_eq!(o.len(), r.len(), "text count\nours={o:?}\nr={r:?}");
-    for ((a, b), c) in o.iter().zip(&r).zip(&cases) {
+    let texts: Vec<&str> = cases.iter().map(|c| c.text).chain(["par las"]).collect();
+    for ((a, b), c) in o.iter().zip(&r).zip(&texts) {
         assert!(
             (a.0 - b.0).abs() < 0.05
                 && (a.1 - b.1).abs() < 0.05
                 && (a.2 - b.2).abs() < 0.05
                 && (a.3 - b.3).abs() < 0.01,
-            "{:?}: ours={a:?} r={b:?}",
-            c.text
+            "{c:?}: ours={a:?} r={b:?}"
         );
     }
 }
