@@ -14,6 +14,8 @@
 //! colour, width, dash pattern) and every label (origin, direction,
 //! colour). Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -23,14 +25,6 @@ use rs_graphics::lty::LineType;
 use rs_graphics::plotmath::Label as AxisLabel;
 use rs_graphics::par::{AxisType, Par, Sides};
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
@@ -549,8 +543,7 @@ fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
 
 #[test]
 fn axis_arguments_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

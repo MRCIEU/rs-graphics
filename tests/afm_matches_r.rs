@@ -10,17 +10,11 @@
 //! `strwidth()` on a `pdf()` device (which uses the same Helvetica AFM
 //! metrics by default). Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::afm::{str_width_inches, FontFace};
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 fn r_strwidth(s: &str, pointsize: f64, cex: f64, font: i32) -> f64 {
     let script = format!(
@@ -43,8 +37,7 @@ fn r_strwidth(s: &str, pointsize: f64, cex: f64, font: i32) -> f64 {
 
 #[test]
 fn str_width_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
 

@@ -17,6 +17,8 @@
 //! back on every second consecutive digit (`bolditalic(x12)` draws "1"
 //! plain and "2" bold italic); we draw them all plain.
 
+mod common;
+
 use std::collections::HashMap;
 use std::process::Command;
 
@@ -25,14 +27,6 @@ use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::par::Par;
 use rs_graphics::plotmath::Label;
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 const PAGE_W: f64 = 8.0;
 const PAGE_H: f64 = 7.0;
@@ -245,8 +239,7 @@ fn extract(pdf: &str) -> (Vec<Text>, Vec<Vec<f64>>) {
 
 #[test]
 fn plotmath_axis_labels_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();
@@ -383,8 +376,7 @@ fn consecutive_digits_are_all_plain() {
 /// `legend()` (labels, including a tall one, and title).
 #[test]
 fn plotmath_title_mtext_text_legend_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();
@@ -574,8 +566,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
 
 #[test]
 fn plotmath_high_level_titles_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

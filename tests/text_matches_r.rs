@@ -12,6 +12,8 @@
 //! offset by `adj[2] * strheight("M")`), rotation, `cex` and `font`.
 //! Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -19,14 +21,6 @@ use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// `(x, y, font size)` of every text matrix, in drawing order.
 fn text_origins(pdf: &str) -> Vec<(f64, f64, f64)> {
@@ -63,8 +57,7 @@ const CASES: &[(&str, f64, Option<f64>, f64, f64, i32)] = &[
 
 #[test]
 fn text_placement_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

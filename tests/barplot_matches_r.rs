@@ -11,6 +11,8 @@
 //! uncompressed output: every bar/legend rectangle and every text origin.
 //! Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -20,14 +22,6 @@ use rs_graphics::highlevel::BarplotOptions;
 use rs_graphics::par::Par;
 use rs_graphics::plotmath::Label;
 use rs_graphics::graphics::Graphics;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// `(x, y)` of every text matrix, sorted.
 fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
@@ -206,8 +200,7 @@ fn cases() -> Vec<Case> {
 
 #[test]
 fn barplot_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let cases = cases();

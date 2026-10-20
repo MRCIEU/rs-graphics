@@ -13,6 +13,8 @@
 //! plotted. Compares every text origin and every data line's vertices
 //! (paths of 5 or more points). Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -21,14 +23,6 @@ use rs_graphics::device::{Device, MtextOptions};
 use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 const PAGE_W: f64 = 8.0;
 const PAGE_H: f64 = 6.0;
@@ -239,8 +233,7 @@ fn r_script(c: &Case, path: &str) -> String {
 
 #[test]
 fn par_new_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

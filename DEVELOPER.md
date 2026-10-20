@@ -374,7 +374,24 @@ against a real R installation by shelling out to `Rscript`:
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but
 for any change touching layout, tick placement, or text metrics, please
-run with R available if you can.
+run with R available if you can. Setting `RS_GRAPHICS_REQUIRE_R=1` makes
+them fail instead of skipping (`tests/common/mod.rs`).
+
+### Continuous integration
+
+`.github/workflows/rust.yml` runs on pushes and pull requests to `main`
+(and by hand, from the Actions tab), on Ubuntu:
+
+- **test** - installs the current R release (`r-lib/actions/setup-r`)
+  and runs `cargo test` with `RS_GRAPHICS_REQUIRE_R=1`, so every R
+  cross-check runs;
+- **msrv** - builds everything with Rust 1.85, `Cargo.toml`'s
+  `rust-version`;
+- **docs** - `cargo doc` with rustdoc warnings (e.g. broken intra-doc
+  links) as errors.
+
+All three use `--locked`, so commit `Cargo.lock` changes. Clippy and
+rustfmt aren't checked: the code base isn't clean under either yet.
 
 ## Licence notices
 

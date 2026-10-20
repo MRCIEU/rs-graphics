@@ -15,6 +15,8 @@
 //! width and line cap; character symbols are compared by text origin, size
 //! and string. Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -22,14 +24,6 @@ use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 const PAGE_W: f64 = 6.0;
 const PAGE_H: f64 = 4.0;
@@ -338,8 +332,7 @@ fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
 
 #[test]
 fn every_pch_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

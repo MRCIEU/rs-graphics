@@ -13,6 +13,8 @@
 //! exercises `plot.window(asp = 1)`'s own range widening). Skipped if
 //! `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -20,14 +22,6 @@ use rs_graphics::device::Device;
 use rs_graphics::highlevel::PieOptions;
 use rs_graphics::par::{AxisStyle, Par};
 use rs_graphics::graphics::Graphics;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 /// Every stroked/filled `m`/`l` path's vertices, in drawing order (clips
 /// and rectangles are skipped).
@@ -132,8 +126,7 @@ const LABELS: [&str; 5] = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"];
 
 #[test]
 fn pie_matches_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();

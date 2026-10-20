@@ -12,6 +12,8 @@
 //! operator only) and every text item in order (origin and string).
 //! Skipped if `Rscript` isn't available.
 
+mod common;
+
 use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
@@ -19,14 +21,6 @@ use rs_graphics::device::Device;
 use rs_graphics::highlevel::PlotOptions;
 use rs_graphics::par::{Par, Pty, Sides};
 use rs_graphics::graphics::Graphics;
-
-fn rscript_available() -> bool {
-    Command::new("Rscript")
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
 
 type Dev = Device<PdfBackend>;
 
@@ -125,7 +119,6 @@ fn cases() -> Vec<Case> {
         },
     ]
 }
-
 
 #[derive(Debug)]
 struct Painted {
@@ -236,8 +229,7 @@ fn extract(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
 
 #[test]
 fn regions_match_r() {
-    if !rscript_available() {
-        eprintln!("Rscript not found on PATH; skipping R cross-check.");
+    if !common::r_available() {
         return;
     }
     let dir = std::env::temp_dir();
