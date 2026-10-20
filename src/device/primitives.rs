@@ -567,14 +567,16 @@ impl<B: Backend> Device<B> {
                 run.push(p);
                 continue;
             }
-            if !run.is_empty() {
+            // As `C_polygon`: a run needs at least two points; a shorter one
+            // is skipped without using up a `col`/`border`/`lty` value.
+            if run.len() >= 2 {
                 let fill = self.resolve(pick(&opts.col, num, ColorSpec::None));
                 let border = self.resolve(pick(&opts.border, num, fg));
                 let stroke = border.map(|c| self.stroke_of(c, lwd, pick(&opts.lty, num, lty)));
                 self.backend.draw_polygon(&run, fill, stroke.as_ref());
-                run.clear();
                 num += 1;
             }
+            run.clear();
         }
         self.pop_clip();
     }

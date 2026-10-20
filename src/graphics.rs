@@ -378,9 +378,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     }
 
     /// `polygon(x, y, ...)`; options in [`PolygonOptions`]: one polygon
-    /// per run of finite points (non-finite coordinates, R's `NA`,
-    /// separate them), with `col`, `border` and `lty` recycled over the
-    /// polygons, as `C_polygon`.
+    /// per run of at least two finite points (non-finite coordinates, R's
+    /// `NA`, separate them), with `col`, `border` and `lty` recycled over
+    /// the polygons drawn, as `C_polygon` (a shorter run is skipped and
+    /// uses up no colour).
     ///
     /// # Panics
     /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and

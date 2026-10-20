@@ -340,6 +340,25 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "polygon_short_runs",
+            r: "plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                polygon(c(1, NA, 2, 3, 4, NA, 6, NA, 7, 8, NA, 9), c(1, NA, 2, 4, 2, NA, 6, NA, 7, 9, NA, 9),\n\
+                        col = c('red', 'blue', 'green'), border = c('black', 'purple'))",
+            draw: |d| {
+                window(d);
+                let na = f64::NAN;
+                // Runs of 1, 3, 1, 2 and 1 points: only the 3- and 2-point
+                // ones are drawn, in the first and second colours.
+                d.polygon(
+                    &[1.0, na, 2.0, 3.0, 4.0, na, 6.0, na, 7.0, 8.0, na, 9.0],
+                    &[1.0, na, 2.0, 4.0, 2.0, na, 6.0, na, 7.0, 9.0, na, 9.0],
+                )
+                .col(["red", "blue", "green"])
+                .border(["black", "purple"])
+                .draw();
+            },
+        },
+        Case {
             name: "text_nonfinite",
             r: "plot.new(); plot.window(c(1, 100), c(0, 10), log = 'x')\n\
                 text(c(NA, 10, 0, 50, -1, 20), c(2, 3, 4, 5, 6, NA), c('a', 'b', 'c', 'd', 'e', 'f'),\n\
