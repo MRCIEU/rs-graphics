@@ -209,7 +209,7 @@ fn cases() -> Vec<Case> {
                 d.text(&[2.0, 4.0], &[9.0], &numbers).draw();
                 let edge = TextOptions {
                     adj: Some(0.0),
-                    xpd: Some(true),
+                    xpd: Some(Xpd::Figure),
                     ..TextOptions::default()
                 };
                 d.text(&[9.5], &[1.0], &["edge"]).with(&edge).draw();

@@ -155,6 +155,27 @@ crate::error::from_r_string!(
     "one of \"o\", \"l\", \"7\", \"c\", \"u\", \"]\" or \"n\""
 );
 
+/// `par(xpd)`: where drawing is clipped to. `true`/`false` convert, so
+/// `.xpd(true)` is R's `xpd = TRUE`.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum Xpd {
+    /// R's `FALSE` (the default): the plot region.
+    #[default]
+    Plot,
+    /// R's `TRUE`: the figure region.
+    Figure,
+    /// R's `NA`: the whole device.
+    Device,
+}
+
+impl From<bool> for Xpd {
+    /// `false` is [`Xpd::Plot`], `true` [`Xpd::Figure`], as R's logical
+    /// `xpd`.
+    fn from(xpd: bool) -> Self {
+        if xpd { Xpd::Figure } else { Xpd::Plot }
+    }
+}
+
 /// `par(xaxt/yaxt)`: whether `axis()` draws on that axis. R's `"s"`, `"l"`
 /// and `"t"` all mean [`AxisType::Standard`]; `"n"` suppresses the axis
 /// (`plot(x, y, xaxt = "n")` before a custom `axis(1, ...)`).
@@ -340,10 +361,11 @@ pub struct Par {
     pub lheight: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
-    /// `par(xpd)`: `false` (the default) clips drawing to the plot
-    /// region, `true` to the figure region. R's `NA` (the device) isn't
-    /// available.
-    pub xpd: bool,
+    /// `par(xpd)`: where drawing is clipped to: [`Xpd::Plot`] (R's
+    /// `FALSE`, the default), [`Xpd::Figure`] (`TRUE`) or [`Xpd::Device`]
+    /// (`NA`). Also sets the extent of `abline()` lines and of `axis()`
+    /// ticks outside the plot range, as R's `getxlimits()`.
+    pub xpd: Xpd,
     /// `par(ann)`: whether `plot()` draws its titles and axis labels, and
     /// the default of `barplot()`'s `ann` (with `!add`). Default `true`. As
     /// in R, `hist()` and `boxplot()` have their own `ann` options that
@@ -410,7 +432,7 @@ impl Default for Par {
             yaxp: [0.0, 1.0, 5.0],
             lheight: 1.0,
             adj: 0.5,
-            xpd: false,
+            xpd: Xpd::Plot,
             ann: true,
         }
     }
@@ -575,7 +597,7 @@ par_options!(
     yaxp: array [f64; 3],
     lheight: option f64,
     adj: option f64,
-    xpd: option bool,
+    xpd: option Xpd,
     ann: option bool,
     ; optional:
     mai: option Sides<f64>,

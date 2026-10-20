@@ -15,6 +15,7 @@ use crate::color::{Color, ColorSpec};
 use crate::device::{
     Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
 };
+use crate::par::Xpd;
 use crate::plotmath::Label;
 
 /// R's default pie slice color cycle (used when `col` isn't given).
@@ -203,7 +204,7 @@ impl<B: Backend> Device<B> {
                 // ifelse(P$x < 0, 1, 0))`.
                 let at = TextOptions {
                     adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
-                    xpd: Some(true),
+                    xpd: Some(Xpd::Figure),
                     srt: opts.srt,
                     ..TextOptions::default()
                 };

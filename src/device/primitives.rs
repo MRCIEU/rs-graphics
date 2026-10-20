@@ -16,7 +16,7 @@
 //! needed. `xpd` is R's inline `xpd = ` (clip to the figure region rather
 //! than the plot region); `None` uses `par(xpd)`.
 
-use super::{Clip, Device};
+use super::{Device, Xpd};
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
@@ -64,9 +64,10 @@ pub struct XyOptions {
     pub lwd: Vec<f64>,
     /// Line type of lines; `None`: `par(lty)`.
     pub lty: Option<LineType>,
-    /// R's inline `xpd`: `Some(true)` clips to the figure region,
-    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
-    pub xpd: Option<bool>,
+    /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
+    /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
+    /// `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
@@ -77,7 +78,7 @@ crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
     cex: values f64,
     lwd: values f64,
     lty: option LineType,
-    xpd: option bool,
+    xpd: option Xpd,
 });
 
 /// Arguments of `segments()`.
@@ -89,16 +90,17 @@ pub struct SegmentsOptions {
     pub lty: Vec<LineType>,
     /// Recycled per segment; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
-    /// R's inline `xpd`: `Some(true)` clips to the figure region,
-    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
-    pub xpd: Option<bool>,
+    /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
+    /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
+    /// `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(SegmentsOptions => [SegmentsCall] {
     col: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
-    xpd: option bool,
+    xpd: option Xpd,
 });
 
 /// Arguments of `arrows()`.
@@ -118,9 +120,10 @@ pub struct ArrowsOptions {
     pub lty: Vec<LineType>,
     /// Recycled per arrow; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
-    /// R's inline `xpd`: `Some(true)` clips to the figure region,
-    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
-    pub xpd: Option<bool>,
+    /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
+    /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
+    /// `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
@@ -130,7 +133,7 @@ crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
     col: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
-    xpd: option bool,
+    xpd: option Xpd,
 });
 
 /// Arguments of `rect()`.
@@ -145,9 +148,10 @@ pub struct RectOptions {
     pub lty: Vec<LineType>,
     /// Recycled per rectangle; empty: `par(lwd)`.
     pub lwd: Vec<f64>,
-    /// R's inline `xpd`: `Some(true)` clips to the figure region,
-    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
-    pub xpd: Option<bool>,
+    /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
+    /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
+    /// `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(RectOptions => [RectCall] {
@@ -155,7 +159,7 @@ crate::setters::setters!(RectOptions => [RectCall] {
     border: values ColorSpec,
     lty: values LineType,
     lwd: values f64,
-    xpd: option bool,
+    xpd: option Xpd,
 });
 
 /// Arguments of `polygon()`. A non-finite coordinate (R's `NA`) ends one
@@ -172,9 +176,10 @@ pub struct PolygonOptions {
     pub lty: Vec<LineType>,
     /// One width for all; `None`: `par(lwd)`.
     pub lwd: Option<f64>,
-    /// R's inline `xpd`: `Some(true)` clips to the figure region,
-    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
-    pub xpd: Option<bool>,
+    /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
+    /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
+    /// `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(PolygonOptions => [PolygonCall] {
@@ -182,7 +187,7 @@ crate::setters::setters!(PolygonOptions => [PolygonCall] {
     border: values ColorSpec,
     lty: values LineType,
     lwd: option f64,
-    xpd: option bool,
+    xpd: option Xpd,
 });
 
 /// Arguments of `text()`.
@@ -207,9 +212,10 @@ pub struct TextOptions {
     /// Recycled per label (1 plain, 2 bold, 3 italic, 4 bold italic, 5
     /// Symbol); empty: `par(font)`.
     pub font: Vec<i32>,
-    /// R's inline `xpd`: `Some(true)` clips to the figure region,
-    /// `Some(false)` to the plot region; `None`: `par(xpd)`.
-    pub xpd: Option<bool>,
+    /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
+    /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
+    /// `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(TextOptions => [TextCall] {
@@ -219,7 +225,7 @@ crate::setters::setters!(TextOptions => [TextCall] {
     cex: values f64,
     col: values ColorSpec,
     font: values i32,
-    xpd: option bool,
+    xpd: option Xpd,
 });
 
 /// Which region `box()` outlines.
@@ -281,12 +287,8 @@ crate::setters::setters!(PlotWindowOptions => [PlotWindowCall] {
 });
 
 impl<B: Backend> Device<B> {
-    fn clip_for(&self, xpd: Option<bool>) -> Clip {
-        if xpd.unwrap_or(self.par.xpd) {
-            Clip::Figure
-        } else {
-            Clip::Plot
-        }
+    fn clip_for(&self, xpd: Option<Xpd>) -> Xpd {
+        xpd.unwrap_or(self.par.xpd)
     }
 
     /// Draws R's `plot_window()`; the public entry is
@@ -386,7 +388,7 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    fn xy_points(&mut self, x: &[f64], y: &[f64], opts: &XyOptions, clip: Clip) {
+    fn xy_points(&mut self, x: &[f64], y: &[f64], opts: &XyOptions, clip: Xpd) {
         let col: Vec<Option<Color>> = if opts.col.is_empty() {
             vec![self.resolve(ColorSpec::Color(self.par.col))]
         } else {

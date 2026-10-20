@@ -18,8 +18,9 @@ usage, see [README.md](README.md).
   page or curved with `AblineOptions::untf`, and `xlog`/`ylog` for `plot()`,
   `hist()`, `barplot()` and `boxplot()`), `par(lab=)`, `par(xaxp=/yaxp=)` (set by
   `plot_window()` as R's `GAxisPars()`, read by `axis()` via
-  `CreateAtVector()`, overridable inline), and R's `xpd`-style clip regions (plot region, figure region,
-  or the whole device for outer-margin text).
+  `CreateAtVector()`, overridable inline), and R's `xpd` clip regions
+  (`par::Xpd`: the plot region, the figure region or the whole device,
+  R's `FALSE`/`TRUE`/`NA`).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
   - each a `Graphics` method (`src/graphics.rs`) taking its data and
@@ -417,6 +418,10 @@ against a real R installation by shelling out to `Rscript`:
   `plot.window()` (linear, log with each tick rule, reversed, `par(lab)`),
   and the ticks drawn with `xaxp`/`yaxp` changed afterwards, inline in
   `axis()` and in `plot()`.
+- `tests/xpd_na_matches_r.rs` - `xpd = NA` on a two-panel page:
+  `par(xpd = NA)` for lines/points/text, `abline()` and `axis()` limits,
+  inline `xpd = NA` on `text()`/`legend()`, `TRUE` next to `NA`: paths
+  and text with the clip rectangle in effect for each, vs. R `pdf()`.
 - `tests/margins_regions_matches_r.rs` - `mai` (also with `cex`, and
   `mar` resetting it), `omi`/`omd` with outer `mtext()` (and `mfrow`),
   `pin` (and `mar` resetting it), `pty` resetting `plt`, `fin`, and

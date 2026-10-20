@@ -37,7 +37,7 @@ use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
-use crate::par::{AxisStyle, Par, Pty, Sides};
+use crate::par::{AxisStyle, Par, Pty, Sides, Xpd};
 use crate::pch;
 use crate::plotmath::Label;
 use crate::pretty::{axis_pars, create_at_vector};
@@ -164,15 +164,6 @@ enum FigSpec {
     Nic([f64; 4]),
     /// `par(fin)`: `[width, height]` in inches, centred.
     Inches([f64; 2]),
-}
-
-/// Where drawing is clipped to: R's `xpd = FALSE` (plot region), `TRUE`
-/// (figure region) and `NA` (the whole device).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Clip {
-    Plot,
-    Figure,
-    Device,
 }
 
 /// The labels of [`Graphics::title`](crate::graphics::Graphics::title) (`None` draws
@@ -769,21 +760,21 @@ impl<B: Backend> Device<B> {
     }
 
     /// R's `getxlimits()`/`getylimits()` in `usr` units: the `usr` range
-    /// with `par(xpd = FALSE)`, else the figure region's extent along the
-    /// axis.
+    /// with `par(xpd = FALSE)`, else the figure region's (`TRUE`) or the
+    /// device's (`NA`) extent along the axis.
     fn xpd_limits(&self, x_axis: bool) -> (f64, f64) {
-        let (u0, u1, p0, p1, f0, f1) = if x_axis {
+        let (u0, u1, p0, p1, f0, f1, d1) = if x_axis {
             let (u0, u1, ..) = self.usr;
-            (u0, u1, self.plt.x0, self.plt.x1, self.fig.x0, self.fig.x1)
+            (u0, u1, self.plt.x0, self.plt.x1, self.fig.x0, self.fig.x1, self.width_in)
         } else {
             let (.., u0, u1) = self.usr;
-            (u0, u1, self.plt.y0, self.plt.y1, self.fig.y0, self.fig.y1)
+            (u0, u1, self.plt.y0, self.plt.y1, self.fig.y0, self.fig.y1, self.height_in)
         };
-        if self.par.xpd {
-            let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
-            (to_usr(f0), to_usr(f1))
-        } else {
-            (u0, u1)
+        let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
+        match self.par.xpd {
+            Xpd::Plot => (u0, u1),
+            Xpd::Figure => (to_usr(f0), to_usr(f1)),
+            Xpd::Device => (to_usr(0.0), to_usr(d1)),
         }
     }
 
@@ -838,14 +829,13 @@ impl<B: Backend> Device<B> {
     }
 
     // ---------------------------------------------------------------
-    // Clipping (matches R's `xpd`: FALSE clips to the plot region, TRUE
-    // clips to the figure region. `par.xpd` is a bool, so R's `NA`, "clip
-    // to the device", is only available internally as `Clip::Device`,
-    // used by `axis()` and `mtext(outer = TRUE)`).
+    // Clipping, as R's `xpd`: FALSE clips to the plot region, TRUE to the
+    // figure region, NA to the device (`axis()` and `mtext(outer = TRUE)`
+    // always use the device, as R).
     // ---------------------------------------------------------------
 
-    fn push_clip_for(&mut self, xpd: bool) {
-        self.push_clip_region(if xpd { Clip::Figure } else { Clip::Plot });
+    fn push_clip_for(&mut self, xpd: Xpd) {
+        self.push_clip_region(xpd);
     }
 
     /// Marks the current plot as drawn on, which resets `par(new)` (R's
@@ -855,12 +845,12 @@ impl<B: Backend> Device<B> {
         self.hold_figure = false;
     }
 
-    fn push_clip_region(&mut self, clip: Clip) {
+    fn push_clip_region(&mut self, clip: Xpd) {
         self.dirty();
         let rect = match clip {
-            Clip::Plot => self.plt,
-            Clip::Figure => self.fig,
-            Clip::Device => Rect::new(0.0, 0.0, self.width_in, self.height_in),
+            Xpd::Plot => self.plt,
+            Xpd::Figure => self.fig,
+            Xpd::Device => Rect::new(0.0, 0.0, self.width_in, self.height_in),
         };
         self.backend.push_clip(rect);
     }
@@ -955,7 +945,7 @@ impl<B: Backend> Device<B> {
         col: ColorSpec,
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let Some(col) = self.resolve(col) else {
             return;
@@ -992,7 +982,7 @@ impl<B: Backend> Device<B> {
         col: ColorSpec,
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let Some(col) = self.resolve(col) else {
             return;
@@ -1029,7 +1019,7 @@ impl<B: Backend> Device<B> {
         col: &[ColorSpec],
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let default = [ColorSpec::Color(self.par.col)];
         let col = if col.is_empty() { &default[..] } else { col };
@@ -1069,7 +1059,7 @@ impl<B: Backend> Device<B> {
         col: ColorSpec,
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let Some(col) = self.resolve(col) else {
             return;
@@ -1162,7 +1152,7 @@ impl<B: Backend> Device<B> {
     #[allow(clippy::too_many_arguments)]
     fn text_at_clipped(
         &mut self,
-        clip: Clip,
+        clip: Xpd,
         anchor: Point,
         label: &str,
         hadj: f64,
@@ -1214,7 +1204,7 @@ impl<B: Backend> Device<B> {
     /// describe it.
     pub(crate) fn title_impl(&mut self, opts: &TitleOptions) {
         let saved_xpd = self.par.xpd;
-        self.par.xpd = true;
+        self.par.xpd = Xpd::Figure;
         let lh = self.line_height_inches();
         let x_mid = (self.plt.x0 + self.plt.x1) / 2.0;
         let y_mid = (self.plt.y0 + self.plt.y1) / 2.0;
@@ -1226,7 +1216,7 @@ impl<B: Backend> Device<B> {
             // uses `yc * height(M)`, not exact ink centring).
             let y = self.plt.y1 + 0.5 * self.mar.top * lh;
             self.draw_label(
-                Clip::Figure,
+                Xpd::Figure,
                 Point::new(x_mid, y),
                 main,
                 0.5,
@@ -1240,7 +1230,7 @@ impl<B: Backend> Device<B> {
         if let Some(sub) = &opts.sub {
             let y = self.plt.y0 - (self.par.mgp[0] + 1.0 + (1.0 - Y_LINE_BIAS)) * lh;
             self.draw_label(
-                Clip::Figure,
+                Xpd::Figure,
                 Point::new(x_mid, y),
                 sub,
                 0.5,
@@ -1254,7 +1244,7 @@ impl<B: Backend> Device<B> {
         if let Some(xlab) = &opts.xlab {
             let y = self.plt.y0 - (self.par.mgp[0] + (1.0 - Y_LINE_BIAS)) * lh;
             self.draw_label(
-                Clip::Figure,
+                Xpd::Figure,
                 Point::new(x_mid, y),
                 xlab,
                 0.5,
@@ -1268,7 +1258,7 @@ impl<B: Backend> Device<B> {
         if let Some(ylab) = &opts.ylab {
             let x = self.plt.x0 - (self.par.mgp[0] + Y_LINE_BIAS) * lh;
             self.draw_label(
-                Clip::Figure,
+                Xpd::Figure,
                 Point::new(x, y_mid),
                 ylab,
                 0.5,

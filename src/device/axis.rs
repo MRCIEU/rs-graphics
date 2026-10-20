@@ -27,7 +27,7 @@ use crate::lty::LineType;
 use crate::par::AxisType;
 use crate::plotmath::Label;
 
-use super::{Clip, Device, Side, Y_LINE_BIAS, format_axis_labels};
+use super::{Device, Side, Xpd, Y_LINE_BIAS, format_axis_labels};
 
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
@@ -334,7 +334,7 @@ impl<B: Backend> Device<B> {
                 None => opts.tcl.unwrap_or(self.par.tcl) * lh,
             };
             let axis_tick = axis_base - outward * len;
-            self.push_clip_region(Clip::Device);
+            self.push_clip_region(Xpd::Device);
             if lwd > 0.0 {
                 if let Some(c) = self.resolve(col) {
                     let stroke = self.stroke_of(c, lwd, lty);
@@ -433,7 +433,7 @@ impl<B: Backend> Device<B> {
                     if let Some(col) = self.resolve(col_axis) {
                         let cex = self.par.cex * cex;
                         let anchor = point(label_perp, temp);
-                        self.math_text(anchor, expr, hadj, padj, angle, col, cex, Clip::Device);
+                        self.math_text(anchor, expr, hadj, padj, angle, col, cex, Xpd::Device);
                     }
                     continue;
                 }
@@ -446,7 +446,7 @@ impl<B: Backend> Device<B> {
             let tnew = temp - 0.5 * labw;
             if tnew - tlast >= gap {
                 self.text_at_clipped(
-                    Clip::Device,
+                    Xpd::Device,
                     point(label_perp, temp),
                     label,
                     hadj,

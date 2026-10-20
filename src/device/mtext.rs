@@ -23,7 +23,7 @@ use crate::geometry::Point;
 
 use crate::plotmath::Label;
 
-use super::{Clip, Device, Side, Y_LINE_BIAS};
+use super::{Device, Side, Xpd, Y_LINE_BIAS};
 
 /// The arguments of R's `mtext()` other than `text` and `side`, with
 /// R's defaults.
@@ -187,11 +187,7 @@ impl<B: Backend> Device<B> {
         } else {
             Point::new(across, along)
         };
-        let clip = if opts.outer {
-            Clip::Device
-        } else {
-            Clip::Figure
-        };
+        let clip = if opts.outer { Xpd::Device } else { Xpd::Figure };
         let col = opts.col.unwrap_or(ColorSpec::Color(self.par.col));
         let font = opts.font.unwrap_or(self.par.font);
         // R sets the text size from `cex` alone (`C_mtext`: "we ignore any

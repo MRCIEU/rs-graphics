@@ -1,0 +1,458 @@
+// Copyright (C) 2026 University of Bristol
+// rs-graphics includes code translated from R, copyright (C) The R Core Team
+// and others; see NOTICE.
+//
+// This file is part of rs-graphics, licensed under the GNU General Public
+// License, version 3 or (at your option) any later version; see LICENSE.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Cross-checks `xpd = NA` (clip to the whole device) against a real R
+//! `pdf()` device's uncompressed output, on a two-panel page where the
+//! figure and the device differ: `par(xpd = NA)` for lines, points and
+//! text reaching into the other panel, `abline()` spanning the device,
+//! `axis()` ticks outside the figure, inline `xpd = NA` on `text()` and
+//! `legend()`, and `TRUE` next to `NA`. Compares every painted path and
+//! text item, with the clip rectangle in effect for each. Skipped if
+//! `Rscript` isn't available.
+
+mod common;
+
+use std::collections::HashMap;
+use std::process::Command;
+
+use rs_graphics::prelude::*;
+
+const PAGE_W: f64 = 8.0;
+const PAGE_H: f64 = 5.0;
+
+const X: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+const Y: [f64; 5] = [2.0, 4.0, 3.0, 5.0, 1.0];
+
+type Draw = fn(&mut Device<PdfBackend>);
+
+struct Case {
+    name: &'static str,
+    /// R code; `x` and `y` are the vectors above.
+    r: &'static str,
+    ours: Draw,
+}
+
+fn cases() -> Vec<Case> {
+    vec![
+        Case {
+            name: "par_xpd_na_primitives",
+            r: "par(mfrow = c(1, 2)); plot(x, y, ann = FALSE); par(xpd = NA)\n\
+                lines(c(1, 14), c(1, 6)); points(c(9, 12), c(3, 4), pch = 19)\n\
+                text(10, 2, 'abc')",
+            ours: |d| {
+                d.mfrow(1, 2);
+                d.plot(&X, &Y).draw();
+                d.par().xpd(Xpd::Device).draw();
+                d.lines(&[1, 14], &[1, 6]).draw();
+                d.points(&[9, 12], &[3, 4]).pch(19).draw();
+                d.text(&[10], &[2], &["abc"]).draw();
+            },
+        },
+        Case {
+            name: "par_xpd_na_abline_axis",
+            r: "par(mfrow = c(1, 2)); plot(x, y, ann = FALSE); par(xpd = NA)\n\
+                abline(h = 3, v = 2, col = 'red')\n\
+                axis(3, at = c(-4, 0, 3, 8, 12))",
+            ours: |d| {
+                d.mfrow(1, 2);
+                d.plot(&X, &Y).draw();
+                d.par().xpd(Xpd::Device).draw();
+                d.abline().h(3).v(2).col("red").draw();
+                d.axis(3).at([-4, 0, 3, 8, 12]).draw();
+            },
+        },
+        Case {
+            name: "inline_xpd_na",
+            r: "par(mfrow = c(1, 2)); plot(x, y, ann = FALSE)\n\
+                text(11, 3, 'abc', xpd = NA); text(11, 4, 'sum', xpd = TRUE)\n\
+                legend(8, 5, legend = c('abc', 'sum'), pch = 1:2, xpd = NA)",
+            ours: |d| {
+                d.mfrow(1, 2);
+                d.plot(&X, &Y).draw();
+                d.text(&[11], &[3], &["abc"]).xpd(Xpd::Device).draw();
+                d.text(&[11], &[4], &["sum"]).xpd(true).draw();
+                let keys = [
+                    LegendEntry::point("abc", 1, 1),
+                    LegendEntry::point("sum", 1, 2),
+                ];
+                d.legend((8, 5), &keys).xpd(Xpd::Device).draw();
+            },
+        },
+        Case {
+            name: "xpd_true_vs_na_abline",
+            r: "par(mfrow = c(1, 2), xpd = TRUE); plot(x, y, ann = FALSE)\n\
+                abline(h = 2, col = 'blue'); par(xpd = NA); abline(h = 4, col = 'red')",
+            ours: |d| {
+                d.par().mfrow(1, 2).xpd(true).draw();
+                d.plot(&X, &Y).draw();
+                d.abline().h(2).col("blue").draw();
+                d.par().xpd(Xpd::Device).draw();
+                d.abline().h(4).col("red").draw();
+            },
+        },
+    ]
+}
+
+// -------------------------------------------------------------------
+// A minimal PDF content-stream interpreter: painted paths, and text with
+// font, size and fill colour.
+// -------------------------------------------------------------------
+
+#[derive(Clone, Debug)]
+struct Gs {
+    /// The clip rectangle `[x0, y0, x1, y1]` in effect.
+    clip: [f64; 4],
+    fill: [f64; 3],
+    stroke: [f64; 3],
+    lwd: f64,
+    cap: i32,
+    dash: Vec<f64>,
+}
+
+#[derive(Debug)]
+struct Painted {
+    clip: [f64; 4],
+    vertices: Vec<(f64, f64)>,
+    curved: bool,
+    fill: Option<[f64; 3]>,
+    /// `(colour, line width, line cap, dash array)`.
+    stroke: Option<([f64; 3], f64, i32, Vec<f64>)>,
+}
+
+impl Painted {
+    fn bbox(&self) -> [f64; 4] {
+        let xs = self.vertices.iter().map(|p| p.0);
+        let ys = self.vertices.iter().map(|p| p.1);
+        [
+            xs.clone().fold(f64::INFINITY, f64::min),
+            ys.clone().fold(f64::INFINITY, f64::min),
+            xs.fold(f64::NEG_INFINITY, f64::max),
+            ys.fold(f64::NEG_INFINITY, f64::max),
+        ]
+    }
+}
+
+#[derive(Debug)]
+struct Text {
+    clip: [f64; 4],
+    string: String,
+    origin: (f64, f64),
+    font: String,
+    size: f64,
+    fill: [f64; 3],
+}
+
+enum Tok {
+    Str(String),
+    Word(String),
+}
+
+/// Tokens of a content stream; `(...)` strings (with `\` escapes) are
+/// one token each.
+fn tokens(content: &str) -> Vec<Tok> {
+    let b = content.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'(' => {
+                let mut s = String::new();
+                i += 1;
+                while i < b.len() && b[i] != b')' {
+                    if b[i] == b'\\' {
+                        i += 1;
+                    }
+                    s.push(b[i] as char);
+                    i += 1;
+                }
+                i += 1;
+                out.push(Tok::Str(s));
+            }
+            b'[' | b']' => {
+                out.push(Tok::Word((b[i] as char).to_string()));
+                i += 1;
+            }
+            c if c.is_ascii_whitespace() => i += 1,
+            _ => {
+                let start = i;
+                while i < b.len() && !b[i].is_ascii_whitespace() && !b"([]".contains(&b[i]) {
+                    i += 1;
+                }
+                out.push(Tok::Word(content[start..i].to_string()));
+            }
+        }
+    }
+    out
+}
+
+/// Font resource name -> base font, from the PDF's font objects (R's
+/// `/Name /F2 /BaseFont /Helvetica-Bold`) or, for ours, the fixed ones.
+fn base_fonts(pdf: &str) -> HashMap<String, String> {
+    let mut map: HashMap<String, String> = [
+        ("/F1", "Helvetica"),
+        ("/F2", "Helvetica-Bold"),
+        ("/F3", "Helvetica-Oblique"),
+        ("/F4", "Helvetica-BoldOblique"),
+        ("/F5", "Symbol"),
+    ]
+    .into_iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect();
+    if pdf.contains("/Name /F") {
+        map.clear();
+        for part in pdf.split("/Name ").skip(1) {
+            let mut w = part.split_whitespace();
+            if let (Some(name), Some("/BaseFont"), Some(base)) = (w.next(), w.next(), w.next()) {
+                map.insert(name.to_string(), base.trim_start_matches('/').to_string());
+            }
+        }
+    }
+    map
+}
+
+fn interpret(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
+    let fonts = base_fonts(pdf);
+    let mut painted = Vec::new();
+    let mut texts = Vec::new();
+    let mut rest = pdf;
+    while let Some(i) = rest.find("stream\n") {
+        let body = &rest[i + 7..];
+        let Some(j) = body.find("endstream") else {
+            break;
+        };
+        let content = &body[..j];
+        rest = &body[j + 9..];
+        if !content.contains(" m") && !content.contains(" re") && !content.contains(" Tf") {
+            continue;
+        }
+        let mut gs = Gs {
+            clip: [0.0, 0.0, PAGE_W * 72.0, PAGE_H * 72.0],
+            fill: [0.0; 3],
+            stroke: [0.0; 3],
+            lwd: 1.0,
+            cap: 0,
+            dash: Vec::new(),
+        };
+        let mut stack: Vec<Gs> = Vec::new();
+        let mut nums: Vec<f64> = Vec::new();
+        let mut array: Option<Vec<f64>> = None;
+        let mut path: Vec<(f64, f64)> = Vec::new();
+        let mut curved = false;
+        let mut clipping = false;
+        let (mut font, mut tf_size, mut m) = (String::new(), 0.0, [0.0; 6]);
+        let mut last_name = String::new();
+        let mut last_str = String::new();
+        for t in tokens(content) {
+            let t = match t {
+                Tok::Str(s) => {
+                    last_str = s;
+                    continue;
+                }
+                Tok::Word(w) => w,
+            };
+            if let Ok(v) = t.parse::<f64>() {
+                match &mut array {
+                    Some(a) => a.push(v),
+                    None => nums.push(v),
+                }
+                continue;
+            }
+            let last = |k: usize| nums[nums.len() - k..].to_vec();
+            match t.as_str() {
+                "[" => array = Some(Vec::new()),
+                "]" => {
+                    gs.dash = array.take().unwrap_or_default();
+                    continue;
+                }
+                "q" => stack.push(gs.clone()),
+                "Q" => gs = stack.pop().unwrap(),
+                "rg" | "scn" => gs.fill = last(3).try_into().unwrap(),
+                "RG" | "SCN" => gs.stroke = last(3).try_into().unwrap(),
+                "g" => gs.fill = [nums[nums.len() - 1]; 3],
+                "G" => gs.stroke = [nums[nums.len() - 1]; 3],
+                "w" => gs.lwd = nums[nums.len() - 1],
+                "J" => gs.cap = nums[nums.len() - 1] as i32,
+                "m" | "l" => path.push((nums[nums.len() - 2], nums[nums.len() - 1])),
+                "c" => {
+                    let n = last(6);
+                    path.extend([(n[0], n[1]), (n[2], n[3]), (n[4], n[5])]);
+                    curved = true;
+                }
+                "re" => {
+                    // Normalised to a positive width and height.
+                    let mut n = last(4);
+                    if n[2] < 0.0 {
+                        n[0] += n[2];
+                        n[2] = -n[2];
+                    }
+                    if n[3] < 0.0 {
+                        n[1] += n[3];
+                        n[3] = -n[3];
+                    }
+                    path.extend([
+                        (n[0], n[1]),
+                        (n[0] + n[2], n[1]),
+                        (n[0] + n[2], n[1] + n[3]),
+                        (n[0], n[1] + n[3]),
+                    ]);
+                }
+                "Tf" => {
+                    font = fonts.get(&last_name).cloned().unwrap_or_default();
+                    tf_size = nums[nums.len() - 1];
+                }
+                "Tm" => m = last(6).try_into().unwrap(),
+                "Tj" => texts.push(Text {
+                    clip: gs.clip,
+                    string: std::mem::take(&mut last_str),
+                    origin: (m[4], m[5]),
+                    font: font.clone(),
+                    size: tf_size * (m[0] * m[0] + m[1] * m[1]).sqrt(),
+                    fill: gs.fill,
+                }),
+                "W" | "W*" => clipping = true,
+                "h" => {}
+                "n" => {
+                    if std::mem::take(&mut clipping) {
+                        let p = Painted {
+                            clip: gs.clip,
+                            vertices: std::mem::take(&mut path),
+                            curved: false,
+                            fill: None,
+                            stroke: None,
+                        };
+                        gs.clip = p.bbox();
+                    }
+                    path.clear();
+                    curved = false;
+                }
+                "S" | "s" | "f" | "F" | "f*" | "B" | "B*" | "b" | "b*" => {
+                    let fill = t.starts_with(['f', 'F', 'B', 'b']);
+                    let stroke = t.starts_with(['S', 's', 'B', 'b']);
+                    let p = Painted {
+                        clip: gs.clip,
+                        vertices: std::mem::take(&mut path),
+                        curved: std::mem::take(&mut curved),
+                        fill: fill.then_some(gs.fill),
+                        stroke: stroke.then(|| (gs.stroke, gs.lwd, gs.cap, gs.dash.clone())),
+                    };
+                    // Skip only a full-page background fill (neither side
+                    // draws one by default, but keep the figure box).
+                    let b = p.bbox();
+                    if p.stroke.is_some() || b[2] - b[0] < 0.99 * PAGE_W * 72.0 {
+                        painted.push(p);
+                    }
+                }
+                w if w.starts_with('/') => last_name = w.to_string(),
+                _ => {}
+            }
+            nums.clear();
+        }
+    }
+    (painted, texts)
+}
+
+fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < tol)
+}
+
+fn r_vec(v: &[f64]) -> String {
+    let v: Vec<String> = v.iter().map(|x| x.to_string()).collect();
+    format!("c({})", v.join(", "))
+}
+
+#[test]
+fn xpd_na_matches_r() {
+    if !common::r_available() {
+        return;
+    }
+    let dir = std::env::temp_dir();
+    let cases = cases();
+    let mut script = format!("x <- {}\ny <- {}\n", r_vec(&X), r_vec(&Y));
+    for c in &cases {
+        let path = dir.join(format!("rs_graphics_xpd_na_{}.pdf", c.name));
+        script.push_str(&format!(
+            "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
+             {}\ninvisible(dev.off())\n",
+            path.display(),
+            c.r
+        ));
+    }
+    let script_path = dir.join("rs_graphics_xpd_na.R");
+    std::fs::write(&script_path, script).unwrap();
+    let out = Command::new("Rscript")
+        .arg(&script_path)
+        .output()
+        .expect("run Rscript");
+    assert!(
+        out.status.success(),
+        "Rscript failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    for c in &cases {
+        let path = dir.join(format!("rs_graphics_xpd_na_{}.pdf", c.name));
+        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
+        let (r_paths, r_texts) = interpret(&r_pdf);
+        let mut dev = Device::new(
+            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
+            Par::default(),
+        );
+        (c.ours)(&mut dev);
+        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
+        let (our_paths, our_texts) = interpret(&ours);
+        let name = c.name;
+
+        assert_eq!(
+            our_paths.len(),
+            r_paths.len(),
+            "{name}: painted path count\nours={our_paths:#?}\nr={r_paths:#?}"
+        );
+        for (k, (a, b)) in our_paths.iter().zip(&r_paths).enumerate() {
+            let ctx = format!("{name}, path {k}:\n ours={a:?}\n r=   {b:?}");
+            assert_eq!(a.curved, b.curved, "curvedness differs. {ctx}");
+            assert!(close(&a.clip, &b.clip, 0.05), "clip region differs. {ctx}");
+            if a.curved {
+                assert!(close(&a.bbox(), &b.bbox(), 0.05), "bbox differs. {ctx}");
+            } else {
+                let flat = |p: &Painted| -> Vec<f64> {
+                    p.vertices.iter().flat_map(|&(x, y)| [x, y]).collect()
+                };
+                assert!(close(&flat(a), &flat(b), 0.05), "vertices differ. {ctx}");
+            }
+            assert_eq!(a.fill.is_some(), b.fill.is_some(), "fill differs. {ctx}");
+            assert_eq!(
+                a.stroke.is_some(),
+                b.stroke.is_some(),
+                "stroke differs. {ctx}"
+            );
+            if let (Some(fa), Some(fb)) = (a.fill, b.fill) {
+                assert!(close(&fa, &fb, 0.005), "fill colour differs. {ctx}");
+            }
+            if let (Some(sa), Some(sb)) = (&a.stroke, &b.stroke) {
+                assert!(close(&sa.0, &sb.0, 0.005), "stroke colour differs. {ctx}");
+                assert!((sa.1 - sb.1).abs() < 0.005, "line width differs. {ctx}");
+                assert_eq!(sa.2, sb.2, "line cap differs. {ctx}");
+                assert!(close(&sa.3, &sb.3, 0.005), "dash pattern differs. {ctx}");
+            }
+        }
+
+        let strings = |t: &[Text]| t.iter().map(|t| t.string.clone()).collect::<Vec<_>>();
+        assert_eq!(strings(&our_texts), strings(&r_texts), "{name}: text items");
+        for (a, b) in our_texts.iter().zip(&r_texts) {
+            let ctx = format!("{name}: text\n ours={a:?}\n r=   {b:?}");
+            assert_eq!(a.font, b.font, "font differs. {ctx}");
+            assert!(close(&a.clip, &b.clip, 0.05), "clip region differs. {ctx}");
+            assert!((a.size - b.size).abs() < 0.01, "size differs. {ctx}");
+            assert!(close(&a.fill, &b.fill, 0.005), "text colour differs. {ctx}");
+            assert!(
+                close(&[a.origin.0, a.origin.1], &[b.origin.0, b.origin.1], 0.05),
+                "origin differs. {ctx}"
+            );
+        }
+    }
+}

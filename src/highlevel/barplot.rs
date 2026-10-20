@@ -34,7 +34,7 @@ use crate::device::{
 };
 use crate::error::{from_r_string, from_str_via_parse};
 use crate::numbers::{Num, Numbers};
-use crate::par::AxisStyle;
+use crate::par::{AxisStyle, Xpd};
 use crate::plotmath::Label;
 
 /// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
@@ -618,7 +618,7 @@ impl<B: Backend> Device<B> {
 
         // R draws everything with `par(xpd = TRUE)`.
         let saved_xpd = self.par.xpd;
-        self.par.xpd = true;
+        self.par.xpd = Xpd::Figure;
 
         for &(k, base, top, ci) in &bars {
             let style = RectOptions {

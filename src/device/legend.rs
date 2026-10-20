@@ -40,7 +40,7 @@ use crate::numbers::Pair;
 
 use crate::plotmath::Label;
 
-use super::{Clip, Device};
+use super::{Device, Xpd};
 
 /// Where to put a legend: R's `legend(x, y)` forms.
 ///
@@ -357,8 +357,9 @@ pub struct LegendOptions {
     /// Border colour of filled box keys (`border=`); `None`: black (R's
     /// default).
     pub border: Option<ColorSpec>,
-    /// R's inline `xpd` while drawing; `None`: `par(xpd)`.
-    pub xpd: Option<bool>,
+    /// R's inline `xpd` while drawing ([`Xpd`]; the setter also takes
+    /// `false`/`true`); `None`: `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(LegendOptions => [LegendCall] {
@@ -380,7 +381,7 @@ crate::setters::setters!(LegendOptions => [LegendCall] {
     text_col: option ColorSpec,
     text_font: option i32,
     border: option ColorSpec,
-    xpd: option bool,
+    xpd: option Xpd,
 });
 
 /// Where `legend()` drew, as R's (invisible) return value `list(rect =
@@ -646,11 +647,7 @@ impl<B: Backend> Device<B> {
 
         let text_col = opts.text_col.unwrap_or(ColorSpec::Color(self.par.col));
         // `text(adj = c(title.adj, 0))` and `text(adj = c(0, 0.5))`.
-        let clip = if self.par.xpd {
-            Clip::Figure
-        } else {
-            Clip::Plot
-        };
+        let clip = self.par.xpd;
         if let Some(t) = title {
             let anchor = Point::new(left + w * 0.5, top - ymaxtitle);
             self.draw_label(

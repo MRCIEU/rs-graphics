@@ -20,7 +20,7 @@ use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::plotmath::{Expr, Expression, Label};
 
-use super::{Clip, Device};
+use super::{Device, Xpd};
 
 /// `BBOX`: height above and depth below the baseline, width, italic
 /// correction, and whether the element was a simple atom.
@@ -105,14 +105,14 @@ struct Math<'d, B: Backend> {
     cos: f64,
     sin: f64,
     col: Color,
-    clip: Clip,
+    clip: Xpd,
 }
 
 impl<B: Backend> Device<B> {
     /// `GEExpressionMetric`: `(ascent, descent, width)` in inches of `expr`
     /// at total text expansion `cex` (`ps * cex` points).
     pub(super) fn expression_metrics(&mut self, expr: &Expression, cex: f64) -> (f64, f64, f64) {
-        let mut m = Math::new(self, cex, Color::BLACK, Clip::Device);
+        let mut m = Math::new(self, cex, Color::BLACK, Xpd::Device);
         let bbox = m.element(&expr.root, false);
         (bbox.height, bbox.depth, bbox.width)
     }
@@ -152,7 +152,7 @@ impl<B: Backend> Device<B> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn draw_label(
         &mut self,
-        clip: Clip,
+        clip: Xpd,
         anchor: Point,
         label: &Label,
         xc: f64,
@@ -191,7 +191,7 @@ impl<B: Backend> Device<B> {
         rotation_deg: f64,
         col: Color,
         cex: f64,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let mut m = Math::new(self, cex, col, clip);
         let bbox = m.element(&expr.root, false);
@@ -314,7 +314,7 @@ const A_TILDE: char = '~';
 impl<'d, B: Backend> Math<'d, B> {
     /// A context in display style and the plain font, as `GEMathText`
     /// starts.
-    fn new(dev: &'d mut Device<B>, cex: f64, col: Color, clip: Clip) -> Self {
+    fn new(dev: &'d mut Device<B>, cex: f64, col: Color, clip: Xpd) -> Self {
         Math {
             dev,
             base_cex: cex,

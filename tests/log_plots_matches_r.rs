@@ -195,7 +195,7 @@ fn cases() -> Vec<Case> {
                         ..AblineOptions::default()
                     })
                     .draw();
-                d.par.xpd = true;
+                d.par.xpd = Xpd::Figure;
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![5.0],
