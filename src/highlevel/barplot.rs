@@ -30,7 +30,7 @@ use crate::device::{
     AxisOptions, Device, LegendEntry, LegendOptions, LegendPos, PlotWindowOptions, RectOptions,
     TitleOptions,
 };
-use crate::error::from_str_via_parse;
+use crate::error::{from_r_string, from_str_via_parse};
 use crate::par::AxisStyle;
 use crate::plotmath::Label;
 
@@ -201,6 +201,7 @@ impl OrderH {
 }
 
 from_str_via_parse!(OrderH, "orderH");
+from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 
 /// The `height` argument of [`Graphics::barplot`](crate::graphics::Graphics::barplot): R's vector or matrix.
 /// Built with `.into()` from a vector of numbers (slice, array, `Vec`) or

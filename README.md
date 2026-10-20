@@ -36,10 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .xlab("x")
         .ylab("y")
         .draw();
-    dev.abline().h(6.0).col("grey").lty(LineType::DASHED).draw();
+    dev.abline().h(6.0).col("grey").lty("dashed").draw();
     let keys = [
         LegendEntry::point("observed", "steelblue", 19),
-        LegendEntry::line("threshold", "grey", 1.0, LineType::DASHED),
+        LegendEntry::line("threshold", "grey", 1.0, "dashed"),
     ];
     dev.legend("topleft", &keys).draw();
     dev.save("scatter.pdf")?;
@@ -99,7 +99,7 @@ dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 
 let x = [4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7];
 let h = dev.hist(&x).col("lightblue").main("Histogram").draw(); // panel 1
-dev.abline().v(h.mids[2]).lty(LineType::DASHED).draw();
+dev.abline().v(h.mids[2]).lty("dashed").draw();
 
 let centres = dev // panel 2: bar centres, for labelling the bars
     .barplot([3.0, 5.0, 2.0])
@@ -124,7 +124,7 @@ Build an options struct once and start a call from it with `.with()`;
 setters after it change just that call.
 
 ```rust
-let grid = AblineOptions::default().col("grey").lty(LineType::DOTTED);
+let grid = AblineOptions::default().col("grey").lty("dotted");
 dev.abline().with(&grid).h([2.0, 4.0, 6.0, 8.0]).draw();
 dev.abline().with(&grid).v([2.0, 4.0, 6.0, 8.0]).draw();
 ```
@@ -151,7 +151,7 @@ fig.plot(&dose, &response)
 fig.lines(&dose, &fitted).col("red").draw();
 let keys = [
     LegendEntry::point("observed", 1, 1),
-    LegendEntry::line("fitted", "red", 1.0, LineType::SOLID),
+    LegendEntry::line("fitted", "red", 1.0, "solid"),
 ];
 fig.legend("bottomright", &keys).draw();
 

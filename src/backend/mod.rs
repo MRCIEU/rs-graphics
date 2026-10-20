@@ -61,6 +61,7 @@ impl LineEnd {
 }
 
 crate::error::from_str_via_parse!(LineEnd, "line end");
+crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"square\"");
 
 /// Join style for strokes (`par(ljoin=)`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -82,6 +83,7 @@ impl LineJoin {
 }
 
 crate::error::from_str_via_parse!(LineJoin, "line join");
+crate::error::from_r_string!(LineJoin, "line join", "\"round\", \"mitre\" or \"bevel\"");
 
 /// Everything needed to stroke a path, mirroring R's graphics context
 /// (`R_GE_gcontext`) stroke-relevant fields.

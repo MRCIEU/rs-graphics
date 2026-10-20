@@ -183,6 +183,7 @@ impl LegendBty {
 }
 
 crate::error::from_str_via_parse!(LegendBty, "legend box type");
+crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
 
 /// One row (key + label) of a legend.
 #[derive(Clone, Debug)]
@@ -245,15 +246,16 @@ impl LegendEntry {
         }
     }
 
-    /// `legend(..., lty = lty, lwd = lwd, col = col)`.
+    /// `legend(..., lty = lty, lwd = lwd, col = col)`; `lty` is a
+    /// [`LineType`] or R's string (`"dashed"`).
     pub fn line(
         label: impl Into<Label>,
         col: impl Into<ColorSpec>,
         lwd: f64,
-        lty: LineType,
+        lty: impl Into<LineType>,
     ) -> Self {
         LegendEntry {
-            lty: Some(lty),
+            lty: Some(lty.into()),
             lwd: Some(lwd),
             ..Self::base(label, col.into())
         }

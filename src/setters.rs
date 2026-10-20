@@ -69,7 +69,7 @@ macro_rules! single_values {
 single_values!(ColorSpec: ColorSpec, Color, &str, String, &String, i32);
 single_values!(f64: f64);
 single_values!(i32: i32);
-single_values!(LineType: LineType);
+single_values!(LineType: LineType, &str, String, &String);
 
 /// A character `pch`, e.g. `'.'` or `'+'`.
 impl Values<i32> for char {
@@ -260,5 +260,58 @@ mod tests {
         assert_eq!(call.opts.at, Some(vec![1.0, 2.0]));
         assert_eq!(call.opts.lwd, Some(0.5));
         assert_eq!(saved.lwd, Some(3.0));
+    }
+
+    #[test]
+    fn setters_take_r_strings() {
+        use crate::backend::{LineEnd, LineJoin};
+        use crate::device::{AxisOptions, LegendBty, LegendOptions, XyOptions};
+        use crate::highlevel::{BarplotOptions, BoxplotOptions, OrderH, PlotOptions, PlotType};
+        use crate::par::{AxisStyle, AxisType, ParOptions, Pty};
+
+        let xy = XyOptions::default().type_("b").lty("dashed");
+        assert_eq!(xy.type_, Some(PlotType::Both));
+        assert_eq!(xy.lty, Some(LineType::DASHED));
+        let p = PlotOptions::default().type_("h").xaxt("n");
+        assert_eq!(
+            (p.type_, p.xaxt),
+            (Some(PlotType::Histogram), Some(AxisType::None))
+        );
+        assert_eq!(AxisOptions::default().axt("n").axt, Some(AxisType::None));
+        assert_eq!(LegendOptions::default().bty("n").bty, Some(LegendBty::None));
+        assert_eq!(
+            BarplotOptions::default().order_h("decr").order_h,
+            OrderH::Decr
+        );
+        let b = BoxplotOptions::default()
+            .lty(["dashed", "dotted"])
+            .boxlty("44");
+        assert_eq!(b.lty, vec![LineType::DASHED, LineType::DOTTED]);
+        assert_eq!(b.boxlty, vec![LineType::parse("44").unwrap()]);
+        let par = ParOptions::default()
+            .xaxs("i")
+            .pty("s")
+            .lty(String::from("dotdash"))
+            .lend("butt")
+            .ljoin("mitre")
+            .yaxt("n");
+        assert_eq!(par.xaxs, Some(AxisStyle::Exact));
+        assert_eq!(par.pty, Some(Pty::Square));
+        assert_eq!(par.lty, Some(LineType::DOTDASH));
+        assert_eq!(par.lend, Some(LineEnd::Butt));
+        assert_eq!(par.ljoin, Some(LineJoin::Mitre));
+        assert_eq!(par.yaxt, Some(AxisType::None));
+    }
+
+    #[test]
+    #[should_panic(expected = "\"z\" is not a valid plot type")]
+    fn invalid_r_string_panics() {
+        let _ = crate::device::XyOptions::default().type_("z");
+    }
+
+    #[test]
+    #[should_panic(expected = "\"0x\" is not a valid line type")]
+    fn invalid_lty_string_panics() {
+        let _ = crate::device::XyOptions::default().lty("0x");
     }
 }

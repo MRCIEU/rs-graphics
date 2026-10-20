@@ -21,7 +21,7 @@
 //! // Build a figure without a device...
 //! let mut fig = Figure::new();
 //! fig.barplot([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
-//! fig.abline().h(4.0).lty(LineType::DASHED).draw();
+//! fig.abline().h(4.0).lty("dashed").draw();
 //!
 //! // ...and draw it later, as often as needed.
 //! let mut dev = Device::pdf(8.0, 4.0);

@@ -81,6 +81,7 @@ impl AxisStyle {
 }
 
 crate::error::from_str_via_parse!(AxisStyle, "axis style");
+crate::error::from_r_string!(AxisStyle, "axis style", "\"r\" or \"i\"");
 
 /// `par(pty)`: the shape of the plot region when it comes from `mar`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -104,6 +105,7 @@ impl Pty {
 }
 
 crate::error::from_str_via_parse!(Pty, "pty");
+crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 
 /// `par(xaxt/yaxt)`: whether `axis()` draws on that axis. R's `"s"`, `"l"`
 /// and `"t"` all mean [`AxisType::Standard`]; `"n"` suppresses the axis
@@ -127,6 +129,7 @@ impl AxisType {
 }
 
 crate::error::from_str_via_parse!(AxisType, "axis type");
+crate::error::from_r_string!(AxisType, "axis type", "\"s\" or \"n\"");
 
 /// The graphics parameter set (`par()`), restricted to what this crate
 /// implements. Field names match R's own where practical.

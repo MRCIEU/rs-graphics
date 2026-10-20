@@ -26,7 +26,7 @@
 //!     .xlab("x")
 //!     .ylab("y")
 //!     .draw();
-//! dev.abline().h(6.0).col("grey").lty(LineType::DASHED).draw();
+//! dev.abline().h(6.0).col("grey").lty("dashed").draw();
 //! dev.save("scatter.pdf")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```

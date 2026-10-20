@@ -18,7 +18,7 @@
 //! # use rs_graphics::prelude::*;
 //! let mut dev = Device::svg(5.0, 5.0);
 //! dev.plot(&[1.0, 2.0, 3.0], &[2.0, 4.0, 3.0]).pch(19).main("Title").draw();
-//! dev.abline().h(3.0).col("grey").lty(LineType::DASHED).draw();
+//! dev.abline().h(3.0).col("grey").lty("dashed").draw();
 //! ```
 //!
 //! The setters are those of the call's options struct ([`AblineOptions`]
@@ -28,7 +28,7 @@
 //! # use rs_graphics::prelude::*;
 //! # let mut dev = Device::svg(5.0, 5.0);
 //! # dev.plot_new();
-//! let grey = SegmentsOptions::default().col("grey").lty(LineType::DASHED);
+//! let grey = SegmentsOptions::default().col("grey").lty("dashed");
 //! dev.segments(&[0.1], &[0.2], &[0.9], &[0.2]).with(&grey).draw();
 //! dev.segments(&[0.1], &[0.8], &[0.9], &[0.8]).with(&grey).lwd(2.0).draw();
 //! ```

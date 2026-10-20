@@ -184,6 +184,11 @@ impl From<i32> for LineType {
 }
 
 crate::error::from_str_via_parse!(LineType, "line type");
+crate::error::from_r_string!(
+    LineType,
+    "line type",
+    "a name (\"solid\", \"dashed\", ...) or 2, 4, 6 or 8 hex digits"
+);
 
 #[cfg(test)]
 mod tests {

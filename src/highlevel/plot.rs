@@ -76,6 +76,11 @@ impl PlotType {
 }
 
 crate::error::from_str_via_parse!(PlotType, "plot type");
+crate::error::from_r_string!(
+    PlotType,
+    "plot type",
+    "one of \"p\", \"l\", \"b\", \"c\", \"o\", \"h\", \"s\", \"S\" or \"n\""
+);
 
 /// Options for [`Graphics::plot`](crate::graphics::Graphics::plot), covering the subset of
 /// `plot.default`'s arguments this crate implements. Unset fields are R's
