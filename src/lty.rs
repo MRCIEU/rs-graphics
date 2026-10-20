@@ -48,9 +48,10 @@ impl LineType {
     /// Parse an `lty` string as R's `par(lty=)` does: a name (`"solid"`,
     /// `"dashed"`, ...) or 2, 4, 6 or 8 hex digits (1-9, A-F; no zeros),
     /// each a segment length in `lwd` units, e.g. `"42"` or `"1343"`. One
-    /// extra form: a single digit is R's numeric code (`"2"` =
-    /// [`LineType::from_code`]`(2)`), which R rejects as a string. `None`
-    /// for anything R rejects.
+    /// extra form: a single digit is a numeric code (`"2"` =
+    /// [`LineType::from_code`]`(2)`, so `"7"` to `"9"` behave as
+    /// `from_code` does), which R rejects as a string. `None` for anything
+    /// R rejects.
     pub fn parse(spec: &str) -> Option<LineType> {
         let s = spec.trim();
         if s.len() == 1 {
@@ -90,8 +91,10 @@ impl LineType {
     }
 
     /// Resolve R's small-integer `lty` codes (`0` = blank, `1` = solid,
-    /// `2..=6` the named dash patterns) as well as the packed-nibble
-    /// encoding used for literal/custom patterns.
+    /// `2..=6` the named dash patterns); any other value is read as R's
+    /// internal packed-nibble encoding of a dash pattern. Unlike R, which
+    /// recycles codes above 6 (`7` is solid, `8` dashed, ...) and rejects
+    /// negative ones, so `from_code(7)` is the pattern `[7]`.
     pub fn from_code(code: i32) -> LineType {
         match code {
             0 => LineType::BLANK,
@@ -177,7 +180,8 @@ impl Default for LineType {
 }
 
 impl From<i32> for LineType {
-    /// R's numeric `lty` codes, as [`LineType::from_code`].
+    /// R's numeric `lty` codes `0..=6`, as [`LineType::from_code`] (which
+    /// also explains other values).
     fn from(code: i32) -> Self {
         LineType::from_code(code)
     }

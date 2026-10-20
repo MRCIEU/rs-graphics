@@ -16,7 +16,9 @@
 //! `gray.colors(nrow)`), `names.arg`, `legend.text` (and `args.legend`),
 //! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH` and `add`.
 //!
-//! Not supported: hatched fills (`density`/`angle`).
+//! Not supported: hatched fills (`density`/`angle`), `xpd` (always
+//! `TRUE`, R's default), `axisnames`, `cex.axis`/`cex.names`, `axis.lty`,
+//! `plot = FALSE` and `panel.first`/`panel.last`.
 //!
 //! **R bug not copied:** for stacked bars R works out the default value
 //! axis limits with `offset` recycled over every element of the matrix of
@@ -61,8 +63,8 @@ pub struct BarplotOptions {
     pub beside: bool,
     /// Horizontal bars. Default `false`.
     pub horiz: bool,
-    /// Matrix only: legend labels, one per row (R's `legend.text`);
-    /// `None`: no legend.
+    /// Legend labels (R's `legend.text`): one per row of a matrix, or per
+    /// bar of a vector, filled with `col`; `None`: no legend.
     pub legend_text: Option<Vec<Label>>,
     /// Where the legend goes (R's `args.legend = list(x = .., y = ..)`),
     /// e.g. `"topleft"` or `(x, y)`; `None`: 0.1 inch in from the top-right
@@ -79,8 +81,9 @@ pub struct BarplotOptions {
     /// y limits; `None`: from the bars.
     pub ylim: Option<(f64, f64)>,
     /// Log x axis (R's `log = "x"`); default `false`. On a log value
-    /// axis bars start at the lower limit given (`ylim`, or `xlim` if
-    /// `horiz`), else at 0.9 times the smallest height, as in R.
+    /// axis bars start at the first value of `ylim` (or `xlim` if
+    /// `horiz`) when given, else at 0.9 times the smallest height, as in
+    /// R.
     pub xlog: bool,
     /// Log y axis (R's `log = "y"`); default `false`. See `xlog`.
     pub ylog: bool,
@@ -100,7 +103,8 @@ pub struct BarplotOptions {
     /// default `ann = !add && par("ann")`).
     pub ann: Option<bool>,
     /// Main title, as for `plot()` (text or a plotmath expression);
-    /// `None`: none. Titles are drawn when `par(ann)` is true, as in R.
+    /// `None`: none. Titles are drawn when `ann` is (by default
+    /// `par(ann)`, and not with `add`).
     pub main: Option<Label>,
     /// Subtitle; `None`: none.
     pub sub: Option<Label>,

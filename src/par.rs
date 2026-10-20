@@ -23,8 +23,7 @@ use crate::lty::LineType;
 
 use super::backend::{LineEnd, LineJoin};
 
-/// The four margin/rectangle sides in R's `mar`/`oma`/`fig`/`plt`
-/// convention: bottom, left, top, right.
+/// The four sides in R's `mar`/`oma` order: bottom, left, top, right.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Sides<T> {
     pub bottom: T,
@@ -193,9 +192,10 @@ pub struct Par {
     pub pch: i32,
 
     /// Base point size, in big points (`par(ps)`). Default `12`. Its value
-    /// at `Device::new` is the device's starting size (R's
-    /// `pdf(pointsize = )`), from which margin lines and symbols are
-    /// sized; changing it later only changes text size, as in R.
+    /// when the device is created is the device's starting size (R's
+    /// `pdf(pointsize = )`, here [`DeviceBuilder::pointsize`](crate::device::DeviceBuilder::pointsize)
+    /// or `ps` passed to `Device::new`), from which margin lines and
+    /// symbols are sized; changing it later only changes text size, as in R.
     pub ps: f64,
     /// `par(cex)`, i.e. R's `cexbase`. Also scales the margin "line"
     /// unit (see [`Device::line_height_inches`](crate::device::Device::line_height_inches)).
@@ -263,9 +263,10 @@ pub struct Par {
     /// region, `true` to the figure region. R's `NA` (the device) isn't
     /// available.
     pub xpd: bool,
-    /// `par(ann)`: whether `plot()` and `barplot()` draw their titles and
-    /// axis labels. Default `true`. As in R, `hist()` and `boxplot()` use
-    /// their own `ann` option instead, and `pie()` always draws `main`.
+    /// `par(ann)`: whether `plot()` draws its titles and axis labels, and
+    /// the default of `barplot()`'s `ann` (with `!add`). Default `true`. As
+    /// in R, `hist()` and `boxplot()` have their own `ann` options that
+    /// don't depend on it, and `pie()` always draws `main`.
     pub ann: bool,
 }
 

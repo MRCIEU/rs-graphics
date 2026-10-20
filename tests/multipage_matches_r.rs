@@ -12,7 +12,8 @@
 //! operator only) and every text item (origin and string). Pages start as
 //! in R: each `plot.new()` on a one-figure page, `mfrow` wrapping, and
 //! `par(fig = )` without `new = TRUE`; `par(new = TRUE)` adds none.
-//! Skipped if `Rscript` isn't available.
+//! Skipped if `Rscript` isn't available. Also, without R: compressed pages
+//! inflate to the uncompressed ones.
 
 mod common;
 

@@ -18,8 +18,7 @@ use std::fmt;
 /// [`LegendKeyword`](crate::device::LegendKeyword),
 /// [`LegendBty`](crate::device::LegendBty),
 /// [`OrderH`](crate::highlevel::OrderH),
-/// [`Format`](crate::backend::Format) and the `par()` enums, and by
-/// [`AnyBackend::for_path`](crate::backend::AnyBackend::for_path).
+/// [`Format`](crate::backend::Format) and the `par()` enums.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {
     /// What was being parsed, e.g. `"colour"` or `"axis style"`.
@@ -66,11 +65,11 @@ pub(crate) use from_str_via_parse;
 macro_rules! from_r_string {
     ($ty:ident, $kind:literal, $valid:literal) => {
         impl From<&str> for $ty {
-            #[doc = concat!("R's string for a [`", stringify!($ty), "`], via [`",
-                        stringify!($ty), "::parse`].")]
+            #[doc = concat!("The string form of a [`", stringify!($ty), "`] (R's, where R has \
+                one), via [`", stringify!($ty), "::parse`].")]
             ///
             /// # Panics
-            #[doc = concat!("If `s` isn't one (R errors too); use [`",
+            #[doc = concat!("If `s` isn't one (as R errors); use [`",
                         stringify!($ty), "::parse`] or `str::parse` to handle that yourself.")]
             fn from(s: &str) -> Self {
                 match <$ty>::parse(s) {

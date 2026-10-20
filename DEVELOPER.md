@@ -16,14 +16,16 @@ usage, see [README.md](README.md).
   axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, `at`/
   `pos`/`abline(h=, v=)` in data units, `abline(a, b)` straight on the
   page or curved with `AblineOptions::untf`, and `xlog`/`ylog` for `plot()`,
-  `hist()` and `barplot()`), `par(lab=)`, `par(xaxp=/yaxp=)` (set by
+  `hist()`, `barplot()` and `boxplot()`), `par(lab=)`, `par(xaxp=/yaxp=)` (set by
   `plot_window()` as R's `GAxisPars()`, read by `axis()` via
   `CreateAtVector()`, overridable inline), and R's `xpd`-style clip regions (plot region, figure region,
   or the whole device for outer-margin text).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
-  - each a `Graphics` method (`src/graphics.rs`) taking its data, with an
-  options struct for the other arguments; the drawing code is in
+  - each a `Graphics` method (`src/graphics.rs`) taking its data and
+  returning a call (`dev.points(&x, &y).pch(19).draw()`): the other
+  arguments are its setters, or an options struct passed with
+  `.with(&opts)`, and `.draw()` runs it; the drawing code is in
   `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`).
   `mtext()` (`Graphics::mtext` + `MtextOptions`, `src/device/mtext.rs`)
   takes the side as an argument, like `axis()`, and
@@ -112,11 +114,11 @@ the corresponding `*.default` R function:
   wrapped in one `<g>` carrying it, so a big scatter plot doesn't repeat
   the style on every point (about a third of the size).
   `SvgBackend::finish_svgz()` returns the document gzip-compressed (`.svgz`,
-  about 6x smaller again) instead of `finish()`'s plain SVG. It isn't the
+  about 4-6x smaller again) instead of `finish()`'s plain SVG. It isn't the
   default: browsers display `.svgz` only when served with
   `Content-Encoding: gzip`, though Inkscape and Illustrator open it.
 - `pdf.rs` - hand-rolled PDF writer (one page per R page), using the 4 standard
-  Type1 Helvetica faces every PDF viewer bundles (no font embedding
+  Type1 Helvetica faces (plus Symbol for plotmath) every PDF viewer bundles (no font embedding
   needed), matching R's own `pdf()` device's default font. Like R's
   `pdf()`, the content stream is Flate-compressed by default (deflated in
   pieces on all cores); `PdfBackend::with_compression(false)` is R's
@@ -180,13 +182,16 @@ A few fidelity-relevant decisions worth calling out:
   `quantile(type = 7)`. `src/highlevel/boxplot.rs` ports `fivenum()`
   directly.
 - **Margins in "line" units.** R measures `mar`/`oma`/`mgp` in units of
-  "one line of text", derived here from first principles as `1.2 *
-  par(ps) / 72` inches (matching `cra[1] = 1.2 * pointsize`, `ipr[1] =
-  1/72` for the PDF/PostScript device family) - this does *not* scale
-  with the *current* `cex` of text drawn in them, only with `ps` and
-  `mex * par(cex)` (R's `cexbase`), which takes effect at the next
-  `plot.new()`. This is cross-checked exactly against R in
-  `tests/device_layout_matches_r.rs` and `tests/layout_matches_r.rs`.
+  "one line of text", derived here from first principles as `mex *
+  par(cex) * 1.2 * startps / 72` inches (matching `cra[1] = 1.2 *
+  pointsize`, `ipr[1] = 1/72` for the PDF/PostScript device family),
+  where `startps` is the device's starting point size
+  (`DeviceBuilder::pointsize`, or `par.ps` at `Device::new`). A later
+  `par(ps)` doesn't change it, and it doesn't scale with the *current*
+  `cex` of text drawn in the margins, only with `mex * par(cex)` (R's
+  `cexbase`), which takes effect at the next `plot.new()`. This is
+  cross-checked exactly against R in `tests/device_layout_matches_r.rs`,
+  `tests/layout_matches_r.rs` and `tests/start_ps_matches_r.rs`.
 - **Engine bugs are deliberately *not* replicated.** Per an explicit
   scoping decision, this crate does not chase R's own internal quirks
   when they'd add complexity without improving visual fidelity - e.g.
@@ -204,9 +209,11 @@ A few fidelity-relevant decisions worth calling out:
   replaces the old one (SVG) or is painted over it (PNG); R would write
   numbered files (`png("plot%03d.png")`), which isn't implemented.
 - **Page background.** As in R, `par("bg")` starts as the device's
-  background: transparent for PDF (R's `pdf()`; set one with
-  `PdfBackend::with_background`, like `pdf(bg = )`), white for SVG, and
-  the canvas colour for PNG. New pages are filled with it, and `legend()`
+  background: transparent for PDF (R's `pdf()`), white for SVG, and the
+  canvas colour for PNG. Set one with `DeviceBuilder::bg`
+  (`Device::pdf(file).bg("white")`, R's `pdf(bg = )`), or with
+  `PdfBackend::with_background` / `RasterBackend::new`'s background when
+  building a backend for `Device::new`. New pages are filled with it, and `legend()`
   boxes by default.
 - **Latin-1 text.** Strings may contain Latin-1 characters (`±`, `é`,
   `×`, ...): string widths use each glyph's AFM metrics looked up by its
@@ -365,6 +372,15 @@ against a real R installation by shelling out to `Rscript`:
   `add_figure`/`add_figure_at` give byte-identical output to direct calls
   (every kind of call, all backends, mixed in multi-panel pages), `par`
   is restored, and recorded results match the device's.
+- `tests/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
+  and `DeviceBuilder`: every option byte-identical to `Device::new` with
+  the same settings, R's defaults, the format by name only (never the
+  file name's), `open()` creating the file (and failing on a bad path)
+  and `close()` writing it.
+- `tests/backend_smoke.rs` (no R needed) - each backend's output is well
+  formed; compressed PDF, `.svgz` and the PNG `pHYs` chunk; PNG output
+  independent of the thread count; `AnyBackend` gives the wrapped
+  backend's bytes; format names.
 - `tests/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
   `plot_new()` move nothing until the next plot (R would move margin
   text but not the data).

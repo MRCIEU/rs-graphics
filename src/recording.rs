@@ -15,7 +15,7 @@
 //! page). A `Figure` usually holds the contents of one: a high-level call
 //! such as `plot()` or `hist()` and what is drawn on top of it.
 //!
-//! ```
+//! ```no_run
 //! use rs_graphics::prelude::*;
 //!
 //! // Build a figure without a device...
@@ -24,18 +24,20 @@
 //! fig.abline().h(4.0).lty("dashed").draw();
 //!
 //! // ...and draw it later, as often as needed.
-//! let mut dev = Device::pdf(8.0, 4.0);
+//! let mut dev = Device::pdf("plot.pdf").width(8.0).height(4.0).open()?;
 //! dev.mfrow(1, 2);
 //! dev.add_figure(&fig); // panel 1
 //! dev.add_figure(&fig); // panel 2
-//! # let _ = dev.finish();
+//! dev.close()?;
+//! # Ok::<(), std::io::Error>(())
 //! ```
 //!
 //! - **Same output.** Drawing a `Figure` calls the same code, in the same
 //!   order, as making the calls on the device, so the output is
 //!   identical.
 //! - **Panels.** A figure that starts with a high-level call (`plot`,
-//!   `hist`, ...) or `plot_new()` moves to the next panel when added,
+//!   `hist`, ..., other than one with `add`) or `plot_new()` moves to the
+//!   next panel when added,
 //!   exactly as those calls do on a device;
 //!   [`add_figure_at`](Device::add_figure_at) puts it in a chosen panel. A
 //!   figure without one draws into the current plot (a layer), and one
@@ -58,29 +60,32 @@
 //! # Saving a figure
 //!
 //! A figure has no page size, format or resolution, so there is no
-//! `Figure::save`: open a device for the file, add the figure, and save
+//! `Figure::save`: open a device for the file, add the figure, and close
 //! the device, as in R (`png(...); replayPlot(p); dev.off()`). The same
 //! figure can go to several files:
 //!
 //! ```no_run
 //! use rs_graphics::prelude::*;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn main() -> std::io::Result<()> {
 //! let mut fig = Figure::new();
 //! fig.hist(&[2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8]).draw();
 //!
-//! for path in ["hist.pdf", "hist.png"] {
-//!     let mut dev = Device::for_path(path, 7.0, 5.0, 300.0)?;
+//! for format in ["pdf", "png"] {
+//!     let mut dev = Device::format(format, format!("hist.{format}"))
+//!         .width(7.0)
+//!         .height(5.0)
+//!         .res(300.0) // PNG only
+//!         .open()?;
 //!     dev.add_figure(&fig);
-//!     dev.save(path)?;
+//!     dev.close()?;
 //! }
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! For device options, such as a PDF background or a different starting
-//! `par()`, build the device with [`Device::new`] and a configured backend
-//! (e.g. [`PdfBackend::with_background`](crate::backend::pdf::PdfBackend::with_background)).
+//! The device's other arguments, such as `bg` or `pointsize`, are set
+//! the same way (see [`DeviceBuilder`](crate::device::DeviceBuilder)).
 
 use crate::backend::Backend;
 use crate::device::{
@@ -255,8 +260,9 @@ pub struct FigureResult {
 
 impl<B: Backend> Device<B> {
     /// Draws `fig` on this device: its calls in order, exactly as if they
-    /// had been made here. A figure starting with a high-level call (or
-    /// `plot_new()`) moves to the next panel, as that call would.
+    /// had been made here. A figure starting with a high-level call (other
+    /// than one with `add`) or `plot_new()` moves to the next panel, as
+    /// that call would.
     ///
     /// `par` is restored afterwards (like R's `op <- par(...);
     /// on.exit(par(op))`), so the figure's `par()` calls don't affect what

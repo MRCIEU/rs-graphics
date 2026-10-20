@@ -32,11 +32,15 @@ fn parse_data(text: &str) -> Vec<f64> {
 
 /// Renders `draw` to `gallery_output/<name>.{svg,pdf,png}`.
 fn save_gallery_plot(name: &str, width_in: f64, height_in: f64, draw: fn(&mut Device<AnyBackend>)) {
-    for ext in ["svg", "pdf", "png"] {
-        let path = format!("gallery_output/{name}.{ext}");
-        let mut dev = Device::for_path(&path, width_in, height_in, 300.0).expect("known format");
+    for format in ["svg", "pdf", "png"] {
+        let mut dev = Device::format(format, format!("gallery_output/{name}.{format}"))
+            .width(width_in)
+            .height(height_in)
+            .res(300.0)
+            .open()
+            .expect("open gallery file");
         draw(&mut dev);
-        dev.save(&path).expect("write gallery file");
+        dev.close().expect("write gallery file");
     }
     println!("wrote gallery_output/{name}.[svg|pdf|png]");
 }
@@ -312,9 +316,13 @@ fn main() {
     save_gallery_plot("multipanel", 8.0, 6.0, draw_multipanel);
     save_gallery_plot("pch", 7.0, 6.0, draw_pch);
 
-    let mut dev = Device::pdf(6.0, 4.0);
+    let mut dev = Device::pdf("gallery_output/multipage.pdf")
+        .width(6.0)
+        .height(4.0)
+        .open()
+        .expect("open gallery file");
     draw_multipage(&mut dev);
-    dev.save("gallery_output/multipage.pdf").expect("write pdf");
+    dev.close().expect("write pdf");
     println!("wrote gallery_output/multipage.pdf (3 pages)");
 
     println!("\nGallery complete. See gallery_output/ for SVG/PDF/PNG output.");

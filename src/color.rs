@@ -14,7 +14,8 @@
 //! (meaning "don't draw"). This module mirrors that model closely enough
 //! that [`Color::parse`] accepts the same strings R's `col2rgb()`/graphics
 //! code would accept, except numeric strings such as `"2"` (R's palette
-//! indices; use [`ColorSpec::Index`]).
+//! indices; use [`ColorSpec::Index`]) and names with spaces in them (R
+//! ignores spaces, so `"light blue"` is `"lightblue"` there).
 
 use crate::named_colors::NAMED_COLORS;
 
@@ -43,9 +44,10 @@ impl Color {
 
     /// Parse a color specification the way R's graphics code would:
     /// `"NA"`/empty => `None`; `"transparent"` => white with alpha 0 (R's
-    /// `#FFFFFF00`); `"#rgb"`, `"#rrggbb"`,
+    /// `#FFFFFF00`); `"#rgb"`, `"#rgba"`, `"#rrggbb"`,
     /// `"#rrggbbaa"` hex forms; or one of R's 657 built-in named colors
-    /// (case-insensitive, matching the `colors()` database).
+    /// (case-insensitive, matching the `colors()` database; unlike R,
+    /// spaces inside a name aren't ignored).
     pub fn parse(spec: &str) -> Option<Color> {
         let s = spec.trim();
         if s.is_empty() || s.eq_ignore_ascii_case("NA") {
@@ -130,7 +132,8 @@ pub const DEFAULT_PALETTE: [Color; 8] = [
 ];
 
 /// A resolvable color specification: either an explicit color, a palette
-/// index (R's small-integer colors, 1-based, recycling like R does), or
+/// index (R's small-integer colors, 1-based; indices above the palette
+/// length recycle as in R, negative ones, an error in R, wrap around), or
 /// "no color" (R's `NA`).
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ColorSpec {

@@ -22,7 +22,10 @@
 //!
 //! Not implemented: `density`/`angle` hatched fills,
 //! per-entry `cex`/`x.intersp`/`seg.len` recycling (these are scalars on
-//! [`LegendOptions`]), `text.width = NA`, and `adj`.
+//! [`LegendOptions`]), `text.width = NA`, `adj`, `box.lwd`/`box.lty`/
+//! `box.col` (always the `par()` values), `title.col`/`title.adj`/
+//! `title.font` (always `text.col`, 0.5 and `text.font`), and
+//! `plot = FALSE`.
 //!
 //! `par(cex)` scales everything as in `legend.R`: the character cell
 //! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and

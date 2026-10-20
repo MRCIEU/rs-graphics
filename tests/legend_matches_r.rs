@@ -9,8 +9,9 @@
 //! Cross-checks `legend()` layout (box rectangle + every label origin)
 //! against a real R `pdf()` device's uncompressed output, for keyword
 //! positions, `inset`, multi-column / horizontal layouts, titles, filled
-//! boxes, `cex`/`intersp`, `par(cex)` and corner-pair positioning. Skipped if
-//! `Rscript` isn't available.
+//! boxes, `cex`/`intersp`, `par(cex)` and corner-pair positioning, and
+//! `legend()`'s return value (also on log axes). Skipped if `Rscript`
+//! isn't available.
 
 mod common;
 

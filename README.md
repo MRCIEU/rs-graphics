@@ -27,8 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let x = [1.0, 2.0, 3.0, 4.0, 5.0];
     let y = [2.1, 3.9, 6.2, 7.8, 10.1];
 
-    // R: pdf("scatter.pdf", 7, 7); plot(x, y, ...); abline(h = 6); legend(...); dev.off()
-    let mut dev = Device::for_path("scatter.pdf", 7.0, 7.0, 300.0)?;
+    // R: pdf("scatter.pdf"); plot(x, y, ...); abline(h = 6); legend(...); dev.off()
+    let mut dev = Device::pdf("scatter.pdf").open()?;
     dev.plot(&x, &y)
         .pch(19)
         .col("steelblue")
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         LegendEntry::line("threshold", "grey", 1.0, "dashed"),
     ];
     dev.legend("topleft", &keys).draw();
-    dev.save("scatter.pdf")?;
+    dev.close()?;
     Ok(())
 }
 ```
@@ -64,7 +64,7 @@ let y = [2.1, 3.9, 6.2, 7.8, 10.1];
 let groups = [1, 1, 2, 2, 2];
 
 // R: png("points.png", 6, 4, units = "in", res = 300)
-let mut dev = Device::png(6.0, 4.0, 300.0);
+let mut dev = Device::png("points.png").width(6.0).height(4.0).res(300.0).open()?;
 // R: par(las = 1, mar = c(4, 4, 2, 1))
 dev.par().las(1).mar([4.0, 4.0, 2.0, 1.0]).draw();
 // R: plot(x, y, pch = 19, col = groups, xlab = "Dose", ylab = "Response")
@@ -78,12 +78,20 @@ let keys = [
 ];
 dev.legend("topleft", &keys).draw();
 // R: dev.off()
-dev.save("points.png")?;
+dev.close()?;
 ```
 
-`Device::pdf(w, h)` and `Device::svg(w, h)` work the same way, and
-`Device::for_path(path, w, h, dpi)` picks the format from the file
-extension. `dev.finish()` returns the file's bytes instead of saving.
+`Device::pdf(file)` and `Device::svg(file)` work the same way. The
+device's arguments (`width`, `height`, `pointsize`, `bg`, `res` for PNG,
+`compress` for PDF) have R's defaults, so
+`Device::pdf("plot.pdf").open()?` is R's `pdf("plot.pdf")`, 7 x 7 inches.
+As in R, opening the device creates the file, so a bad path fails
+before anything is drawn, and `dev.close()` (R's `dev.off()`) writes it.
+Sizes are in inches for every format. The format is the function's, not
+the file name's. `Device::format(format, file)` takes the format as a
+value or a name (`"pdf"`, `"svg"`, `"png"`), for choosing it at run
+time, and `dev.finish()` returns the file's bytes instead of writing
+them.
 
 ### Several panels on a page
 
@@ -94,7 +102,7 @@ High-level calls return what R's functions return.
 
 ```rust
 // R: pdf("panels.pdf", 8, 4); par(mfrow = c(1, 2), oma = c(0, 0, 2, 0))
-let mut dev = Device::pdf(8.0, 4.0);
+let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
 dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 
 let x = [4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7];
@@ -110,7 +118,7 @@ dev.text(&centres, &[3.3, 5.3, 2.3], &["3", "5", "2"]).draw();
 
 // R: mtext("Two panels", outer = TRUE, line = 0.5, font = 2)
 dev.mtext("Two panels", 3).outer(true).line(0.5).font(2).draw();
-dev.save("panels.pdf")?;
+dev.close()?;
 ```
 
 `par()` ends in `.draw()` like every other call, although it draws
@@ -155,10 +163,11 @@ let keys = [
 ];
 fig.legend("bottomright", &keys).draw();
 
-let mut dev = Device::pdf(8.0, 8.0);
+let mut dev = Device::pdf("fits.pdf").width(8.0).height(8.0).open()?;
 dev.par().mfrow(2, 2).draw();
 dev.add_figure_at(1, 1, &fig); // top left
 dev.add_figure_at(2, 2, &fig); // bottom right
+dev.close()?;
 ```
 
 The legend is placed when the figure is drawn, so it goes in the bottom
@@ -172,10 +181,14 @@ plot onto a device you've opened. The same figure can go to several
 files:
 
 ```rust
-for path in ["fit.pdf", "fit.png"] {
-    let mut dev = Device::for_path(path, 7.0, 5.0, 300.0)?;
+for format in ["pdf", "png"] {
+    let mut dev = Device::format(format, format!("fit.{format}"))
+        .width(7.0)
+        .height(5.0)
+        .res(300.0) // PNG only
+        .open()?;
     dev.add_figure(&fig);
-    dev.save(path)?;
+    dev.close()?;
 }
 ```
 

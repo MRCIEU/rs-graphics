@@ -18,7 +18,9 @@
 //! field and documented there. `Option` fields take the value itself
 //! (`.las(1)`, `.main("Title")`); fields R recycles per element take one
 //! value or several (see [`Values`]); limits take two numbers
-//! (`.xlim(0.0, 10.0)`).
+//! (`.xlim(0.0, 10.0)`). Fields holding one of R's string-valued choices
+//! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
+//! `.order_h("decr")`); an invalid string panics, as R errors.
 
 use crate::color::{Color, ColorSpec};
 use crate::lty::LineType;
@@ -244,10 +246,12 @@ mod tests {
 
     #[test]
     fn calls_have_the_same_setters_and_with() {
+        use crate::backend::svg::SvgBackend;
         use crate::device::{AxisOptions, Device};
         use crate::graphics::Graphics;
+        use crate::par::Par;
 
-        let mut dev = Device::svg(4.0, 4.0);
+        let mut dev = Device::new(SvgBackend::new(4.0, 4.0), Par::default());
         let saved = AxisOptions::default().las(1).at([1.0, 2.0]).lwd(3.0);
 
         let call = dev.axis(2).las(2).tick(false);

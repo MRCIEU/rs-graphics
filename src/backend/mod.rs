@@ -50,6 +50,9 @@ pub enum LineEnd {
 }
 
 impl LineEnd {
+    /// R's `par(lend=)` names `"round"`, `"butt"` and `"square"`, or their
+    /// numeric codes as strings `"0"`, `"1"`, `"2"` (which R accepts only
+    /// as numbers); `None` otherwise.
     pub fn parse(spec: &str) -> Option<LineEnd> {
         match spec {
             "round" | "0" => Some(LineEnd::Round),
@@ -72,6 +75,9 @@ pub enum LineJoin {
 }
 
 impl LineJoin {
+    /// R's `par(ljoin=)` names `"round"`, `"mitre"` and `"bevel"`, or
+    /// their numeric codes as strings `"0"`, `"1"`, `"2"` (which R accepts
+    /// only as numbers); `None` otherwise.
     pub fn parse(spec: &str) -> Option<LineJoin> {
         match spec {
             "round" | "0" => Some(LineJoin::Round),

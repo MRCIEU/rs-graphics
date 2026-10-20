@@ -136,7 +136,8 @@ pub struct BoxplotOptions {
     /// ..., n`.
     pub at: Option<Vec<f64>>,
     /// Relative box widths, one per group (scaled so the widest is
-    /// `boxwex`); `None`: equal widths, or by group size with `varwidth`.
+    /// `boxwex`); `None`: equal widths, or by group size with `varwidth`;
+    /// a single box is half of `boxwex` wide (as `bxp()`).
     pub width: Option<Vec<f64>>,
     /// Draw on the current plot (R's `add = TRUE`) instead of starting a
     /// new one. Default `false`.

@@ -6,10 +6,12 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Cross-checks plotmath expression labels on `axis()` against a real R
-//! `pdf()` device's uncompressed output: every text item (font, size,
-//! origin, direction, string) and every stroked line (the `/` slash), on
-//! all four sides, with rotation, `cex.axis`, `hadj`/`padj` and `las`.
+//! Cross-checks plotmath expression labels against a real R `pdf()`
+//! device's uncompressed output: on `axis()` (all four sides, with
+//! rotation, `cex.axis`, `hadj`/`padj` and `las`), in `title()`,
+//! `mtext()`, `text()` and `legend()`, and as the titles of the high-level
+//! plots on a 2x3 `mfrow` page. Compares every text item (font, size,
+//! origin, direction, string) and every stroked line (the `/` slash).
 //! Skipped if `Rscript` isn't available.
 //!
 //! Not compared: two or more digits in a name in a non-plain font. R's

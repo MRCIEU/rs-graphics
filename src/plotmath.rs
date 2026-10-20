@@ -103,7 +103,8 @@ impl std::str::FromStr for Expression {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParseError {
     pub message: String,
-    /// Byte offset in the source, where known.
+    /// Byte offset in the source; 0 when not known (e.g. for unsupported
+    /// constructs).
     pub offset: usize,
 }
 

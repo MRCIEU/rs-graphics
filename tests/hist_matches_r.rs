@@ -6,8 +6,8 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Cross-checks `rs_graphics::highlevel::hist`'s bin edges/counts against
-//! R's own `hist(x, plot = FALSE)` for a handful of fixed datasets.
+//! Cross-checks the bin edges and counts `hist()` returns against R's own
+//! `hist(x, plot = FALSE)` for a handful of fixed datasets.
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.
 
