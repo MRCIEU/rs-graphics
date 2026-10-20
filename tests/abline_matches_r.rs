@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks `abline()` with vectors of `h`/`v` and recycled `col`/
-//! `lty`/`lwd`, and `coef =`, against a real R `pdf()` device's uncompressed output: every
+//! `lty`/`lwd`, `a`/`b` and `coef =`, against a real R `pdf()` device's uncompressed output: every
 //! stroked path in drawing order (vertices, colour, width, dash pattern),
 //! on linear and log axes, and dashes with square and butt line ends. Skipped if `Rscript` isn't available.
 
@@ -138,6 +138,20 @@ fn cases() -> Vec<Case> {
                         ..Default::default()
                     })
                     .draw();
+            },
+        },
+        Case {
+            name: "a_and_b",
+            r: "abline(a = 1, b = 0.5, col = 'red')\n\
+                suppressWarnings(abline(a = 9, b = -1, coef = c(2, 0.3), lty = 2))\n\
+                abline(1, 0.8, h = 3)",
+            log: "",
+            lims: ((0.0, 10.0), (0.0, 10.0)),
+            draw: |d| {
+                d.abline().a(1).b(0.5).col("red").draw();
+                // `coef` wins over `a`/`b`, as in R.
+                d.abline().a(9).b(-1).coef(2, 0.3).lty("dashed").draw();
+                d.abline().b(0.8).a(1).h(3).draw();
             },
         },
         Case {
@@ -314,6 +328,45 @@ fn abline_matches_r() {
             assert!(close(&a.dash, &b.dash, 0.005), "dash differs. {ctx}");
         }
     }
+}
+
+fn window() -> Device<PdfBackend> {
+    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+    dev.plot_new();
+    dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
+    dev
+}
+
+#[test]
+#[should_panic(expected = "invalid a=, b= specification")]
+fn abline_a_needs_b() {
+    window().abline().a(1).draw();
+}
+
+/// R draws nothing for a lone `b` (`C_abline` only looks at `b` when `a`
+/// is given); we treat it as the same mistake as a lone `a`.
+#[test]
+#[should_panic(expected = "invalid a=, b= specification")]
+fn abline_b_needs_a() {
+    window().abline().b(2).h(0.5).draw();
+}
+
+#[test]
+fn abline_a_and_b_record_in_a_figure() {
+    let mut fig = Figure::new();
+    fig.plot_new();
+    fig.abline().a(0.2).b(0.5).draw();
+    let (mut a, mut b) = (window(), window());
+    a.add_figure(&fig);
+    b.plot_new();
+    b.abline().coef(0.2, 0.5).draw();
+    assert!(a.finish() == b.finish());
+}
+
+#[test]
+#[should_panic(expected = "'a' and 'b' must be finite")]
+fn abline_ab_must_be_finite() {
+    window().abline().a(f64::NAN).b(1).draw();
 }
 
 #[test]

@@ -427,12 +427,14 @@ pub trait Graphics: sealed::Sealed + Sized {
     }
 
     /// `abline(a, b, h, v, untf, col, lty, lwd)`; options in
-    /// [`AblineOptions`]. For R's `abline(coef = )` or `abline(reg = )`,
-    /// set the intercept and slope as `coef`.
+    /// [`AblineOptions`]: `.a(1).b(2)`, or `.coef(1, 2)` (R's `coef = `,
+    /// which wins over `a`/`b`). For R's `abline(reg = )`, pass the
+    /// model's intercept and slope.
     ///
     /// # Panics
-    /// At `.draw()`, if `coef` has a non-finite value (R: "'a' and 'b'
-    /// must be finite").
+    /// At `.draw()`, if only one of `a` and `b` is given (R: "invalid
+    /// a=, b= specification"; R itself ignores a lone `b`), or if the
+    /// line's values aren't finite (R: "'a' and 'b' must be finite").
     fn abline(&mut self) -> AblineCall<'_, Self> {
         AblineCall {
             target: self,

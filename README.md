@@ -208,7 +208,7 @@ trait Diagnostics {
 impl<G: Graphics> Diagnostics for G {
     fn obs_vs_exp(&mut self, exp: &[f64], obs: &[f64]) {
         self.plot(exp, obs).pch(20).xlab("Expected").ylab("Observed").draw();
-        self.abline().coef(0.0, 1.0).col("red").draw();
+        self.abline().a(0).b(1).col("red").draw();
     }
 }
 

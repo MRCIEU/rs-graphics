@@ -93,7 +93,7 @@
 //! let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
 //! dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 //! dev.plot(&x, &[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
-//! dev.abline().coef(0.0, 4.0).draw(); // still panel 1
+//! dev.abline().a(0).b(4).draw(); // still panel 1
 //! dev.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
 //! dev.mtext("Two panels", 3).outer(true).line(0.5).draw();
 //! dev.close()?;
@@ -142,7 +142,7 @@
 //! impl<G: Graphics> Diagnostic for G {
 //!     fn obs_vs_exp(&mut self, exp: &[f64], obs: &[f64]) {
 //!         self.plot(exp, obs).pch(20).draw();
-//!         self.abline().coef(0.0, 1.0).col("red").draw();
+//!         self.abline().a(0).b(1).col("red").draw();
 //!     }
 //! }
 //!

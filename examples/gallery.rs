@@ -139,13 +139,8 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .col(grey)
         .lty("dashed")
         .draw();
-    dev.abline().coef(2f64.log10(), 1.5).col(2).lwd(2.0).draw();
-    dev.abline()
-        .coef(2000.0, 20.0)
-        .untf(true)
-        .col(3)
-        .lwd(2.0)
-        .draw();
+    dev.abline().a(2f64.log10()).b(1.5).col(2).lwd(2.0).draw();
+    dev.abline().a(2000).b(20).untf(true).col(3).lwd(2.0).draw();
     let entries = vec![
         LegendEntry::line("abline(log10(2), 1.5)", 2, 2.0, "solid"),
         LegendEntry::line("abline(2000, 20, untf = TRUE)", 3, 2.0, "solid"),
