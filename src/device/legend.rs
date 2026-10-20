@@ -14,19 +14,20 @@
 //! R computes everything in *user* coordinates; since the user -> device
 //! mapping is linear (also for log axes, where user coordinates are
 //! `log10`-transformed), this port works directly in device inches (y up),
-//! which gives identical results for non-reversed axes, and converts what
-//! it returns ([`LegendLayout`]) back to user coordinates. Reversed axes
-//! (`xlim = c(hi, lo)`) are not handled.
+//! and converts what it returns ([`LegendLayout`]) back to user
+//! coordinates. That gives R's results on reversed axes (`xlim = c(hi,
+//! lo)`) too, where R's widths and heights turn negative together, with
+//! one exception: for [`LegendPos::Corners`] on a reversed axis R sorts the
+//! corners but then steps by its negative character size, so it draws the
+//! entries outside its own box. That is not copied: here they go inside,
+//! as on other axes.
 //!
 //! Labels and the title may be plotmath expressions (`Label::math`). As
 //! R draws them with `text()`, they are rotated by `par(srt)`.
 //!
 //! Not implemented: `density`/`angle` hatched fills,
 //! per-entry `cex`/`x.intersp`/`seg.len` recycling (these are scalars on
-//! [`LegendOptions`]), `text.width = NA`, `adj`, `box.lwd`/`box.lty`/
-//! `box.col` (always the `par()` values), `title.col`/`title.adj`/
-//! `title.font` (always `text.col`, 0.5 and `text.font`), and
-//! `plot = FALSE`.
+//! [`LegendOptions`]), `text.width = NA`, `adj` and `trace`.
 //!
 //! `par(cex)` scales everything as in `legend.R`: the character cell
 //! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and
@@ -311,8 +312,9 @@ impl LegendEntry {
     }
 }
 
-/// The scalar arguments of R's `legend()`. `None` is R's default, given
-/// for each field.
+/// The arguments of R's `legend()` other than the per-entry keys (which
+/// are on [`LegendEntry`]). `None` (or an empty `Vec`) is R's default,
+/// given for each field.
 #[derive(Clone, Debug, Default)]
 pub struct LegendOptions {
     /// `bty`: whether to draw the surrounding box; `None`: a box (R's
@@ -347,19 +349,38 @@ pub struct LegendOptions {
     pub title: Option<Label>,
     /// `title.cex`; `None` = `cex`.
     pub title_cex: Option<f64>,
+    /// `title.col`; `None` = the first `text_col`.
+    pub title_col: Option<ColorSpec>,
+    /// `title.adj`: where the title sits across the box (0 left, 1
+    /// right) and its justification there; `None`: 0.5 (centred).
+    pub title_adj: Option<f64>,
+    /// `title.font`; `None` = the first `text_font`.
+    pub title_font: Option<i32>,
     /// `inset` as fractions of the plot region, `(x, y)`, for keyword
     /// positions; `None`: `(0, 0)`.
     pub inset: Option<(f64, f64)>,
-    /// `text.col`; `None` = `par("col")`.
-    pub text_col: Option<ColorSpec>,
-    /// `text.font`; `None` = `par("font")`.
-    pub text_font: Option<i32>,
+    /// `text.col`: label colours, recycled over the entries; empty:
+    /// `par("col")`.
+    pub text_col: Vec<ColorSpec>,
+    /// `text.font`: label fonts, recycled over the entries (also for
+    /// measuring them); empty: `par("font")`.
+    pub text_font: Vec<i32>,
+    /// `box.lwd`: line width of the legend box; `None`: `par("lwd")`.
+    pub box_lwd: Option<f64>,
+    /// `box.lty`: line type of the legend box; `None`: `par("lty")`.
+    pub box_lty: Option<LineType>,
+    /// `box.col`: colour of the legend box's border (`ColorSpec::None`:
+    /// no border); `None`: `par("fg")`.
+    pub box_col: Option<ColorSpec>,
     /// Border colour of filled box keys (`border=`); `None`: black (R's
     /// default).
     pub border: Option<ColorSpec>,
     /// R's inline `xpd` while drawing ([`Xpd`]; the setter also takes
     /// `false`/`true`); `None`: `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's `plot`: `false` works out the layout (returned as usual) but
+    /// draws nothing; `None`: `true`.
+    pub plot: Option<bool>,
 }
 
 crate::setters::setters!(LegendOptions => [LegendCall] {
@@ -377,11 +398,18 @@ crate::setters::setters!(LegendOptions => [LegendCall] {
     horiz: value bool,
     title: option Label,
     title_cex: option f64,
+    title_col: option ColorSpec,
+    title_adj: option f64,
+    title_font: option i32,
     inset: option_pair (f64, f64),
-    text_col: option ColorSpec,
-    text_font: option i32,
+    text_col: values ColorSpec,
+    text_font: values i32,
+    box_lwd: option f64,
+    box_lty: option LineType,
+    box_col: option ColorSpec,
     border: option ColorSpec,
     xpd: option Xpd,
+    plot: option bool,
 });
 
 /// Where `legend()` drew, as R's (invisible) return value `list(rect =
@@ -457,14 +485,23 @@ impl<B: Backend> Device<B> {
         let xc = cex_eff * cin_x;
         let yc = cex_eff * cin_y;
 
-        let font = opts.text_font.unwrap_or(self.par.font);
+        // `text.font` recycled over the entries, as R's `mapply()`; the
+        // title's font defaults to the first.
+        let fonts: Vec<i32> = (0..n)
+            .map(|i| match opts.text_font.len() {
+                0 => self.par.font,
+                l => opts.text_font[i % l],
+            })
+            .collect();
+        let title_font = opts.title_font.unwrap_or(fonts[0]);
         let (ux0, ux1, _, _) = self.usr;
         let inches_per_user_x = plt.width() / (ux1 - ux0).abs();
         let text_w = match opts.text_width {
             Some(tw) => tw.abs() * inches_per_user_x,
             None => entries
                 .iter()
-                .map(|e| self.label_width(&e.label, font, cex))
+                .zip(&fonts)
+                .map(|(e, &f)| self.label_width(&e.label, f, cex))
                 .fold(0.0, f64::max),
         };
 
@@ -473,7 +510,8 @@ impl<B: Backend> Device<B> {
         let yextra = yc * (y_intersp - 1.0);
         let ymax = entries
             .iter()
-            .map(|e| self.label_height(&e.label, font, cex))
+            .zip(&fonts)
+            .map(|(e, &f)| self.label_height(&e.label, f, cex))
             .fold(yc, f64::max);
         let ychar = yextra + ymax;
 
@@ -485,7 +523,7 @@ impl<B: Backend> Device<B> {
         let tcex = opts.title_cex.unwrap_or(cex);
         let title_unit_h = tcex * self.par.cex * cin_y;
         let ymaxtitle = match title {
-            Some(t) => title_unit_h.max(self.label_height(t, font, tcex)),
+            Some(t) => title_unit_h.max(self.label_height(t, title_font, tcex)),
             None => title_unit_h,
         };
         let ychartitle = yextra + ymaxtitle;
@@ -526,7 +564,8 @@ impl<B: Backend> Device<B> {
                 let mut w_ = ncol as f64 * w0 + 0.5 * xc;
                 let mut xextra_ = 0.0;
                 if let Some(t) = title {
-                    let tw = self.label_width(t, font, tcex) + 0.5 * tcex * self.par.cex * cin_x;
+                    let tw =
+                        self.label_width(t, title_font, tcex) + 0.5 * tcex * self.par.cex * cin_x;
                     if tw > w_ {
                         xextra_ = (tw - w_) / 2.0;
                         w_ = tw;
@@ -567,15 +606,28 @@ impl<B: Backend> Device<B> {
         }
 
         // The legend itself. Graphics are clipped according to `xpd`, like
-        // the `rect()`/`segments()`/`points()` calls R makes.
-        let lwd_box = self.par.lwd;
-        self.push_clip_for(self.par.xpd);
-        if opts.bty.unwrap_or_default() == LegendBty::Box {
+        // the `rect()`/`segments()`/`points()` calls R makes. With `plot =
+        // FALSE` only the positions are worked out.
+        let plot = opts.plot.unwrap_or(true);
+        if plot {
+            self.push_clip_for(self.par.xpd);
+        }
+        if plot && opts.bty.unwrap_or_default() == LegendBty::Box {
             let bg = opts.bg.unwrap_or(ColorSpec::Color(self.par.bg));
             let fill = self.resolve(bg).filter(|c| c.a > 0);
-            let stroke = self.stroke_of(self.par.fg, lwd_box, self.par.lty);
-            self.backend
-                .draw_rect(Rect::new(left, top - h, left + w, top), fill, Some(&stroke));
+            let box_col = opts.box_col.unwrap_or(ColorSpec::Color(self.par.fg));
+            let stroke = self.resolve(box_col).map(|c| {
+                self.stroke_of(
+                    c,
+                    opts.box_lwd.unwrap_or(self.par.lwd),
+                    opts.box_lty.unwrap_or(self.par.lty),
+                )
+            });
+            self.backend.draw_rect(
+                Rect::new(left, top - h, left + w, top),
+                fill,
+                stroke.as_ref(),
+            );
         }
 
         let topspace = 0.5 * ymax + title_extra_h;
@@ -591,6 +643,10 @@ impl<B: Backend> Device<B> {
             let stroke = border.map(|c| self.stroke_of(c, self.par.lwd, self.par.lty));
             for i in 0..n {
                 let fill = entries[i].fill.and_then(|f| self.resolve(f));
+                if !plot {
+                    xt[i] += dx_fill;
+                    continue;
+                }
                 self.backend.draw_rect(
                     Rect::new(xt[i], yt[i] - ybox / 2.0, xt[i] + xbox, yt[i] + ybox / 2.0),
                     fill,
@@ -603,7 +659,8 @@ impl<B: Backend> Device<B> {
         if do_lines {
             for i in 0..n {
                 let e = &entries[i];
-                if let (true, Some(col), Some(lty)) = (e.has_line(), self.resolve(e.col), e.lty) {
+                let draw = plot && e.has_line();
+                if let (true, Some(col), Some(lty)) = (draw, self.resolve(e.col), e.lty) {
                     let stroke = self.stroke_of(col, e.lwd.unwrap_or(self.par.lwd), lty);
                     let x0 = xt[i] + x_off * xc;
                     self.backend.draw_line(
@@ -616,7 +673,7 @@ impl<B: Backend> Device<B> {
             }
         }
 
-        if has_pch {
+        if plot && has_pch {
             for i in 0..n {
                 let e = &entries[i];
                 if !e.has_pch() {
@@ -643,23 +700,31 @@ impl<B: Backend> Device<B> {
                 );
             }
         }
-        self.pop_clip();
+        if plot {
+            self.pop_clip();
+        }
 
-        let text_col = opts.text_col.unwrap_or(ColorSpec::Color(self.par.col));
+        // `text.col` recycled over the entries; the title's colour defaults
+        // to the first.
+        let text_col = |dev: &Self, i: usize| match opts.text_col.len() {
+            0 => ColorSpec::Color(dev.par.col),
+            l => opts.text_col[i % l],
+        };
         // `text(adj = c(title.adj, 0))` and `text(adj = c(0, 0.5))`.
         let clip = self.par.xpd;
-        if let Some(t) = title {
-            let anchor = Point::new(left + w * 0.5, top - ymaxtitle);
+        if let (true, Some(t)) = (plot, title) {
+            let title_adj = opts.title_adj.unwrap_or(0.5);
+            let anchor = Point::new(left + w * title_adj, top - ymaxtitle);
             self.draw_label(
                 clip,
                 anchor,
                 t,
-                0.5,
+                title_adj,
                 Some(0.0),
                 self.par.srt,
-                text_col,
+                opts.title_col.unwrap_or(text_col(self, 0)),
                 tcex,
-                font,
+                title_font,
             );
         }
         let mut text_x = Vec::with_capacity(n);
@@ -669,6 +734,9 @@ impl<B: Backend> Device<B> {
             let (tx, ty) = self.inches_to_usr(anchor);
             text_x.push(tx);
             text_y.push(ty);
+            if !plot {
+                continue;
+            }
             let label = &entries[i].label;
             self.draw_label(
                 clip,
@@ -677,9 +745,9 @@ impl<B: Backend> Device<B> {
                 0.0,
                 Some(0.5),
                 self.par.srt,
-                text_col,
+                text_col(self, i),
                 cex,
-                font,
+                fonts[i],
             );
         }
 

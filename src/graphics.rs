@@ -482,7 +482,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`LegendEntry`], placed by `pos`; options in [`LegendOptions`]. On
     /// a [`Device`], `.draw()` returns where the box and labels went (R's
     /// return value, in `usr` units), or `None` if `entries` is empty (R
-    /// errors there).
+    /// errors there). With `.plot(false)` (R's `plot = FALSE`) it only
+    /// works that out, drawing nothing, so a legend can be measured first.
     ///
     /// `pos` is written as in R (see [`LegendPos`]): a keyword such as
     /// `"topright"`, a point `(x, y)`, or two corners
