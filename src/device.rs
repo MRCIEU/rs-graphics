@@ -216,6 +216,15 @@ pub struct TitleOptions {
     /// Margin lines for `xlab`/`ylab` (`mgp[0]`) and `sub` (`mgp[0] + 1`)
     /// (R's inline `mgp`); `None`: `par(mgp)`.
     pub mgp: Option<[f64; 3]>,
+    /// Margin line for every title given (R's `line`), instead of their
+    /// defaults (half the top margin for `main`, `mgp[0]` for `xlab`/`ylab`,
+    /// `mgp[0] + 1` for `sub`); `main` then sits with its baseline on it.
+    /// `None` (or non-finite): the defaults.
+    pub line: Option<f64>,
+    /// Draw in the outer margins (`par(oma)`) instead, positioned along the
+    /// inner region (R's `outer = TRUE`); `main` defaults to half the top
+    /// outer margin. Default `false`.
+    pub outer: bool,
 }
 
 crate::setters::setters!(TitleOptions => [TitleCall] {
@@ -234,6 +243,8 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     font_lab: option i32,
     adj: option f64,
     mgp: array [f64; 3],
+    line: option f64,
+    outer: value bool,
 });
 
 impl<B: Backend> Device<B> {
@@ -1216,36 +1227,65 @@ impl<B: Backend> Device<B> {
     /// describe it.
     pub(crate) fn title_impl(&mut self, opts: &TitleOptions) {
         let lh = self.line_height_inches();
-        // `C_title`: every title sits at `adj` (NPC) along its side and is
-        // justified by `adj` (`GMtext` uses `par(adj)` in all cases).
+        // `C_title`: every title sits at `adj` along its side and is
+        // justified by `adj` (`GMtext` uses `par(adj)` in all cases); along
+        // the plot region (NPC), or with `outer` the inner region (NIC).
         let adj = opts.adj.unwrap_or(self.par.adj);
         let mgp = opts.mgp.unwrap_or(self.par.mgp);
-        let x_at = self.plt.x0 + adj * self.plt.width();
-        let y_at = self.plt.y0 + adj * self.plt.height();
-        // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
-        // `GMtext` nudges the line by `yLineBias` (see `line_bias`).
+        let line = opts.line.filter(|l| l.is_finite());
+        let (region, clip) = if opts.outer {
+            (self.inner, Xpd::Device)
+        } else {
+            // R raises `xpd` to at least `TRUE` (`NA` stays `NA`).
+            let clip = match self.par.xpd {
+                Xpd::Device => Xpd::Device,
+                _ => Xpd::Figure,
+            };
+            (self.plt, clip)
+        };
+        let x_at = region.x0 + adj * region.width();
+        let y_at = region.y0 + adj * region.height();
         if let Some(main) = &opts.main {
-            // `vpos = 0.5 * mar[2]`, `adjy = 0.5` (finite, so `GEText`
-            // uses `yc * height(M)`, not exact ink centring).
-            let y = self.plt.y1 + 0.5 * self.mar.top * lh;
+            // `GText(hpos, vpos, MAR3/OMA3, .., adj, adjy)`: at `line` with
+            // the baseline on it (`adjy = 0`), else half the top margin
+            // (`0.5 * mar[2]` or `oma[2]`) with `adjy = 0.5` (finite, so
+            // `GEText` uses `yc * height(M)`, not exact ink centring). An
+            // expression is always centred (`GMathText(.., adj, 0.5)`).
+            let (y, adjy) = match line {
+                Some(l) => (region.y1 + l * lh, 0.0),
+                None => {
+                    let margin = if opts.outer {
+                        self.height_in - self.inner.y1
+                    } else {
+                        self.mar.top * lh
+                    };
+                    (region.y1 + 0.5 * margin, 0.5)
+                }
+            };
+            let adjy = if matches!(main, Label::Math(_)) {
+                0.5
+            } else {
+                adjy
+            };
             self.draw_label(
-                Xpd::Figure,
+                clip,
                 Point::new(x_at, y),
                 main,
                 adj,
-                Some(0.5),
+                Some(adjy),
                 0.0,
                 opts.col_main.unwrap_or(ColorSpec::Color(self.par.col_main)),
                 opts.cex_main.unwrap_or(self.par.cex_main),
                 opts.font_main.unwrap_or(self.par.font_main),
             );
         }
+        // The rest via `GMtext()`: at `line`, else `mgp[0]` (+ 1 for
+        // `sub`), nudged by `yLineBias` (see `line_bias`).
         if let Some(sub) = &opts.sub {
-            let line = mgp[0] + 1.0 + self.line_bias(Side::Bottom, true);
-            let y = self.plt.y0 - line * lh;
+            let l = line.unwrap_or(mgp[0] + 1.0) + self.line_bias(Side::Bottom, true);
             self.draw_label(
-                Xpd::Figure,
-                Point::new(x_at, y),
+                clip,
+                Point::new(x_at, region.y0 - l * lh),
                 sub,
                 adj,
                 Some(0.0),
@@ -1256,11 +1296,10 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(xlab) = &opts.xlab {
-            let line = mgp[0] + self.line_bias(Side::Bottom, true);
-            let y = self.plt.y0 - line * lh;
+            let l = line.unwrap_or(mgp[0]) + self.line_bias(Side::Bottom, true);
             self.draw_label(
-                Xpd::Figure,
-                Point::new(x_at, y),
+                clip,
+                Point::new(x_at, region.y0 - l * lh),
                 xlab,
                 adj,
                 Some(0.0),
@@ -1271,11 +1310,10 @@ impl<B: Backend> Device<B> {
             );
         }
         if let Some(ylab) = &opts.ylab {
-            let line = mgp[0] + self.line_bias(Side::Left, true);
-            let x = self.plt.x0 - line * lh;
+            let l = line.unwrap_or(mgp[0]) + self.line_bias(Side::Left, true);
             self.draw_label(
-                Xpd::Figure,
-                Point::new(x, y_at),
+                clip,
+                Point::new(region.x0 - l * lh, y_at),
                 ylab,
                 adj,
                 Some(0.0),

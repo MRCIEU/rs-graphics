@@ -212,6 +212,37 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "title_line_outer",
+            r: "par(oma = c(2, 3, 3, 1)); plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                title(main = 'M', sub = 'S', xlab = 'X', ylab = 'Y', line = 1)\n\
+                title(main = 'N', outer = TRUE)\n\
+                title(main = 'O', sub = 'T', xlab = 'W', ylab = 'Z', outer = TRUE, line = 0.5, adj = 0)\n\
+                title(main = expression(beta^2), line = 2.5)",
+            ours: |d| {
+                d.par().oma([2, 3, 3, 1]).draw();
+                d.plot_new();
+                d.plot_window((0, 10), (0, 10)).draw();
+                d.title()
+                    .main("M")
+                    .sub("S")
+                    .xlab("X")
+                    .ylab("Y")
+                    .line(1)
+                    .draw();
+                d.title().main("N").outer(true).draw();
+                d.title()
+                    .main("O")
+                    .sub("T")
+                    .xlab("W")
+                    .ylab("Z")
+                    .outer(true)
+                    .line(0.5)
+                    .adj(0)
+                    .draw();
+                d.title().main(Label::math("beta^2")).line(2.5).draw();
+            },
+        },
+        Case {
             name: "plot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\

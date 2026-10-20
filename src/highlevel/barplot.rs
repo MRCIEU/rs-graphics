@@ -763,8 +763,8 @@ impl<B: Backend> Device<B> {
                 cex_lab: opts.cex_lab,
                 col_lab: opts.col_lab,
                 font_lab: opts.font_lab,
-                adj: None,
                 mgp: opts.mgp,
+                ..TitleOptions::default()
             });
         }
 
