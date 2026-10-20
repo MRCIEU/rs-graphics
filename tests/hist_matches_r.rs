@@ -7,7 +7,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks the bin edges and counts `hist()` returns against R's own
-//! `hist(x, plot = FALSE)` for a handful of fixed datasets.
+//! `hist(x, plot = FALSE)` for a handful of fixed datasets, with the
+//! default Sturges breaks, a number of classes (`breaks = 20`) and unsorted
+//! edges.
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.
 
@@ -20,10 +22,17 @@ use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
 use rs_graphics::par::Par;
 
-fn r_hist(data: &[f64]) -> (Vec<f64>, Vec<f64>) {
+/// R's `hist(x, breaks = <breaks>, plot = FALSE)` (`breaks` an R
+/// expression, or "" for the default): breaks and counts.
+fn r_hist(data: &[f64], breaks: &str) -> (Vec<f64>, Vec<f64>) {
     let values: Vec<String> = data.iter().map(|v| format!("{v:.17}")).collect();
+    let breaks = if breaks.is_empty() {
+        String::new()
+    } else {
+        format!(", breaks = {breaks}")
+    };
     let script = format!(
-        "x <- c({}); h <- hist(x, plot = FALSE); \
+        "x <- c({}); h <- hist(x{breaks}, plot = FALSE); \
          cat(paste(sprintf('%.17g', h$breaks), collapse=','), '|', \
              paste(h$counts, collapse=','), '\\n')",
         values.join(",")
@@ -71,7 +80,7 @@ fn breaks_and_counts_match_r_sturges() {
     ];
 
     for data in datasets {
-        let (expected_breaks, expected_counts) = r_hist(data);
+        let (expected_breaks, expected_counts) = r_hist(data, "");
 
         let backend = PdfBackend::new(6.0, 4.0).with_compression(false);
         let mut dev = Device::new(backend, Par::default());
@@ -98,4 +107,52 @@ fn breaks_and_counts_match_r_sturges() {
             result.counts, expected_counts
         );
     }
+}
+
+/// `breaks` as one number is a number of classes (edges from `pretty()`,
+/// the number truncated); two or more are edges, sorted.
+#[test]
+fn breaks_as_a_count_or_unsorted_edges_match_r() {
+    if !common::r_available() {
+        return;
+    }
+    let data = [-5.0, -3.0, -1.0, 0.0, 1.0, 2.0, 4.0, 8.0, 10.0, 12.0, 15.0];
+    let cases: [(&str, Vec<f64>); 4] = [
+        ("20", vec![20.0]),
+        ("3", vec![3.0]),
+        ("7.9", vec![7.9]),
+        ("c(20, -10, 0, 5)", vec![20.0, -10.0, 0.0, 5.0]),
+    ];
+    for (r_breaks, breaks) in cases {
+        let (expected_breaks, expected_counts) = r_hist(&data, r_breaks);
+        let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+        let result = dev.hist(&data).breaks(breaks).draw();
+        assert_eq!(
+            result.breaks.len(),
+            expected_breaks.len(),
+            "breaks = {r_breaks}"
+        );
+        for (a, b) in result.breaks.iter().zip(&expected_breaks) {
+            assert!(
+                (a - b).abs() < 1e-9,
+                "breaks = {r_breaks}: {:?} vs {expected_breaks:?}",
+                result.breaks
+            );
+        }
+        assert_eq!(result.counts, expected_counts, "breaks = {r_breaks}");
+    }
+}
+
+#[test]
+#[should_panic(expected = "invalid number of 'breaks'")]
+fn zero_breaks_panics_like_r() {
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    dev.hist(&[1.0, 2.0, 3.0]).breaks(0).draw();
+}
+
+#[test]
+#[should_panic(expected = "invalid number of 'breaks'")]
+fn nan_breaks_panics_like_r() {
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    dev.hist(&[1.0, 2.0, 3.0]).breaks(f64::NAN).draw();
 }

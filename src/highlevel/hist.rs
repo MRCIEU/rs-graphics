@@ -8,8 +8,8 @@
 
 //! `hist(x, ...)`, ported from `hist.default`/`plot.histogram` in
 //! `r-source/src/library/graphics/R/hist.R`, restricted to the default
-//! `breaks = "Sturges"` rule or explicit bin edges (a number of classes, a
-//! function, and the `"fd"`/`"scott"` rules aren't implemented) and no
+//! `breaks = "Sturges"` rule, a number of classes or explicit bin edges (a
+//! function and the `"fd"`/`"scott"` rules aren't implemented) and no
 //! `include.lowest`/`right`/`fuzz` customization (R's defaults,
 //! `include.lowest = TRUE`, `right = TRUE`, are always used).
 
@@ -64,9 +64,14 @@ fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
 /// are R's defaults, given for each.
 #[derive(Clone, Debug)]
 pub struct HistOptions {
-    /// Bin edges, used verbatim (must be increasing, length >= 2).
-    /// `None` (or empty): Sturges' rule + `pretty()`, R's default `breaks =
-    /// "Sturges"`.
+    /// R's `breaks`: two or more values are the bin edges (sorted, as R
+    /// does); one value is a suggested number of bins, as R's `breaks =
+    /// 20` (edges from `pretty()`). `None` (or empty): Sturges' rule +
+    /// `pretty()`, R's default `breaks = "Sturges"`.
+    ///
+    /// # Panics
+    /// When drawn (or recorded), if the one value isn't finite or is less
+    /// than 1 (R: "invalid number of 'breaks'").
     pub breaks: Option<Vec<f64>>,
     /// `true`: plot counts; `false`: plot densities (`count / (n * bin
     /// width)`). `None`: counts if the bins are equally wide, as R.
@@ -180,18 +185,35 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let n = data.len();
 
-    let given = opts.breaks.clone().filter(|b| !b.is_empty());
-    let breaks = given.unwrap_or_else(|| {
-        let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
-        let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
-            (lo, hi)
-        } else {
-            (0.0, 1.0)
-        };
-        let nclass = nclass_sturges(n).max(1);
-        pretty_r(lo, hi, nclass, 1)
-    });
+    // `hist.default`: two or more values are the edges (sorted); one value
+    // is a number of classes, and none is Sturges' rule; either way the
+    // edges are `pretty(range(x), n = classes, min.n = 1)`.
+    let breaks = match opts.breaks.as_deref() {
+        Some(edges) if edges.len() > 1 => {
+            let mut edges = edges.to_vec();
+            edges.sort_by(f64::total_cmp);
+            edges
+        }
+        classes => {
+            let nclass = match classes {
+                Some(&[k]) => {
+                    assert!(k.is_finite() && k >= 1.0, "invalid number of 'breaks'");
+                    // R caps it (with a warning) so that pretty() gets an
+                    // integer; pretty() truncates it.
+                    k.min(1e6) as i32
+                }
+                _ => nclass_sturges(n).max(1),
+            };
+            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
+            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+                (lo, hi)
+            } else {
+                (0.0, 1.0)
+            };
+            pretty_r(lo, hi, nclass, 1)
+        }
+    };
 
     let counts = bin_counts(&data, &breaks);
     let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
@@ -232,7 +254,7 @@ impl<B: Backend> Device<B> {
         // R's `freq = NULL`: counts if the bins are equally wide
         // (`equidist`; always for computed breaks).
         let freq = opts.freq.unwrap_or_else(|| {
-            let given = opts.breaks.as_ref().is_some_and(|b| !b.is_empty());
+            let given = opts.breaks.as_ref().is_some_and(|b| b.len() > 1);
             let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
             let (lo, hi) = widths
                 .iter()
