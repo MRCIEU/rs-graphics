@@ -39,6 +39,12 @@ pub struct PieOptions {
     /// Rotation of the labels in degrees, counterclockwise (R's `srt`,
     /// passed to `text()`); `None`: `par(srt)`.
     pub srt: Option<f64>,
+    /// Size of the labels (R's inline `cex`, passed to `text()`; `main`
+    /// keeps `cex.main`); `None`: 1.
+    pub cex: Option<f64>,
+    /// Font of the labels (R's inline `font`, passed to `text()`); `None`:
+    /// `par(font)`.
+    pub font: Option<i32>,
     /// Pie radius in user units, where the plot region's shorter side
     /// spans `[-1, 1]` before the usual 4% axis extension; `None`: 0.8
     /// (R's default).
@@ -73,6 +79,8 @@ pub struct PieOptions {
 crate::setters::setters!(PieOptions => [PieCall] {
     labels: list Label,
     srt: option f64,
+    cex: option f64,
+    font: option i32,
     radius: option f64,
     col: values ColorSpec,
     border: option ColorSpec,
@@ -90,6 +98,8 @@ impl Default for PieOptions {
         PieOptions {
             labels: None,
             srt: None,
+            cex: None,
+            font: None,
             radius: None,
             col: Vec::new(),
             border: None,
@@ -206,6 +216,8 @@ impl<B: Backend> Device<B> {
                     adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
                     xpd: Some(Xpd::Figure),
                     srt: opts.srt,
+                    cex: opts.cex.into_iter().collect(),
+                    font: opts.font.into_iter().collect(),
                     ..TextOptions::default()
                 };
                 self.text_impl(&[1.1 * px], &[1.1 * py], std::slice::from_ref(label), &at);

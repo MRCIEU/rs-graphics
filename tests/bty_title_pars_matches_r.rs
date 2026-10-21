@@ -299,6 +299,18 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "pie_inline_cex_font",
+            r: "pie(c(1, 2, 3), labels = c('a', 'b', 'c'), main = 'M', cex = 1.8, font = 3)",
+            ours: |d| {
+                d.pie(&[1, 2, 3])
+                    .labels(["a", "b", "c"])
+                    .main("M")
+                    .cex(1.8)
+                    .font(3)
+                    .draw();
+            },
+        },
+        Case {
             name: "plot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\
