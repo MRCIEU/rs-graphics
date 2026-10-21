@@ -895,7 +895,15 @@ impl<B: Backend> Device<B> {
         let size = pch::symbol_size_inches(self.start_ps, cex);
         if let Some(geom) = pch::pch_geometry(pch, p.x, p.y, size) {
             // `GSymbol()`: `par(lend/ljoin/lmitre)`, always a solid line.
-            let stroke = self.stroke_of(col, lwd, LineType::SOLID);
+            // Built as the constant default stroke unless `par()` differs,
+            // which keeps the per-point path as fast as before.
+            let mut stroke = Stroke::simple(col, lwd);
+            let (lend, ljoin, lmitre) = (self.par.lend, self.par.ljoin, self.par.lmitre);
+            if (lend, ljoin, lmitre) != (stroke.lend, stroke.ljoin, stroke.lmitre) {
+                stroke.lend = lend;
+                stroke.ljoin = ljoin;
+                stroke.lmitre = lmitre;
+            }
             for shape in &geom.outline_only {
                 self.paint_shape(shape, None, Some(&stroke));
             }
