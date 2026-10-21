@@ -307,7 +307,7 @@ impl<B: Backend> Device<B> {
             cex: opts.cex.clone(),
             lwd: opts.lwd.clone(),
             lty: opts.lty,
-            xpd: None,
+            ..XyOptions::default()
         };
         self.points_impl(x, y, &xy);
 

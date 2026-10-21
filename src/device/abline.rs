@@ -15,7 +15,7 @@
 //! the page (`untf = FALSE`) or `y = a + b * x` in data units (`untf =
 //! TRUE`).
 
-use crate::backend::Backend;
+use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::ColorSpec;
 use crate::geometry::Point;
 use crate::lty::LineType;
@@ -55,6 +55,15 @@ pub struct AblineOptions {
     /// [`Xpd::Figure`], the whole device for [`Xpd::Device`]; the setter
     /// also takes `false`/`true`); `None`: `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
+    /// `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
+    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+    /// `None`: `par(ljoin)`.
+    pub ljoin: Option<LineJoin>,
+    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+    /// `par(lmitre)`.
+    pub lmitre: Option<f64>,
 }
 
 crate::setters::setters!(AblineOptions => [AblineCall] {
@@ -68,6 +77,9 @@ crate::setters::setters!(AblineOptions => [AblineCall] {
     lty: values LineType,
     lwd: values f64,
     xpd: option Xpd,
+    lend: option LineEnd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
 });
 
 impl AblineOptions {
@@ -100,6 +112,11 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::abline`](crate::graphics::Graphics::abline), whose docs
     /// describe it.
     pub(crate) fn abline_impl(&mut self, opts: &AblineOptions) {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.abline_draw(opts);
+    }
+
+    fn abline_draw(&mut self, opts: &AblineOptions) {
         let line = opts.line();
         let mut nlines = 0;
         // The style of the `n`th line: `col`, `lty` and `lwd` recycled.

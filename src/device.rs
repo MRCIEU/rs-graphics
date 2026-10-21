@@ -33,7 +33,7 @@ use std::fs::File;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 
-use crate::backend::{Backend, Stroke, TextStyle};
+use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout};
@@ -894,7 +894,8 @@ impl<B: Backend> Device<B> {
         let cex = self.par.cex * cex;
         let size = pch::symbol_size_inches(self.start_ps, cex);
         if let Some(geom) = pch::pch_geometry(pch, p.x, p.y, size) {
-            let stroke = Stroke::simple(col, lwd);
+            // `GSymbol()`: `par(lend/ljoin/lmitre)`, always a solid line.
+            let stroke = self.stroke_of(col, lwd, LineType::SOLID);
             for shape in &geom.outline_only {
                 self.paint_shape(shape, None, Some(&stroke));
             }
@@ -1406,6 +1407,43 @@ impl<B: Backend> Device<B> {
             saved,
             restore,
         }
+    }
+}
+
+impl<B: Backend> Device<B> {
+    /// R's inline `lend`/`ljoin`/`lmitre` for one call (`ProcessInlinePars`,
+    /// undone by `GRestorePars`): every line drawn in the scope uses them.
+    ///
+    /// # Panics
+    /// If `lmitre` is below 1 (R's "invalid value specified for graphical
+    /// parameter \"lmitre\"").
+    pub(crate) fn line_pars(
+        &mut self,
+        lend: Option<LineEnd>,
+        ljoin: Option<LineJoin>,
+        lmitre: Option<f64>,
+    ) -> ParScope<'_, B> {
+        if let Some(m) = lmitre {
+            assert!(
+                m >= 1.0,
+                "invalid value specified for graphical parameter \"lmitre\""
+            );
+        }
+        let mut dev = self.par_scope(|now, saved| {
+            now.lend = saved.lend;
+            now.ljoin = saved.ljoin;
+            now.lmitre = saved.lmitre;
+        });
+        if let Some(l) = lend {
+            dev.par.lend = l;
+        }
+        if let Some(j) = ljoin {
+            dev.par.ljoin = j;
+        }
+        if let Some(m) = lmitre {
+            dev.par.lmitre = m;
+        }
+        dev
     }
 }
 

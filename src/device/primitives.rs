@@ -17,7 +17,7 @@
 //! than the plot region); `None` uses `par(xpd)`.
 
 use super::{Device, Xpd};
-use crate::backend::{Backend, LineEnd};
+use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
@@ -68,6 +68,15 @@ pub struct XyOptions {
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
+    /// `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
+    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+    /// `None`: `par(ljoin)`.
+    pub ljoin: Option<LineJoin>,
+    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+    /// `par(lmitre)`.
+    pub lmitre: Option<f64>,
 }
 
 crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
@@ -79,6 +88,9 @@ crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
     lwd: values f64,
     lty: option LineType,
     xpd: option Xpd,
+    lend: option LineEnd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
 });
 
 /// Arguments of `segments()`.
@@ -97,6 +109,12 @@ pub struct SegmentsOptions {
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+    /// `None`: `par(ljoin)`.
+    pub ljoin: Option<LineJoin>,
+    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+    /// `par(lmitre)`.
+    pub lmitre: Option<f64>,
 }
 
 crate::setters::setters!(SegmentsOptions => [SegmentsCall] {
@@ -105,6 +123,8 @@ crate::setters::setters!(SegmentsOptions => [SegmentsCall] {
     lwd: values f64,
     lend: option LineEnd,
     xpd: option Xpd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
 });
 
 /// Arguments of `arrows()`.
@@ -128,6 +148,15 @@ pub struct ArrowsOptions {
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
+    /// `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
+    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+    /// `None`: `par(ljoin)`.
+    pub ljoin: Option<LineJoin>,
+    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+    /// `par(lmitre)`.
+    pub lmitre: Option<f64>,
 }
 
 crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
@@ -138,6 +167,9 @@ crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
     lty: values LineType,
     lwd: values f64,
     xpd: option Xpd,
+    lend: option LineEnd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
 });
 
 /// Arguments of `rect()`.
@@ -156,6 +188,15 @@ pub struct RectOptions {
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
+    /// `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
+    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+    /// `None`: `par(ljoin)`.
+    pub ljoin: Option<LineJoin>,
+    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+    /// `par(lmitre)`.
+    pub lmitre: Option<f64>,
 }
 
 crate::setters::setters!(RectOptions => [RectCall] {
@@ -164,6 +205,9 @@ crate::setters::setters!(RectOptions => [RectCall] {
     lty: values LineType,
     lwd: values f64,
     xpd: option Xpd,
+    lend: option LineEnd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
 });
 
 /// Arguments of `polygon()`. A non-finite coordinate (R's `NA`) ends one
@@ -184,6 +228,15 @@ pub struct PolygonOptions {
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
     pub xpd: Option<Xpd>,
+    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
+    /// `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
+    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+    /// `None`: `par(ljoin)`.
+    pub ljoin: Option<LineJoin>,
+    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+    /// `par(lmitre)`.
+    pub lmitre: Option<f64>,
 }
 
 crate::setters::setters!(PolygonOptions => [PolygonCall] {
@@ -192,6 +245,9 @@ crate::setters::setters!(PolygonOptions => [PolygonCall] {
     lty: values LineType,
     lwd: option f64,
     xpd: option Xpd,
+    lend: option LineEnd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
 });
 
 /// Arguments of `text()`.
@@ -276,6 +332,15 @@ pub struct BoxOptions {
     /// `par(bty)`. Ignored for the other regions, which always get all
     /// four sides (R's `GBox()`).
     pub bty: Option<Bty>,
+    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
+    /// `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
+    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+    /// `None`: `par(ljoin)`.
+    pub ljoin: Option<LineJoin>,
+    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+    /// `par(lmitre)`.
+    pub lmitre: Option<f64>,
 }
 
 crate::setters::setters!(BoxOptions => [BoxCall] {
@@ -284,6 +349,9 @@ crate::setters::setters!(BoxOptions => [BoxCall] {
     lty: option LineType,
     lwd: option f64,
     bty: option Bty,
+    lend: option LineEnd,
+    ljoin: option LineJoin,
+    lmitre: option f64,
 });
 
 /// Arguments of `plot.window()` besides the limits.
@@ -354,14 +422,16 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::points`](crate::graphics::Graphics::points), whose docs
     /// describe it.
     pub(crate) fn points_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
-        self.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Points), opts);
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Points), opts);
     }
 
     /// Draws R's `lines()`; the public entry is
     /// [`Graphics::lines`](crate::graphics::Graphics::lines), whose docs
     /// describe it.
     pub(crate) fn lines_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
-        self.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Lines), opts);
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Lines), opts);
     }
 
     /// `C_plotXY`: the lines for `type`, then the points for `"p"`, `"b"`
@@ -452,6 +522,18 @@ impl<B: Backend> Device<B> {
         y1: &[f64],
         opts: &SegmentsOptions,
     ) {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.segments_draw(x0, y0, x1, y1, opts);
+    }
+
+    fn segments_draw(
+        &mut self,
+        x0: &[f64],
+        y0: &[f64],
+        x1: &[f64],
+        y1: &[f64],
+        opts: &SegmentsOptions,
+    ) {
         let n = recycled_len(&[x0.len(), y0.len(), x1.len(), y1.len()]);
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
@@ -465,10 +547,7 @@ impl<B: Backend> Device<B> {
             let Some(c) = self.resolve(pick(&opts.col, i, fg)) else {
                 continue;
             };
-            let mut stroke = self.stroke_of(c, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty));
-            if let Some(lend) = opts.lend {
-                stroke.lend = lend;
-            }
+            let stroke = self.stroke_of(c, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty));
             self.backend.draw_line(p0, p1, &stroke);
         }
         self.pop_clip();
@@ -478,6 +557,18 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::arrows`](crate::graphics::Graphics::arrows), whose docs
     /// describe it.
     pub(crate) fn arrows_impl(
+        &mut self,
+        x0: &[f64],
+        y0: &[f64],
+        x1: &[f64],
+        y1: &[f64],
+        opts: &ArrowsOptions,
+    ) {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.arrows_draw(x0, y0, x1, y1, opts);
+    }
+
+    fn arrows_draw(
         &mut self,
         x0: &[f64],
         y0: &[f64],
@@ -545,6 +636,11 @@ impl<B: Backend> Device<B> {
         y1: &[f64],
         opts: &RectOptions,
     ) {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.rect_draw(x0, y0, x1, y1, opts);
+    }
+
+    fn rect_draw(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: &RectOptions) {
         let n = recycled_len(&[x0.len(), y0.len(), x1.len(), y1.len()]);
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
@@ -569,6 +665,11 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::polygon`](crate::graphics::Graphics::polygon), whose docs
     /// describe it.
     pub(crate) fn polygon_impl(&mut self, x: &[f64], y: &[f64], opts: &PolygonOptions) {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.polygon_draw(x, y, opts);
+    }
+
+    fn polygon_draw(&mut self, x: &[f64], y: &[f64], opts: &PolygonOptions) {
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, opts.lwd.unwrap_or(self.par.lwd));
         self.push_clip_region(self.clip_for(opts.xpd));
@@ -659,6 +760,11 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::box_`](crate::graphics::Graphics::box_), whose docs
     /// describe it.
     pub(crate) fn box_impl(&mut self, opts: &BoxOptions) {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        dev.box_draw(opts);
+    }
+
+    fn box_draw(&mut self, opts: &BoxOptions) {
         let Some(color) = self.resolve(opts.col.unwrap_or(ColorSpec::Color(self.par.col))) else {
             return;
         };

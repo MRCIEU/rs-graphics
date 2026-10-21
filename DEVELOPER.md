@@ -427,6 +427,10 @@ against a real R installation by shelling out to `Rscript`:
   `mar` resetting it), `omi`/`omd` with outer `mtext()` (and `mfrow`),
   `pin` (and `mar` resetting it), `pty` resetting `plt`, `fin`, and
   `par(oma)` starting a new page: paths and text vs. R `pdf()`.
+- `tests/line_pars_matches_r.rs` - inline `lend`/`ljoin`/`lmitre` on
+  every primitive (incl. a `pch` symbol, which uses `par()`'s with a
+  solid line): cap, join, mitre and width at each stroke vs R `pdf()`,
+  and that they don't outlast the call.
 - `tests/xy_lengths_matches_r.rs` - `plot()`/`points()`/`lines()`/
   `polygon()` with `x` and `y` of different lengths panic with R's
   `xy.coords()` message (on a device and in a `Figure`); `text()`
