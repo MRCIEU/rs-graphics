@@ -216,8 +216,8 @@ impl<B: Backend> Device<B> {
                     adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
                     xpd: Some(Xpd::Figure),
                     srt: opts.srt,
-                    cex: opts.cex.into_iter().collect(),
-                    font: opts.font.into_iter().collect(),
+                    cex: opts.cex.into_iter().map(Some).collect(),
+                    font: opts.font.into_iter().map(Some).collect(),
                     ..TextOptions::default()
                 };
                 self.text_impl(&[1.1 * px], &[1.1 * py], std::slice::from_ref(label), &at);

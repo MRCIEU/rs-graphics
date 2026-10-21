@@ -27,7 +27,7 @@
 
 use std::fmt::Write as _;
 
-use super::compress::{zlib_compress, DEFLATE_LEVEL};
+use super::compress::{DEFLATE_LEVEL, zlib_compress};
 use super::numfmt::push_fixed;
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::afm::FontFace;
@@ -293,7 +293,11 @@ impl PdfBackend {
         objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
         let kids: Vec<String> = (0..n_pages).map(|i| format!("{} 0 R", 3 + 2 * i)).collect();
         objects.push(
-            format!("<< /Type /Pages /Kids [{}] /Count {n_pages} >>", kids.join(" ")).into_bytes(),
+            format!(
+                "<< /Type /Pages /Kids [{}] /Count {n_pages} >>",
+                kids.join(" ")
+            )
+            .into_bytes(),
         );
         let symbol_res = if self.uses_symbol {
             format!(" /F5 {} 0 R", font0 + 4)
@@ -492,7 +496,11 @@ impl Backend for PdfBackend {
             self.content.push(' ');
         }
         self.op(&[x, y], 3, "Tm");
-        let _ = writeln!(self.content, "({}) Tj", Self::escape_pdf_string(text, symbol));
+        let _ = writeln!(
+            self.content,
+            "({}) Tj",
+            Self::escape_pdf_string(text, symbol)
+        );
         self.content.push_str("ET\n");
     }
 }

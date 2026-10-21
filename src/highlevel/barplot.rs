@@ -30,8 +30,7 @@
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec, gray_colors};
 use crate::device::{
-    AxisOptions, Device, LegendEntry, LegendOptions, LegendPos, PlotWindowOptions, RectOptions,
-    TitleOptions,
+    AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions, TitleOptions,
 };
 use crate::error::{from_r_string, from_str_via_parse};
 use crate::lty::LineType;
@@ -76,10 +75,10 @@ pub struct BarplotOptions {
     /// corner of the plot region, as R.
     pub legend_pos: Option<LegendPos>,
     /// The rest of R's `args.legend`: every field set here overrides
-    /// barplot's choice for the legend (`xjust = yjust = 1`, otherwise
-    /// `legend()`'s defaults), e.g. `bty`, `inset`, `ncol`, `cex`, `title`.
-    /// The labels and fill colours always come from `legend_text` and
-    /// `col`. Default: no overrides.
+    /// barplot's choice for the legend (`fill` from `col`, `xjust = yjust
+    /// = 1`, otherwise `legend()`'s defaults), e.g. `bty`, `inset`, `ncol`,
+    /// `cex`, `title`, `fill`. The labels always come from `legend_text`.
+    /// Default: no overrides.
     pub args_legend: LegendOptions,
     /// x limits; `None`: from the bars.
     pub xlim: Option<(f64, f64)>,
@@ -734,13 +733,13 @@ impl<B: Backend> Device<B> {
         }
 
         if let Some(labels) = &opts.legend_text {
-            let mut entries: Vec<LegendEntry> = labels
-                .iter()
-                .enumerate()
-                .map(|(i, l)| LegendEntry::filled(l.clone(), colors[i % colors.len()]))
+            let mut labels = labels.clone();
+            let mut fill: Vec<ColorSpec> = (0..labels.len())
+                .map(|i| colors[i % colors.len()])
                 .collect();
             if (horiz && beside) || (!horiz && !beside) {
-                entries.reverse();
+                labels.reverse();
+                fill.reverse();
             }
             // By default 0.1 inch in from the top-right corner of the plot
             // region. (On a log axis R passes the log10 `par("usr")` values
@@ -758,7 +757,10 @@ impl<B: Backend> Device<B> {
             let mut lopts = opts.args_legend.clone();
             lopts.xjust.get_or_insert(1.0);
             lopts.yjust.get_or_insert(1.0);
-            self.legend_impl(pos, &entries, &lopts);
+            if lopts.fill.is_empty() {
+                lopts.fill = fill;
+            }
+            self.legend_impl(pos, &labels, &lopts);
         }
 
         if opts.ann.unwrap_or(!opts.add && self.par.ann) {

@@ -52,8 +52,9 @@ mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
-pub use legend::{LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
-pub use mtext::{MtextLabels, MtextOptions};
+pub(crate) use legend::check_legend;
+pub use legend::{LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos};
+pub use mtext::MtextOptions;
 pub use open::DeviceBuilder;
 pub use primitives::{
     ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
@@ -654,7 +655,11 @@ impl<B: Backend> Device<B> {
     /// value), and `xaxs = "r"` adds 4% at each end.
     fn gscale(min: f64, max: f64, style: AxisStyle, log: bool) -> (f64, f64) {
         const EPS_FAC_1: f64 = 16.0;
-        let (mut min, mut max) = if log { (min.log10(), max.log10()) } else { (min, max) };
+        let (mut min, mut max) = if log {
+            (min.log10(), max.log10())
+        } else {
+            (min, max)
+        };
         let fix = |v: f64| {
             if v.is_finite() {
                 v
@@ -692,7 +697,13 @@ impl<B: Backend> Device<B> {
                 0.04 * (max - min)
             };
             let clamp = |v: f64| {
-                if v.is_finite() { v } else if v < 0.0 { -f64::MAX } else { f64::MAX }
+                if v.is_finite() {
+                    v
+                } else if v < 0.0 {
+                    -f64::MAX
+                } else {
+                    f64::MAX
+                }
             };
             if log {
                 min -= d;
@@ -786,10 +797,26 @@ impl<B: Backend> Device<B> {
     fn xpd_limits(&self, x_axis: bool, xpd: Xpd) -> (f64, f64) {
         let (u0, u1, p0, p1, f0, f1, d1) = if x_axis {
             let (u0, u1, ..) = self.usr;
-            (u0, u1, self.plt.x0, self.plt.x1, self.fig.x0, self.fig.x1, self.width_in)
+            (
+                u0,
+                u1,
+                self.plt.x0,
+                self.plt.x1,
+                self.fig.x0,
+                self.fig.x1,
+                self.width_in,
+            )
         } else {
             let (.., u0, u1) = self.usr;
-            (u0, u1, self.plt.y0, self.plt.y1, self.fig.y0, self.fig.y1, self.height_in)
+            (
+                u0,
+                u1,
+                self.plt.y0,
+                self.plt.y1,
+                self.fig.y0,
+                self.fig.y1,
+                self.height_in,
+            )
         };
         let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
         match xpd {
@@ -932,10 +959,12 @@ impl<B: Backend> Device<B> {
                 Some(col),
                 None,
             );
-        } else if (32..=126).contains(&pch) {
+        } else if (32..=126).contains(&pch) || pch <= -32 {
             // `GEText(x, y, str, hadj = NA, yc = NA)`: centred on the
             // advance width, and vertically on the glyph's own bounding box.
-            let ch = char::from_u32(pch as u32).unwrap_or('?').to_string();
+            // A negative `pch` is minus a Unicode code point, as in R.
+            let code = pch.unsigned_abs();
+            let ch = char::from_u32(code).unwrap_or('?').to_string();
             let face = self.par.font_face(self.par.font);
             let size_pt = self.backend.effective_font_size(self.par.ps * cex);
             if size_pt <= 0.0 {
@@ -1163,7 +1192,10 @@ impl<B: Backend> Device<B> {
             .fold(0.0, f64::max);
         let newlines = text.matches('\n').count() as f64;
         let line = self.par.lheight * 1.2 * self.par.ps * self.par.cex * cex / 72.0;
-        (width, newlines * line + afm::m_height_inches(face, size, 1.0))
+        (
+            width,
+            newlines * line + afm::m_height_inches(face, size, 1.0),
+        )
     }
 
     /// Draws one line of text at `anchor` (device inches), clipped to
@@ -1216,7 +1248,6 @@ impl<B: Backend> Device<B> {
         self.backend.draw_text(origin, label, &style);
         self.pop_clip();
     }
-
 
     // ---------------------------------------------------------------
     // title()
@@ -1526,9 +1557,15 @@ mod tests {
             region_error(ok, [0.8, 0.2, 0.0, 2.0]),
             Some("figure margins too large")
         );
-        assert_eq!(region_error(ok, [0.0, 2.0, 0.0, 1.0]), Some("plot region too large"));
+        assert_eq!(
+            region_error(ok, [0.0, 2.0, 0.0, 1.0]),
+            Some("plot region too large")
+        );
         // R's FLT_EPSILON tolerance at the edges.
-        assert_eq!(region_error([-1e-9, 1.0 + 1e-9, 0.0, 1.0], [-1e-9, 1.0, 0.0, 1.0]), None);
+        assert_eq!(
+            region_error([-1e-9, 1.0 + 1e-9, 0.0, 1.0], [-1e-9, 1.0, 0.0, 1.0]),
+            None
+        );
     }
 
     #[test]

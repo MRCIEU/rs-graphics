@@ -20,7 +20,7 @@ use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::ColorSpec;
-use rs_graphics::device::{Device, LegendEntry, LegendKeyword, LegendPos};
+use rs_graphics::device::{Device, LegendKeyword, LegendPos};
 use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::lty::LineType;
 use rs_graphics::par::Par;
@@ -57,15 +57,10 @@ fn draw_ours(start: f64, ps: f64) -> String {
         .with(&opts)
         .draw();
     let black = ColorSpec::Index(1);
-    let entries: Vec<LegendEntry> = ["a", "bb"]
-        .iter()
-        .map(|l| {
-            LegendEntry::point(*l, black, 1)
-                .lwd(1.0)
-                .lty(LineType::from_code(1))
-        })
-        .collect();
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
+    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), ["a", "bb"])
+        .col(black)
+        .pch(1)
+        .lty(LineType::from_code(1))
         .draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }

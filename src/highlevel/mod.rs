@@ -48,11 +48,7 @@ pub(crate) fn data_range(xs: &[f64]) -> (f64, f64) {
             hi = hi.max(v);
         }
     }
-    if lo > hi {
-        (0.0, 1.0)
-    } else {
-        (lo, hi)
-    }
+    if lo > hi { (0.0, 1.0) } else { (lo, hi) }
 }
 
 /// R's inline axis parameters that a high-level plot passes through its

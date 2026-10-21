@@ -77,11 +77,10 @@ fn cases() -> Vec<Case> {
                 d.plot(&X, &Y).draw();
                 d.text(&[11], &[3], &["abc"]).xpd(Xpd::Device).draw();
                 d.text(&[11], &[4], &["sum"]).xpd(true).draw();
-                let keys = [
-                    LegendEntry::point("abc", 1, 1),
-                    LegendEntry::point("sum", 1, 2),
-                ];
-                d.legend((8, 5), &keys).xpd(Xpd::Device).draw();
+                d.legend((8, 5), ["abc", "sum"])
+                    .pch([1, 2])
+                    .xpd(Xpd::Device)
+                    .draw();
             },
         },
         Case {

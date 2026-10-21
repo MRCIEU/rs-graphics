@@ -37,11 +37,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ylab("y")
         .draw();
     dev.abline().h(6.0).col("grey").lty("dashed").draw();
-    let keys = [
-        LegendEntry::point("observed", "steelblue", 19),
-        LegendEntry::line("threshold", "grey", 1.0, "dashed"),
-    ];
-    dev.legend("topleft", &keys).draw();
+    // R: legend("topleft", legend = c("observed", "threshold"),
+    //           col = c("steelblue", "grey"), pch = c(19, NA), lty = c(NA, 2))
+    dev.legend("topleft", ["observed", "threshold"])
+        .col(["steelblue", "grey"])
+        .pch([Some(19), None])
+        .lty([None, Some(2)])
+        .draw();
     dev.close()?;
     Ok(())
 }
@@ -54,7 +56,8 @@ calls without `.draw()` draw nothing (the compiler warns). Every
 setter is documented on its options struct, e.g. `XyOptions` for
 `points()`. As in R, numbers may be integers or floats:
 `dev.plot(1..=10, &y).cex(2).xlim(0, 12)` (`1..=10` is R's `1:10`), and
-data vectors may hold any number type.
+data vectors may hold any number type. R's `NA` in a style vector is
+`None`: R's `pch = c(19, NA)` is `.pch([Some(19), None])`.
 
 ### R side by side
 
@@ -74,11 +77,7 @@ dev.plot(&x, &y).pch(19).col(groups).xlab("Dose").ylab("Response").draw();
 // R: text(x, y, labels = c("a", "b", "c", "d", "e"), adj = -0.5)
 dev.text(&x, &y, &["a", "b", "c", "d", "e"]).adj(-0.5).draw();
 // R: legend("topleft", legend = c("control", "treated"), pch = 19, col = 1:2)
-let keys = [
-    LegendEntry::point("control", 1, 19),
-    LegendEntry::point("treated", 2, 19),
-];
-dev.legend("topleft", &keys).draw();
+dev.legend("topleft", ["control", "treated"]).pch(19).col([1, 2]).draw();
 // R: dev.off()
 dev.close()?;
 ```
@@ -161,11 +160,11 @@ fig.plot(&dose, &response)
     .main(Label::math("y == alpha + beta * x"))
     .draw();
 fig.lines(&dose, &fitted).col("red").draw();
-let keys = [
-    LegendEntry::point("observed", 1, 1),
-    LegendEntry::line("fitted", "red", 1.0, "solid"),
-];
-fig.legend("bottomright", &keys).draw();
+fig.legend("bottomright", ["observed", "fitted"])
+    .col(["black", "red"])
+    .pch([Some(1), None])
+    .lty([None, Some(1)])
+    .draw();
 
 let mut dev = Device::pdf("fits.pdf").width(8.0).height(8.0).open()?;
 dev.par().mfrow(2, 2).draw();

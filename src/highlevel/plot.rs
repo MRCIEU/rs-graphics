@@ -91,8 +91,11 @@ pub struct PlotOptions {
     /// What to draw (R's `type`, see [`PlotType`]); `None`: points
     /// (`"p"`).
     pub type_: Option<PlotType>,
-    /// Plotting symbols, recycled per point; empty: `par(pch)`.
-    pub pch: Vec<i32>,
+    /// Plotting symbols, recycled per point (a negative value is minus a
+    /// Unicode code point, as in R; the setter takes characters too);
+    /// empty: `par(pch)`.
+    /// `None` (R's `NA`): no point there.
+    pub pch: Vec<Option<i32>>,
     /// Colours, recycled per point (lines use the first, except
     /// `type = "h"`'s, one per point); empty: `par(col)`.
     pub col: Vec<ColorSpec>,
@@ -100,11 +103,13 @@ pub struct PlotOptions {
     pub bg: Vec<ColorSpec>,
     /// Line widths, recycled per point (lines use the first); empty:
     /// `par(lwd)`.
-    pub lwd: Vec<f64>,
+    /// `None` (R's `NA`): no point there (the lines use `par(lwd)`).
+    pub lwd: Vec<Option<f64>>,
     /// Line type of lines; `None`: `par(lty)`.
     pub lty: Option<LineType>,
     /// Symbol sizes, recycled per point, times `par(cex)`; empty: 1.
-    pub cex: Vec<f64>,
+    /// `None` (R's `NA`): no point there.
+    pub cex: Vec<Option<f64>>,
     /// x limits; `None`: the finite data range, like R's
     /// `plot.window(xlim = range(x))` (positive values only on a log
     /// axis).
@@ -213,12 +218,12 @@ pub struct PlotOptions {
 
 crate::setters::setters!(PlotOptions => [PlotCall] {
     type_: option PlotType,
-    pch: values i32,
+    pch: na_values i32,
     col: values ColorSpec,
     bg: values ColorSpec,
-    lwd: values f64,
+    lwd: na_values f64,
     lty: option LineType,
-    cex: values f64,
+    cex: na_values f64,
     xlim: pair f64,
     ylim: pair f64,
     xlog: value bool,

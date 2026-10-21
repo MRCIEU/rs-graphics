@@ -127,10 +127,10 @@ fn draw_ours(c: &Case) -> String {
         let (x, y) = pch_pos(pch);
         dev.points(&[x], &[y])
             .with(&XyOptions {
-                pch: vec![pch as i32],
+                pch: vec![Some(pch as i32)],
                 col: vec![col],
                 bg: vec![bg],
-                cex: vec![c.cex],
+                cex: vec![Some(c.cex)],
                 ..XyOptions::default()
             })
             .draw();
@@ -140,9 +140,9 @@ fn draw_ours(c: &Case) -> String {
         let (x, y) = char_pos(i);
         dev.points(&[x], &[y])
             .with(&XyOptions {
-                pch: vec![ch as i32],
+                pch: vec![Some(ch as i32)],
                 col: vec![col],
-                cex: vec![c.cex],
+                cex: vec![Some(c.cex)],
                 ..XyOptions::default()
             })
             .draw();

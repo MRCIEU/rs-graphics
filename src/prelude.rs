@@ -24,9 +24,9 @@ pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
 pub use crate::device::{
     AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, DeviceBuilder,
-    LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextLabels,
-    MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side,
-    TextOptions, TitleOptions, XyOptions,
+    LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos, MtextOptions,
+    PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
+    TitleOptions, XyOptions,
 };
 pub use crate::geometry::{Point, Rect};
 pub use crate::graphics::Graphics;
@@ -38,5 +38,5 @@ pub use crate::layout::{Layout, LayoutSize};
 pub use crate::lty::LineType;
 pub use crate::numbers::{Groups, Numbers, Pair};
 pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};
-pub use crate::plotmath::{Expression, Label};
+pub use crate::plotmath::{Expression, Label, Labels};
 pub use crate::recording::{Figure, FigureResult};

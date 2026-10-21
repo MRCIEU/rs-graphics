@@ -17,15 +17,7 @@ mod common;
 
 use std::process::Command;
 
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::{
-    Device, LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos,
-};
-use rs_graphics::highlevel::PlotOptions;
-use rs_graphics::lty::LineType;
-use rs_graphics::par::Par;
-use rs_graphics::graphics::Graphics;
+use rs_graphics::prelude::*;
 
 /// `(x, y)` of every text matrix, sorted.
 fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
@@ -81,22 +73,10 @@ fn rects(pdf: &str) -> Vec<[f64; 4]> {
     out
 }
 
-fn black() -> ColorSpec {
-    ColorSpec::Color(Color::BLACK)
-}
-
-fn named(s: &str) -> ColorSpec {
-    ColorSpec::Color(Color::parse(s).unwrap())
-}
-
-fn solid() -> LineType {
-    LineType::from_code(1)
-}
-
 struct Case {
     name: &'static str,
     r: &'static str,
-    run: fn(&mut Device<PdfBackend>) -> Option<LegendLayout>,
+    run: fn(&mut Device<PdfBackend>) -> LegendLayout,
 }
 
 fn cases() -> Vec<Case> {
@@ -105,20 +85,12 @@ fn cases() -> Vec<Case> {
             name: "topright_title_merge",
             r: r#"legend("topright", legend=c("alpha","beta gamma"), col=c(1,2), pch=c(19,1), lty=c(1,2), lwd=c(1,2), title="Key")"#,
             run: |d| {
-                let e = vec![
-                    LegendEntry::point("alpha", ColorSpec::Index(1), 19)
-                        .lwd(1.0)
-                        .lty(solid()),
-                    LegendEntry::point("beta gamma", ColorSpec::Index(2), 1)
-                        .lwd(2.0)
-                        .lty(LineType::from_code(2)),
-                ];
-                let o = LegendOptions {
-                    title: Some("Key".into()),
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e)
-                    .with(&o)
+                d.legend("topright", ["alpha", "beta gamma"])
+                    .col([1, 2])
+                    .pch([19, 1])
+                    .lty([1, 2])
+                    .lwd([1, 2])
+                    .title("Key")
                     .draw()
             },
         },
@@ -126,17 +98,9 @@ fn cases() -> Vec<Case> {
             name: "bottomleft_inset",
             r: r#"legend("bottomleft", legend=c("a","bb","ccc"), pch=c(1,2,3), inset=0.05)"#,
             run: |d| {
-                let e = vec![
-                    LegendEntry::point("a", black(), 1),
-                    LegendEntry::point("bb", black(), 2),
-                    LegendEntry::point("ccc", black(), 3),
-                ];
-                let o = LegendOptions {
-                    inset: Some((0.05, 0.05)),
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Keyword(LegendKeyword::BottomLeft), &e)
-                    .with(&o)
+                d.legend("bottomleft", ["a", "bb", "ccc"])
+                    .pch([1, 2, 3])
+                    .inset((0.05, 0.05))
                     .draw()
             },
         },
@@ -144,18 +108,11 @@ fn cases() -> Vec<Case> {
             name: "center_ncol2_nobox",
             r: r#"legend("center", legend=c("one","two","three"), lty=1:3, col=2:4, ncol=2, bty="n")"#,
             run: |d| {
-                let e = vec![
-                    LegendEntry::line("one", ColorSpec::Index(2), 1.0, LineType::from_code(1)),
-                    LegendEntry::line("two", ColorSpec::Index(3), 1.0, LineType::from_code(2)),
-                    LegendEntry::line("three", ColorSpec::Index(4), 1.0, LineType::from_code(3)),
-                ];
-                let o = LegendOptions {
-                    ncol: Some(2),
-                    bty: Some(LegendBty::None),
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Keyword(LegendKeyword::Center), &e)
-                    .with(&o)
+                d.legend("center", ["one", "two", "three"])
+                    .lty([1, 2, 3])
+                    .col([2, 3, 4])
+                    .ncol(2)
+                    .bty("n")
                     .draw()
             },
         },
@@ -163,16 +120,9 @@ fn cases() -> Vec<Case> {
             name: "top_horiz_fill",
             r: r#"legend("top", legend=c("x","yy"), fill=c("red","blue"), horiz=TRUE)"#,
             run: |d| {
-                let e = vec![
-                    LegendEntry::filled("x", named("red")),
-                    LegendEntry::filled("yy", named("blue")),
-                ];
-                let o = LegendOptions {
-                    horiz: true,
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Keyword(LegendKeyword::Top), &e)
-                    .with(&o)
+                d.legend("top", ["x", "yy"])
+                    .fill(["red", "blue"])
+                    .horiz(true)
                     .draw()
             },
         },
@@ -180,48 +130,29 @@ fn cases() -> Vec<Case> {
             name: "xy_cex_intersp_title",
             r: r#"legend(5, 20, legend=c("p","qq","rrr"), pch=1:3, cex=0.8, y.intersp=1.5, x.intersp=2, title="T")"#,
             run: |d| {
-                let e = vec![
-                    LegendEntry::point("p", black(), 1),
-                    LegendEntry::point("qq", black(), 2),
-                    LegendEntry::point("rrr", black(), 3),
-                ];
-                let o = LegendOptions {
-                    cex: Some(0.8),
-                    y_intersp: Some(1.5),
-                    x_intersp: Some(2.0),
-                    title: Some("T".into()),
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Xy(5.0, 20.0), &e).with(&o).draw()
+                d.legend((5, 20), ["p", "qq", "rrr"])
+                    .pch([1, 2, 3])
+                    .cex(0.8)
+                    .y_intersp(1.5)
+                    .x_intersp(2)
+                    .title("T")
+                    .draw()
             },
         },
         Case {
             name: "corners",
             r: r#"legend(c(5,15), c(10,20), legend=c("a","b"), pch=1:2)"#,
-            run: |d| {
-                let e = vec![
-                    LegendEntry::point("a", black(), 1),
-                    LegendEntry::point("b", black(), 2),
-                ];
-                d.legend(LegendPos::Corners(5.0, 10.0, 15.0, 20.0), &e)
-                    .draw()
-            },
+            run: |d| d.legend(((5, 15), (10, 20)), ["a", "b"]).pch([1, 2]).draw(),
         },
         Case {
             name: "right_long_title_seglen",
             r: r#"legend("right", legend=c("lo","hi"), lty=1, lwd=2, seg.len=3, title="A rather long legend title")"#,
             run: |d| {
-                let e = vec![
-                    LegendEntry::line("lo", black(), 2.0, solid()),
-                    LegendEntry::line("hi", black(), 2.0, solid()),
-                ];
-                let o = LegendOptions {
-                    seg_len: Some(3.0),
-                    title: Some("A rather long legend title".into()),
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Keyword(LegendKeyword::Right), &e)
-                    .with(&o)
+                d.legend("right", ["lo", "hi"])
+                    .lty(1)
+                    .lwd(2)
+                    .seg_len(3)
+                    .title("A rather long legend title")
                     .draw()
             },
         },
@@ -230,21 +161,11 @@ fn cases() -> Vec<Case> {
             r: r#"par(cex = 1.5); legend("topright", legend=c("alpha","beta gamma"), pch=1:2, lty=1, cex=0.8, title="Key")"#,
             run: |d| {
                 d.par().cex(1.5).draw();
-                let e = vec![
-                    LegendEntry::point("alpha", black(), 1)
-                        .lwd(1.0)
-                        .lty(solid()),
-                    LegendEntry::point("beta gamma", black(), 2)
-                        .lwd(1.0)
-                        .lty(solid()),
-                ];
-                let o = LegendOptions {
-                    cex: Some(0.8),
-                    title: Some("Key".into()),
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &e)
-                    .with(&o)
+                d.legend("topright", ["alpha", "beta gamma"])
+                    .pch([1, 2])
+                    .lty(1)
+                    .cex(0.8)
+                    .title("Key")
                     .draw()
             },
         },
@@ -252,16 +173,9 @@ fn cases() -> Vec<Case> {
             name: "topleft_text_width",
             r: r#"legend("topleft", legend=c("a","b"), pch=1:2, text.width=2)"#,
             run: |d| {
-                let e = vec![
-                    LegendEntry::point("a", black(), 1),
-                    LegendEntry::point("b", black(), 2),
-                ];
-                let o = LegendOptions {
-                    text_width: Some(2.0),
-                    ..Default::default()
-                };
-                d.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e)
-                    .with(&o)
+                d.legend("topleft", ["a", "b"])
+                    .pch([1, 2])
+                    .text_width(2)
                     .draw()
             },
         },
@@ -340,13 +254,13 @@ fn legend_layout_matches_r() {
 
         let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), Par::default());
         let opts = PlotOptions {
-            pch: vec![19],
+            pch: vec![Some(19)],
             xlab: Some("x".into()),
             ylab: Some("y".into()),
             ..PlotOptions::default()
         };
         dev.plot(&x, &y).with(&opts).draw();
-        let layout = (c.run)(&mut dev).expect("legend drawn");
+        let layout = (c.run)(&mut dev);
         check_return_value(
             c.name,
             &layout,
@@ -411,19 +325,11 @@ fn legend_return_value_on_log_axes_matches_r() {
         ..PlotOptions::default()
     };
     dev.plot(&[1.0, 1000.0], &[2.0, 500.0]).with(&opts).draw();
-    let e = vec![
-        LegendEntry::point("a", black(), 1),
-        LegendEntry::point("bb", black(), 2),
-    ];
-    let o = LegendOptions {
-        inset: Some((0.05, 0.05)),
-        ..Default::default()
-    };
     let layout = dev
-        .legend(LegendPos::Keyword(LegendKeyword::TopLeft), &e)
-        .with(&o)
-        .draw()
-        .expect("legend drawn");
+        .legend("topleft", ["a", "bb"])
+        .pch([1, 2])
+        .inset((0.05, 0.05))
+        .draw();
     check_return_value(
         "log",
         &layout,

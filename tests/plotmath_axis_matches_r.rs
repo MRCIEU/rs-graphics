@@ -414,7 +414,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
 
     use rs_graphics::color::{Color, ColorSpec};
     use rs_graphics::device::{
-        LegendEntry, LegendKeyword, LegendOptions, LegendPos, MtextOptions, TitleOptions,
+        LegendKeyword, LegendOptions, LegendPos, MtextOptions, TitleOptions,
     };
     use rs_graphics::lty::LineType;
     use rs_graphics::par::Sides;
@@ -467,8 +467,8 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .with(&TextOptions {
             adj: Some(0.5),
             col: vec![black],
-            cex: vec![1.0],
-            font: vec![1],
+            cex: vec![Some(1.0)],
+            font: vec![Some(1)],
             ..TextOptions::default()
         })
         .draw();
@@ -478,8 +478,8 @@ fn plotmath_title_mtext_text_legend_match_r() {
             vadj: Some(1.0),
             srt: Some(30.0),
             col: vec![black],
-            cex: vec![1.5],
-            font: vec![1],
+            cex: vec![Some(1.5)],
+            font: vec![Some(1)],
             ..TextOptions::default()
         })
         .draw();
@@ -488,28 +488,20 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .with(&TextOptions {
             adj: Some(0.5),
             col: vec![red],
-            cex: vec![1.0],
-            font: vec![1],
+            cex: vec![Some(1.0)],
+            font: vec![Some(1)],
             ..TextOptions::default()
         })
         .draw();
-    let entries: Vec<LegendEntry> = ["alpha", "beta^2", "x[i]^(y^2)"]
-        .iter()
-        .enumerate()
-        .map(|(i, e)| {
-            LegendEntry::line(
-                Label::math(e),
-                black,
-                1.0,
-                LineType::from_code(i as i32 + 1),
-            )
-        })
-        .collect();
+    let labels = ["alpha", "beta^2", "x[i]^(y^2)"].map(Label::math);
     let opts = LegendOptions {
+        col: vec![black],
+        lty: (1..=3).map(|c| Some(LineType::from_code(c))).collect(),
+        lwd: vec![Some(1.0)],
         title: Some(Label::math("Sigma[j]")),
         ..LegendOptions::default()
     };
-    d.legend(LegendPos::Keyword(LegendKeyword::TopRight), &entries)
+    d.legend(LegendPos::Keyword(LegendKeyword::TopRight), labels)
         .with(&opts)
         .draw();
 

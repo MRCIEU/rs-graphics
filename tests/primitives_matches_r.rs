@@ -60,11 +60,11 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 let x: Vec<f64> = (1..=9).map(f64::from).collect();
                 let opts = XyOptions {
-                    pch: vec![1, 19, 21, 3],
+                    pch: vec![Some(1), Some(19), Some(21), Some(3)],
                     col: cols(&["red", "blue", "darkgreen"]),
                     bg: cols(&["yellow", "pink"]),
-                    cex: vec![1.0, 2.0],
-                    lwd: vec![1.0, 3.0],
+                    cex: vec![Some(1.0), Some(2.0)],
+                    lwd: vec![Some(1.0), Some(3.0)],
                     ..XyOptions::default()
                 };
                 d.points(&x, &x).with(&opts).draw();
@@ -82,16 +82,16 @@ fn cases() -> Vec<Case> {
                 let shift = |s: f64| Y.iter().map(|v| v + s).collect::<Vec<_>>();
                 let b = XyOptions {
                     type_: Some(PlotType::Both),
-                    pch: vec![19],
+                    pch: vec![Some(19)],
                     col: cols(&["red"]),
-                    lwd: vec![2.0],
+                    lwd: vec![Some(2.0)],
                     lty: Some(LineType::DASHED),
                     ..XyOptions::default()
                 };
                 d.lines(&x, &Y).with(&b).draw();
                 let o = XyOptions {
                     type_: Some(PlotType::Overplotted),
-                    pch: vec![0],
+                    pch: vec![Some(0)],
                     col: cols(&["blue", "green"]),
                     ..XyOptions::default()
                 };
@@ -104,7 +104,7 @@ fn cases() -> Vec<Case> {
                 d.points(&x, &shift(-0.5)).with(&c).draw();
                 let p = XyOptions {
                     type_: Some(PlotType::Points),
-                    pch: vec![4],
+                    pch: vec![Some(4)],
                     ..XyOptions::default()
                 };
                 d.lines(&x, &shift(-1.0)).with(&p).draw();
@@ -121,8 +121,8 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.par().fg(Color::parse("blue").unwrap()).draw();
                 let solid_dashed = SegmentsOptions {
-                    lty: vec![LineType::SOLID, LineType::DASHED],
-                    lwd: vec![1.0, 4.0],
+                    lty: vec![Some(LineType::SOLID), Some(LineType::DASHED)],
+                    lwd: vec![Some(1.0), Some(4.0)],
                     ..SegmentsOptions::default()
                 };
                 d.segments(&[1.0], &[1.0, 2.0, 3.0, 4.0], &[9.0], &[1.0, 2.0, 3.0, 4.0])
@@ -161,14 +161,14 @@ fn cases() -> Vec<Case> {
                 let three = RectOptions {
                     col: vec!["grey".into(), ColorSpec::None],
                     border: vec!["red".into(), "blue".into(), ColorSpec::None],
-                    lwd: vec![2.0],
+                    lwd: vec![Some(2.0)],
                     ..RectOptions::default()
                 };
                 d.rect(&[1.0, 3.0, 5.0], &[1.0], &[2.0, 4.0, 6.0], &[2.0, 3.0, 4.0])
                     .with(&three)
                     .draw();
                 let dashed = RectOptions {
-                    lty: vec![LineType::DASHED],
+                    lty: vec![Some(LineType::DASHED)],
                     ..RectOptions::default()
                 };
                 d.rect(&[7.0], &[1.0], &[9.0], &[3.0]).with(&dashed).draw();
@@ -176,7 +176,11 @@ fn cases() -> Vec<Case> {
                 let polys = PolygonOptions {
                     col: vec!["orange".into(), ColorSpec::None, "cyan".into()],
                     border: vec![ColorSpec::Index(1), ColorSpec::Index(2)],
-                    lty: vec![LineType::SOLID, LineType::DASHED, LineType::DOTTED],
+                    lty: vec![
+                        Some(LineType::SOLID),
+                        Some(LineType::DASHED),
+                        Some(LineType::DOTTED),
+                    ],
                     ..PolygonOptions::default()
                 };
                 d.polygon(
@@ -198,8 +202,8 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 let vec_text = TextOptions {
                     col: cols(&["red", "blue"]),
-                    cex: vec![1.0, 1.5, 2.0],
-                    font: vec![1, 2],
+                    cex: vec![Some(1.0), Some(1.5), Some(2.0)],
+                    font: vec![Some(1), Some(2)],
                     ..TextOptions::default()
                 };
                 d.text(&[2.0, 5.0, 8.0], &[2.0, 5.0, 8.0], &["a", "bb"])

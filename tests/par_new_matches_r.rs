@@ -146,7 +146,7 @@ fn cases() -> Vec<Case> {
                 let black = ColorSpec::Index(1);
                 d.points(&[5.0], &[50.0])
                     .with(&XyOptions {
-                        pch: vec![19],
+                        pch: vec![Some(19)],
                         col: vec![black],
                         ..XyOptions::default()
                     })

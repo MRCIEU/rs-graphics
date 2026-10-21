@@ -9,7 +9,7 @@
 //! Integers wherever R takes numbers: data vectors (`&[1, 2, 3]`, other
 //! integer types, ranges), recycled and single-value setters, limits,
 //! arrays (`mar`, `mgp`, `xaxp`), pairs (`plot_window`, legend positions,
-//! `inset`), `LegendEntry::line`'s `lwd`, `Layout` sizes, `fig()` and the
+//! `inset`), legend `lwd`/`pt_cex`, `Layout` sizes, `fig()` and the
 //! backend constructors draw byte for byte what the same `f64` values do,
 //! on a device and in a recorded `Figure`. No R needed.
 
@@ -36,14 +36,20 @@ fn with_integers<G: Graphics>(g: &mut G) {
     g.text(&[1, 2], &[5, 5], &["a", "b"]).cex(2).draw();
     g.abline().h(3).v([1, 2]).coef(0, 1).lwd(2).draw();
     g.axis(3).at([1, 2, 3]).lwd(2).draw();
-    let keys = [
-        LegendEntry::line("line", "blue", 2, "dashed"),
-        LegendEntry::point("point", "black", 21)
-            .pt_bg("red")
-            .pt_cex(2),
-    ];
-    g.legend((1, 6), &keys).inset((0, 0)).draw();
-    g.legend(((3, 5), (4, 6)), &keys).draw();
+    let keys = LegendOptions::default()
+        .col(["blue", "black"])
+        .lty([Some("dashed"), None])
+        .lwd(2)
+        .pch([None, Some(21)])
+        .pt_bg("red")
+        .pt_cex(2);
+    g.legend((1, 6), ["line", "point"])
+        .with(&keys)
+        .inset((0, 0))
+        .draw();
+    g.legend(((3, 5), (4, 6)), ["line", "point"])
+        .with(&keys)
+        .draw();
     g.plot_window((0, 10), (0, 5)).draw();
     g.hist(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).draw();
     g.barplot([3, 5, 2]).width([1, 2, 1]).space(1).draw();
@@ -89,14 +95,20 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .lwd(2.0)
         .draw();
     g.axis(3).at([1.0, 2.0, 3.0]).lwd(2.0).draw();
-    let keys = [
-        LegendEntry::line("line", "blue", 2.0, "dashed"),
-        LegendEntry::point("point", "black", 21)
-            .pt_bg("red")
-            .pt_cex(2.0),
-    ];
-    g.legend((1.0, 6.0), &keys).inset((0.0, 0.0)).draw();
-    g.legend(((3.0, 5.0), (4.0, 6.0)), &keys).draw();
+    let keys = LegendOptions::default()
+        .col(["blue", "black"])
+        .lty([Some("dashed"), None])
+        .lwd(2.0)
+        .pch([None, Some(21)])
+        .pt_bg("red")
+        .pt_cex(2.0);
+    g.legend((1.0, 6.0), ["line", "point"])
+        .with(&keys)
+        .inset((0.0, 0.0))
+        .draw();
+    g.legend(((3.0, 5.0), (4.0, 6.0)), ["line", "point"])
+        .with(&keys)
+        .draw();
     g.plot_window((0.0, 10.0), (0.0, 5.0)).draw();
     g.hist(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0])
         .breaks([0.0, 1.0, 2.0, 3.0])

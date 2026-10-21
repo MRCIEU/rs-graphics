@@ -137,8 +137,8 @@ fn latin1_text_matches_r() {
                     adj: Some(*adj),
                     vadj: Some(0.0),
                     col: vec![black],
-                    cex: vec![1.0],
-                    font: vec![1 + (i % 2) as i32],
+                    cex: vec![Some(1.0)],
+                    font: vec![Some(1 + (i % 2) as i32)],
                     ..TextOptions::default()
                 })
                 .draw();

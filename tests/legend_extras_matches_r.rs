@@ -8,8 +8,11 @@
 
 //! Cross-checks `legend()` on reversed axes, the box style (`box.lwd`,
 //! `box.lty`, `box.col`), the title style (`title.col`, `title.adj`,
-//! `title.font`), per-entry `text.col`/`text.font` and `plot = FALSE`
-//! against a real R `pdf()` device's uncompressed output: every painted
+//! `title.font`), per-entry `text.col`/`text.font`, `plot = FALSE`, and
+//! R's per-key vectors (boxes, lines and points mixed with `NA`s,
+//! character `pch`, per-key sizes and spacing, `text.width = NA` or per
+//! column, `adj`) against a real R `pdf()` device's uncompressed output:
+//! every painted
 //! path in order (vertices or, for curves, bounding boxes; fill, stroke
 //! colour, width, cap, dash), every text item's string, origin, font,
 //! size and fill colour, and `legend()`'s return value. Skipped if
@@ -28,7 +31,7 @@ const PAGE_H: f64 = 5.0;
 const X: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
 const Y: [f64; 5] = [2.0, 4.0, 3.0, 5.0, 1.0];
 
-type Draw = fn(&mut Device<PdfBackend>) -> Option<LegendLayout>;
+type Draw = fn(&mut Device<PdfBackend>) -> LegendLayout;
 
 struct Case {
     name: &'static str,
@@ -46,11 +49,9 @@ fn cases() -> Vec<Case> {
                 l <- legend('topright', c('a', 'b'), pch = 1:2, lty = 1:2, title = 'T', inset = 0.05)",
             ours: |d| {
                 d.plot(&X, &Y).xlim(6, 0).draw();
-                let keys = [
-                    LegendEntry::point("a", 1, 1).lty("solid"),
-                    LegendEntry::point("b", 1, 2).lty("dashed"),
-                ];
-                d.legend("topright", &keys)
+                d.legend("topright", ["a", "b"])
+                    .pch([1, 2])
+                    .lty([1, 2])
                     .title("T")
                     .inset((0.05, 0.05))
                     .draw()
@@ -62,11 +63,11 @@ fn cases() -> Vec<Case> {
                 l <- legend(1, 1, c('a', 'b'), fill = c('red', 'blue'), xjust = 0.2, yjust = 0.3)",
             ours: |d| {
                 d.plot(&X, &Y).ylim(6, 0).draw();
-                let keys = [
-                    LegendEntry::filled("a", "red"),
-                    LegendEntry::filled("b", "blue"),
-                ];
-                d.legend((1, 1), &keys).xjust(0.2).yjust(0.3).draw()
+                d.legend((1, 1), ["a", "b"])
+                    .fill(["red", "blue"])
+                    .xjust(0.2)
+                    .yjust(0.3)
+                    .draw()
             },
         },
         Case {
@@ -75,12 +76,8 @@ fn cases() -> Vec<Case> {
                 l <- legend('bottomright', c('a', 'b', 'c'), pch = 1:3, ncol = 2, inset = c(0.02, 0.1))",
             ours: |d| {
                 d.plot(&X, &Y).xlim(6, 0).ylim(6, 0).draw();
-                let keys = [
-                    LegendEntry::point("a", 1, 1),
-                    LegendEntry::point("b", 1, 2),
-                    LegendEntry::point("c", 1, 3),
-                ];
-                d.legend("bottomright", &keys)
+                d.legend("bottomright", ["a", "b", "c"])
+                    .pch([1, 2, 3])
                     .ncol(2usize)
                     .inset((0.02, 0.1))
                     .draw()
@@ -92,8 +89,9 @@ fn cases() -> Vec<Case> {
                 l <- legend('bottomleft', c('a', 'b'), pch = 1:2, title = 'mmm nnn mmm nnn')",
             ours: |d| {
                 d.plot(&X, &Y).xlim(6, 0).draw();
-                let keys = [LegendEntry::point("a", 1, 1), LegendEntry::point("b", 1, 2)];
-                d.legend("bottomleft", &keys)
+                let keys = LegendOptions::default().pch([1, 2]);
+                d.legend("bottomleft", ["a", "b"])
+                    .with(&keys)
                     .title("mmm nnn mmm nnn")
                     .draw()
             },
@@ -104,11 +102,10 @@ fn cases() -> Vec<Case> {
                 l <- legend('center', c('a', 'b'), lty = 1:2, text.width = 1.5)",
             ours: |d| {
                 d.plot(&X, &Y).xlim(6, 0).draw();
-                let keys = [
-                    LegendEntry::line("a", 1, 1, "solid"),
-                    LegendEntry::line("b", 1, 1, "dashed"),
-                ];
-                d.legend("center", &keys).text_width(1.5).draw()
+                d.legend("center", ["a", "b"])
+                    .lty([1, 2])
+                    .text_width(1.5)
+                    .draw()
             },
         },
         Case {
@@ -118,8 +115,9 @@ fn cases() -> Vec<Case> {
                             box.col = 'blue', bg = 'grey90')",
             ours: |d| {
                 d.plot(&X, &Y).draw();
-                let keys = [LegendEntry::point("a", 1, 1), LegendEntry::point("b", 1, 2)];
-                d.legend("topleft", &keys)
+                let keys = LegendOptions::default().pch([1, 2]);
+                d.legend("topleft", ["a", "b"])
+                    .with(&keys)
                     .box_lwd(3)
                     .box_lty("dashed")
                     .box_col("blue")
@@ -135,9 +133,10 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.plot(&X, &Y).draw();
                 d.par().lwd(2).lty("dotted").fg("red").draw();
-                let keys = [LegendEntry::point("a", 1, 1), LegendEntry::point("b", 1, 2)];
-                d.legend("top", &keys).draw();
-                d.legend("bottom", &keys)
+                let keys = LegendOptions::default().pch([1, 2]);
+                d.legend("top", ["a", "b"]).with(&keys).draw();
+                d.legend("bottom", ["a", "b"])
+                    .with(&keys)
                     .box_col(ColorSpec::None)
                     .bg("yellow")
                     .draw()
@@ -150,8 +149,9 @@ fn cases() -> Vec<Case> {
                             title.col = 'red', title.adj = 0, title.font = 2)",
             ours: |d| {
                 d.plot(&X, &Y).draw();
-                let keys = [LegendEntry::point("a", 1, 1), LegendEntry::point("b", 1, 2)];
-                d.legend("topright", &keys)
+                let keys = LegendOptions::default().pch([1, 2]);
+                d.legend("topright", ["a", "b"])
+                    .with(&keys)
                     .title("mmm")
                     .title_col("red")
                     .title_adj(0)
@@ -166,18 +166,139 @@ fn cases() -> Vec<Case> {
                             title.adj = 1, text.col = c('blue', 'darkgreen'), text.font = c(3, 2))",
             ours: |d| {
                 d.plot(&X, &Y).draw();
-                let keys = [
-                    LegendEntry::point("mmmm", 1, 1),
-                    LegendEntry::point("mmmm", 1, 2),
-                    LegendEntry::point("a", 1, 3),
-                ];
                 // The bold second label sets the width; the title takes
                 // the first colour and font.
-                d.legend("bottomright", &keys)
+                d.legend("bottomright", ["mmmm", "mmmm", "a"])
+                    .pch([1, 2, 3])
                     .title("nnn")
                     .title_adj(1)
                     .text_col(["blue", "darkgreen"])
                     .text_font([3, 2])
+                    .draw()
+            },
+        },
+        Case {
+            name: "mixed_keys",
+            r: "plot(x, y, ann = FALSE)\n\
+                l <- legend('topleft', c('a', 'nn', 'ccc', 'dd'), fill = c('red', NA, NA, 'blue'), \
+                            border = c('black', NA, NA, 'darkgreen'), lty = c(0, 1, 0, 2), \
+                            pch = c(NA, NA, 19, 21), pt.bg = 'yellow', col = c(1, 'red', 'blue', 1))",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("topleft", ["a", "nn", "ccc", "dd"])
+                    .fill([Some("red"), None, None, Some("blue")])
+                    .border([Some("black"), None, None, Some("darkgreen")])
+                    .lty([0, 1, 0, 2])
+                    .pch([None, None, Some(19), Some(21)])
+                    .pt_bg("yellow")
+                    .col(["black", "red", "blue", "black"])
+                    .draw()
+            },
+        },
+        Case {
+            name: "lwd_draws_lines_no_merge",
+            r: "plot(x, y, ann = FALSE)\n\
+                l <- legend('topright', c('a', 'b'), pch = 1:2, lwd = c(1, 3), merge = FALSE, \
+                            cex = c(0.8, 1.3))",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("topright", ["a", "b"])
+                    .pch([1, 2])
+                    .lwd([1, 3])
+                    .merge(false)
+                    .cex([0.8, 1.3])
+                    .draw()
+            },
+        },
+        Case {
+            name: "character_pch",
+            r: "plot(x, y, ann = FALSE)\n\
+                l <- legend('bottomleft', c('a', 'b', 'c', 'd'), pch = c('x', '+', '\\u00e9', ''), \
+                            col = c(1, 2, 4, 1))",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("bottomleft", ["a", "b", "c", "d"])
+                    .pch(["x", "+", "\u{e9}", ""])
+                    .col([1, 2, 4, 1])
+                    .draw()
+            },
+        },
+        Case {
+            name: "character_pch_split",
+            r: "plot(x, y, ann = FALSE)\n\
+                l <- legend('bottomright', c('mm', 'nn', 'aa'), pch = 'xyz', lty = 1, col = 2:4)",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("bottomright", ["mm", "nn", "aa"])
+                    .pch("xyz")
+                    .lty(1)
+                    .col([2, 3, 4])
+                    .draw()
+            },
+        },
+        Case {
+            name: "per_entry_sizes",
+            r: "plot(x, y, ann = FALSE)\n\
+                l <- legend('top', c('a', 'nn', 'ccc', 'd', 'mm'), ncol = 2, pch = 1, lty = 1, \
+                            cex = c(0.8, 1.2, 1, 1.5, 0.7), x.intersp = c(1, 2, 0.5, 1, 0.5), \
+                            seg.len = c(1, 3), y.intersp = c(1, 1.8, 1.2), pt.cex = c(1, 2))",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("top", ["a", "nn", "ccc", "d", "mm"])
+                    .ncol(2)
+                    .pch(1)
+                    .lty(1)
+                    .cex([0.8, 1.2, 1.0, 1.5, 0.7])
+                    .x_intersp([1.0, 2.0, 0.5, 1.0, 0.5])
+                    .seg_len([1, 3])
+                    .y_intersp([1.0, 1.8, 1.2])
+                    .pt_cex([1, 2])
+                    .draw()
+            },
+        },
+        Case {
+            name: "text_width_na",
+            r: "plot(x, y, ann = FALSE)\n\
+                l <- legend('center', c('a', 'mmmmmm', 'cc', 'd'), pch = 1:4, ncol = 3, text.width = NA)",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("center", ["a", "mmmmmm", "cc", "d"])
+                    .pch([1, 2, 3, 4])
+                    .ncol(3)
+                    .text_width(f64::NAN)
+                    .draw()
+            },
+        },
+        Case {
+            name: "text_width_per_column",
+            r: "plot(x, y, ann = FALSE)\n\
+                l <- legend('bottom', c('a', 'b', 'c', 'd', 'e'), pch = 1:5, ncol = 3, \
+                            text.width = c(0.5, 1.5))",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("bottom", ["a", "b", "c", "d", "e"])
+                    .pch([1, 2, 3, 4, 5])
+                    .ncol(3)
+                    .text_width([0.5, 1.5])
+                    .draw()
+            },
+        },
+        Case {
+            name: "adj",
+            r: "plot(x, y, ann = FALSE)\n\
+                legend('topright', c('mmm', 'a'), pch = 1:2, adj = c(0.5, 0.2))\n\
+                l <- legend('bottomleft', c('mmm', 'g'), pch = 1:2, adj = 0.3)",
+            ours: |d| {
+                d.plot(&X, &Y).draw();
+                d.legend("topright", ["mmm", "a"])
+                    .pch([1, 2])
+                    .adj(0.5)
+                    .vadj(0.2)
+                    .draw();
+                d.legend("bottomleft", ["mmm", "g"])
+                    .pch([1, 2])
+                    .adj(0.3)
+                    .vadj(f64::NAN)
                     .draw()
             },
         },
@@ -189,12 +310,17 @@ fn cases() -> Vec<Case> {
                      border = 'red')",
             ours: |d| {
                 d.plot(&X, &Y).draw();
-                let keys = [LegendEntry::point("a", 1, 1), LegendEntry::point("b", 1, 2)];
-                let l = d.legend("topright", &keys).title("T").plot(false).draw()?;
+                let keys = LegendOptions::default().pch([1, 2]);
+                let l = d
+                    .legend("topright", ["a", "b"])
+                    .with(&keys)
+                    .title("T")
+                    .plot(false)
+                    .draw();
                 d.rect(&[l.left], &[l.top - l.h], &[l.left + l.w], &[l.top])
                     .border("red")
                     .draw();
-                Some(l)
+                l
             },
         },
     ]
@@ -264,9 +390,22 @@ fn tokens(content: &str) -> Vec<Tok> {
                 while i < b.len() && b[i] != b')' {
                     if b[i] == b'\\' {
                         i += 1;
+                        // An octal escape (ours, for Latin-1 bytes).
+                        let n = b[i..]
+                            .iter()
+                            .take(3)
+                            .take_while(|c| c.is_ascii_digit())
+                            .count();
+                        if n > 0 {
+                            let code = std::str::from_utf8(&b[i..i + n]).unwrap();
+                            s.push(u8::from_str_radix(code, 8).unwrap() as char);
+                            i += n;
+                            continue;
+                        }
                     }
-                    s.push(b[i] as char);
-                    i += 1;
+                    let ch = content[i..].chars().next().unwrap();
+                    s.push(ch);
+                    i += ch.len_utf8();
                 }
                 i += 1;
                 out.push(Tok::Str(s));
@@ -491,15 +630,24 @@ fn legend_extras_match_r() {
 
     for (c, r_value) in cases.iter().zip(r_values) {
         let path = dir.join(format!("rs_graphics_legend_extras_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
+        let r_pdf: String = std::fs::read(&path)
+            .unwrap()
+            .iter()
+            .map(|&c| c as char)
+            .collect();
         let (r_paths, r_texts) = interpret(&r_pdf);
         let mut dev = Device::new(
             PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
             Par::default(),
         );
-        let layout = (c.ours)(&mut dev).expect("a legend layout");
+        let layout = (c.ours)(&mut dev);
         let usr = dev.usr();
-        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
+        let ours: String = dev
+            .into_backend()
+            .finish()
+            .iter()
+            .map(|&c| c as char)
+            .collect();
         let (our_paths, our_texts) = interpret(&ours);
         let name = c.name;
 

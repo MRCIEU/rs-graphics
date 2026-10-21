@@ -47,11 +47,14 @@ fit <- function(label, ...) {
 }
 "#;
 
-fn keys() -> [LegendEntry; 2] {
-    [
-        LegendEntry::point("observed", 1, 1),
-        LegendEntry::line("fitted", "red", 1.0, LineType::SOLID),
-    ]
+const LABELS: [&str; 2] = ["observed", "fitted"];
+
+/// R's `key()` arguments: a point, then a line.
+fn keys() -> LegendOptions {
+    LegendOptions::default()
+        .pch([Some(1), None])
+        .lty([None, Some(LineType::SOLID)])
+        .col(["black", "red"])
 }
 
 /// R's `fit()`: points, the fitted line and a legend at `pos`.
@@ -63,7 +66,7 @@ fn fit_figure(pos: LegendPos, opts: &LegendOptions) -> Figure {
         .main("Fit")
         .draw();
     fig.lines(&DOSE, &FITTED).col("red").draw();
-    fig.legend(pos, &keys()).with(opts).draw();
+    fig.legend(pos, LABELS).with(opts).draw();
     fig
 }
 
@@ -81,10 +84,7 @@ struct Case {
 }
 
 fn layouts(r: FigureResult, usr: (f64, f64, f64, f64)) -> Vec<Drawn> {
-    r.legends
-        .into_iter()
-        .map(|l| (l.expect("legend drawn"), usr))
-        .collect()
+    r.legends.into_iter().map(|l| (l, usr)).collect()
 }
 
 fn cases() -> Vec<Case> {
@@ -102,7 +102,7 @@ par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
                 d.par().mfrow(2, 2).draw();
                 let a = fit_figure(
                     LegendPos::Keyword(LegendKeyword::BottomRight),
-                    &LegendOptions::default().title("Key"),
+                    &keys().title("Key"),
                 );
                 let mut out = layouts(d.add_figure_at(1, 2, &a), d.usr());
                 // las = 1 is recorded in the figure, so it must not leak
@@ -115,7 +115,9 @@ par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
                     .main("Fit")
                     .draw();
                 b.lines(&DOSE, &FITTED).col("red").draw();
-                b.legend(LegendPos::Xy(1.5, 6.8), &keys()).draw();
+                b.legend(LegendPos::Xy(1.5, 6.8), LABELS)
+                    .with(&keys())
+                    .draw();
                 out.extend(layouts(d.add_figure_at(2, 1, &b), d.usr()));
                 d.par().mfg(2, 2).draw();
                 d.plot(&DOSE, &FITTED)
@@ -158,7 +160,8 @@ key("layout_key.0", "center")"#,
                 let mut key = Figure::new();
                 key.par().mar([0.0, 0.0, 0.0, 0.0]).draw();
                 key.plot_new();
-                key.legend(LegendPos::Keyword(LegendKeyword::Center), &keys())
+                key.legend(LegendPos::Keyword(LegendKeyword::Center), LABELS)
+                    .with(&keys())
                     .draw();
                 d.add_figure(&a);
                 d.add_figure(&b);
@@ -176,7 +179,7 @@ fit("mfrow_3x2.2", "topleft", inset = 0.05)"#,
                 d.par().mfrow(3, 2).draw();
                 let fig = fit_figure(
                     LegendPos::Keyword(LegendKeyword::TopLeft),
-                    &LegendOptions::default().inset((0.05, 0.05)),
+                    &keys().inset((0.05, 0.05)),
                 );
                 let mut out = Vec::new();
                 for _ in 0..3 {

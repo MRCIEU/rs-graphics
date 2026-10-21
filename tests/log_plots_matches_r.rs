@@ -81,8 +81,8 @@ fn cases() -> Vec<Case> {
                 )
                 .with(&SegmentsOptions {
                     col: vec![red()],
-                    lty: vec![solid()],
-                    lwd: vec![1.0],
+                    lty: vec![Some(solid())],
+                    lwd: vec![Some(1.0)],
                     ..SegmentsOptions::default()
                 })
                 .draw();
@@ -108,8 +108,8 @@ fn cases() -> Vec<Case> {
                     .with(&AblineOptions {
                         h: vec![10.0],
                         col: vec![black],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -117,8 +117,8 @@ fn cases() -> Vec<Case> {
                     .with(&AblineOptions {
                         v: vec![100.0],
                         col: vec![red()],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -126,8 +126,8 @@ fn cases() -> Vec<Case> {
                     .with(&AblineOptions {
                         coef: Some((0.0, 1.0)),
                         col: vec![black],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -136,8 +136,8 @@ fn cases() -> Vec<Case> {
                         coef: Some((5.0, 2.0)),
                         untf: true,
                         col: vec![black],
-                        lwd: vec![1.0],
-                        lty: vec![LineType::from_code(2)],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(LineType::from_code(2))],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -145,8 +145,8 @@ fn cases() -> Vec<Case> {
                     .with(&AblineOptions {
                         h: vec![-1.0],
                         col: vec![black],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -155,8 +155,8 @@ fn cases() -> Vec<Case> {
                         coef: Some((-50.0, 3.0)),
                         untf: true,
                         col: vec![red()],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -180,8 +180,8 @@ fn cases() -> Vec<Case> {
                     .with(&AblineOptions {
                         coef: Some((1.0, 2.0)),
                         col: vec![black],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -190,8 +190,8 @@ fn cases() -> Vec<Case> {
                         coef: Some((1.0, 0.01)),
                         untf: true,
                         col: vec![black],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();
@@ -201,8 +201,8 @@ fn cases() -> Vec<Case> {
                         h: vec![5.0],
                         v: vec![10.0],
                         col: vec![red()],
-                        lwd: vec![1.0],
-                        lty: vec![solid()],
+                        lwd: vec![Some(1.0)],
+                        lty: vec![Some(solid())],
                         ..AblineOptions::default()
                     })
                     .draw();

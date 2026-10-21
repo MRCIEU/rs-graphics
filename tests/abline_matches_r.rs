@@ -56,8 +56,8 @@ fn cases() -> Vec<Case> {
                         h: vec![2.0, 5.0, 8.0],
                         v: vec![3.0, 7.0],
                         col: col(&["red", "blue"]),
-                        lty: (1..=3).map(LineType::from_code).collect(),
-                        lwd: vec![1.0, 2.0],
+                        lty: (1..=3).map(|c| Some(LineType::from_code(c))).collect(),
+                        lwd: vec![Some(1.0), Some(2.0)],
                         ..Default::default()
                     })
                     .draw();
@@ -76,7 +76,7 @@ fn cases() -> Vec<Case> {
                         h: vec![4.0, 6.0],
                         v: vec![9.0],
                         col: col(&["darkgreen", "orange", "purple"]),
-                        lwd: vec![3.0],
+                        lwd: vec![Some(3.0)],
                         ..Default::default()
                     })
                     .draw();
@@ -107,7 +107,7 @@ fn cases() -> Vec<Case> {
                 // R ignores coef values after the first two.
                 let first_two = AblineOptions {
                     coef: Some((2.0, -0.3)),
-                    lty: vec![LineType::DASHED],
+                    lty: vec![Some(LineType::DASHED)],
                     ..AblineOptions::default()
                 };
                 d.abline().with(&first_two).draw();
@@ -124,8 +124,8 @@ fn cases() -> Vec<Case> {
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![2.0, 4.0],
-                        lty: vec![LineType::from_code(2), LineType::from_code(3)],
-                        lwd: vec![1.0, 3.0],
+                        lty: vec![Some(LineType::from_code(2)), Some(LineType::from_code(3))],
+                        lwd: vec![Some(1.0), Some(3.0)],
                         ..Default::default()
                     })
                     .draw();
@@ -133,8 +133,11 @@ fn cases() -> Vec<Case> {
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![6.0, 8.0],
-                        lty: vec![LineType::from_code(4), LineType::parse("42").unwrap()],
-                        lwd: vec![2.0],
+                        lty: vec![
+                            Some(LineType::from_code(4)),
+                            Some(LineType::parse("42").unwrap()),
+                        ],
+                        lwd: vec![Some(2.0)],
                         ..Default::default()
                     })
                     .draw();

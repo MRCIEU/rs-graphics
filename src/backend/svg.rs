@@ -23,7 +23,7 @@
 
 use std::fmt::Write as _;
 
-use super::compress::{gzip_compress, DEFLATE_LEVEL};
+use super::compress::{DEFLATE_LEVEL, gzip_compress};
 use super::numfmt::{push_hex, push_trimmed};
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::Color;
@@ -458,7 +458,11 @@ mod tests {
         b.pop_clip();
         b.draw_circle(Point::new(0.5, 0.5), 0.1, Some(Color::rgb(255, 0, 0)), None);
         let svg = b.finish();
-        assert_eq!(svg.matches("<g").count(), svg.matches("</g>").count(), "{svg}");
+        assert_eq!(
+            svg.matches("<g").count(),
+            svg.matches("</g>").count(),
+            "{svg}"
+        );
     }
 
     /// Runs of same-style shapes share a `<g>`; a shape whose style differs

@@ -458,8 +458,13 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/legend_extras_matches_r.rs` - `legend()` on reversed axes
   (keyword, `(x, y)`, `ncol`, wide title, `text.width`), `box.lwd`/
   `box.lty`/`box.col` (also from `par()`, and `NA`), `title.col`/
-  `title.adj`/`title.font`, per-entry `text.col`/`text.font` and `plot =
-  FALSE`: every painted path and text item, and the return value.
+  `title.adj`/`title.font`, per-entry `text.col`/`text.font`, `plot =
+  FALSE`, keys mixing boxes, lines and points (`NA`s, per-key `border`),
+  lines from `lwd` alone with `merge = FALSE`, character `pch` (incl. a
+  non-ASCII one and R's split of `pch = "xyz"`), per-key `cex`/`pt.cex`/
+  `x.intersp`/`seg.len` with per-row `y.intersp`, `text.width = NA` and
+  per column, and `adj`: every painted path and text item, and the
+  return value.
 - `tests/primitives_matches_r.rs` - per-element recycling in `points()`,
   `segments()`, `arrows()`, `rect()`, `polygon()` and `text()`,
   `lines(type = )`, `par("fg")` defaults, polygons split at `NA`, default

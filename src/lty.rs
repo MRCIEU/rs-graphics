@@ -230,7 +230,10 @@ mod tests {
     fn hex_strings_follow_r() {
         assert_eq!(LineType::parse("42"), Some(LineType::Pattern(&[4, 2])));
         assert_eq!(LineType::parse("44"), Some(LineType::from_code(2)));
-        assert_eq!(LineType::parse("4F2A"), Some(LineType::Pattern(&[4, 15, 2, 10])));
+        assert_eq!(
+            LineType::parse("4F2A"),
+            Some(LineType::Pattern(&[4, 15, 2, 10]))
+        );
         // R: "must be length 2, 4, 6 or 8" / "zeroes are not allowed".
         for bad in ["123", "10", "123456789", "4G", ""] {
             assert_eq!(LineType::parse(bad), None, "{bad}");

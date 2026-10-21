@@ -394,7 +394,8 @@ pub struct HistOptions {
     /// Bar borders, recycled; empty: `par(fg)` (R's default).
     pub border: Vec<ColorSpec>,
     /// Bar border line types, recycled; empty: `par(lty)`.
-    pub lty: Vec<LineType>,
+    /// `None` (R's `NA`): that bar has no border.
+    pub lty: Vec<Option<LineType>>,
     /// R's `labels`: [`HistLabels::Values`] writes each bar's count (or,
     /// with densities, its density to 3 decimals) above it, `Text` the
     /// given labels; default none.
@@ -482,7 +483,7 @@ crate::setters::setters!(HistOptions => [HistCall] {
     ylim: pair f64,
     col: values ColorSpec,
     border: values ColorSpec,
-    lty: values LineType,
+    lty: na_values LineType,
     labels: value HistLabels,
     right: option bool,
     include_lowest: option bool,

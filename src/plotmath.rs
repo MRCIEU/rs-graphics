@@ -166,6 +166,59 @@ impl From<Expression> for Label {
     }
 }
 
+/// One label (`&str`, `String`, [`Label`], an [`Expression`]) or several
+/// (a slice, array or `Vec` of them): the text of
+/// [`mtext()`](crate::graphics::Graphics::mtext), recycled with its other
+/// arguments, and the labels of
+/// [`legend()`](crate::graphics::Graphics::legend), one per key.
+pub trait Labels {
+    /// The labels, in order.
+    fn into_labels(self) -> Vec<Label>;
+}
+
+macro_rules! one_label {
+    ($($t:ty),*) => {
+        $(
+            impl Labels for $t {
+                fn into_labels(self) -> Vec<Label> {
+                    vec![self.into()]
+                }
+            }
+        )*
+    };
+}
+one_label!(&str, &&str, String, &String, Label, Expression);
+
+impl<L: Clone + Into<Label>> Labels for &[L] {
+    fn into_labels(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>, const N: usize> Labels for [L; N] {
+    fn into_labels(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>, const N: usize> Labels for &[L; N] {
+    fn into_labels(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>> Labels for Vec<L> {
+    fn into_labels(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>> Labels for &Vec<L> {
+    fn into_labels(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
 // ---------------------------------------------------------------------
 // Tokens
 // ---------------------------------------------------------------------

@@ -41,7 +41,8 @@
 //! [`prelude`] imports it all, including the trait. As in R, numbers may
 //! be integers or floats: `dev.plot(1..=10, &y).cex(2).xlim(0, 12)` (data
 //! vectors are any [`Numbers`](numbers::Numbers); `f64` data is borrowed
-//! without copying).
+//! without copying). R's `NA` in a style vector is `None`:
+//! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`.
 //!
 //! # Devices and files
 //!

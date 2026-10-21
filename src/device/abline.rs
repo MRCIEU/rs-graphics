@@ -20,6 +20,7 @@ use crate::color::ColorSpec;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::Xpd;
+use crate::setters::pick_na;
 
 use super::Device;
 
@@ -47,9 +48,9 @@ pub struct AblineOptions {
     /// Colours, recycled over the lines; empty: `par(col)`.
     pub col: Vec<ColorSpec>,
     /// Line types, recycled over the lines; empty: `par(lty)`.
-    pub lty: Vec<LineType>,
+    pub lty: Vec<Option<LineType>>,
     /// Line widths, recycled over the lines; empty: `par(lwd)`.
-    pub lwd: Vec<f64>,
+    pub lwd: Vec<Option<f64>>,
     /// R's inline `xpd`: how far the lines run and where they are clipped
     /// (the plot region for [`Xpd::Plot`], the figure region for
     /// [`Xpd::Figure`], the whole device for [`Xpd::Device`]; the setter
@@ -74,8 +75,8 @@ crate::setters::setters!(AblineOptions => [AblineCall] {
     h: values f64,
     v: values f64,
     col: values ColorSpec,
-    lty: values LineType,
-    lwd: values f64,
+    lty: na_values LineType,
+    lwd: na_values f64,
     xpd: option Xpd,
     lend: option LineEnd,
     ljoin: option LineJoin,
@@ -126,14 +127,9 @@ impl<B: Backend> Device<B> {
                 0 => ColorSpec::Color(dev.par.col),
                 l => opts.col[pick(l)],
             };
-            let lty = match opts.lty.len() {
-                0 => dev.par.lty,
-                l => opts.lty[pick(l)],
-            };
-            let lwd = match opts.lwd.len() {
-                0 => dev.par.lwd,
-                l => opts.lwd[pick(l)],
-            };
+            // An `NA` colour, `lty` or `lwd` (`None`) skips the line.
+            let lty = pick_na(&opts.lty, n, dev.par.lty)?;
+            let lwd = pick_na(&opts.lwd, n, dev.par.lwd)?;
             dev.resolve(col).map(|c| dev.stroke_of(c, lwd, lty))
         };
         let xpd = opts.xpd.unwrap_or(self.par.xpd);

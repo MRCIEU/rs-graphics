@@ -24,6 +24,7 @@ use crate::highlevel::PlotType;
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Bty};
 use crate::plotmath::Label;
+use crate::setters::pick_na;
 
 /// `v[i]`, recycling `v`; `default` when `v` is empty.
 fn pick<T: Copy>(v: &[T], i: usize, default: T) -> T {
@@ -50,18 +51,23 @@ pub struct XyOptions {
     /// R's `type` (see [`PlotType`]): `None` is `"p"` for `points()` and
     /// `"l"` for `lines()`.
     pub type_: Option<PlotType>,
-    /// Plotting symbols, recycled per point; empty: `par(pch)`.
-    pub pch: Vec<i32>,
+    /// Plotting symbols, recycled per point (a negative value is minus a
+    /// Unicode code point, as in R; the setter takes characters too);
+    /// empty: `par(pch)`.
+    /// `None` (R's `NA`): no point there.
+    pub pch: Vec<Option<i32>>,
     /// Colours, recycled per point (lines use the first, except
     /// `type = "h"`'s, one per point); empty: `par(col)`.
     pub col: Vec<ColorSpec>,
     /// Fill of symbols 21-25, recycled per point; empty: none (R's `NA`).
     pub bg: Vec<ColorSpec>,
     /// Symbol sizes, recycled per point, times `par(cex)`; empty: 1.
-    pub cex: Vec<f64>,
+    /// `None` (R's `NA`): no point there.
+    pub cex: Vec<Option<f64>>,
     /// Line widths, recycled per point (lines use the first); empty:
     /// `par(lwd)`.
-    pub lwd: Vec<f64>,
+    /// `None` (R's `NA`): no point there (the lines use `par(lwd)`, as in R).
+    pub lwd: Vec<Option<f64>>,
     /// Line type of lines; `None`: `par(lty)`.
     pub lty: Option<LineType>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
@@ -81,11 +87,11 @@ pub struct XyOptions {
 
 crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
     type_: option PlotType,
-    pch: values i32,
+    pch: na_values i32,
     col: values ColorSpec,
     bg: values ColorSpec,
-    cex: values f64,
-    lwd: values f64,
+    cex: na_values f64,
+    lwd: na_values f64,
     lty: option LineType,
     xpd: option Xpd,
     lend: option LineEnd,
@@ -99,9 +105,11 @@ pub struct SegmentsOptions {
     /// Recycled per segment; empty: `par(fg)` (R's default).
     pub col: Vec<ColorSpec>,
     /// Recycled per segment; empty: `par(lty)`.
-    pub lty: Vec<LineType>,
+    /// `None` (R's `NA`): no segment.
+    pub lty: Vec<Option<LineType>>,
     /// Recycled per segment; empty: `par(lwd)`.
-    pub lwd: Vec<f64>,
+    /// `None` (R's `NA`): no segment.
+    pub lwd: Vec<Option<f64>>,
     /// R's inline `lend`: how the segments end (`"round"`, `"butt"`,
     /// `"square"`); `None`: `par(lend)`.
     pub lend: Option<LineEnd>,
@@ -119,8 +127,8 @@ pub struct SegmentsOptions {
 
 crate::setters::setters!(SegmentsOptions => [SegmentsCall] {
     col: values ColorSpec,
-    lty: values LineType,
-    lwd: values f64,
+    lty: na_values LineType,
+    lwd: na_values f64,
     lend: option LineEnd,
     xpd: option Xpd,
     ljoin: option LineJoin,
@@ -141,9 +149,11 @@ pub struct ArrowsOptions {
     /// Recycled per arrow; empty: `par(fg)` (R's default).
     pub col: Vec<ColorSpec>,
     /// Recycled per arrow; empty: `par(lty)`.
-    pub lty: Vec<LineType>,
+    /// `None` (R's `NA`): no arrow.
+    pub lty: Vec<Option<LineType>>,
     /// Recycled per arrow; empty: `par(lwd)`.
-    pub lwd: Vec<f64>,
+    /// `None` (R's `NA`): no arrow.
+    pub lwd: Vec<Option<f64>>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
@@ -164,8 +174,8 @@ crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
     angle: option f64,
     code: option u8,
     col: values ColorSpec,
-    lty: values LineType,
-    lwd: values f64,
+    lty: na_values LineType,
+    lwd: na_values f64,
     xpd: option Xpd,
     lend: option LineEnd,
     ljoin: option LineJoin,
@@ -181,9 +191,11 @@ pub struct RectOptions {
     /// draws no border.
     pub border: Vec<ColorSpec>,
     /// Recycled per rectangle; empty: `par(lty)`.
-    pub lty: Vec<LineType>,
+    /// `None` (R's `NA`): no border (the fill is drawn).
+    pub lty: Vec<Option<LineType>>,
     /// Recycled per rectangle; empty: `par(lwd)`.
-    pub lwd: Vec<f64>,
+    /// `None` (R's `NA`): no border (the fill is drawn).
+    pub lwd: Vec<Option<f64>>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
@@ -202,8 +214,8 @@ pub struct RectOptions {
 crate::setters::setters!(RectOptions => [RectCall] {
     col: values ColorSpec,
     border: values ColorSpec,
-    lty: values LineType,
-    lwd: values f64,
+    lty: na_values LineType,
+    lwd: na_values f64,
     xpd: option Xpd,
     lend: option LineEnd,
     ljoin: option LineJoin,
@@ -221,7 +233,8 @@ pub struct PolygonOptions {
     /// border.
     pub border: Vec<ColorSpec>,
     /// Empty: `par(lty)`.
-    pub lty: Vec<LineType>,
+    /// `None` (R's `NA`): no border (the fill is drawn).
+    pub lty: Vec<Option<LineType>>,
     /// One width for all; `None`: `par(lwd)`.
     pub lwd: Option<f64>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
@@ -242,7 +255,7 @@ pub struct PolygonOptions {
 crate::setters::setters!(PolygonOptions => [PolygonCall] {
     col: values ColorSpec,
     border: values ColorSpec,
-    lty: values LineType,
+    lty: na_values LineType,
     lwd: option f64,
     xpd: option Xpd,
     lend: option LineEnd,
@@ -266,12 +279,14 @@ pub struct TextOptions {
     /// `par(srt)` (0 by default).
     pub srt: Option<f64>,
     /// Recycled per label, times `par(cex)`; empty: 1.
-    pub cex: Vec<f64>,
+    /// `None` (R's `NA`): 1.
+    pub cex: Vec<Option<f64>>,
     /// Recycled per label; empty: `par(col)`.
     pub col: Vec<ColorSpec>,
     /// Recycled per label (1 plain, 2 bold, 3 italic, 4 bold italic, 5
     /// Symbol); empty: `par(font)`.
-    pub font: Vec<i32>,
+    /// `None` (R's `NA`): `par(font)`.
+    pub font: Vec<Option<i32>>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
@@ -289,9 +304,9 @@ crate::setters::setters!(TextOptions => [TextCall] {
     adj: option f64,
     vadj: option f64,
     srt: option f64,
-    cex: values f64,
+    cex: na_values f64,
     col: values ColorSpec,
-    font: values i32,
+    font: na_values i32,
     xpd: option Xpd,
     pos: values i32,
     offset: option f64,
@@ -470,9 +485,11 @@ impl<B: Backend> Device<B> {
     /// and `"o"`.
     fn plot_xy(&mut self, x: &[f64], y: &[f64], type_: PlotType, opts: &XyOptions) {
         let clip = self.clip_for(opts.xpd);
+        // The lines use the first `col` and `lwd`; an `NA` `lwd` (`None`)
+        // is `par(lwd)` there, as in R.
         let line = || {
             let col = pick(&opts.col, 0, ColorSpec::Color(self.par.col));
-            let lwd = pick(&opts.lwd, 0, self.par.lwd);
+            let lwd = pick_na(&opts.lwd, 0, self.par.lwd).unwrap_or(self.par.lwd);
             (col, lwd, opts.lty.unwrap_or(self.par.lty))
         };
         match type_ {
@@ -527,7 +544,14 @@ impl<B: Backend> Device<B> {
             let Some(c) = col[i % col.len()] else {
                 continue;
             };
-            let cex = pick(&opts.cex, i, 1.0);
+            // An `NA` (`None`) `pch`, `cex` or `lwd` skips the point.
+            let (Some(cex), Some(pch), Some(lwd)) = (
+                pick_na(&opts.cex, i, 1.0),
+                pick_na(&opts.pch, i, pch),
+                pick_na(&opts.lwd, i, lwd),
+            ) else {
+                continue;
+            };
             if !cex.is_finite() {
                 continue;
             }
@@ -536,8 +560,6 @@ impl<B: Backend> Device<B> {
             } else {
                 bg[i % bg.len()]
             };
-            let pch = pick(&opts.pch, i, pch);
-            let lwd = pick(&opts.lwd, i, lwd);
             self.draw_pch(pch, p, cex, c, bg, lwd);
         }
         self.pop_clip();
@@ -576,10 +598,15 @@ impl<B: Backend> Device<B> {
             if ![p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
                 continue;
             }
-            let Some(c) = self.resolve(pick(&opts.col, i, fg)) else {
+            // An `NA` colour, `lwd` or `lty` skips the segment.
+            let (Some(c), Some(lwd), Some(lty)) = (
+                self.resolve(pick(&opts.col, i, fg)),
+                pick_na(&opts.lwd, i, lwd),
+                pick_na(&opts.lty, i, lty),
+            ) else {
                 continue;
             };
-            let stroke = self.stroke_of(c, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty));
+            let stroke = self.stroke_of(c, lwd, lty);
             self.backend.draw_line(p0, p1, &stroke);
         }
         self.pop_clip();
@@ -627,10 +654,15 @@ impl<B: Backend> Device<B> {
             if ![from.x, from.y, to.x, to.y].iter().all(|v| v.is_finite()) {
                 continue;
             }
-            let Some(color) = self.resolve(pick(&opts.col, i, fg)) else {
+            // An `NA` colour, `lwd` or `lty` skips the arrow.
+            let (Some(color), Some(lwd), Some(lty)) = (
+                self.resolve(pick(&opts.col, i, fg)),
+                pick_na(&opts.lwd, i, lwd),
+                pick_na(&opts.lty, i, lty),
+            ) else {
                 continue;
             };
-            let stroke = self.stroke_of(color, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty));
+            let stroke = self.stroke_of(color, lwd, lty);
             self.backend.draw_line(from, to, &stroke);
             if code & 3 == 0 || length == 0.0 || (from.x - to.x).hypot(from.y - to.y) < 1e-3 {
                 continue;
@@ -683,10 +715,14 @@ impl<B: Backend> Device<B> {
             if ![p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
                 continue;
             }
+            // An `NA` `lwd` or `lty` leaves out the border (R does this for
+            // `lwd`), as an `NA` border colour does; the fill is drawn.
             let fill = self.resolve(pick(&opts.col, i, ColorSpec::None));
             let border = self.resolve(pick(&opts.border, i, fg));
-            let stroke =
-                border.map(|c| self.stroke_of(c, pick(&opts.lwd, i, lwd), pick(&opts.lty, i, lty)));
+            let line = pick_na(&opts.lwd, i, lwd).zip(pick_na(&opts.lty, i, lty));
+            let stroke = border
+                .zip(line)
+                .map(|(c, (lwd, lty))| self.stroke_of(c, lwd, lty));
             self.backend
                 .draw_rect(Rect::new(p0.x, p0.y, p1.x, p1.y), fill, stroke.as_ref());
         }
@@ -717,9 +753,12 @@ impl<B: Backend> Device<B> {
             // As `C_polygon`: a run needs at least two points; a shorter one
             // is skipped without using up a `col`/`border`/`lty` value.
             if run.len() >= 2 {
+                // An `NA` `lty` leaves out the border, as for `rect()`.
                 let fill = self.resolve(pick(&opts.col, num, ColorSpec::None));
                 let border = self.resolve(pick(&opts.border, num, fg));
-                let stroke = border.map(|c| self.stroke_of(c, lwd, pick(&opts.lty, num, lty)));
+                let stroke = border
+                    .zip(pick_na(&opts.lty, num, lty))
+                    .map(|(c, lty)| self.stroke_of(c, lwd, lty));
                 self.backend.draw_polygon(&run, fill, stroke.as_ref());
                 num += 1;
             }
@@ -782,8 +821,9 @@ impl<B: Backend> Device<B> {
                 vadj,
                 opts.srt.unwrap_or(self.par.srt),
                 pick(&opts.col, i, col),
-                pick(&opts.cex, i, 1.0),
-                pick(&opts.font, i, font),
+                // An `NA` `cex` or `font` is the default, as in R.
+                pick_na(&opts.cex, i, 1.0).unwrap_or(1.0),
+                pick_na(&opts.font, i, font).unwrap_or(font),
             );
         }
     }

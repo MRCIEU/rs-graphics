@@ -941,10 +941,12 @@ impl RasterBackend {
             let queue = Mutex::new(work.into_iter());
             std::thread::scope(|s| {
                 for _ in 0..threads {
-                    s.spawn(|| loop {
-                        let next = queue.lock().unwrap().next();
-                        let Some((tile, bin)) = next else { break };
-                        ctx.paint_tile(tile, bin);
+                    s.spawn(|| {
+                        loop {
+                            let next = queue.lock().unwrap().next();
+                            let Some((tile, bin)) = next else { break };
+                            ctx.paint_tile(tile, bin);
+                        }
                     });
                 }
             });

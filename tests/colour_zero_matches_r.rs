@@ -61,7 +61,7 @@ fn draw_ours(c: &Case) -> String {
     let zero = ColorSpec::Index(0);
     d.points(&[0.5], &[0.5])
         .with(&XyOptions {
-            pch: vec![19],
+            pch: vec![Some(19)],
             col: vec![zero],
             ..XyOptions::default()
         })
@@ -71,8 +71,8 @@ fn draw_ours(c: &Case) -> String {
         .with(&RectOptions {
             col: vec![zero],
             border: vec![ColorSpec::Index(2)],
-            lwd: vec![1.0],
-            lty: vec![solid],
+            lwd: vec![Some(1.0)],
+            lty: vec![Some(solid)],
             ..RectOptions::default()
         })
         .draw();
@@ -80,15 +80,15 @@ fn draw_ours(c: &Case) -> String {
         .with(&TextOptions {
             adj: Some(0.5),
             col: vec![zero],
-            cex: vec![1.0],
-            font: vec![1],
+            cex: vec![Some(1.0)],
+            font: vec![Some(1)],
             ..TextOptions::default()
         })
         .draw();
     let line = SegmentsOptions {
         col: vec![zero],
-        lty: vec![solid],
-        lwd: vec![3.0],
+        lty: vec![Some(solid)],
+        lwd: vec![Some(3.0)],
         ..SegmentsOptions::default()
     };
     d.segments(&[0.0], &[1.0], &[1.0], &[0.0])

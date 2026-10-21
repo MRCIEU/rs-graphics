@@ -67,7 +67,7 @@ fn two_pages<B: Backend>(backend: B) -> B {
     dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
     dev.points(&[0.5], &[0.5])
         .with(&XyOptions {
-            pch: vec![0],
+            pch: vec![Some(0)],
             col: vec![ColorSpec::Index(2)],
             ..XyOptions::default()
         })
@@ -76,7 +76,7 @@ fn two_pages<B: Backend>(backend: B) -> B {
     dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
     dev.points(&[0.5], &[0.5])
         .with(&XyOptions {
-            pch: vec![0],
+            pch: vec![Some(0)],
             col: vec![ColorSpec::Index(4)],
             ..XyOptions::default()
         })

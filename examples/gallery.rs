@@ -141,13 +141,17 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .draw();
     dev.abline().a(2f64.log10()).b(1.5).col(2).lwd(2.0).draw();
     dev.abline().a(2000).b(20).untf(true).col(3).lwd(2.0).draw();
-    let entries = vec![
-        LegendEntry::line("abline(log10(2), 1.5)", 2, 2.0, "solid"),
-        LegendEntry::line("abline(2000, 20, untf = TRUE)", 3, 2.0, "solid"),
-        LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, "dashed"),
+    let labels = [
+        "abline(log10(2), 1.5)",
+        "abline(2000, 20, untf = TRUE)",
+        "abline(h = 1000, v = 10)",
     ];
-    let o = LegendOptions::default().bg(Color::WHITE);
-    dev.legend("topleft", &entries).with(&o).draw();
+    dev.legend("topleft", labels)
+        .col([ColorSpec::Index(2), ColorSpec::Index(3), grey])
+        .lwd([2, 2, 1])
+        .lty(["solid", "solid", "dashed"])
+        .bg(Color::WHITE)
+        .draw();
 }
 
 fn draw_legend<B: Backend>(dev: &mut Device<B>) {
@@ -166,12 +170,12 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
     dev.plot(&x, &sin).with(&opts).draw();
     let cos_line = XyOptions::default().col(4).lwd(2.0).lty("dashed");
     dev.lines(&x, &cos).with(&cos_line).draw();
-    let entries = vec![
-        LegendEntry::line("sin(x)", 2, 2.0, "solid"),
-        LegendEntry::line("cos(x)", 4, 2.0, "dashed"),
-    ];
-    let o = LegendOptions::default().title("Functions");
-    dev.legend("topright", &entries).with(&o).draw();
+    dev.legend("topright", ["sin(x)", "cos(x)"])
+        .col([2, 4])
+        .lwd(2)
+        .lty(["solid", "dashed"])
+        .title("Functions")
+        .draw();
 }
 
 fn draw_hist<B: Backend>(dev: &mut Device<B>) {

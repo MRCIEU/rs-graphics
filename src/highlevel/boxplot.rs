@@ -221,57 +221,75 @@ pub struct BoxplotOptions {
 
     /// Default line type of the box, median and staples, and of the
     /// whiskers; empty: `par(lty)` (the whiskers: dashed).
-    pub lty: Vec<LineType>,
+    /// `None` (R's `NA`): that box's box outline, median, whiskers and staples aren't drawn (unless their own type is given).
+    pub lty: Vec<Option<LineType>>,
     /// Default line width of every part (the median: 3 times it); empty:
     /// `par(lwd)`.
-    pub lwd: Vec<f64>,
+    /// `None` (R's `NA`): none of that box's lines or outliers are drawn (unless their own width is given).
+    pub lwd: Vec<Option<f64>>,
     /// Default outlier symbol; empty: `par(pch)`.
-    pub pch: Vec<i32>,
+    /// `None` (R's `NA`): that box's outliers aren't drawn (unless `outpch` is given).
+    pub pch: Vec<Option<i32>>,
     /// Default size of the median and outlier symbols; empty: 1.
-    pub cex: Vec<f64>,
+    /// `None` (R's `NA`): that box's median and outlier symbols aren't drawn (unless their own size is given).
+    pub cex: Vec<Option<f64>>,
     /// Default fill of the median and outlier symbols (21 to 25); empty:
     /// `par(bg)`.
     pub bg: Vec<ColorSpec>,
 
     /// Line type of the box outline; empty: `lty`.
-    pub boxlty: Vec<LineType>,
+    /// `None` (R's `NA`): no box outline.
+    pub boxlty: Vec<Option<LineType>>,
     /// Line width of the box outline; empty: `lwd`.
-    pub boxlwd: Vec<f64>,
+    /// `None` (R's `NA`): no box outline.
+    pub boxlwd: Vec<Option<f64>>,
     /// Colour of the box outline; empty: `border`.
     pub boxcol: Vec<ColorSpec>,
     /// Line type of the median; empty: `lty`.
-    pub medlty: Vec<LineType>,
+    /// `None` (R's `NA`): no median line.
+    pub medlty: Vec<Option<LineType>>,
     /// Line width of the median; empty: 3 times `lwd`.
-    pub medlwd: Vec<f64>,
+    /// `None` (R's `NA`): no median line.
+    pub medlwd: Vec<Option<f64>>,
     /// A symbol drawn at the median; empty: none.
-    pub medpch: Vec<i32>,
+    /// `None` (R's `NA`): no median symbol.
+    pub medpch: Vec<Option<i32>>,
     /// Size of the median symbol; empty: `cex`.
-    pub medcex: Vec<f64>,
+    /// `None` (R's `NA`): no median symbol.
+    pub medcex: Vec<Option<f64>>,
     /// Colour of the median line and symbol; empty: `border`.
     pub medcol: Vec<ColorSpec>,
     /// Fill of the median symbol; empty: `bg`.
     pub medbg: Vec<ColorSpec>,
     /// Line type of the whiskers; empty: `lty`, else dashed.
-    pub whisklty: Vec<LineType>,
+    /// `None` (R's `NA`): no whiskers.
+    pub whisklty: Vec<Option<LineType>>,
     /// Line width of the whiskers; empty: `lwd`.
-    pub whisklwd: Vec<f64>,
+    /// `None` (R's `NA`): no whiskers.
+    pub whisklwd: Vec<Option<f64>>,
     /// Colour of the whiskers; empty: `border`.
     pub whiskcol: Vec<ColorSpec>,
     /// Line type of the staples; empty: `lty`.
-    pub staplelty: Vec<LineType>,
+    /// `None` (R's `NA`): no staples.
+    pub staplelty: Vec<Option<LineType>>,
     /// Line width of the staples; empty: `lwd`.
-    pub staplelwd: Vec<f64>,
+    /// `None` (R's `NA`): no staples.
+    pub staplelwd: Vec<Option<f64>>,
     /// Colour of the staples; empty: `border`.
     pub staplecol: Vec<ColorSpec>,
     /// Line type of a short line across each outlier (`outwex` wide);
     /// empty: blank (no line).
-    pub outlty: Vec<LineType>,
+    /// `None` (R's `NA`): no outlier lines.
+    pub outlty: Vec<Option<LineType>>,
     /// Line width of the outlier lines and symbols; empty: `lwd`.
-    pub outlwd: Vec<f64>,
+    /// `None` (R's `NA`): no outlier lines or symbols.
+    pub outlwd: Vec<Option<f64>>,
     /// Outlier symbol; empty: `pch`.
-    pub outpch: Vec<i32>,
+    /// `None` (R's `NA`): no outlier symbols.
+    pub outpch: Vec<Option<i32>>,
     /// Size of the outlier symbols; empty: `cex`.
-    pub outcex: Vec<f64>,
+    /// `None` (R's `NA`): no outlier symbols.
+    pub outcex: Vec<Option<f64>>,
     /// Colour of the outlier lines and symbols; empty: `border`.
     pub outcol: Vec<ColorSpec>,
     /// Fill of the outlier symbols; empty: `bg`.
@@ -336,30 +354,30 @@ crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
     boxwex: values f64,
     staplewex: values f64,
     outwex: values f64,
-    lty: values LineType,
-    lwd: values f64,
-    pch: values i32,
-    cex: values f64,
+    lty: na_values LineType,
+    lwd: na_values f64,
+    pch: na_values i32,
+    cex: na_values f64,
     bg: values ColorSpec,
-    boxlty: values LineType,
-    boxlwd: values f64,
+    boxlty: na_values LineType,
+    boxlwd: na_values f64,
     boxcol: values ColorSpec,
-    medlty: values LineType,
-    medlwd: values f64,
-    medpch: values i32,
-    medcex: values f64,
+    medlty: na_values LineType,
+    medlwd: na_values f64,
+    medpch: na_values i32,
+    medcex: na_values f64,
     medcol: values ColorSpec,
     medbg: values ColorSpec,
-    whisklty: values LineType,
-    whisklwd: values f64,
+    whisklty: na_values LineType,
+    whisklwd: na_values f64,
     whiskcol: values ColorSpec,
-    staplelty: values LineType,
-    staplelwd: values f64,
+    staplelty: na_values LineType,
+    staplelwd: na_values f64,
     staplecol: values ColorSpec,
-    outlty: values LineType,
-    outlwd: values f64,
-    outpch: values i32,
-    outcex: values f64,
+    outlty: na_values LineType,
+    outlwd: na_values f64,
+    outpch: na_values i32,
+    outcex: na_values f64,
     outcol: values ColorSpec,
     outbg: values ColorSpec,
     las: option i32,
@@ -570,7 +588,8 @@ impl<B: Backend> Device<B> {
         let xp = |x: f64, w: f64| if pos_log { x * w.exp() } else { x + w };
 
         // `bxp()`'s per-box parameters (`pcycle`): the specific value, else
-        // the general one, else `par()`.
+        // the general one, else `par()`. For style vectors the result is an
+        // `Option` too: `None` (R's `NA`) leaves that part of the box out.
         let par_lty = self.par.lty;
         let par_lwd = self.par.lwd;
         let par_pch = self.par.pch;
@@ -578,8 +597,8 @@ impl<B: Backend> Device<B> {
         let fg = ColorSpec::Color(self.par.fg);
         let lightgray = ColorSpec::Color(Color::parse("lightgray").unwrap());
         let lty = |i| cycle(&opts.lty, i);
-        let lwd = |i| cycle(&opts.lwd, i).unwrap_or(par_lwd);
-        let cex = |i| cycle(&opts.cex, i).unwrap_or(1.0);
+        let lwd = |i| cycle(&opts.lwd, i).unwrap_or(Some(par_lwd));
+        let cex = |i| cycle(&opts.cex, i).unwrap_or(Some(1.0));
         let bg = |i| cycle(&opts.bg, i).unwrap_or(par_bg);
         let border = |i| cycle(&opts.border, i).unwrap_or(fg);
         let notch_frac = if opts.notch { 0.5 } else { 1.0 };
@@ -590,7 +609,7 @@ impl<B: Backend> Device<B> {
             if five.iter().any(|v| v.is_nan()) {
                 continue;
             }
-            let line = |col: ColorSpec, lty: LineType, lwd: f64| SegmentsOptions {
+            let line = |col: ColorSpec, lty: Option<LineType>, lwd: Option<f64>| SegmentsOptions {
                 col: vec![col],
                 lty: vec![lty],
                 lwd: vec![lwd],
@@ -621,7 +640,7 @@ impl<B: Backend> Device<B> {
             let box_fill = PolygonOptions {
                 col: vec![cycle(&opts.col, i).unwrap_or(lightgray)],
                 border: vec![ColorSpec::None],
-                lty: vec![LineType::BLANK],
+                lty: vec![Some(LineType::BLANK)],
                 ..PolygonOptions::default()
             };
             self.polygon_impl(&bx, &by, &box_fill);
@@ -636,8 +655,8 @@ impl<B: Backend> Device<B> {
                 lend: Some(LineEnd::Butt),
                 ..line(
                     medcol,
-                    cycle(&opts.medlty, i).or(lty(i)).unwrap_or(par_lty),
-                    cycle(&opts.medlwd, i).unwrap_or(3.0 * lwd(i)),
+                    cycle(&opts.medlty, i).or(lty(i)).unwrap_or(Some(par_lty)),
+                    cycle(&opts.medlwd, i).unwrap_or(lwd(i).map(|l| 3.0 * l)),
                 )
             };
             self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
@@ -660,7 +679,7 @@ impl<B: Backend> Device<B> {
                 cycle(&opts.whiskcol, i).unwrap_or(border(i)),
                 cycle(&opts.whisklty, i)
                     .or(lty(i))
-                    .unwrap_or(LineType::DASHED),
+                    .unwrap_or(Some(LineType::DASHED)),
                 cycle(&opts.whisklwd, i).unwrap_or(lwd(i)),
             );
             for &(w, h) in &ends {
@@ -670,21 +689,25 @@ impl<B: Backend> Device<B> {
             let cap = wid * cycle(&opts.staplewex, i).unwrap_or(0.5);
             let staple = line(
                 cycle(&opts.staplecol, i).unwrap_or(border(i)),
-                cycle(&opts.staplelty, i).or(lty(i)).unwrap_or(par_lty),
+                cycle(&opts.staplelty, i)
+                    .or(lty(i))
+                    .unwrap_or(Some(par_lty)),
                 cycle(&opts.staplelwd, i).unwrap_or(lwd(i)),
             );
             for &(w, _) in &ends {
                 let (sx, sy) = xy(&[xp(x, -cap), xp(x, cap)], &[w, w]);
                 self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &staple);
             }
-            let box_border = PolygonOptions {
-                col: vec![ColorSpec::None],
-                border: vec![cycle(&opts.boxcol, i).unwrap_or(border(i))],
-                lty: vec![cycle(&opts.boxlty, i).or(lty(i)).unwrap_or(par_lty)],
-                lwd: Some(cycle(&opts.boxlwd, i).unwrap_or(lwd(i))),
-                ..PolygonOptions::default()
-            };
-            self.polygon_impl(&bx, &by, &box_border);
+            if let Some(boxlwd) = cycle(&opts.boxlwd, i).unwrap_or(lwd(i)) {
+                let box_border = PolygonOptions {
+                    col: vec![ColorSpec::None],
+                    border: vec![cycle(&opts.boxcol, i).unwrap_or(border(i))],
+                    lty: vec![cycle(&opts.boxlty, i).or(lty(i)).unwrap_or(Some(par_lty))],
+                    lwd: Some(boxlwd),
+                    ..PolygonOptions::default()
+                };
+                self.polygon_impl(&bx, &by, &box_border);
+            }
 
             if opts.outline && !s.outliers.is_empty() {
                 let outcol = cycle(&opts.outcol, i).unwrap_or(border(i));
@@ -692,13 +715,13 @@ impl<B: Backend> Device<B> {
                 // A line across each outlier; blank (nothing) by default. R
                 // computes its ends as `x -/+ w` even on a log position axis;
                 // we use `xP()`, as for every other part.
-                let outlty = cycle(&opts.outlty, i).unwrap_or(LineType::BLANK);
-                if outlty != LineType::BLANK {
+                let outlty = cycle(&opts.outlty, i).unwrap_or(Some(LineType::BLANK));
+                if let Some(outlty) = outlty.filter(|&l| l != LineType::BLANK) {
                     let half = wid * cycle(&opts.outwex, i).unwrap_or(0.5);
                     let k = s.outliers.len();
                     let (x0, y0) = xy(&vec![xp(x, -half); k], &s.outliers);
                     let (x1, y1) = xy(&vec![xp(x, half); k], &s.outliers);
-                    self.segments_impl(&x0, &y0, &x1, &y1, &line(outcol, outlty, outlwd));
+                    self.segments_impl(&x0, &y0, &x1, &y1, &line(outcol, Some(outlty), outlwd));
                 }
                 let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
                 let (ox, oy) = xy(&pos, &s.outliers);
@@ -709,7 +732,7 @@ impl<B: Backend> Device<B> {
                     pch: vec![
                         cycle(&opts.outpch, i)
                             .or(cycle(&opts.pch, i))
-                            .unwrap_or(par_pch),
+                            .unwrap_or(Some(par_pch)),
                     ],
                     cex: vec![cycle(&opts.outcex, i).unwrap_or(cex(i))],
                     col: vec![outcol],

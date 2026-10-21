@@ -48,7 +48,7 @@ fn cases() -> Vec<Case> {
                 let v = [0.0, 0.5, 1.0];
                 d.points(&v, &v)
                     .with(&XyOptions {
-                        pch: vec![1],
+                        pch: vec![Some(1)],
                         col: vec![ColorSpec::Index(1)],
                         ..XyOptions::default()
                     })
@@ -84,7 +84,7 @@ fn cases() -> Vec<Case> {
                 d.plot_new();
                 d.points(&[0.25], &[0.75])
                     .with(&XyOptions {
-                        pch: vec![1],
+                        pch: vec![Some(1)],
                         col: vec![ColorSpec::Index(1)],
                         ..XyOptions::default()
                     })

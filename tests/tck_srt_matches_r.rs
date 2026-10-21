@@ -111,11 +111,10 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.plot(&X, &Y).draw();
                 d.par().srt(20).draw();
-                let keys = [
-                    LegendEntry::point("abc", 1, 1),
-                    LegendEntry::point("sum", 1, 2),
-                ];
-                d.legend("topleft", &keys).title("title").draw();
+                d.legend("topleft", ["abc", "sum"])
+                    .pch([1, 2])
+                    .title("title")
+                    .draw();
             },
         },
     ]

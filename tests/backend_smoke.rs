@@ -226,19 +226,20 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
     use rs_graphics::prelude::*;
     let x = [1.0, 2.5, 4.0];
     let opts = PlotOptions {
-        pch: vec![21],
-        cex: vec![1.3],
+        pch: vec![Some(21)],
+        cex: vec![Some(1.3)],
         main: Some(Label::math("alpha^2")),
         ..PlotOptions::default()
     };
     dev.plot(&x, &x).with(&opts).draw();
-    let entries = [LegendEntry::point("a", "red", 46)];
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
+    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), "a")
+        .col("red")
+        .pch(46)
         .draw();
     // `pch = "."` small enough that its one-device-unit minimum applies.
     let dots = PlotOptions {
-        pch: vec![46],
-        cex: vec![0.5],
+        pch: vec![Some(46)],
+        cex: vec![Some(0.5)],
         ..PlotOptions::default()
     };
     dev.plot(&x, &[3.0, 1.0, 2.0]).with(&dots).draw();

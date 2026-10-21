@@ -211,14 +211,20 @@ impl From<&String> for ColorSpec {
     }
 }
 
-impl From<Option<Color>> for ColorSpec {
-    fn from(c: Option<Color>) -> Self {
-        match c {
-            Some(c) => ColorSpec::Color(c),
-            None => ColorSpec::None,
-        }
-    }
+/// `None` is R's `NA` (draw nothing), so recycled colour vectors can mix
+/// colours and `NA`s: `.col([Some("red"), None])`.
+macro_rules! from_option {
+    ($($t:ty),*) => {
+        $(
+            impl From<Option<$t>> for ColorSpec {
+                fn from(c: Option<$t>) -> Self {
+                    c.map_or(ColorSpec::None, Into::into)
+                }
+            }
+        )*
+    };
 }
+from_option!(Color, ColorSpec, i32, &str, String, &String);
 
 crate::error::from_str_via_parse!(Color, "colour");
 crate::error::from_r_string!(

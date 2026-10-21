@@ -254,11 +254,7 @@ pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
     (0..=ndiv)
         .map(|i| {
             let at = lo + (i as f64 / dn) * range;
-            if at.abs() < small {
-                0.0
-            } else {
-                at
-            }
+            if at.abs() < small { 0.0 } else { at }
         })
         .collect()
 }
@@ -515,9 +511,15 @@ mod tests {
     fn log_axis_ticks_follow_r_rules() {
         let ticks = |lo: f64, hi: f64| log_axis_ticks(lo.log10(), hi.log10(), 5);
         // Under 2 decades between powers inside: 1, 2, 5.
-        assert_eq!(ticks(3.0, 700.0), [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0]);
+        assert_eq!(
+            ticks(3.0, 700.0),
+            [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0]
+        );
         // 3 decades: 1, 5.
-        assert_eq!(ticks(1.0, 1000.0), [1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0]);
+        assert_eq!(
+            ticks(1.0, 1000.0),
+            [1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0]
+        );
         // More: powers of ten, every other one over 10 decades.
         assert_eq!(ticks(1.0, 1e6), [1.0, 10.0, 100.0, 1e3, 1e4, 1e5, 1e6]);
         assert_eq!(ticks(1e-5, 1e5), [1e-5, 1e-3, 1e-1, 1e1, 1e3, 1e5]);

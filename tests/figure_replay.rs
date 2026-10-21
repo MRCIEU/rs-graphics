@@ -55,13 +55,15 @@ fn scatter<G: Graphics>(g: &mut G) {
         .draw();
     g.axis(3).at([1.0, 3.0, 5.0]).labels(["a", "b", "c"]).draw();
     g.abline().coef(1.0, 1.0).h([3.5]).col("darkgreen").draw();
-    let entries = [
-        LegendEntry::point("points", "red", 19),
-        LegendEntry::line("fit", "darkgreen", 1.0, LineType::SOLID),
-    ];
-    g.legend(LegendPos::Keyword(LegendKeyword::BottomRight), &entries)
-        .title("Key")
-        .draw();
+    g.legend(
+        LegendPos::Keyword(LegendKeyword::BottomRight),
+        ["points", "fit"],
+    )
+    .col(["red", "darkgreen"])
+    .pch([Some(19), None])
+    .lty([None, Some(LineType::SOLID)])
+    .title("Key")
+    .draw();
     g.mtext("right margin", 4).line(0.5).draw();
     g.title().sub("a subtitle").draw();
 }
@@ -253,14 +255,16 @@ fn recorded_results_match_the_device() {
     assert_eq!(format!("{b_fig:?}"), format!("{b_dev:?}"));
 
     // Legend layouts come back from add_figure, one per legend() call.
-    let entries = [LegendEntry::point("a", "red", 1)];
+    let key = LegendOptions::default().col("red").pch(1);
     let mut legends = Figure::new();
     legends.plot(&x, &x).draw();
     legends
-        .legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
+        .legend(LegendPos::Keyword(LegendKeyword::TopLeft), "a")
+        .with(&key)
         .draw();
     legends
-        .legend(LegendPos::Xy(5.0, 3.0), &entries)
+        .legend(LegendPos::Xy(5.0, 3.0), "a")
+        .with(&key)
         .cex(0.8)
         .draw();
     let mut d1 = device(Format::Pdf);
@@ -268,9 +272,13 @@ fn recorded_results_match_the_device() {
     let mut d2 = device(Format::Pdf);
     d2.plot(&x, &x).draw();
     let direct = vec![
-        d2.legend(LegendPos::Keyword(LegendKeyword::TopLeft), &entries)
+        d2.legend(LegendPos::Keyword(LegendKeyword::TopLeft), "a")
+            .with(&key)
             .draw(),
-        d2.legend(LegendPos::Xy(5.0, 3.0), &entries).cex(0.8).draw(),
+        d2.legend(LegendPos::Xy(5.0, 3.0), "a")
+            .with(&key)
+            .cex(0.8)
+            .draw(),
     ];
     assert_eq!(replayed.legends, direct);
 }
@@ -289,20 +297,33 @@ fn recording_checks_arguments_like_the_device() {
     );
 }
 
+#[test]
+fn legend_errors_panic_when_recorded() {
+    let no_labels = std::panic::catch_unwind(|| {
+        Figure::new().legend("topleft", [] as [&str; 0]).draw();
+    });
+    assert!(no_labels.is_err(), "a legend without labels should panic");
+    let bad_width = std::panic::catch_unwind(|| {
+        Figure::new().legend("topleft", "a").text_width(-1).draw();
+    });
+    assert!(bad_width.is_err(), "a negative text.width should panic");
+}
+
 /// The legends drawn with R-style positions or with `LegendPos` variants.
 fn legends<G: Graphics>(g: &mut G, short: bool) {
     let x = [1.0, 10.0];
     g.plot(&x, &x).draw();
-    let keys = [LegendEntry::point("a", 1, 19)];
     if short {
-        g.legend("bottomr", &keys).draw();
-        g.legend((5.0, 3.0), &keys).draw();
-        g.legend(((2.0, 4.0), (6.0, 9.0)), &keys).draw();
+        g.legend("bottomr", "a").pch(19).draw();
+        g.legend((5.0, 3.0), "a").pch(19).draw();
+        g.legend(((2.0, 4.0), (6.0, 9.0)), "a").pch(19).draw();
     } else {
-        g.legend(LegendPos::Keyword(LegendKeyword::BottomRight), &keys)
+        g.legend(LegendPos::Keyword(LegendKeyword::BottomRight), "a")
+            .pch(19)
             .draw();
-        g.legend(LegendPos::Xy(5.0, 3.0), &keys).draw();
-        g.legend(LegendPos::Corners(2.0, 6.0, 4.0, 9.0), &keys)
+        g.legend(LegendPos::Xy(5.0, 3.0), "a").pch(19).draw();
+        g.legend(LegendPos::Corners(2.0, 6.0, 4.0, 9.0), "a")
+            .pch(19)
             .draw();
     }
 }
@@ -357,7 +378,6 @@ fn barplot_and_legend_restore_their_par_changes() {
         (p.xaxs, p.yaxs, p.xpd),
         (AxisStyle::Regular, AxisStyle::Regular, Xpd::Plot)
     );
-    let keys = [LegendEntry::point("a", 1, 1)];
-    dev.legend("topright", &keys).xpd(Xpd::Device).draw();
+    dev.legend("topright", "a").pch(1).xpd(Xpd::Device).draw();
     assert_eq!(dev.current_par().xpd, Xpd::Plot);
 }

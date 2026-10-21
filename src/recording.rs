@@ -89,9 +89,9 @@
 
 use crate::backend::Backend;
 use crate::device::{
-    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendEntry, LegendLayout,
-    LegendOptions, LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions,
-    SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
+    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendLayout, LegendOptions,
+    LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side,
+    TextOptions, TitleOptions, XyOptions,
 };
 use crate::graphics::{Graphics, ParPage};
 use crate::highlevel::barplot::bar_layout;
@@ -157,7 +157,7 @@ enum Call {
     Box(BoxOptions),
     Axis(Side, AxisOptions),
     Abline(AblineOptions),
-    Legend(LegendPos, Vec<LegendEntry>, LegendOptions),
+    Legend(LegendPos, Vec<Label>, LegendOptions),
     Mtext(Vec<Label>, Side, MtextOptions),
     Title(TitleOptions),
 }
@@ -240,8 +240,9 @@ impl Graphics for Figure {
     fn emit_abline(&mut self, opts: AblineOptions) {
         self.calls.push(Call::Abline(opts));
     }
-    fn emit_legend(&mut self, pos: LegendPos, entries: &[LegendEntry], opts: LegendOptions) {
-        self.calls.push(Call::Legend(pos, entries.to_vec(), opts));
+    fn emit_legend(&mut self, pos: LegendPos, labels: Vec<Label>, opts: LegendOptions) {
+        crate::device::check_legend(&labels, &opts);
+        self.calls.push(Call::Legend(pos, labels, opts));
     }
     fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions) {
         self.calls.push(Call::Mtext(text, side, opts));
@@ -262,7 +263,7 @@ impl Graphics for Figure {
 pub struct FigureResult {
     /// What each of the figure's `legend()` calls returned on the device, in
     /// order (see [`Graphics::legend`]).
-    pub legends: Vec<Option<LegendLayout>>,
+    pub legends: Vec<LegendLayout>,
     /// What each of the figure's `axis()` calls returned on the device (its
     /// tick positions), in order (see [`Graphics::axis`]).
     pub axes: Vec<Vec<f64>>,
@@ -314,8 +315,9 @@ impl<B: Backend> Device<B> {
                 Call::Box(o) => d.emit_box(o.clone()),
                 Call::Axis(side, o) => out.axes.push(d.emit_axis(*side, o.clone())),
                 Call::Abline(o) => d.emit_abline(o.clone()),
-                Call::Legend(pos, entries, o) => {
-                    out.legends.push(d.emit_legend(*pos, entries, o.clone()))
+                Call::Legend(pos, labels, o) => {
+                    out.legends
+                        .push(d.emit_legend(*pos, labels.clone(), o.clone()))
                 }
                 Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), *side, o.clone()),
                 Call::Title(o) => d.emit_title(o.clone()),

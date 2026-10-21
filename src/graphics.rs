@@ -53,9 +53,9 @@ use std::borrow::Cow;
 
 use crate::backend::Backend;
 use crate::device::{
-    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendEntry, LegendLayout,
-    LegendOptions, LegendPos, MtextLabels, MtextOptions, PlotWindowOptions, PolygonOptions,
-    RectOptions, SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
+    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendLayout, LegendOptions,
+    LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side,
+    TextOptions, TitleOptions, XyOptions,
 };
 use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
@@ -63,7 +63,7 @@ use crate::highlevel::{
 };
 use crate::numbers::{Groups, Numbers, Pair};
 use crate::par::ParOptions;
-use crate::plotmath::Label;
+use crate::plotmath::{Label, Labels};
 
 pub(crate) mod sealed {
     pub trait Sealed {}
@@ -88,7 +88,7 @@ impl<B: Backend> sealed::Sealed for Device<B> {}
 /// `G: Graphics` (see the crate docs), and they work on both.
 pub trait Graphics: sealed::Sealed + Sized {
     /// What [`legend`](Graphics::legend)'s `.draw()` returns:
-    /// `Option<LegendLayout>` on a [`Device`], `()` on a
+    /// [`LegendLayout`] on a [`Device`], `()` on a
     /// [`Figure`](crate::recording::Figure) (whose legend layouts come from
     /// [`Device::add_figure`]).
     type LegendResult;
@@ -497,11 +497,13 @@ pub trait Graphics: sealed::Sealed + Sized {
         }
     }
 
-    /// `legend(pos, legend, ...)`, a port of R's layout: one row per
-    /// [`LegendEntry`], placed by `pos`; options in [`LegendOptions`]. On
-    /// a [`Device`], `.draw()` returns where the box and labels went (R's
-    /// return value, in `usr` units), or `None` if `entries` is empty (R
-    /// errors there). With `.plot(false)` (R's `plot = FALSE`) it only
+    /// `legend(pos, legend, ...)`, a port of R's `legend()`: one key per
+    /// label (text or plotmath expressions; one or several, see
+    /// [`Labels`]), placed by `pos`; R's other arguments in
+    /// [`LegendOptions`], whose per-key ones (`col`, `pch`, `lty`, `lwd`,
+    /// `fill`, ...) are recycled over the keys, as in R. On a [`Device`],
+    /// `.draw()` returns where the box and labels went (R's return value,
+    /// in `usr` units). With `.plot(false)` (R's `plot = FALSE`) it only
     /// works that out, drawing nothing, so a legend can be measured first.
     ///
     /// `pos` is written as in R (see [`LegendPos`]): a keyword such as
@@ -512,23 +514,22 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
     /// # dev.plot(&[1.0, 10.0], &[1.0, 30.0]).draw();
-    /// let keys = [LegendEntry::point("observed", 1, 19)];
-    /// dev.legend("topright", &keys).draw(); // legend("topright", ...)
-    /// dev.legend((5.0, 20.0), &keys).draw(); // legend(5, 20, ...)
+    /// // legend("topright", legend = c("a", "b"), pch = 19, col = 1:2)
+    /// dev.legend("topright", ["a", "b"]).pch(19).col([1, 2]).draw();
+    /// // legend(5, 20, legend = "fit", lty = 2, lwd = 2)
+    /// dev.legend((5.0, 20.0), "fit").lty(2).lwd(2).draw();
     /// ```
     ///
     /// # Panics
     /// If `pos` is a string that isn't one of R's nine keywords (or a
-    /// unique prefix of one).
-    fn legend<'a>(
-        &'a mut self,
-        pos: impl Into<LegendPos>,
-        entries: &'a [LegendEntry],
-    ) -> LegendCall<'a, Self> {
+    /// unique prefix of one), and at `.draw()` with R's errors: no labels
+    /// ("'legend' is of length 0"), or a `text_width` that is negative or
+    /// has `NaN` among several values.
+    fn legend(&mut self, pos: impl Into<LegendPos>, labels: impl Labels) -> LegendCall<'_, Self> {
         LegendCall {
             target: self,
             pos: pos.into(),
-            entries,
+            labels: labels.into_labels(),
             opts: LegendOptions::default(),
         }
     }
@@ -542,7 +543,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// # Panics
     /// If `side` is a number other than 1 to 4.
-    fn mtext(&mut self, text: impl MtextLabels, side: impl Into<Side>) -> MtextCall<'_, Self> {
+    fn mtext(&mut self, text: impl Labels, side: impl Into<Side>) -> MtextCall<'_, Self> {
         MtextCall {
             target: self,
             text: text.into_labels(),
@@ -653,7 +654,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     fn emit_legend(
         &mut self,
         pos: LegendPos,
-        entries: &[LegendEntry],
+        labels: Vec<Label>,
         opts: LegendOptions,
     ) -> Self::LegendResult;
     #[doc(hidden)]
@@ -665,7 +666,7 @@ pub trait Graphics: sealed::Sealed + Sized {
 }
 
 impl<B: Backend> Graphics for Device<B> {
-    type LegendResult = Option<LegendLayout>;
+    type LegendResult = LegendLayout;
     type AxisResult = Vec<f64>;
 
     fn plot_new(&mut self) {
@@ -729,10 +730,10 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_legend(
         &mut self,
         pos: LegendPos,
-        entries: &[LegendEntry],
+        labels: Vec<Label>,
         opts: LegendOptions,
-    ) -> Option<LegendLayout> {
-        self.legend_impl(pos, entries, &opts)
+    ) -> LegendLayout {
+        self.legend_impl(pos, &labels, &opts)
     }
     fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions) {
         self.mtext_impl(&text, side, &opts)
@@ -905,8 +906,8 @@ call!(
 call!(
     /// [`Graphics::legend`]'s call.
     LegendCall, LegendOptions, emit_legend -> G::LegendResult,
-    { pos: LegendPos, entries: &'a [LegendEntry] },
-    |t, o| (pos, entries, o)
+    { pos: LegendPos, labels: Vec<Label> },
+    |t, o| (pos, labels, o)
 );
 call!(
     /// [`Graphics::mtext`]'s call.

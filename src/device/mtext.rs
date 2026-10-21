@@ -24,6 +24,7 @@ use crate::geometry::Point;
 use crate::plotmath::Label;
 
 use super::{Device, Side, Xpd};
+use crate::setters::pick_na;
 
 /// The arguments of R's `mtext()` other than `text` and `side`, with
 /// R's defaults. As in R, the text and the vector arguments are recycled
@@ -52,15 +53,16 @@ pub struct MtextOptions {
     /// Justification across the text; empty or `NaN`: depends on `side`
     /// and `las` (0, i.e. baseline on the line, for `las = 0`).
     pub padj: Vec<f64>,
-    /// Empty or `NaN`: 1. Unlike most text, *not* scaled by `par(cex)` (so
+    /// Empty, `None` (R's `NA`) or `NaN`: 1. Unlike most text, *not* scaled by `par(cex)` (so
     /// neither by the multi-panel reduction), as in R. (For an `NA` after a
     /// finite value, R keeps the previous label's size, as `C_mtext`
     /// forgets to reset it; that bug isn't copied.)
-    pub cex: Vec<f64>,
+    pub cex: Vec<Option<f64>>,
     /// Empty: `par(col)`.
     pub col: Vec<ColorSpec>,
     /// Empty: `par(font)`.
-    pub font: Vec<i32>,
+    /// `None` (R's `NA`): `par(font)`.
+    pub font: Vec<Option<i32>>,
     /// Text orientation (R's inline `las`, through `mtext()`'s `...`): 0
     /// parallel to the side, 1 horizontal, 2 perpendicular to the side, 3
     /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
@@ -74,9 +76,9 @@ crate::setters::setters!(MtextOptions => [MtextCall] {
     at: values f64,
     adj: values f64,
     padj: values f64,
-    cex: values f64,
+    cex: na_values f64,
     col: values ColorSpec,
-    font: values i32,
+    font: na_values i32,
     las: option i32,
 });
 
@@ -91,64 +93,6 @@ struct One {
     col: Option<ColorSpec>,
     font: Option<i32>,
     las: Option<i32>,
-}
-
-/// `mtext()`'s text: one label (`&str`, `String`, [`Label`], an
-/// [`Expression`](crate::plotmath::Expression)) or several (a slice, array
-/// or `Vec` of them), recycled with the other arguments.
-pub trait MtextLabels {
-    /// The labels, in order.
-    fn into_labels(self) -> Vec<Label>;
-}
-
-macro_rules! one_label {
-    ($($t:ty),*) => {
-        $(
-            impl MtextLabels for $t {
-                fn into_labels(self) -> Vec<Label> {
-                    vec![self.into()]
-                }
-            }
-        )*
-    };
-}
-one_label!(
-    &str,
-    &&str,
-    String,
-    &String,
-    Label,
-    crate::plotmath::Expression
-);
-
-impl<L: Clone + Into<Label>> MtextLabels for &[L] {
-    fn into_labels(self) -> Vec<Label> {
-        self.iter().cloned().map(Into::into).collect()
-    }
-}
-
-impl<L: Clone + Into<Label>, const N: usize> MtextLabels for [L; N] {
-    fn into_labels(self) -> Vec<Label> {
-        self.into_iter().map(Into::into).collect()
-    }
-}
-
-impl<L: Clone + Into<Label>, const N: usize> MtextLabels for &[L; N] {
-    fn into_labels(self) -> Vec<Label> {
-        self.iter().cloned().map(Into::into).collect()
-    }
-}
-
-impl<L: Clone + Into<Label>> MtextLabels for Vec<L> {
-    fn into_labels(self) -> Vec<Label> {
-        self.into_iter().map(Into::into).collect()
-    }
-}
-
-impl<L: Clone + Into<Label>> MtextLabels for &Vec<L> {
-    fn into_labels(self) -> Vec<Label> {
-        self.iter().cloned().map(Into::into).collect()
-    }
 }
 
 /// `ComputeAdjValue()`.
@@ -220,9 +164,12 @@ impl<B: Backend> Device<B> {
                 at: pick(&opts.at, i),
                 adj: pick(&opts.adj, i),
                 padj: pick(&opts.padj, i),
-                cex: pick(&opts.cex, i),
+                // An `NA` (`None`) `cex` or `font` is the default, as in R.
+                cex: pick_na(&opts.cex, i, f64::NAN).filter(|c| !c.is_nan()),
                 col: (!opts.col.is_empty()).then(|| opts.col[i % opts.col.len()]),
-                font: (!opts.font.is_empty()).then(|| opts.font[i % opts.font.len()]),
+                font: (!opts.font.is_empty())
+                    .then(|| opts.font[i % opts.font.len()])
+                    .flatten(),
                 las: opts.las,
             };
             self.mtext_one(texts[i % texts.len()].clone(), side, &one);
