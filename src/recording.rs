@@ -141,7 +141,8 @@ enum Call {
     Par(ParOptions),
     Plot(Vec<f64>, Vec<f64>, PlotOptions),
     Hist(Vec<f64>, HistOptions),
-    Barplot(BarHeights, BarplotOptions),
+    // Boxed, as `BoxplotOptions`: much larger than the other options.
+    Barplot(BarHeights, Box<BarplotOptions>),
     // Boxed: `BoxplotOptions` is much larger than the other options.
     Boxplot(Vec<Vec<f64>>, Box<BoxplotOptions>),
     Pie(Vec<f64>, PieOptions),
@@ -186,7 +187,7 @@ impl Graphics for Figure {
     }
     fn emit_barplot(&mut self, heights: BarHeights, opts: BarplotOptions) -> Vec<f64> {
         let centres = bar_layout(&heights, &opts).w_m;
-        self.calls.push(Call::Barplot(heights, opts));
+        self.calls.push(Call::Barplot(heights, Box::new(opts)));
         centres
     }
     fn emit_boxplot(&mut self, groups: &[Vec<f64>], opts: BoxplotOptions) -> Vec<BoxStats> {
@@ -296,7 +297,7 @@ impl<B: Backend> Device<B> {
                     d.emit_hist(x, o.clone());
                 }
                 Call::Barplot(h, o) => {
-                    d.emit_barplot(h.clone(), o.clone());
+                    d.emit_barplot(h.clone(), (**o).clone());
                 }
                 Call::Boxplot(g, o) => {
                     d.emit_boxplot(g, (**o).clone());

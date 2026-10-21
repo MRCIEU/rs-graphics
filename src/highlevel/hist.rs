@@ -7,26 +7,237 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! `hist(x, ...)`, ported from `hist.default`/`plot.histogram` in
-//! `r-source/src/library/graphics/R/hist.R`, restricted to the default
-//! `breaks = "Sturges"` rule, a number of classes or explicit bin edges (a
-//! function and the `"fd"`/`"scott"` rules aren't implemented) and no
+//! `r-source/src/library/graphics/R/hist.R`, with every form of `breaks`
+//! (edges, a number of classes, the `"Sturges"`/`"Scott"`/`"FD"` rules, a
+//! function; see [`HistBreaks`]), `xlim`/`ylim`, and no
 //! `include.lowest`/`right`/`fuzz` customization (R's defaults,
 //! `include.lowest = TRUE`, `right = TRUE`, are always used).
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::device::{AxisOptions, Device, PlotWindowOptions, RectOptions, TitleOptions};
+use crate::error::from_r_string;
+use crate::numbers::Num;
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
 use super::InlineAxis;
 
 /// Sturges' rule (`nclass.Sturges()`): `ceiling(log2(length(x)) + 1)`.
-fn nclass_sturges(n: usize) -> i32 {
+fn nclass_sturges(n: usize) -> f64 {
     if n == 0 {
-        return 1;
+        return 1.0;
     }
-    ((n as f64).log2() + 1.0).ceil() as i32
+    ((n as f64).log2() + 1.0).ceil()
+}
+
+/// R's `var(x)`: the sample variance, with `cov()`'s corrected mean; NaN
+/// for fewer than two values.
+fn var(x: &[f64]) -> f64 {
+    let n = x.len() as f64;
+    if x.len() < 2 {
+        return f64::NAN;
+    }
+    let mut mean = x.iter().sum::<f64>() / n;
+    mean += x.iter().map(|v| v - mean).sum::<f64>() / n;
+    x.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>() / (n - 1.0)
+}
+
+/// R's `quantile(x, p, type = 7)` of sorted `x`.
+fn quantile7(sorted: &[f64], p: f64) -> f64 {
+    let n = sorted.len();
+    let index = 1.0 + (n.saturating_sub(1)) as f64 * p;
+    let (lo, hi) = (index.floor(), index.ceil());
+    let qs = sorted[lo as usize - 1];
+    let x_hi = sorted[hi as usize - 1];
+    if index > lo && x_hi != qs {
+        let h = index - lo;
+        (1.0 - h) * qs + h * x_hi
+    } else {
+        qs
+    }
+}
+
+/// R's `signif(x, digits)` (`fprec()`: round half to even at `digits`
+/// significant digits).
+fn signif(x: f64, digits: i32) -> f64 {
+    const MAX10E: i32 = f64::MAX_10_EXP;
+    if !x.is_finite() || x == 0.0 {
+        return x;
+    }
+    let (sgn, x) = (x.signum(), x.abs());
+    let l10 = x.log10();
+    if l10.abs() >= (MAX10E - 2) as f64 {
+        return sgn * x;
+    }
+    let mut e10 = digits - 1 - l10.floor() as i32;
+    let mut p10 = 1.0;
+    if e10 > MAX10E {
+        p10 = 10f64.powi(e10 - MAX10E);
+        e10 = MAX10E;
+    }
+    if e10 > 0 {
+        let pow10 = 10f64.powi(e10);
+        sgn * ((x * pow10 * p10).round_ties_even() / pow10) / p10
+    } else {
+        let pow10 = 10f64.powi(-e10);
+        sgn * (x / pow10).round_ties_even() * pow10
+    }
+}
+
+/// `diff(range(x))`.
+fn spread(x: &[f64]) -> f64 {
+    let lo = x.iter().cloned().fold(f64::INFINITY, f64::min);
+    let hi = x.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    hi - lo
+}
+
+/// Scott's rule (`nclass.scott()`).
+fn nclass_scott(x: &[f64]) -> f64 {
+    let h = 3.5 * var(x).sqrt() * (x.len() as f64).powf(-1.0 / 3.0);
+    if h > 0.0 {
+        (spread(x) / h).ceil().max(1.0)
+    } else {
+        1.0
+    }
+}
+
+/// The Freedman-Diaconis rule (`nclass.FD()`, `digits = 5`).
+fn nclass_fd(x: &[f64]) -> f64 {
+    let mut rounded: Vec<f64> = x.iter().map(|&v| signif(v, 5)).collect();
+    rounded.sort_by(f64::total_cmp);
+    let mut h = 2.0 * (quantile7(&rounded, 0.75) - quantile7(&rounded, 0.25));
+    if h == 0.0 {
+        // Try quantiles 1/8, 1/16, ... 1/512.
+        let mut al = 0.25;
+        while h == 0.0 {
+            al /= 2.0;
+            if al < 1.0 / 512.0 {
+                break;
+            }
+            h = (quantile7(&rounded, 1.0 - al) - quantile7(&rounded, al)) / (1.0 - 2.0 * al);
+        }
+    }
+    if h == 0.0 {
+        h = 3.5 * var(x).sqrt();
+    }
+    if h > 0.0 {
+        (spread(x) / h * (x.len() as f64).powf(1.0 / 3.0)).ceil()
+    } else {
+        1.0
+    }
+}
+
+/// A function of the data giving edges or a number of classes.
+type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
+
+/// R's `hist(breaks = )`.
+#[derive(Clone)]
+pub enum HistBreaks {
+    /// `"Sturges"` (R's default): `ceiling(log2(n) + 1)` classes.
+    Sturges,
+    /// `"Scott"`: classes of width `3.5 * sd(x) * n^(-1/3)`.
+    Scott,
+    /// `"FD"` / `"Freedman-Diaconis"`: classes of width `2 * IQR(x) *
+    /// n^(-1/3)` (on `x` rounded to 5 significant digits).
+    FreedmanDiaconis,
+    /// A suggested number of classes (R's `breaks = 20`).
+    Count(f64),
+    /// Bin edges (sorted before use, as R does).
+    Edges(Vec<f64>),
+    /// A function of the finite data returning edges, or one value, a
+    /// number of classes (R's `breaks = function(x) ...`); see
+    /// [`HistBreaks::function`].
+    Function(BreaksFn),
+}
+
+impl HistBreaks {
+    /// R's `breaks` as a function of the data: `.breaks(HistBreaks::function(|x| ..))`.
+    pub fn function(f: impl Fn(&[f64]) -> Vec<f64> + Send + Sync + 'static) -> Self {
+        HistBreaks::Function(std::sync::Arc::new(f))
+    }
+
+    /// A rule's name, as R's `match.arg(tolower(breaks), ..)`: `"Sturges"`,
+    /// `"Scott"`, `"FD"` or `"Freedman-Diaconis"` in any case, or a unique
+    /// prefix.
+    pub fn parse(s: &str) -> Option<HistBreaks> {
+        const ALL: [&str; 4] = ["sturges", "fd", "freedman-diaconis", "scott"];
+        let s = s.to_lowercase();
+        let name = ALL.iter().find(|&&a| a == s).copied().or_else(|| {
+            let mut it = ALL.iter().filter(|a| !s.is_empty() && a.starts_with(&s));
+            match (it.next(), it.next()) {
+                (Some(&a), None) => Some(a),
+                _ => None,
+            }
+        })?;
+        Some(match name {
+            "sturges" => HistBreaks::Sturges,
+            "scott" => HistBreaks::Scott,
+            _ => HistBreaks::FreedmanDiaconis,
+        })
+    }
+}
+
+impl std::fmt::Debug for HistBreaks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HistBreaks::Sturges => write!(f, "Sturges"),
+            HistBreaks::Scott => write!(f, "Scott"),
+            HistBreaks::FreedmanDiaconis => write!(f, "FreedmanDiaconis"),
+            HistBreaks::Count(k) => write!(f, "Count({k})"),
+            HistBreaks::Edges(e) => write!(f, "Edges({e:?})"),
+            HistBreaks::Function(_) => write!(f, "Function(..)"),
+        }
+    }
+}
+
+from_r_string!(
+    HistBreaks,
+    "histogram breaks rule",
+    "\"Sturges\", \"Scott\", \"FD\" or \"Freedman-Diaconis\""
+);
+
+impl From<f64> for HistBreaks {
+    /// A number of classes.
+    fn from(k: f64) -> Self {
+        HistBreaks::Count(k)
+    }
+}
+
+impl From<i32> for HistBreaks {
+    /// A number of classes.
+    fn from(k: i32) -> Self {
+        HistBreaks::Count(k.into())
+    }
+}
+
+/// Values: one is a number of classes, more are edges (R's length rule).
+fn values_to_breaks(v: Vec<f64>) -> HistBreaks {
+    match v.as_slice() {
+        [k] => HistBreaks::Count(*k),
+        _ => HistBreaks::Edges(v),
+    }
+}
+
+impl<T: Num, const N: usize> From<[T; N]> for HistBreaks {
+    /// Edges (or, for one value, a number of classes).
+    fn from(v: [T; N]) -> Self {
+        values_to_breaks(v.iter().map(|x| x.to_f64()).collect())
+    }
+}
+
+impl<T: Num> From<Vec<T>> for HistBreaks {
+    /// Edges (or, for one value, a number of classes).
+    fn from(v: Vec<T>) -> Self {
+        values_to_breaks(v.iter().map(|x| x.to_f64()).collect())
+    }
+}
+
+impl<T: Num> From<&[T]> for HistBreaks {
+    /// Edges (or, for one value, a number of classes).
+    fn from(v: &[T]) -> Self {
+        values_to_breaks(v.iter().map(|x| x.to_f64()).collect())
+    }
 }
 
 /// Bin `data` (assumed sorted or not, finite-only) into intervals
@@ -66,18 +277,25 @@ fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
 /// are R's defaults, given for each.
 #[derive(Clone, Debug)]
 pub struct HistOptions {
-    /// R's `breaks`: two or more values are the bin edges (sorted, as R
-    /// does); one value is a suggested number of bins, as R's `breaks =
-    /// 20` (edges from `pretty()`). `None` (or empty): Sturges' rule +
-    /// `pretty()`, R's default `breaks = "Sturges"`.
+    /// R's `breaks`: edges (`.breaks([0, 2, 5, 10])`, sorted as R does), a
+    /// suggested number of classes (`.breaks(20)`), a rule (`.breaks("FD")`,
+    /// `"Scott"`, `"Sturges"`) or a function of the data
+    /// ([`HistBreaks::function`]); a number of classes gives the edges
+    /// `pretty(range(x), n = classes, min.n = 1)`. `None`: `"Sturges"`, R's
+    /// default.
     ///
     /// # Panics
-    /// When drawn (or recorded), if the one value isn't finite or is less
-    /// than 1 (R: "invalid number of 'breaks'").
-    pub breaks: Option<Vec<f64>>,
+    /// When drawn (or recorded), if a number of classes isn't finite or is
+    /// less than 1 (R: "invalid number of 'breaks'"); for an unknown rule
+    /// name, at the setter.
+    pub breaks: Option<HistBreaks>,
     /// `true`: plot counts; `false`: plot densities (`count / (n * bin
     /// width)`). `None`: counts if the bins are equally wide, as R.
     pub freq: Option<bool>,
+    /// x axis limits (R's `xlim`); `None`: the range of the breaks.
+    pub xlim: Option<(f64, f64)>,
+    /// y axis limits (R's `ylim`); `None`: 0 to the tallest bar.
+    pub ylim: Option<(f64, f64)>,
     /// Bar fill; `None`: `"lightgray"` (R's default).
     pub col: Option<ColorSpec>,
     /// Bar borders; `None`: `par(fg)` (R's default).
@@ -146,8 +364,10 @@ pub struct HistOptions {
 }
 
 crate::setters::setters!(HistOptions => [HistCall] {
-    breaks: option_values f64,
+    breaks: option HistBreaks,
     freq: option bool,
+    xlim: pair f64,
+    ylim: pair f64,
     col: option ColorSpec,
     border: option ColorSpec,
     main: option Label,
@@ -179,6 +399,8 @@ impl Default for HistOptions {
         HistOptions {
             breaks: None,
             freq: None,
+            xlim: None,
+            ylim: None,
             col: None,
             border: None,
             main: None,
@@ -208,13 +430,17 @@ impl Default for HistOptions {
 }
 
 /// The `"histogram"` object R's `hist()` returns: bin edges, counts,
-/// density, and bin midpoints.
+/// density, bin midpoints, and whether the bins are equally wide.
 #[derive(Clone, Debug)]
 pub struct HistResult {
     pub breaks: Vec<f64>,
     pub counts: Vec<f64>,
     pub density: Vec<f64>,
     pub mids: Vec<f64>,
+    /// R's `equidist`: the bins came from a number of classes or rule, or
+    /// the given edges are equally spaced (to `1e-7` of the mean width);
+    /// `freq`'s default.
+    pub equidist: bool,
 }
 
 /// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
@@ -224,25 +450,26 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let n = data.len();
 
-    // `hist.default`: two or more values are the edges (sorted); one value
-    // is a number of classes, and none is Sturges' rule; either way the
-    // edges are `pretty(range(x), n = classes, min.n = 1)`.
-    let breaks = match opts.breaks.as_deref() {
-        Some(edges) if edges.len() > 1 => {
-            let mut edges = edges.to_vec();
+    // `hist.default`: edges (from the user or a function) are sorted and
+    // used as they are; otherwise a number of classes (given, or from a
+    // rule) becomes `pretty(range(x), n = classes, min.n = 1)`.
+    let given = match &opts.breaks {
+        None | Some(HistBreaks::Sturges) => HistBreaks::Count(nclass_sturges(n)),
+        Some(HistBreaks::Scott) => HistBreaks::Count(nclass_scott(&data)),
+        Some(HistBreaks::FreedmanDiaconis) => HistBreaks::Count(nclass_fd(&data)),
+        Some(HistBreaks::Function(f)) => values_to_breaks(f(&data)),
+        Some(b) => b.clone(),
+    };
+    let (breaks, use_br) = match given {
+        HistBreaks::Edges(mut edges) if edges.len() > 1 => {
             edges.sort_by(f64::total_cmp);
-            edges
+            (edges, true)
         }
-        classes => {
-            let nclass = match classes {
-                Some(&[k]) => {
-                    assert!(k.is_finite() && k >= 1.0, "invalid number of 'breaks'");
-                    // R caps it (with a warning) so that pretty() gets an
-                    // integer; pretty() truncates it.
-                    k.min(1e6) as i32
-                }
-                _ => nclass_sturges(n).max(1),
-            };
+        HistBreaks::Count(k) => {
+            assert!(k.is_finite() && k >= 1.0, "invalid number of 'breaks'");
+            // R caps it (with a warning) so that pretty() gets an integer;
+            // pretty() truncates it.
+            let nclass = k.min(1e6) as i32;
             let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
             let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
@@ -250,7 +477,18 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
             } else {
                 (0.0, 1.0)
             };
-            pretty_r(lo, hi, nclass, 1)
+            (pretty_r(lo, hi, nclass, 1), false)
+        }
+        // Fewer than two edges (none given): Sturges.
+        _ => {
+            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
+            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+                (lo, hi)
+            } else {
+                (0.0, 1.0)
+            };
+            (pretty_r(lo, hi, nclass_sturges(n) as i32, 1), false)
         }
     };
 
@@ -268,12 +506,21 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
         })
         .collect();
     let mids: Vec<f64> = breaks.windows(2).map(|w| 0.5 * (w[0] + w[1])).collect();
+    // `equidist <- !use.br || diff(range(h)) < 1e-7 * mean(h)`.
+    let (lo, hi) = widths
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &w| {
+            (a.min(w), b.max(w))
+        });
+    let mean = widths.iter().sum::<f64>() / widths.len() as f64;
+    let equidist = !use_br || hi - lo < 1e-7 * mean;
 
     HistResult {
         breaks,
         counts,
         density,
         mids,
+        equidist,
     }
 }
 
@@ -287,22 +534,12 @@ impl<B: Backend> Device<B> {
             counts,
             density,
             mids,
+            equidist,
         } = hist_bins(x, opts);
         let nb = breaks.len();
 
-        // R's `freq = NULL`: counts if the bins are equally wide
-        // (`equidist`; always for computed breaks).
-        let freq = opts.freq.unwrap_or_else(|| {
-            let given = opts.breaks.as_ref().is_some_and(|b| b.len() > 1);
-            let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
-            let (lo, hi) = widths
-                .iter()
-                .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &w| {
-                    (a.min(w), b.max(w))
-                });
-            let mean = widths.iter().sum::<f64>() / widths.len() as f64;
-            !given || hi - lo < 1e-7 * mean
-        });
+        // R's `freq = NULL`: counts if the bins are equally wide.
+        let freq = opts.freq.unwrap_or(equidist);
         let heights: Vec<f64> = if freq {
             counts.clone()
         } else {
@@ -319,7 +556,10 @@ impl<B: Backend> Device<B> {
                 ylog: opts.ylog,
                 ..PlotWindowOptions::default()
             };
-            self.plot_window_impl((breaks[0], breaks[nb - 1]), (0.0, ymax), &window);
+            // `xlim = range(breaks)`, `ylim = range(y, 0)` unless given.
+            let xlim = opts.xlim.unwrap_or((breaks[0], breaks[nb - 1]));
+            let ylim = opts.ylim.unwrap_or((0.0, ymax));
+            self.plot_window_impl(xlim, ylim, &window);
 
             if opts.ann {
                 let or = |l: &Option<Label>, default: &str| {
@@ -388,6 +628,58 @@ impl<B: Backend> Device<B> {
             counts,
             density,
             mids,
+            equidist,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Values from R 4.6: `sprintf("%.17g", signif(v, 5))` and
+    /// `quantile(x, p, type = 7)`, written out in full.
+    #[test]
+    #[allow(clippy::excessive_precision)]
+    fn signif_and_quantile_match_r() {
+        let cases = [
+            (1.23455, 1.2345999999999999),
+            (2.5e-7, 2.4999999999999999e-07),
+            (123456789.0, 123460000.0),
+            (-0.000123455, -0.00012344999999999999),
+            (1.00005, 1.0001),
+            (99999.5, 100000.0),
+            (0.15, 0.14999999999999999),
+            (12345.65, 12346.0),
+            (7.65432198, 7.6543000000000001),
+            // An exact half rounds to even (`nearbyint`).
+            (12344.5, 12344.0),
+        ];
+        for (v, r) in cases {
+            assert_eq!(signif(v, 5), r, "signif({v}, 5)");
+        }
+        assert_eq!(signif(2.5, 1), 2.0);
+        let x = [0.1, 0.7, 1.3, 2.9, 3.3, 10.1, 11.0];
+        let cases = [
+            (0.25, 1.0),
+            (0.75, 6.6999999999999993),
+            (1.0 / 8.0, 0.54999999999999993),
+            (7.0 / 8.0, 10.324999999999999),
+            (1.0 / 3.0, 1.3),
+        ];
+        for (p, r) in cases {
+            assert_eq!(quantile7(&x, p), r, "quantile({p})");
+        }
+        // Here `(1 - h) * lo + h * hi` and `lo + h * (hi - lo)` differ.
+        let x = [0.092, 0.223, 1.022, 3.174, 5.912, 6.495, 8.812];
+        assert_eq!(quantile7(&x, 0.3), 0.86219999999999997);
+        // `signif()` makes these all 1, so FD falls back to Scott's width.
+        let tiny: Vec<f64> = (1..=20).map(|i| 1.0 + i as f64 * 1e-7).collect();
+        assert_eq!(nclass_fd(&tiny), 3.0);
+        // R's `nclass.FD()` gives 13 here; without `signif()` it would be 12.
+        let x = [
+            1.4796339, 1.4452033, 1.341357, 1.4070209, 1.9657181, 0.4703397,
+        ];
+        assert_eq!(nclass_fd(&x), 13.0);
     }
 }

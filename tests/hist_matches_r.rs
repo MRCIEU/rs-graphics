@@ -20,6 +20,7 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
+use rs_graphics::highlevel::HistBreaks;
 use rs_graphics::par::Par;
 
 /// R's `hist(x, breaks = <breaks>, plot = FALSE)` (`breaks` an R
@@ -155,4 +156,110 @@ fn zero_breaks_panics_like_r() {
 fn nan_breaks_panics_like_r() {
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
     dev.hist(&[1.0, 2.0, 3.0]).breaks(f64::NAN).draw();
+}
+
+/// R's output of `expr` (an R expression evaluated with `x` set to `data`),
+/// printed with 17 significant digits, as numbers.
+fn r_values(data: &[f64], expr: &str) -> Vec<f64> {
+    let values: Vec<String> = data.iter().map(|v| format!("{v:.17}")).collect();
+    let script = format!(
+        "x <- c({}); v <- {expr}; cat(sprintf('%.17g', as.numeric(v)), '\\n')",
+        values.join(",")
+    );
+    let out = Command::new("Rscript")
+        .args(["-e", &script])
+        .output()
+        .expect("failed to run Rscript");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .map(|v| v.parse().unwrap())
+        .collect()
+}
+
+/// The `"Scott"`/`"FD"` rules (also named in other cases or by prefix,
+/// with FD's fallbacks for ties), functions returning edges or a count,
+/// `equidist`, and `xlim`/`ylim`.
+#[test]
+fn breaks_rules_and_functions_match_r() {
+    if !common::r_available() {
+        return;
+    }
+    let spread: Vec<f64> = (0..30)
+        .map(|i| (i as f64 * 0.7).sin() * 4.0 + i as f64 * 0.3)
+        .collect();
+    let mut ties = vec![5.0; 20];
+    ties.extend([1.0, 9.0, 10.0]);
+    let skewed = [-5.0, -3.0, -1.0, 0.0, 1.0, 2.0, 4.0, 8.0, 10.0, 12.0, 15.0];
+    let rules: [(&str, HistBreaks); 4] = [
+        ("'Scott'", "Scott".into()),
+        ("'FD'", "FD".into()),
+        ("'fd'", "fd".into()),
+        ("'freedman'", "freedman".into()),
+    ];
+    for data in [&spread[..], &ties[..], &skewed[..]] {
+        for (r_breaks, breaks) in &rules {
+            let expected = r_values(
+                data,
+                &format!("hist(x, breaks = {r_breaks}, plot = FALSE)$breaks"),
+            );
+            let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+            let result = dev.hist(data).breaks(breaks.clone()).draw();
+            assert_eq!(
+                result.breaks, expected,
+                "breaks = {r_breaks}, data {data:?}"
+            );
+        }
+    }
+    // Functions: edges, or one value (a number of classes).
+    let edges = r_values(
+        &skewed,
+        "hist(x, breaks = function(x) c(max(x), -10, 0, 20), plot = FALSE)$breaks",
+    );
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let result = dev
+        .hist(&skewed)
+        .breaks(HistBreaks::function(|x| {
+            let hi = x.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            vec![hi, -10.0, 0.0, 20.0]
+        }))
+        .draw();
+    assert_eq!(result.breaks, edges);
+    let r_equidist = r_values(
+        &skewed,
+        "hist(x, breaks = function(x) c(max(x), -10, 0, 20), plot = FALSE)$equidist",
+    );
+    assert_eq!(result.equidist, r_equidist == [1.0]);
+    let count = r_values(
+        &skewed,
+        "hist(x, breaks = function(x) 4, plot = FALSE)$breaks",
+    );
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let result = dev
+        .hist(&skewed)
+        .breaks(HistBreaks::function(|_| vec![4.0]))
+        .draw();
+    assert_eq!(result.breaks, count);
+    assert!(result.equidist);
+    // xlim/ylim set the window.
+    let usr = r_values(
+        &skewed,
+        "{ pdf(NULL); hist(x, xlim = c(-20, 30), ylim = c(0, 10)); par('usr') }",
+    );
+    let mut dev = Device::new(PdfBackend::new(7.0, 7.0), Par::default());
+    dev.hist(&skewed).xlim(-20, 30).ylim(0, 10).draw();
+    let (a, b, c, d) = dev.usr();
+    for (ours, r) in [a, b, c, d].iter().zip(&usr) {
+        assert!((ours - r).abs() < 1e-9, "usr {:?} vs {usr:?}", (a, b, c, d));
+    }
+}
+
+#[test]
+#[should_panic(expected = "is not a valid histogram breaks rule")]
+fn unknown_breaks_rule_panics() {
+    let _ = HistBreaks::from("f");
 }
