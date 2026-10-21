@@ -107,7 +107,7 @@ fn arrows_match_r() {
 
     let mut dev = Device::new(PdfBackend::new(7.0, 5.0).with_compression(false), Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 10.0)).draw();
+    dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
     for &(x0, y0, x1, y1, length, angle, code) in CALLS {
         let opts = ArrowsOptions {
             length: Some(length),
@@ -116,7 +116,7 @@ fn arrows_match_r() {
             col: vec![ColorSpec::Color(Color::BLACK)],
             ..ArrowsOptions::default()
         };
-        dev.arrows(x0, y0, x1, y1).with(&opts).draw();
+        dev.arrows().x0(x0).y0(y0).x1(x1).y1(y1).with(&opts).draw();
     }
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 

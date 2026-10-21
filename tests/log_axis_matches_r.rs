@@ -125,7 +125,9 @@ fn draw_ours(c: &Case) -> String {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    dev.plot(&values(c.x, c.xlog), &values(c.y, c.ylog))
+    dev.plot()
+        .x(&values(c.x, c.xlog))
+        .y(&values(c.y, c.ylog))
         .with(&opts)
         .draw();
     if let Some(at) = c.at3 {
@@ -133,7 +135,7 @@ fn draw_ours(c: &Case) -> String {
             at: Some(at.to_vec()),
             ..Default::default()
         };
-        dev.axis(3).with(&o).draw();
+        dev.axis().side(3).with(&o).draw();
     }
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }

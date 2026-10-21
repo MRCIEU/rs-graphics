@@ -47,7 +47,9 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, pch = c(1, NA, 3, 19, 2), cex = c(1, 1, NA, 2, 1), \
                 col = c(1, 2, 3, NA, 4))",
             ours: |d| {
-                d.plot(&X, &Y)
+                d.plot()
+                    .x(&X)
+                    .y(&Y)
                     .pch([Some(1), None, Some(3), Some(19), Some(2)])
                     .cex([Some(1), Some(1), None, Some(2), Some(1)])
                     .col([Some(1), Some(2), Some(3), None, Some(4)])
@@ -59,8 +61,10 @@ fn cases() -> Vec<Case> {
             name: "points_lwd",
             r: "plot(x, y, ann = FALSE, type = 'n'); points(x[-2], y[-2], lwd = c(2, 3, 1, 2))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
-                d.points(&X, &Y)
+                d.plot().x(&X).y(&Y).type_("n").draw();
+                d.points()
+                    .x(&X)
+                    .y(&Y)
                     .lwd([Some(2), None, Some(3), Some(1), Some(2)])
                     .draw();
             },
@@ -70,9 +74,9 @@ fn cases() -> Vec<Case> {
             name: "lines_lwd",
             r: "plot(x, y, ann = FALSE, type = 'n'); par(lwd = 2); lines(x, y, lwd = NA)",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
+                d.plot().x(&X).y(&Y).type_("n").draw();
                 d.par().lwd(2).draw();
-                d.lines(&X, &Y).lwd([None::<f64>]).draw();
+                d.lines().x(&X).y(&Y).lwd([None::<f64>]).draw();
             },
         },
         Case {
@@ -81,14 +85,24 @@ fn cases() -> Vec<Case> {
                 segments(x, y, x + 0.5, y + 0.5, lwd = c(2, NA, 1, 1, 3), col = c(1, 2, NA, 4, 5))\n\
                 arrows(x, y - 0.5, x + 0.3, y - 0.2, lwd = c(NA, 2))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
+                d.plot().x(&X).y(&Y).type_("n").draw();
                 let (x1, y1) = (X.map(|v| v + 0.5), Y.map(|v| v + 0.5));
-                d.segments(&X, &Y, &x1, &y1)
+                d.segments()
+                    .x0(&X)
+                    .y0(&Y)
+                    .x1(&x1)
+                    .y1(&y1)
                     .lwd([Some(2), None, Some(1), Some(1), Some(3)])
                     .col([Some(1), Some(2), None, Some(4), Some(5)])
                     .draw();
                 let (y0, x2, y2) = (Y.map(|v| v - 0.5), X.map(|v| v + 0.3), Y.map(|v| v - 0.2));
-                d.arrows(&X, &y0, &x2, &y2).lwd([None, Some(2)]).draw();
+                d.arrows()
+                    .x0(&X)
+                    .y0(&y0)
+                    .x1(&x2)
+                    .y1(&y2)
+                    .lwd([None, Some(2)])
+                    .draw();
             },
         },
         Case {
@@ -96,8 +110,12 @@ fn cases() -> Vec<Case> {
             name: "segments_lty",
             r: "plot(x, y, ann = FALSE, type = 'n'); segments(x[-4], y[-4], x[-4] + 0.5, y[-4], lty = c(1, 2, 3, 5))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
-                d.segments(&X, &Y, &X.map(|v| v + 0.5), &Y)
+                d.plot().x(&X).y(&Y).type_("n").draw();
+                d.segments()
+                    .x0(&X)
+                    .y0(&Y)
+                    .x1(&X.map(|v| v + 0.5))
+                    .y1(&Y)
                     .lty([Some(1), Some(2), Some(3), None, Some(5)])
                     .draw();
             },
@@ -111,15 +129,27 @@ fn cases() -> Vec<Case> {
                 rect(c(1, 3), 0.5, c(1.4, 3.4), 0.8, lty = c(1, 3))\n\
                 rect(2, 0.5, 2.4, 0.8, border = NA, col = 'pink')",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
-                d.rect(&X, &Y, &X.map(|v| v + 0.4), &Y.map(|v| v + 0.3))
+                d.plot().x(&X).y(&Y).type_("n").draw();
+                d.rect()
+                    .xleft(&X)
+                    .ybottom(&Y)
+                    .xright(&X.map(|v| v + 0.4))
+                    .ytop(&Y.map(|v| v + 0.3))
                     .col("grey")
                     .lwd([Some(1), None, Some(2), Some(1), Some(1)])
                     .draw();
-                d.rect(&[1.0, 2.0, 3.0], &[0.5], &[1.4, 2.4, 3.4], &[0.8])
+                d.rect()
+                    .xleft(&[1.0, 2.0, 3.0])
+                    .ybottom(&[0.5])
+                    .xright(&[1.4, 2.4, 3.4])
+                    .ytop(&[0.8])
                     .lty([Some(1), None, Some(3)])
                     .draw();
-                d.rect(&[2.0], &[0.5], &[2.4], &[0.8])
+                d.rect()
+                    .xleft(&[2.0])
+                    .ybottom(&[0.5])
+                    .xright(&[2.4])
+                    .ytop(&[0.8])
                     .col("pink")
                     .lty([None::<LineType>])
                     .draw();
@@ -132,15 +162,14 @@ fn cases() -> Vec<Case> {
                 polygon(c(1, 2, 2, NA, 3, 4, 4, NA, 4, 5, 5), c(1, 1, 2, NA, 1, 1, 2, NA, 1, 1, 2), \
                         col = c('red', 'green', 'blue'), border = c(1, NA, 1), lty = c(1, 1, 2))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
+                d.plot().x(&X).y(&Y).type_("n").draw();
                 let nan = f64::NAN;
-                d.polygon(
-                    &[1.0, 2.0, 2.0, nan, 3.0, 4.0, 4.0, nan, 4.0, 5.0, 5.0],
-                    &[1.0, 1.0, 2.0, nan, 1.0, 1.0, 2.0, nan, 1.0, 1.0, 2.0],
-                )
-                .col([Some("red"), Some("green"), Some("blue")])
-                .lty([Some(1), None, Some(2)])
-                .draw();
+                d.polygon()
+                    .x(&[1.0, 2.0, 2.0, nan, 3.0, 4.0, 4.0, nan, 4.0, 5.0, 5.0])
+                    .y(&[1.0, 1.0, 2.0, nan, 1.0, 1.0, 2.0, nan, 1.0, 1.0, 2.0])
+                    .col([Some("red"), Some("green"), Some("blue")])
+                    .lty([Some(1), None, Some(2)])
+                    .draw();
             },
         },
         Case {
@@ -149,12 +178,17 @@ fn cases() -> Vec<Case> {
                 text(x, y, c('a', 'b', 'c', 'd', 'e'), cex = c(1, NA, 2), font = c(2, 3, NA))\n\
                 mtext(c('m', 'n'), at = c(2, 4), cex = c(NA, 1.5), font = c(2, NA))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
-                d.text(&X, &Y, &["a", "b", "c", "d", "e"])
+                d.plot().x(&X).y(&Y).type_("n").draw();
+                d.text()
+                    .x(&X)
+                    .y(&Y)
+                    .labels(["a", "b", "c", "d", "e"])
                     .cex([Some(1), None, Some(2)])
                     .font([Some(2), Some(3), None])
                     .draw();
-                d.mtext(["m", "n"], 3)
+                d.mtext()
+                    .text(["m", "n"])
+                    .side(3)
                     .at([2, 4])
                     .cex([None, Some(1.5)])
                     .font([Some(2), None])
@@ -168,7 +202,7 @@ fn cases() -> Vec<Case> {
                 abline(h = 1:4, lwd = c(1, NA, 2, 1))\n\
                 abline(v = c(1, 3), lty = c(2, 3))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
+                d.plot().x(&X).y(&Y).type_("n").draw();
                 d.abline()
                     .h([1, 2, 3, 4])
                     .lwd([Some(1), None, Some(2), Some(1)])
@@ -189,7 +223,8 @@ fn cases() -> Vec<Case> {
                     (2..=12).map(f64::from).chain([40.0]).collect(),
                     (3..=9).map(f64::from).collect(),
                 ];
-                d.boxplot(&g[..])
+                d.boxplot()
+                    .x(&g[..])
                     .medpch([Some(19), None, Some(1)])
                     .medlwd([Some(3), None, Some(2)])
                     .outpch([None, Some(19)])
@@ -199,7 +234,8 @@ fn cases() -> Vec<Case> {
                     (1..=10).map(f64::from).collect::<Vec<_>>(),
                     (2..=12).map(f64::from).collect(),
                 ];
-                d.boxplot(&g2[..])
+                d.boxplot()
+                    .x(&g2[..])
                     .medlty([None, Some(1)])
                     .add(true)
                     .at([1.5, 2.5])
@@ -213,7 +249,8 @@ fn cases() -> Vec<Case> {
             name: "hist_lty",
             r: "hist(c(1, 2, 2, 3, 3, 3, 4, 4), col = 'grey', border = c(1, NA), ann = FALSE)",
             ours: |d| {
-                d.hist(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0])
+                d.hist()
+                    .x(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0])
                     .col("grey")
                     .lty([Some(LineType::SOLID), None])
                     .ann(false)
@@ -226,8 +263,10 @@ fn cases() -> Vec<Case> {
                 legend('topleft', c('a', 'mm', 'n'), pch = c(19, NA, 1), lty = c(NA, 1, 2), \
                        lwd = c(1, 2, NA), pt.cex = c(2, 1, NA), text.font = c(NA, 2, 3))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
-                d.legend("topleft", ["a", "mm", "n"])
+                d.plot().x(&X).y(&Y).type_("n").draw();
+                d.legend()
+                    .pos("topleft")
+                    .labels(["a", "mm", "n"])
                     .pch([Some(19), None, Some(1)])
                     .lty([None, Some(1), Some(2)])
                     .lwd([Some(1), Some(2), None])
@@ -246,8 +285,10 @@ fn cases() -> Vec<Case> {
                        cex = c(1.5, 1, 1), x.intersp = c(2, 1, 1), seg.len = c(2, 3, 2), \
                        y.intersp = c(1, 1.5, 1), pt.lwd = c(2, 1, 1))",
             ours: |d| {
-                d.plot(&X, &Y).type_("n").draw();
-                d.legend("bottomright", ["a", "mm", "n"])
+                d.plot().x(&X).y(&Y).type_("n").draw();
+                d.legend()
+                    .pos("bottomright")
+                    .labels(["a", "mm", "n"])
                     .pch([1, 2, 3])
                     .lty(1)
                     .cex([Some(1.5), None, Some(1.0)])

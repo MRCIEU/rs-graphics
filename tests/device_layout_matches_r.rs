@@ -64,7 +64,10 @@ fn plot_region_and_usr_match_r() {
     let backend = PdfBackend::new(width, height).with_compression(false);
     let mut dev = Device::new(backend, par);
     dev.plot_new();
-    dev.plot_window(xlim, ylim).draw();
+    dev.plot_window()
+        .xlim(xlim.0, xlim.1)
+        .ylim(ylim.0, ylim.1)
+        .draw();
 
     let plt = dev.plot_region();
     assert!(

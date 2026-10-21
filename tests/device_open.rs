@@ -20,7 +20,9 @@ use rs_graphics::prelude::*;
 /// The same drawing on any device: text (pointsize matters), a symbol
 /// (`startps` matters) and the page background.
 fn draw<B: Backend>(dev: &mut Device<B>) {
-    dev.plot(&[1.0, 2.0, 3.0], &[3.0, 1.0, 2.0])
+    dev.plot()
+        .x(&[1.0, 2.0, 3.0])
+        .y(&[3.0, 1.0, 2.0])
         .pch(19)
         .main("title")
         .draw();

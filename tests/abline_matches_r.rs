@@ -309,7 +309,9 @@ fn abline_matches_r() {
         );
         dev.plot_new();
         let (xl, yl) = c.lims;
-        dev.plot_window(xl, yl)
+        dev.plot_window()
+            .xlim(xl.0, xl.1)
+            .ylim(yl.0, yl.1)
             .with(&PlotWindowOptions {
                 xlog: c.log.contains('x'),
                 ylog: c.log.contains('y'),
@@ -336,7 +338,7 @@ fn abline_matches_r() {
 fn window() -> Device<PdfBackend> {
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
+    dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
     dev
 }
 
@@ -377,7 +379,7 @@ fn abline_ab_must_be_finite() {
 fn abline_coef_must_be_finite() {
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
     dev.plot_new();
-    dev.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
+    dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
     dev.abline()
         .with(&AblineOptions {
             coef: Some((f64::NAN, 1.0)),

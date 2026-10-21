@@ -146,7 +146,7 @@ fn draw_ours(c: &Case) -> String {
         horizontal: c.horizontal,
         ..Default::default()
     };
-    dev.boxplot(&groups()).with(&opts).draw();
+    dev.boxplot().x(&groups()).with(&opts).draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

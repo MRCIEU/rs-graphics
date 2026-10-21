@@ -127,12 +127,15 @@ fn latin1_text_matches_r() {
     };
     let mut dev = Device::new(PdfBackend::new(6.0, 6.0).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 16.0)).draw();
+    dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 16.0).draw();
     let black = ColorSpec::Color(Color::BLACK);
     for (i, label) in LABELS.iter().enumerate() {
         for (j, adj) in [0.0, 0.5, 1.0].iter().enumerate() {
             let y = (3 * i + j + 1) as f64;
-            dev.text(&[5.0], &[y], &[label])
+            dev.text()
+                .x(&[5.0])
+                .y(&[y])
+                .labels([label])
                 .with(&TextOptions {
                     adj: Some(*adj),
                     vadj: Some(0.0),

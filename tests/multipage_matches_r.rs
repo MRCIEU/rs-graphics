@@ -41,7 +41,7 @@ fn pl(d: &mut Dev, n: usize, main: &'static str) {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    d.plot(&x, &x).with(&o).draw();
+    d.plot().x(&x).y(&x).with(&o).draw();
 }
 
 struct Case {

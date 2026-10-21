@@ -19,7 +19,7 @@
 //!
 //! // R: pdf("scatter.pdf"); plot(x, y, ...); abline(h = 6); dev.off()
 //! let mut dev = Device::pdf("scatter.pdf").open()?;
-//! dev.plot(&x, &y)
+//! dev.plot().x(&x).y(&y)
 //!     .pch(19)
 //!     .col("steelblue")
 //!     .main(Label::math("y == beta[0] + beta[1] * x"))
@@ -34,12 +34,13 @@
 //! [`device::Device`] holds the page and `par()` state. Every R graphics
 //! function is a method of the [`graphics::Graphics`] trait, which
 //! `Device` implements, named as in R (`box()` is `box_()`, as `box` is a
-//! Rust keyword). A method takes R's data arguments and starts a call;
-//! the call's chainable setters take R's other arguments, and `.draw()`
-//! runs it. To reuse a set of arguments, build its options struct
+//! Rust keyword). A method starts a call; the call's chainable setters
+//! take all of R's arguments, named as R's (data too: `.x(&x)`), and
+//! `.draw()` runs it. A required argument (one R gives no default) that is
+//! left out panics at `.draw()` with R's message. To reuse a set of arguments, build its options struct
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
 //! [`prelude`] imports it all, including the trait. As in R, numbers may
-//! be integers or floats: `dev.plot(1..=10, &y).cex(2).xlim(0, 12)` (data
+//! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (data
 //! vectors are any [`Numbers`](numbers::Numbers); `f64` data is borrowed
 //! without copying). R's `NA` in a style vector is `None`:
 //! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`.
@@ -92,10 +93,10 @@
 //! let x = [1.0, 2.0, 3.0, 4.0];
 //! let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
 //! dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
-//! dev.plot(&x, &[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
+//! dev.plot().x(&x).y(&[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
 //! dev.abline().a(0).b(4).draw(); // still panel 1
-//! dev.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
-//! dev.mtext("Two panels", 3).outer(true).line(0.5).draw();
+//! dev.hist().x(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
+//! dev.mtext().text("Two panels").side(3).outer(true).line(0.5).draw();
 //! dev.close()?;
 //! # Ok::<(), std::io::Error>(())
 //! ```
@@ -115,7 +116,7 @@
 //!
 //! let mut fig = Figure::new();
 //! fig.par().las(1).draw();
-//! fig.hist(&[1.0, 2.0, 2.5, 3.0, 3.2]).main("Recorded").draw();
+//! fig.hist().x(&[1.0, 2.0, 2.5, 3.0, 3.2]).main("Recorded").draw();
 //!
 //! let mut dev = Device::pdf("figure.pdf").width(8.0).height(4.0).open()?;
 //! dev.par().mfrow(1, 2).draw();
@@ -141,7 +142,7 @@
 //!
 //! impl<G: Graphics> Diagnostic for G {
 //!     fn obs_vs_exp(&mut self, exp: &[f64], obs: &[f64]) {
-//!         self.plot(exp, obs).pch(20).draw();
+//!         self.plot().x(exp).y(obs).pch(20).draw();
 //!         self.abline().a(0).b(1).col("red").draw();
 //!     }
 //! }

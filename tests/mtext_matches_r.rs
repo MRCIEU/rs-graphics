@@ -148,9 +148,11 @@ fn mtext_placement_matches_r() {
     let mut dev = Device::new(PdfBackend::new(8.0, 6.0).with_compression(false), par);
     dev.par().mfrow(2, 2).draw();
     dev.plot_new();
-    dev.plot_window((0.0, 10.0), (0.0, 5.0)).draw();
+    dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
     for c in &cases {
-        dev.mtext(c.text, c.side)
+        dev.mtext()
+            .text(c.text)
+            .side(c.side)
             .with(&MtextOptions {
                 line: vec![c.line],
                 outer: c.outer,
@@ -166,7 +168,7 @@ fn mtext_placement_matches_r() {
     }
     assert_eq!(dev.current_par().las, 0);
     dev.par().las(1).draw();
-    dev.mtext("par las", 2).line(2.5).draw();
+    dev.mtext().text("par las").side(2).line(2.5).draw();
     let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 
     let (r, o) = (text_origins(&r_pdf), text_origins(&ours));

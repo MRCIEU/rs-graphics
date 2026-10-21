@@ -34,7 +34,7 @@ struct Case {
 
 fn axes(d: &mut Device<PdfBackend>, sides: &[i32]) {
     for &s in sides {
-        d.axis(s).draw();
+        d.axis().side(s).draw();
     }
 }
 
@@ -46,7 +46,9 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.plot_new();
                 let v = [0.0, 0.5, 1.0];
-                d.points(&v, &v)
+                d.points()
+                    .x(&v)
+                    .y(&v)
                     .with(&XyOptions {
                         pch: vec![Some(1)],
                         col: vec![ColorSpec::Index(1)],
@@ -62,7 +64,9 @@ fn cases() -> Vec<Case> {
                 par(new = TRUE); plot.new(); axis(3); axis(4)",
             draw: |d| {
                 d.plot_new();
-                d.plot_window((1.0, 1000.0), (1.0, 1000.0))
+                d.plot_window()
+                    .xlim(1.0, 1000.0)
+                    .ylim(1.0, 1000.0)
                     .with(&PlotWindowOptions {
                         xlog: true,
                         ylog: true,
@@ -82,7 +86,9 @@ fn cases() -> Vec<Case> {
                 d.par().xaxs(AxisStyle::Exact).draw();
                 d.par().yaxs(AxisStyle::Exact).draw();
                 d.plot_new();
-                d.points(&[0.25], &[0.75])
+                d.points()
+                    .x(&[0.25])
+                    .y(&[0.75])
                     .with(&XyOptions {
                         pch: vec![Some(1)],
                         col: vec![ColorSpec::Index(1)],

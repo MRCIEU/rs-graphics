@@ -57,9 +57,11 @@ fn draw_ours(c: &Case) -> String {
     if let Some(bg) = c.par_bg {
         d.par().bg(Color::parse(bg).unwrap()).draw();
     }
-    d.plot_window((0.0, 1.0), (0.0, 1.0)).draw();
+    d.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
     let zero = ColorSpec::Index(0);
-    d.points(&[0.5], &[0.5])
+    d.points()
+        .x(&[0.5])
+        .y(&[0.5])
         .with(&XyOptions {
             pch: vec![Some(19)],
             col: vec![zero],
@@ -67,7 +69,11 @@ fn draw_ours(c: &Case) -> String {
         })
         .draw();
     let solid = LineType::from_code(1);
-    d.rect(&[0.1], &[0.1], &[0.3], &[0.3])
+    d.rect()
+        .xleft(&[0.1])
+        .ybottom(&[0.1])
+        .xright(&[0.3])
+        .ytop(&[0.3])
         .with(&RectOptions {
             col: vec![zero],
             border: vec![ColorSpec::Index(2)],
@@ -76,7 +82,10 @@ fn draw_ours(c: &Case) -> String {
             ..RectOptions::default()
         })
         .draw();
-    d.text(&[0.7], &[0.7], &["z"])
+    d.text()
+        .x(&[0.7])
+        .y(&[0.7])
+        .labels(["z"])
         .with(&TextOptions {
             adj: Some(0.5),
             col: vec![zero],
@@ -91,7 +100,11 @@ fn draw_ours(c: &Case) -> String {
         lwd: vec![Some(3.0)],
         ..SegmentsOptions::default()
     };
-    d.segments(&[0.0], &[1.0], &[1.0], &[0.0])
+    d.segments()
+        .x0(&[0.0])
+        .y0(&[1.0])
+        .x1(&[1.0])
+        .y1(&[0.0])
         .with(&line)
         .draw();
     String::from_utf8_lossy(&d.into_backend().finish()).into_owned()

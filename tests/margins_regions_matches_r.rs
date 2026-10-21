@@ -38,7 +38,9 @@ struct Case {
 }
 
 fn titled(d: &mut Device<PdfBackend>) {
-    d.plot(&X, &Y)
+    d.plot()
+        .x(&X)
+        .y(&Y)
         .main("title")
         .xlab("xlab")
         .ylab("ylab")
@@ -70,7 +72,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().mai([2, 2, 2, 2]).draw();
                 d.par().mar([4, 4, 2, 1]).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
             },
         },
         Case {
@@ -79,8 +81,8 @@ fn cases() -> Vec<Case> {
                 mtext('title', side = 3, outer = TRUE, line = 1)",
             ours: |d| {
                 d.par().omi([0.5, 0.6, 0.8, 0.2]).draw();
-                d.plot(&X, &Y).draw();
-                d.mtext("title", 3).outer(true).line(1).draw();
+                d.plot().x(&X).y(&Y).draw();
+                d.mtext().text("title").side(3).outer(true).line(1).draw();
             },
         },
         Case {
@@ -89,8 +91,8 @@ fn cases() -> Vec<Case> {
                 mtext('title', outer = TRUE, line = 0.5)",
             ours: |d| {
                 d.par().omd([0.1, 0.9, 0.05, 0.9]).draw();
-                d.plot(&X, &Y).draw();
-                d.mtext("title", 3).outer(true).line(0.5).draw();
+                d.plot().x(&X).y(&Y).draw();
+                d.mtext().text("title").side(3).outer(true).line(0.5).draw();
             },
         },
         Case {
@@ -101,9 +103,9 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().mfrow(2, 2).omi([0.0, 0.0, 0.5, 0.0]).draw();
                 for _ in 0..4 {
-                    d.plot(&X, &Y).draw();
+                    d.plot().x(&X).y(&Y).draw();
                 }
-                d.mtext("title", 3).outer(true).line(1).draw();
+                d.mtext().text("title").side(3).outer(true).line(1).draw();
             },
         },
         Case {
@@ -120,7 +122,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().pin([3, 2]).draw();
                 d.par().mar([5, 4, 4, 2]).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
             },
         },
         Case {
@@ -129,7 +131,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().plt([0.2, 0.8, 0.3, 0.7]).draw();
                 d.par().pty("s").draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
             },
         },
         Case {
@@ -146,9 +148,9 @@ fn cases() -> Vec<Case> {
                 par(oma = c(0, 0, 2, 0)); plot(x, y, ann = FALSE)",
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 d.par().oma([0, 0, 2, 0]).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
             },
         },
     ]

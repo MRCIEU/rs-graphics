@@ -33,14 +33,14 @@ fn outcome(f: impl FnOnce()) -> String {
 /// same code.
 fn call<G: Graphics>(g: &mut G, i: usize) {
     match i {
-        0 => g.plot(&[1, 2, 3], &[1, 2]).draw(),
-        1 => g.points(&[1, 2, 3], &[1, 2]).draw(),
-        2 => g.points(&[1], &[1, 2, 3]).draw(),
-        3 => g.lines(&[1, 2, 3, 4], &[1, 2]).draw(),
-        4 => g.polygon(&[1, 2, 3], &[1, 2]).draw(),
-        5 => g.text(&[1, 2, 3], &[1, 2], &["a"]).draw(),
-        6 => g.points(&[0.0; 0], &[0.0; 0]).draw(),
-        7 => g.lines(&[1, 2, 3], &[3, 1, 2]).draw(),
+        0 => g.plot().x(&[1, 2, 3]).y(&[1, 2]).draw(),
+        1 => g.points().x(&[1, 2, 3]).y(&[1, 2]).draw(),
+        2 => g.points().x(&[1]).y(&[1, 2, 3]).draw(),
+        3 => g.lines().x(&[1, 2, 3, 4]).y(&[1, 2]).draw(),
+        4 => g.polygon().x(&[1, 2, 3]).y(&[1, 2]).draw(),
+        5 => g.text().x(&[1, 2, 3]).y(&[1, 2]).labels(["a"]).draw(),
+        6 => g.points().x(&[0.0; 0]).y(&[0.0; 0]).draw(),
+        7 => g.lines().x(&[1, 2, 3]).y(&[3, 1, 2]).draw(),
         _ => unreachable!(),
     }
 }
@@ -94,7 +94,7 @@ fn unequal_xy_lengths_fail_like_r() {
     std::panic::set_hook(Box::new(|_| {}));
     for (i, (r, e)) in R_CALLS.iter().zip(&expected).enumerate() {
         let mut dev = Device::new(PdfBackend::new(6, 6), Par::default());
-        dev.plot(1..=10, 1..=10).draw();
+        dev.plot().x(1..=10).y(1..=10).draw();
         let on_device = outcome(|| call(&mut dev, i));
         // A `Figure` panics at the call, not only when it is added.
         let mut fig = Figure::new();

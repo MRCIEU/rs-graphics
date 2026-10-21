@@ -24,7 +24,7 @@ usage, see [README.md](README.md).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
   - each a `Graphics` method (`src/graphics.rs`) taking its data and
-  returning a call (`dev.points(&x, &y).pch(19).draw()`): the other
+  returning a call (`dev.points().x(&x).y(&y).pch(19).draw()`): the other
   arguments are its setters, or an options struct passed with
   `.with(&opts)`, and `.draw()` runs it; the drawing code is in
   `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`;
@@ -465,6 +465,10 @@ against a real R installation by shelling out to `Rscript`:
   `x.intersp`/`seg.len` with per-row `y.intersp`, `text.width = NA` and
   per column, and `adj`: every painted path and text item, and the
   return value.
+- `tests/required_args.rs` (no R needed) - every required argument left
+  out panics with R's message (`argument "x" is missing, with no
+  default`), on a device and in a `Figure`; arguments with R defaults can
+  be left out.
 - `tests/primitives_matches_r.rs` - per-element recycling in `points()`,
   `segments()`, `arrows()`, `rect()`, `polygon()` and `text()`,
   `lines(type = )`, `par("fg")` defaults, polygons split at `NA`, default

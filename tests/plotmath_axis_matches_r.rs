@@ -277,14 +277,14 @@ fn plotmath_axis_labels_match_r() {
     par.mar = rs_graphics::par::Sides::new(5.0, 6.0, 5.0, 6.0);
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 6.0), (0.0, 6.0)).draw();
+    dev.plot_window().xlim(0.0, 6.0).ylim(0.0, 6.0).draw();
     for c in CASES {
         let opts = AxisOptions {
             at: Some((1..=c.exprs.len()).map(|i| i as f64).collect()),
             labels: Some(c.exprs.iter().map(|e| Some(Label::math(e))).collect()),
             ..(c.opts)()
         };
-        dev.axis(c.side).with(&opts).draw();
+        dev.axis().side(c.side).with(&opts).draw();
     }
     // Byte for byte: R writes Symbol codes above 127 as raw bytes.
     let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
@@ -354,7 +354,7 @@ fn consecutive_digits_are_all_plain() {
         labels: Some(vec![Some(Label::math("bolditalic(x12)"))]),
         ..AxisOptions::default()
     };
-    dev.axis(1).with(&opts).draw();
+    dev.axis().side(1).with(&opts).draw();
     let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
     let fonts: Vec<(String, Vec<u8>)> = extract(&latin1(&dev.into_backend().finish()))
         .0
@@ -425,7 +425,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
     };
     let mut d = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     d.plot_new();
-    d.plot_window((0.0, 10.0), (0.0, 10.0)).draw();
+    d.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
     d.title()
         .with(&TitleOptions {
             main: Some(Label::math("Main ~ alpha^2")),
@@ -439,23 +439,31 @@ fn plotmath_title_mtext_text_legend_match_r() {
         line: vec![line],
         ..MtextOptions::default()
     };
-    d.mtext(Label::math("beta^2"), 3)
+    d.mtext()
+        .text(Label::math("beta^2"))
+        .side(3)
         .with(&MtextOptions {
             adj: vec![0.0],
             ..mt(0.5)
         })
         .draw();
-    d.mtext(Label::math("Omega ~ infinity"), 4)
+    d.mtext()
+        .text(Label::math("Omega ~ infinity"))
+        .side(4)
         .with(&mt(1.0))
         .draw();
-    d.mtext(Label::math("10^-5"), 1)
+    d.mtext()
+        .text(Label::math("10^-5"))
+        .side(1)
         .with(&MtextOptions {
             outer: true,
             ..mt(0.5)
         })
         .draw();
     d.par().las(1).draw();
-    d.mtext(Label::math("gamma[k]"), 2)
+    d.mtext()
+        .text(Label::math("gamma[k]"))
+        .side(2)
         .with(&MtextOptions {
             at: vec![8.0],
             ..mt(3.0)
@@ -463,7 +471,10 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .draw();
     d.par().las(0).draw();
     let black = ColorSpec::Index(1);
-    d.text(&[2.0], &[8.0], &[Label::math("x^2 + y^2 == r^2")])
+    d.text()
+        .x(&[2.0])
+        .y(&[8.0])
+        .labels(&[Label::math("x^2 + y^2 == r^2")])
         .with(&TextOptions {
             adj: Some(0.5),
             col: vec![black],
@@ -472,7 +483,10 @@ fn plotmath_title_mtext_text_legend_match_r() {
             ..TextOptions::default()
         })
         .draw();
-    d.text(&[7.0], &[3.0], &[Label::math("alpha %+-% beta")])
+    d.text()
+        .x(&[7.0])
+        .y(&[3.0])
+        .labels(&[Label::math("alpha %+-% beta")])
         .with(&TextOptions {
             adj: Some(0.0),
             vadj: Some(1.0),
@@ -484,7 +498,10 @@ fn plotmath_title_mtext_text_legend_match_r() {
         })
         .draw();
     let red = ColorSpec::Color(Color::parse("red").unwrap());
-    d.text(&[5.0], &[2.0], &[Label::math("paste(\"P = \", 0.05)")])
+    d.text()
+        .x(&[5.0])
+        .y(&[2.0])
+        .labels(&[Label::math("paste(\"P = \", 0.05)")])
         .with(&TextOptions {
             adj: Some(0.5),
             col: vec![red],
@@ -501,7 +518,9 @@ fn plotmath_title_mtext_text_legend_match_r() {
         title: Some(Label::math("Sigma[j]")),
         ..LegendOptions::default()
     };
-    d.legend(LegendPos::Keyword(LegendKeyword::TopRight), labels)
+    d.legend()
+        .pos(LegendPos::Keyword(LegendKeyword::TopRight))
+        .labels(labels)
         .with(&opts)
         .draw();
 
@@ -605,7 +624,9 @@ fn plotmath_high_level_titles_match_r() {
     d.par().mfrow(2, 3).draw();
     let x: Vec<f64> = (1..=10).map(f64::from).collect();
     let y: Vec<f64> = x.iter().map(|v| v * v).collect();
-    d.plot(&x, &y)
+    d.plot()
+        .x(&x)
+        .y(&y)
         .with(&PlotOptions {
             main: math("y == x^2"),
             sub: math("n[obs]"),
@@ -614,14 +635,16 @@ fn plotmath_high_level_titles_match_r() {
             ..PlotOptions::default()
         })
         .draw();
-    d.hist(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0])
+    d.hist()
+        .x(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0])
         .with(&HistOptions {
             main: math("Histogram ~ of ~ X[1]"),
             ylab: math("count[i]"),
             ..HistOptions::default()
         })
         .draw();
-    d.barplot([3.0, 5.0, 2.0])
+    d.barplot()
+        .height([3.0, 5.0, 2.0])
         .with(&BarplotOptions {
             names: abc(),
             main: math("bold(Bars)"),
@@ -629,14 +652,16 @@ fn plotmath_high_level_titles_match_r() {
             ..BarplotOptions::default()
         })
         .draw();
-    d.boxplot(&[vec![1.0, 2.0, 3.0, 4.0, 9.0], vec![2.0, 3.0, 4.0]])
+    d.boxplot()
+        .x(&[vec![1.0, 2.0, 3.0, 4.0, 9.0], vec![2.0, 3.0, 4.0]])
         .with(&BoxplotOptions {
             main: math("sigma^2"),
             ylab: math("mu %+-% sigma"),
             ..BoxplotOptions::default()
         })
         .draw();
-    d.pie(&[1.0, 2.0, 3.0])
+    d.pie()
+        .x(&[1.0, 2.0, 3.0])
         .with(&PieOptions {
             labels: abc(),
             main: math("pi * r^2"),

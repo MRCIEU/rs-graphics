@@ -60,13 +60,15 @@ fn keys() -> LegendOptions {
 /// R's `fit()`: points, the fitted line and a legend at `pos`.
 fn fit_figure(pos: LegendPos, opts: &LegendOptions) -> Figure {
     let mut fig = Figure::new();
-    fig.plot(&DOSE, &RESPONSE)
+    fig.plot()
+        .x(&DOSE)
+        .y(&RESPONSE)
         .xlab("x")
         .ylab("y")
         .main("Fit")
         .draw();
-    fig.lines(&DOSE, &FITTED).col("red").draw();
-    fig.legend(pos, LABELS).with(opts).draw();
+    fig.lines().x(&DOSE).y(&FITTED).col("red").draw();
+    fig.legend().pos(pos).labels(LABELS).with(opts).draw();
     fig
 }
 
@@ -109,18 +111,24 @@ par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
                 // into the next panel.
                 let mut b = Figure::new();
                 b.par().las(1).draw();
-                b.plot(&DOSE, &RESPONSE)
+                b.plot()
+                    .x(&DOSE)
+                    .y(&RESPONSE)
                     .xlab("x")
                     .ylab("y")
                     .main("Fit")
                     .draw();
-                b.lines(&DOSE, &FITTED).col("red").draw();
-                b.legend(LegendPos::Xy(1.5, 6.8), LABELS)
+                b.lines().x(&DOSE).y(&FITTED).col("red").draw();
+                b.legend()
+                    .pos(LegendPos::Xy(1.5, 6.8))
+                    .labels(LABELS)
                     .with(&keys())
                     .draw();
                 out.extend(layouts(d.add_figure_at(2, 1, &b), d.usr()));
                 d.par().mfg(2, 2).draw();
-                d.plot(&DOSE, &FITTED)
+                d.plot()
+                    .x(&DOSE)
+                    .y(&FITTED)
                     .type_(PlotType::Lines)
                     .xlab("dose")
                     .ylab("fitted")
@@ -144,13 +152,17 @@ key("layout_key.0", "center")"#,
                     rel(1.0),
                 ]));
                 let mut a = Figure::new();
-                a.plot(&DOSE, &RESPONSE)
+                a.plot()
+                    .x(&DOSE)
+                    .y(&RESPONSE)
                     .xlab("x")
                     .ylab("y")
                     .main("A")
                     .draw();
                 let mut b = Figure::new();
-                b.plot(&DOSE, &FITTED)
+                b.plot()
+                    .x(&DOSE)
+                    .y(&FITTED)
                     .type_(PlotType::Lines)
                     .xlab("x")
                     .ylab("y")
@@ -160,7 +172,9 @@ key("layout_key.0", "center")"#,
                 let mut key = Figure::new();
                 key.par().mar([0.0, 0.0, 0.0, 0.0]).draw();
                 key.plot_new();
-                key.legend(LegendPos::Keyword(LegendKeyword::Center), LABELS)
+                key.legend()
+                    .pos(LegendPos::Keyword(LegendKeyword::Center))
+                    .labels(LABELS)
                     .with(&keys())
                     .draw();
                 d.add_figure(&a);

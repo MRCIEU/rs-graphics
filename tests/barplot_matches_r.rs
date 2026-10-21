@@ -119,7 +119,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("v".into()),
                     ..Default::default()
                 };
-                d.barplot([23.0, 41.0, 12.0, -5.0]).with(&o).draw();
+                d.barplot().height([23.0, 41.0, 12.0, -5.0]).with(&o).draw();
             },
             check_text: true,
         },
@@ -132,7 +132,7 @@ fn cases() -> Vec<Case> {
                     legend_text: names(&["r1", "r2", "r3"]),
                     ..Default::default()
                 };
-                d.barplot(mat()).with(&o).draw();
+                d.barplot().height(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -146,7 +146,7 @@ fn cases() -> Vec<Case> {
                     col: red_green_blue().expect("REASON"),
                     ..Default::default()
                 };
-                d.barplot(mat()).with(&o).draw();
+                d.barplot().height(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -159,7 +159,7 @@ fn cases() -> Vec<Case> {
                     horiz: true,
                     ..Default::default()
                 };
-                d.barplot(mat()).with(&o).draw();
+                d.barplot().height(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -175,7 +175,7 @@ fn cases() -> Vec<Case> {
                     legend_text: names(&["r1", "r2", "r3"]),
                     ..Default::default()
                 };
-                d.barplot(mat()).with(&o).draw();
+                d.barplot().height(mat()).with(&o).draw();
             },
             check_text: true,
         },
@@ -191,7 +191,7 @@ fn cases() -> Vec<Case> {
                     ylim: Some((-8.0, 12.0)),
                     ..Default::default()
                 };
-                d.barplot(&cols).with(&o).draw();
+                d.barplot().height(&cols).with(&o).draw();
             },
             check_text: false,
         },

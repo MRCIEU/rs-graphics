@@ -137,7 +137,7 @@ impl Device<AnyBackend> {
     /// # fn main() -> std::io::Result<()> {
     /// let format = "png"; // e.g. from a command-line option
     /// let mut dev = Device::format(format, "plot.png").res(300.0).open()?;
-    /// dev.plot(&[1.0, 2.0, 3.0], &[2.0, 1.0, 3.0]).draw();
+    /// dev.plot().x(&[1.0, 2.0, 3.0]).y(&[2.0, 1.0, 3.0]).draw();
     /// dev.close()?;
     /// # Ok(())
     /// # }
@@ -164,7 +164,7 @@ impl Device<AnyBackend> {
     /// # fn main() -> std::io::Result<()> {
     /// // R: pdf("scatter.pdf", width = 7, height = 5)
     /// let mut dev = Device::pdf("scatter.pdf").width(7.0).height(5.0).open()?;
-    /// dev.plot(&[1.0, 2.0, 3.0], &[2.0, 1.0, 3.0]).draw();
+    /// dev.plot().x(&[1.0, 2.0, 3.0]).y(&[2.0, 1.0, 3.0]).draw();
     /// dev.close()?; // R: dev.off()
     /// # Ok(())
     /// # }

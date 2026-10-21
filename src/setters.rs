@@ -462,12 +462,12 @@ mod tests {
         let mut dev = Device::new(SvgBackend::new(4.0, 4.0), Par::default());
         let saved = AxisOptions::default().las(1).at([1.0, 2.0]).lwd(3.0);
 
-        let call = dev.axis(2).las(2).tick(false);
+        let call = dev.axis().side(2).las(2).tick(false);
         assert_eq!((call.opts.las, call.opts.tick), (Some(2), false));
 
         // `with` replaces what was set before it; later setters override
         // just this call, leaving `saved` alone.
-        let call = dev.axis(2).las(2).with(&saved).lwd(0.5);
+        let call = dev.axis().side(2).las(2).with(&saved).lwd(0.5);
         assert_eq!(call.opts.las, Some(1));
         assert_eq!(call.opts.at, Some(vec![1.0, 2.0]));
         assert_eq!(call.opts.lwd, Some(0.5));

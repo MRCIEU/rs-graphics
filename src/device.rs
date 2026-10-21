@@ -63,8 +63,8 @@ pub use primitives::{
 
 /// A side of the plot, figure or page, as R's `side` argument. Functions
 /// take `impl Into<Side>`, so R's numbers work too: `1` = bottom, `2` =
-/// left, `3` = top, `4` = right (`dev.axis(1)` is
-/// `dev.axis(Side::Bottom)`).
+/// left, `3` = top, `4` = right (`dev.axis().side(1)` is
+/// `dev.axis().side(Side::Bottom)`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     Bottom = 1,

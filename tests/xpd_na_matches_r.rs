@@ -47,11 +47,11 @@ fn cases() -> Vec<Case> {
                 text(10, 2, 'abc')",
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 d.par().xpd(Xpd::Device).draw();
-                d.lines(&[1, 14], &[1, 6]).draw();
-                d.points(&[9, 12], &[3, 4]).pch(19).draw();
-                d.text(&[10], &[2], &["abc"]).draw();
+                d.lines().x(&[1, 14]).y(&[1, 6]).draw();
+                d.points().x(&[9, 12]).y(&[3, 4]).pch(19).draw();
+                d.text().x(&[10]).y(&[2]).labels(["abc"]).draw();
             },
         },
         Case {
@@ -61,10 +61,10 @@ fn cases() -> Vec<Case> {
                 axis(3, at = c(-4, 0, 3, 8, 12))",
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 d.par().xpd(Xpd::Device).draw();
                 d.abline().h(3).v(2).col("red").draw();
-                d.axis(3).at([-4, 0, 3, 8, 12]).draw();
+                d.axis().side(3).at([-4, 0, 3, 8, 12]).draw();
             },
         },
         Case {
@@ -74,10 +74,17 @@ fn cases() -> Vec<Case> {
                 legend(8, 5, legend = c('abc', 'sum'), pch = 1:2, xpd = NA)",
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
-                d.plot(&X, &Y).draw();
-                d.text(&[11], &[3], &["abc"]).xpd(Xpd::Device).draw();
-                d.text(&[11], &[4], &["sum"]).xpd(true).draw();
-                d.legend((8, 5), ["abc", "sum"])
+                d.plot().x(&X).y(&Y).draw();
+                d.text()
+                    .x(&[11])
+                    .y(&[3])
+                    .labels(["abc"])
+                    .xpd(Xpd::Device)
+                    .draw();
+                d.text().x(&[11]).y(&[4]).labels(["sum"]).xpd(true).draw();
+                d.legend()
+                    .pos((8, 5))
+                    .labels(["abc", "sum"])
                     .pch([1, 2])
                     .xpd(Xpd::Device)
                     .draw();
@@ -89,7 +96,7 @@ fn cases() -> Vec<Case> {
                 abline(h = 2, col = 'blue'); par(xpd = NA); abline(h = 4, col = 'red')",
             ours: |d| {
                 d.par().mfrow(1, 2).xpd(true).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 d.abline().h(2).col("blue").draw();
                 d.par().xpd(Xpd::Device).draw();
                 d.abline().h(4).col("red").draw();
@@ -102,8 +109,8 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), ylim = c(0, 4))",
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
-                d.barplot([3, 5, 2]).ylim(0, 4).xpd(false).draw();
-                d.barplot([3, 5, 2]).ylim(0, 4).draw();
+                d.barplot().height([3, 5, 2]).ylim(0, 4).xpd(false).draw();
+                d.barplot().height([3, 5, 2]).ylim(0, 4).draw();
             },
         },
         Case {
@@ -116,7 +123,7 @@ fn cases() -> Vec<Case> {
                 abline(a = 1, b = 0.5, untf = TRUE, xpd = NA, col = 'green')",
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 d.abline().h(2).xpd(true).col("blue").draw();
                 d.abline().v(3).xpd(Xpd::Device).col("red").draw();
                 d.abline().a(1).b(0.5).xpd(Xpd::Device).draw();
@@ -125,7 +132,7 @@ fn cases() -> Vec<Case> {
                 d.par().xpd(true).draw();
                 d.abline().h(1.5).xpd(false).col("grey").draw();
                 d.par().xpd(false).draw();
-                d.plot(&X, &Y).xlog(true).draw();
+                d.plot().x(&X).y(&Y).xlog(true).draw();
                 d.abline()
                     .a(1)
                     .b(0.5)

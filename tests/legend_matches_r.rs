@@ -85,7 +85,9 @@ fn cases() -> Vec<Case> {
             name: "topright_title_merge",
             r: r#"legend("topright", legend=c("alpha","beta gamma"), col=c(1,2), pch=c(19,1), lty=c(1,2), lwd=c(1,2), title="Key")"#,
             run: |d| {
-                d.legend("topright", ["alpha", "beta gamma"])
+                d.legend()
+                    .pos("topright")
+                    .labels(["alpha", "beta gamma"])
                     .col([1, 2])
                     .pch([19, 1])
                     .lty([1, 2])
@@ -98,7 +100,9 @@ fn cases() -> Vec<Case> {
             name: "bottomleft_inset",
             r: r#"legend("bottomleft", legend=c("a","bb","ccc"), pch=c(1,2,3), inset=0.05)"#,
             run: |d| {
-                d.legend("bottomleft", ["a", "bb", "ccc"])
+                d.legend()
+                    .pos("bottomleft")
+                    .labels(["a", "bb", "ccc"])
                     .pch([1, 2, 3])
                     .inset((0.05, 0.05))
                     .draw()
@@ -108,7 +112,9 @@ fn cases() -> Vec<Case> {
             name: "center_ncol2_nobox",
             r: r#"legend("center", legend=c("one","two","three"), lty=1:3, col=2:4, ncol=2, bty="n")"#,
             run: |d| {
-                d.legend("center", ["one", "two", "three"])
+                d.legend()
+                    .pos("center")
+                    .labels(["one", "two", "three"])
                     .lty([1, 2, 3])
                     .col([2, 3, 4])
                     .ncol(2)
@@ -120,7 +126,9 @@ fn cases() -> Vec<Case> {
             name: "top_horiz_fill",
             r: r#"legend("top", legend=c("x","yy"), fill=c("red","blue"), horiz=TRUE)"#,
             run: |d| {
-                d.legend("top", ["x", "yy"])
+                d.legend()
+                    .pos("top")
+                    .labels(["x", "yy"])
                     .fill(["red", "blue"])
                     .horiz(true)
                     .draw()
@@ -130,7 +138,9 @@ fn cases() -> Vec<Case> {
             name: "xy_cex_intersp_title",
             r: r#"legend(5, 20, legend=c("p","qq","rrr"), pch=1:3, cex=0.8, y.intersp=1.5, x.intersp=2, title="T")"#,
             run: |d| {
-                d.legend((5, 20), ["p", "qq", "rrr"])
+                d.legend()
+                    .pos((5, 20))
+                    .labels(["p", "qq", "rrr"])
                     .pch([1, 2, 3])
                     .cex(0.8)
                     .y_intersp(1.5)
@@ -142,13 +152,21 @@ fn cases() -> Vec<Case> {
         Case {
             name: "corners",
             r: r#"legend(c(5,15), c(10,20), legend=c("a","b"), pch=1:2)"#,
-            run: |d| d.legend(((5, 15), (10, 20)), ["a", "b"]).pch([1, 2]).draw(),
+            run: |d| {
+                d.legend()
+                    .pos(((5, 15), (10, 20)))
+                    .labels(["a", "b"])
+                    .pch([1, 2])
+                    .draw()
+            },
         },
         Case {
             name: "right_long_title_seglen",
             r: r#"legend("right", legend=c("lo","hi"), lty=1, lwd=2, seg.len=3, title="A rather long legend title")"#,
             run: |d| {
-                d.legend("right", ["lo", "hi"])
+                d.legend()
+                    .pos("right")
+                    .labels(["lo", "hi"])
                     .lty(1)
                     .lwd(2)
                     .seg_len(3)
@@ -161,7 +179,9 @@ fn cases() -> Vec<Case> {
             r: r#"par(cex = 1.5); legend("topright", legend=c("alpha","beta gamma"), pch=1:2, lty=1, cex=0.8, title="Key")"#,
             run: |d| {
                 d.par().cex(1.5).draw();
-                d.legend("topright", ["alpha", "beta gamma"])
+                d.legend()
+                    .pos("topright")
+                    .labels(["alpha", "beta gamma"])
                     .pch([1, 2])
                     .lty(1)
                     .cex(0.8)
@@ -173,7 +193,9 @@ fn cases() -> Vec<Case> {
             name: "topleft_text_width",
             r: r#"legend("topleft", legend=c("a","b"), pch=1:2, text.width=2)"#,
             run: |d| {
-                d.legend("topleft", ["a", "b"])
+                d.legend()
+                    .pos("topleft")
+                    .labels(["a", "b"])
                     .pch([1, 2])
                     .text_width(2)
                     .draw()
@@ -259,7 +281,7 @@ fn legend_layout_matches_r() {
             ylab: Some("y".into()),
             ..PlotOptions::default()
         };
-        dev.plot(&x, &y).with(&opts).draw();
+        dev.plot().x(&x).y(&y).with(&opts).draw();
         let layout = (c.run)(&mut dev);
         check_return_value(
             c.name,
@@ -324,9 +346,15 @@ fn legend_return_value_on_log_axes_matches_r() {
         ylog: true,
         ..PlotOptions::default()
     };
-    dev.plot(&[1.0, 1000.0], &[2.0, 500.0]).with(&opts).draw();
+    dev.plot()
+        .x(&[1.0, 1000.0])
+        .y(&[2.0, 500.0])
+        .with(&opts)
+        .draw();
     let layout = dev
-        .legend("topleft", ["a", "bb"])
+        .legend()
+        .pos("topleft")
+        .labels(["a", "bb"])
         .pch([1, 2])
         .inset((0.05, 0.05))
         .draw();

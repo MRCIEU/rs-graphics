@@ -20,7 +20,7 @@
 //!
 //! // Build a figure without a device...
 //! let mut fig = Figure::new();
-//! fig.barplot([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
+//! fig.barplot().height([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
 //! fig.abline().h(4.0).lty("dashed").draw();
 //!
 //! // ...and draw it later, as often as needed.
@@ -69,7 +69,7 @@
 //!
 //! # fn main() -> std::io::Result<()> {
 //! let mut fig = Figure::new();
-//! fig.hist(&[2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8]).draw();
+//! fig.hist().x(&[2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8]).draw();
 //!
 //! for format in ["pdf", "png"] {
 //!     let mut dev = Device::format(format, format!("hist.{format}"))

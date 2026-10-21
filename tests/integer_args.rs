@@ -18,7 +18,9 @@ use rs_graphics::prelude::*;
 /// Every changed kind of argument, with integers.
 fn with_integers<G: Graphics>(g: &mut G) {
     g.par().mar([5, 4, 4, 2]).mgp([3, 1, 0]).draw();
-    g.plot(&[1, 2, 3, 4], &vec![2u32, 4, 3, 5])
+    g.plot()
+        .x(&[1, 2, 3, 4])
+        .y(&vec![2u32, 4, 3, 5])
         .pch(21)
         .cex(2)
         .lwd(2)
@@ -27,15 +29,38 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .ylim(0, 6)
         .xaxp([0, 5, 5])
         .draw();
-    g.lines(1..=4, &[1i64, 2, 2, 3]).lwd(3).draw();
-    g.points(&[2, 3], &[5, 1]).cex([1, 2]).draw();
-    g.segments(&[0], &[0], &[5], &[6]).lwd(2).draw();
-    g.arrows(&[1], &[1], &[2], &[2]).length(0.1).draw();
-    g.rect(&[1], &[1], &[2], &[2]).lwd(2).draw();
-    g.polygon(&[3, 4, 4], &[3, 3, 4]).col("grey").draw();
-    g.text(&[1, 2], &[5, 5], &["a", "b"]).cex(2).draw();
+    g.lines().x(1..=4).y(&[1i64, 2, 2, 3]).lwd(3).draw();
+    g.points().x(&[2, 3]).y(&[5, 1]).cex([1, 2]).draw();
+    g.segments()
+        .x0(&[0])
+        .y0(&[0])
+        .x1(&[5])
+        .y1(&[6])
+        .lwd(2)
+        .draw();
+    g.arrows()
+        .x0(&[1])
+        .y0(&[1])
+        .x1(&[2])
+        .y1(&[2])
+        .length(0.1)
+        .draw();
+    g.rect()
+        .xleft(&[1])
+        .ybottom(&[1])
+        .xright(&[2])
+        .ytop(&[2])
+        .lwd(2)
+        .draw();
+    g.polygon().x(&[3, 4, 4]).y(&[3, 3, 4]).col("grey").draw();
+    g.text()
+        .x(&[1, 2])
+        .y(&[5, 5])
+        .labels(["a", "b"])
+        .cex(2)
+        .draw();
     g.abline().h(3).v([1, 2]).coef(0, 1).lwd(2).draw();
-    g.axis(3).at([1, 2, 3]).lwd(2).draw();
+    g.axis().side(3).at([1, 2, 3]).lwd(2).draw();
     let keys = LegendOptions::default()
         .col(["blue", "black"])
         .lty([Some("dashed"), None])
@@ -43,21 +68,30 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .pch([None, Some(21)])
         .pt_bg("red")
         .pt_cex(2);
-    g.legend((1, 6), ["line", "point"])
+    g.legend()
+        .pos((1, 6))
+        .labels(["line", "point"])
         .with(&keys)
         .inset((0, 0))
         .draw();
-    g.legend(((3, 5), (4, 6)), ["line", "point"])
+    g.legend()
+        .pos(((3, 5), (4, 6)))
+        .labels(["line", "point"])
         .with(&keys)
         .draw();
-    g.plot_window((0, 10), (0, 5)).draw();
-    g.hist(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).draw();
-    g.barplot([3, 5, 2]).width([1, 2, 1]).space(1).draw();
-    g.barplot(vec![vec![1, 2], vec![3, 4]]).draw();
-    g.boxplot(&[vec![1, 2, 3, 9], vec![4, 5, 6]])
+    g.plot_window().xlim(0, 10).ylim(0, 5).draw();
+    g.hist().x(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).draw();
+    g.barplot()
+        .height([3, 5, 2])
+        .width([1, 2, 1])
+        .space(1)
+        .draw();
+    g.barplot().height(vec![vec![1, 2], vec![3, 4]]).draw();
+    g.boxplot()
+        .x(&[vec![1, 2, 3, 9], vec![4, 5, 6]])
         .at([1, 3])
         .draw();
-    g.pie(&[1, 2, 3]).radius(1).draw();
+    g.pie().x(&[1, 2, 3]).radius(1).draw();
 }
 
 /// The same with `f64`s.
@@ -66,7 +100,9 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .mar([5.0, 4.0, 4.0, 2.0])
         .mgp([3.0, 1.0, 0.0])
         .draw();
-    g.plot(&[1.0, 2.0, 3.0, 4.0], &[2.0, 4.0, 3.0, 5.0])
+    g.plot()
+        .x(&[1.0, 2.0, 3.0, 4.0])
+        .y(&[2.0, 4.0, 3.0, 5.0])
         .pch(21)
         .cex(2.0)
         .lwd(2.0)
@@ -75,17 +111,46 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .ylim(0.0, 6.0)
         .xaxp([0.0, 5.0, 5.0])
         .draw();
-    g.lines(&[1.0, 2.0, 3.0, 4.0], &[1.0, 2.0, 2.0, 3.0])
+    g.lines()
+        .x(&[1.0, 2.0, 3.0, 4.0])
+        .y(&[1.0, 2.0, 2.0, 3.0])
         .lwd(3.0)
         .draw();
-    g.points(&[2.0, 3.0], &[5.0, 1.0]).cex([1.0, 2.0]).draw();
-    g.segments(&[0.0], &[0.0], &[5.0], &[6.0]).lwd(2.0).draw();
-    g.arrows(&[1.0], &[1.0], &[2.0], &[2.0]).length(0.1).draw();
-    g.rect(&[1.0], &[1.0], &[2.0], &[2.0]).lwd(2.0).draw();
-    g.polygon(&[3.0, 4.0, 4.0], &[3.0, 3.0, 4.0])
+    g.points()
+        .x(&[2.0, 3.0])
+        .y(&[5.0, 1.0])
+        .cex([1.0, 2.0])
+        .draw();
+    g.segments()
+        .x0(&[0.0])
+        .y0(&[0.0])
+        .x1(&[5.0])
+        .y1(&[6.0])
+        .lwd(2.0)
+        .draw();
+    g.arrows()
+        .x0(&[1.0])
+        .y0(&[1.0])
+        .x1(&[2.0])
+        .y1(&[2.0])
+        .length(0.1)
+        .draw();
+    g.rect()
+        .xleft(&[1.0])
+        .ybottom(&[1.0])
+        .xright(&[2.0])
+        .ytop(&[2.0])
+        .lwd(2.0)
+        .draw();
+    g.polygon()
+        .x(&[3.0, 4.0, 4.0])
+        .y(&[3.0, 3.0, 4.0])
         .col("grey")
         .draw();
-    g.text(&[1.0, 2.0], &[5.0, 5.0], &["a", "b"])
+    g.text()
+        .x(&[1.0, 2.0])
+        .y(&[5.0, 5.0])
+        .labels(["a", "b"])
         .cex(2.0)
         .draw();
     g.abline()
@@ -94,7 +159,7 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .coef(0.0, 1.0)
         .lwd(2.0)
         .draw();
-    g.axis(3).at([1.0, 2.0, 3.0]).lwd(2.0).draw();
+    g.axis().side(3).at([1.0, 2.0, 3.0]).lwd(2.0).draw();
     let keys = LegendOptions::default()
         .col(["blue", "black"])
         .lty([Some("dashed"), None])
@@ -102,26 +167,35 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .pch([None, Some(21)])
         .pt_bg("red")
         .pt_cex(2.0);
-    g.legend((1.0, 6.0), ["line", "point"])
+    g.legend()
+        .pos((1.0, 6.0))
+        .labels(["line", "point"])
         .with(&keys)
         .inset((0.0, 0.0))
         .draw();
-    g.legend(((3.0, 5.0), (4.0, 6.0)), ["line", "point"])
+    g.legend()
+        .pos(((3.0, 5.0), (4.0, 6.0)))
+        .labels(["line", "point"])
         .with(&keys)
         .draw();
-    g.plot_window((0.0, 10.0), (0.0, 5.0)).draw();
-    g.hist(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0])
+    g.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
+    g.hist()
+        .x(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0])
         .breaks([0.0, 1.0, 2.0, 3.0])
         .draw();
-    g.barplot([3.0, 5.0, 2.0])
+    g.barplot()
+        .height([3.0, 5.0, 2.0])
         .width([1.0, 2.0, 1.0])
         .space(1.0)
         .draw();
-    g.barplot(vec![vec![1.0, 2.0], vec![3.0, 4.0]]).draw();
-    g.boxplot(&[vec![1.0, 2.0, 3.0, 9.0], vec![4.0, 5.0, 6.0]])
+    g.barplot()
+        .height(vec![vec![1.0, 2.0], vec![3.0, 4.0]])
+        .draw();
+    g.boxplot()
+        .x(&[vec![1.0, 2.0, 3.0, 9.0], vec![4.0, 5.0, 6.0]])
         .at([1.0, 3.0])
         .draw();
-    g.pie(&[1.0, 2.0, 3.0]).radius(1.0).draw();
+    g.pie().x(&[1.0, 2.0, 3.0]).radius(1.0).draw();
 }
 
 fn device(w: f64, h: f64) -> Device<PdfBackend> {
@@ -164,14 +238,14 @@ fn layout_fig_and_backends_take_integers() {
             layout.widths(&[LayoutSize::Relative(2.0), LayoutSize::Relative(1.0)])
         };
         dev.layout(layout);
-        dev.plot(&[1.0, 2.0], &[1.0, 2.0]).draw();
+        dev.plot().x(&[1.0, 2.0]).y(&[1.0, 2.0]).draw();
         if ints {
             dev.par().fig([0, 1, 0, 1]).draw();
         } else {
             dev.par().fig([0.0, 1.0, 0.0, 1.0]).draw();
         }
         dev.par().new(true).draw();
-        dev.plot(&[1.0, 2.0], &[2.0, 1.0]).draw();
+        dev.plot().x(&[1.0, 2.0]).y(&[2.0, 1.0]).draw();
         dev.finish()
     };
     assert!(render(true) == render(false));

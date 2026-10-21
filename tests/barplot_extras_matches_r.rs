@@ -66,7 +66,8 @@ fn cases() -> Vec<Case> {
             name: "offset_vector",
             r: "barplot(c(3, 1, 2, 4), offset = c(1, 5, 2), names.arg = c('a', 'b', 'c', 'd'))",
             ours: |d| {
-                d.barplot([3.0, 1.0, 2.0, 4.0])
+                d.barplot()
+                    .height([3.0, 1.0, 2.0, 4.0])
                     .offset([1.0, 5.0, 2.0])
                     .names(["a", "b", "c", "d"])
                     .draw();
@@ -76,7 +77,8 @@ fn cases() -> Vec<Case> {
             name: "offset_beside",
             r: "barplot(m, beside = TRUE, offset = c(1, 2, 0), legend.text = c('r1', 'r2', 'r3'))",
             ours: |d| {
-                d.barplot(mat())
+                d.barplot()
+                    .height(mat())
                     .beside(true)
                     .offset([1.0, 2.0, 0.0])
                     .legend_text(ROWS)
@@ -87,7 +89,8 @@ fn cases() -> Vec<Case> {
             name: "offset_stacked",
             r: "barplot(m, offset = c(0, 10, 0, 5), ylim = c(0, 25))",
             ours: |d| {
-                d.barplot(mat())
+                d.barplot()
+                    .height(mat())
                     .offset([0.0, 10.0, 0.0, 5.0])
                     .ylim(0.0, 25.0)
                     .draw();
@@ -98,7 +101,8 @@ fn cases() -> Vec<Case> {
             r: "barplot(m, orderH = 'decr', col = c('red', 'green', 'blue'), \
                 legend.text = c('r1', 'r2', 'r3'))",
             ours: |d| {
-                d.barplot(mat())
+                d.barplot()
+                    .height(mat())
                     .order_h(OrderH::Decr)
                     .col(["red", "green", "blue"])
                     .legend_text(ROWS)
@@ -109,7 +113,8 @@ fn cases() -> Vec<Case> {
             name: "order_incr_horiz",
             r: "barplot(m, orderH = 'incr', horiz = TRUE, col = c('red', 'green', 'blue'))",
             ours: |d| {
-                d.barplot(mat())
+                d.barplot()
+                    .height(mat())
                     .order_h(OrderH::Incr)
                     .horiz(true)
                     .col(["red", "green", "blue"])
@@ -122,10 +127,13 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 8, 5), add = TRUE, space = 1, col = 'white', main = 'hidden', \
                 names.arg = c('x', 'y', 'z'))",
             ours: |d| {
-                d.plot(&[0.0, 6.0], &[0.0, 12.0])
+                d.plot()
+                    .x(&[0.0, 6.0])
+                    .y(&[0.0, 12.0])
                     .type_(PlotType::None)
                     .draw();
-                d.barplot([3.0, 8.0, 5.0])
+                d.barplot()
+                    .height([3.0, 8.0, 5.0])
                     .add(true)
                     .space([1.0])
                     .col("white")
@@ -140,10 +148,13 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 8, 5), add = TRUE, ann = TRUE, axes = FALSE, main = 'title', \
                 xlab = 'x label')",
             ours: |d| {
-                d.plot(&[0.0, 6.0], &[0.0, 12.0])
+                d.plot()
+                    .x(&[0.0, 6.0])
+                    .y(&[0.0, 12.0])
                     .type_(PlotType::None)
                     .draw();
-                d.barplot([3.0, 8.0, 5.0])
+                d.barplot()
+                    .height([3.0, 8.0, 5.0])
                     .add(true)
                     .ann(true)
                     .axes(false)
@@ -157,7 +168,8 @@ fn cases() -> Vec<Case> {
             r: "barplot(m, legend.text = c('r1', 'r2', 'r3'), \
                 args.legend = list(x = 'topleft', bty = 'n', inset = 0.05, title = 'Groups'))",
             ours: |d| {
-                d.barplot(mat())
+                d.barplot()
+                    .height(mat())
                     .legend_text(ROWS)
                     .legend_pos("topleft")
                     .args_legend(
@@ -174,7 +186,8 @@ fn cases() -> Vec<Case> {
             r: "barplot(m, beside = TRUE, legend.text = c('r1', 'r2', 'r3'), ylim = c(0, 8), \
                 args.legend = list(x = 2, y = 7.5, ncol = 3, xjust = 0, cex = 0.8))",
             ours: |d| {
-                d.barplot(mat())
+                d.barplot()
+                    .height(mat())
                     .beside(true)
                     .legend_text(ROWS)
                     .ylim(0.0, 8.0)

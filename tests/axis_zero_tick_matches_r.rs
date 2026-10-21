@@ -82,8 +82,12 @@ fn zero_ticks_match_r() {
     let black = ColorSpec::Color(Color::BLACK);
     for &(xlim, ylim) in RANGES {
         dev.plot_new();
-        dev.plot_window(xlim, ylim).draw();
-        dev.axis(1)
+        dev.plot_window()
+            .xlim(xlim.0, xlim.1)
+            .ylim(ylim.0, ylim.1)
+            .draw();
+        dev.axis()
+            .side(1)
             .with(&AxisOptions {
                 col: Some(black),
                 col_axis: Some(black),
@@ -93,7 +97,8 @@ fn zero_ticks_match_r() {
                 ..AxisOptions::default()
             })
             .draw();
-        dev.axis(2)
+        dev.axis()
+            .side(2)
             .with(&AxisOptions {
                 col: Some(black),
                 col_axis: Some(black),

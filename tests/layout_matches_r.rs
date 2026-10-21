@@ -92,7 +92,7 @@ fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
         ylab: Some("v".into()),
         ..Default::default()
     };
-    d.barplot(h).with(&o).draw();
+    d.barplot().height(h).with(&o).draw();
 }
 
 struct Case {
@@ -270,7 +270,7 @@ fn cases() -> Vec<Case> {
                         ylab: Some("y".into()),
                         ..Default::default()
                     };
-                    d.plot(&x, &y).with(&o).draw();
+                    d.plot().x(&x).y(&y).with(&o).draw();
                 }
             },
             check_rects: false,

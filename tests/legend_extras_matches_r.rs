@@ -48,8 +48,10 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0))\n\
                 l <- legend('topright', c('a', 'b'), pch = 1:2, lty = 1:2, title = 'T', inset = 0.05)",
             ours: |d| {
-                d.plot(&X, &Y).xlim(6, 0).draw();
-                d.legend("topright", ["a", "b"])
+                d.plot().x(&X).y(&Y).xlim(6, 0).draw();
+                d.legend()
+                    .pos("topright")
+                    .labels(["a", "b"])
                     .pch([1, 2])
                     .lty([1, 2])
                     .title("T")
@@ -62,8 +64,10 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, ylim = c(6, 0))\n\
                 l <- legend(1, 1, c('a', 'b'), fill = c('red', 'blue'), xjust = 0.2, yjust = 0.3)",
             ours: |d| {
-                d.plot(&X, &Y).ylim(6, 0).draw();
-                d.legend((1, 1), ["a", "b"])
+                d.plot().x(&X).y(&Y).ylim(6, 0).draw();
+                d.legend()
+                    .pos((1, 1))
+                    .labels(["a", "b"])
                     .fill(["red", "blue"])
                     .xjust(0.2)
                     .yjust(0.3)
@@ -75,8 +79,10 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0), ylim = c(6, 0))\n\
                 l <- legend('bottomright', c('a', 'b', 'c'), pch = 1:3, ncol = 2, inset = c(0.02, 0.1))",
             ours: |d| {
-                d.plot(&X, &Y).xlim(6, 0).ylim(6, 0).draw();
-                d.legend("bottomright", ["a", "b", "c"])
+                d.plot().x(&X).y(&Y).xlim(6, 0).ylim(6, 0).draw();
+                d.legend()
+                    .pos("bottomright")
+                    .labels(["a", "b", "c"])
                     .pch([1, 2, 3])
                     .ncol(2usize)
                     .inset((0.02, 0.1))
@@ -88,9 +94,11 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0))\n\
                 l <- legend('bottomleft', c('a', 'b'), pch = 1:2, title = 'mmm nnn mmm nnn')",
             ours: |d| {
-                d.plot(&X, &Y).xlim(6, 0).draw();
+                d.plot().x(&X).y(&Y).xlim(6, 0).draw();
                 let keys = LegendOptions::default().pch([1, 2]);
-                d.legend("bottomleft", ["a", "b"])
+                d.legend()
+                    .pos("bottomleft")
+                    .labels(["a", "b"])
                     .with(&keys)
                     .title("mmm nnn mmm nnn")
                     .draw()
@@ -101,8 +109,10 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0))\n\
                 l <- legend('center', c('a', 'b'), lty = 1:2, text.width = 1.5)",
             ours: |d| {
-                d.plot(&X, &Y).xlim(6, 0).draw();
-                d.legend("center", ["a", "b"])
+                d.plot().x(&X).y(&Y).xlim(6, 0).draw();
+                d.legend()
+                    .pos("center")
+                    .labels(["a", "b"])
                     .lty([1, 2])
                     .text_width(1.5)
                     .draw()
@@ -114,9 +124,11 @@ fn cases() -> Vec<Case> {
                 l <- legend('topleft', c('a', 'b'), pch = 1:2, box.lwd = 3, box.lty = 2, \
                             box.col = 'blue', bg = 'grey90')",
             ours: |d| {
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 let keys = LegendOptions::default().pch([1, 2]);
-                d.legend("topleft", ["a", "b"])
+                d.legend()
+                    .pos("topleft")
+                    .labels(["a", "b"])
                     .with(&keys)
                     .box_lwd(3)
                     .box_lty("dashed")
@@ -131,11 +143,13 @@ fn cases() -> Vec<Case> {
                 legend('top', c('a', 'b'), pch = 1:2)\n\
                 l <- legend('bottom', c('a', 'b'), pch = 1:2, box.col = NA, bg = 'yellow')",
             ours: |d| {
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 d.par().lwd(2).lty("dotted").fg("red").draw();
                 let keys = LegendOptions::default().pch([1, 2]);
-                d.legend("top", ["a", "b"]).with(&keys).draw();
-                d.legend("bottom", ["a", "b"])
+                d.legend().pos("top").labels(["a", "b"]).with(&keys).draw();
+                d.legend()
+                    .pos("bottom")
+                    .labels(["a", "b"])
                     .with(&keys)
                     .box_col(ColorSpec::None)
                     .bg("yellow")
@@ -148,9 +162,11 @@ fn cases() -> Vec<Case> {
                 l <- legend('topright', c('a', 'b'), pch = 1:2, title = 'mmm', \
                             title.col = 'red', title.adj = 0, title.font = 2)",
             ours: |d| {
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 let keys = LegendOptions::default().pch([1, 2]);
-                d.legend("topright", ["a", "b"])
+                d.legend()
+                    .pos("topright")
+                    .labels(["a", "b"])
                     .with(&keys)
                     .title("mmm")
                     .title_col("red")
@@ -165,10 +181,12 @@ fn cases() -> Vec<Case> {
                 l <- legend('bottomright', c('mmmm', 'mmmm', 'a'), pch = 1:3, title = 'nnn', \
                             title.adj = 1, text.col = c('blue', 'darkgreen'), text.font = c(3, 2))",
             ours: |d| {
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 // The bold second label sets the width; the title takes
                 // the first colour and font.
-                d.legend("bottomright", ["mmmm", "mmmm", "a"])
+                d.legend()
+                    .pos("bottomright")
+                    .labels(["mmmm", "mmmm", "a"])
                     .pch([1, 2, 3])
                     .title("nnn")
                     .title_adj(1)
@@ -184,8 +202,10 @@ fn cases() -> Vec<Case> {
                             border = c('black', NA, NA, 'darkgreen'), lty = c(0, 1, 0, 2), \
                             pch = c(NA, NA, 19, 21), pt.bg = 'yellow', col = c(1, 'red', 'blue', 1))",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("topleft", ["a", "nn", "ccc", "dd"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("topleft")
+                    .labels(["a", "nn", "ccc", "dd"])
                     .fill([Some("red"), None, None, Some("blue")])
                     .border([Some("black"), None, None, Some("darkgreen")])
                     .lty([0, 1, 0, 2])
@@ -201,8 +221,10 @@ fn cases() -> Vec<Case> {
                 l <- legend('topright', c('a', 'b'), pch = 1:2, lwd = c(1, 3), merge = FALSE, \
                             cex = c(0.8, 1.3))",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("topright", ["a", "b"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("topright")
+                    .labels(["a", "b"])
                     .pch([1, 2])
                     .lwd([1, 3])
                     .merge(false)
@@ -216,8 +238,10 @@ fn cases() -> Vec<Case> {
                 l <- legend('bottomleft', c('a', 'b', 'c', 'd'), pch = c('x', '+', '\\u00e9', ''), \
                             col = c(1, 2, 4, 1))",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("bottomleft", ["a", "b", "c", "d"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("bottomleft")
+                    .labels(["a", "b", "c", "d"])
                     .pch(["x", "+", "\u{e9}", ""])
                     .col([1, 2, 4, 1])
                     .draw()
@@ -228,8 +252,10 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE)\n\
                 l <- legend('bottomright', c('mm', 'nn', 'aa'), pch = 'xyz', lty = 1, col = 2:4)",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("bottomright", ["mm", "nn", "aa"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("bottomright")
+                    .labels(["mm", "nn", "aa"])
                     .pch("xyz")
                     .lty(1)
                     .col([2, 3, 4])
@@ -243,8 +269,10 @@ fn cases() -> Vec<Case> {
                             cex = c(0.8, 1.2, 1, 1.5, 0.7), x.intersp = c(1, 2, 0.5, 1, 0.5), \
                             seg.len = c(1, 3), y.intersp = c(1, 1.8, 1.2), pt.cex = c(1, 2))",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("top", ["a", "nn", "ccc", "d", "mm"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("top")
+                    .labels(["a", "nn", "ccc", "d", "mm"])
                     .ncol(2)
                     .pch(1)
                     .lty(1)
@@ -261,8 +289,10 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE)\n\
                 l <- legend('center', c('a', 'mmmmmm', 'cc', 'd'), pch = 1:4, ncol = 3, text.width = NA)",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("center", ["a", "mmmmmm", "cc", "d"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("center")
+                    .labels(["a", "mmmmmm", "cc", "d"])
                     .pch([1, 2, 3, 4])
                     .ncol(3)
                     .text_width(f64::NAN)
@@ -275,8 +305,10 @@ fn cases() -> Vec<Case> {
                 l <- legend('bottom', c('a', 'b', 'c', 'd', 'e'), pch = 1:5, ncol = 3, \
                             text.width = c(0.5, 1.5))",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("bottom", ["a", "b", "c", "d", "e"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("bottom")
+                    .labels(["a", "b", "c", "d", "e"])
                     .pch([1, 2, 3, 4, 5])
                     .ncol(3)
                     .text_width([0.5, 1.5])
@@ -289,13 +321,17 @@ fn cases() -> Vec<Case> {
                 legend('topright', c('mmm', 'a'), pch = 1:2, adj = c(0.5, 0.2))\n\
                 l <- legend('bottomleft', c('mmm', 'g'), pch = 1:2, adj = 0.3)",
             ours: |d| {
-                d.plot(&X, &Y).draw();
-                d.legend("topright", ["mmm", "a"])
+                d.plot().x(&X).y(&Y).draw();
+                d.legend()
+                    .pos("topright")
+                    .labels(["mmm", "a"])
                     .pch([1, 2])
                     .adj(0.5)
                     .vadj(0.2)
                     .draw();
-                d.legend("bottomleft", ["mmm", "g"])
+                d.legend()
+                    .pos("bottomleft")
+                    .labels(["mmm", "g"])
                     .pch([1, 2])
                     .adj(0.3)
                     .vadj(f64::NAN)
@@ -309,15 +345,21 @@ fn cases() -> Vec<Case> {
                 rect(l$rect$left, l$rect$top - l$rect$h, l$rect$left + l$rect$w, l$rect$top, \
                      border = 'red')",
             ours: |d| {
-                d.plot(&X, &Y).draw();
+                d.plot().x(&X).y(&Y).draw();
                 let keys = LegendOptions::default().pch([1, 2]);
                 let l = d
-                    .legend("topright", ["a", "b"])
+                    .legend()
+                    .pos("topright")
+                    .labels(["a", "b"])
                     .with(&keys)
                     .title("T")
                     .plot(false)
                     .draw();
-                d.rect(&[l.left], &[l.top - l.h], &[l.left + l.w], &[l.top])
+                d.rect()
+                    .xleft(&[l.left])
+                    .ybottom(&[l.top - l.h])
+                    .xright(&[l.left + l.w])
+                    .ytop(&[l.top])
                     .border("red")
                     .draw();
                 l

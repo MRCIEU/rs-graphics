@@ -65,7 +65,9 @@ fn cases() -> Vec<Case> {
                          c(10, 50, 100, 20, 0, 9, 80), c(5, 20, 0.5, 30, 30, 9, 0), col = 'red')",
             draw: |d| {
                 d.plot_new();
-                d.plot_window((1.0, 100.0), (1.0, 100.0))
+                d.plot_window()
+                    .xlim(1.0, 100.0)
+                    .ylim(1.0, 100.0)
                     .with(&PlotWindowOptions {
                         xlog: true,
                         ylog: true,
@@ -73,19 +75,18 @@ fn cases() -> Vec<Case> {
                     })
                     .draw();
                 let nan = f64::NAN;
-                d.segments(
-                    &[1.0, 0.0, 10.0, -5.0, 2.0, nan, 3.0],
-                    &[1.0, 10.0, 50.0, 5.0, 3.0, 5.0, 2.0],
-                    &[10.0, 50.0, 100.0, 20.0, 0.0, 9.0, 80.0],
-                    &[5.0, 20.0, 0.5, 30.0, 30.0, 9.0, 0.0],
-                )
-                .with(&SegmentsOptions {
-                    col: vec![red()],
-                    lty: vec![Some(solid())],
-                    lwd: vec![Some(1.0)],
-                    ..SegmentsOptions::default()
-                })
-                .draw();
+                d.segments()
+                    .x0(&[1.0, 0.0, 10.0, -5.0, 2.0, nan, 3.0])
+                    .y0(&[1.0, 10.0, 50.0, 5.0, 3.0, 5.0, 2.0])
+                    .x1(&[10.0, 50.0, 100.0, 20.0, 0.0, 9.0, 80.0])
+                    .y1(&[5.0, 20.0, 0.5, 30.0, 30.0, 9.0, 0.0])
+                    .with(&SegmentsOptions {
+                        col: vec![red()],
+                        lty: vec![Some(solid())],
+                        lwd: vec![Some(1.0)],
+                        ..SegmentsOptions::default()
+                    })
+                    .draw();
             },
         },
         Case {
@@ -102,7 +103,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
-                d.plot(&[1.0, 1000.0], &[1.0, 1e4]).with(&opts).draw();
+                d.plot().x(&[1.0, 1000.0]).y(&[1.0, 1e4]).with(&opts).draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
                     .with(&AblineOptions {
@@ -174,7 +175,11 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
-                d.plot(&[1.0, 1000.0], &[0.0, 10.0]).with(&opts).draw();
+                d.plot()
+                    .x(&[1.0, 1000.0])
+                    .y(&[0.0, 10.0])
+                    .with(&opts)
+                    .draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
                     .with(&AblineOptions {
@@ -213,7 +218,7 @@ fn cases() -> Vec<Case> {
             r: "hist(hx, log = 'x', ylab = 'n')",
             draw: |d| {
                 let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                d.hist(&hist_data()).with(&o).draw();
+                d.hist().x(&hist_data()).with(&o).draw();
             },
         },
         Case {
@@ -221,7 +226,7 @@ fn cases() -> Vec<Case> {
             r: "suppressWarnings(hist(hx, log = 'y', ylab = 'n'))",
             draw: |d| {
                 let o = HistOptions { ylog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                d.hist(&hist_data()).with(&o).draw();
+                d.hist().x(&hist_data()).with(&o).draw();
             },
         },
         Case {
@@ -230,7 +235,7 @@ fn cases() -> Vec<Case> {
                 hist(hx * 1.05, add = TRUE, col = 'pink', border = 'red')",
             draw: |d| {
                 let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                d.hist(&hist_data()).with(&o).draw();
+                d.hist().x(&hist_data()).with(&o).draw();
                 let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
                 let o = HistOptions {
                     add: true,
@@ -238,7 +243,7 @@ fn cases() -> Vec<Case> {
                     border: vec![red()],
                     ..Default::default()
                 };
-                d.hist(&more).with(&o).draw();
+                d.hist().x(&more).with(&o).draw();
             },
         },
         Case {
@@ -250,7 +255,7 @@ fn cases() -> Vec<Case> {
                     ylog: true,
                     ..Default::default()
                 };
-                d.barplot([3.0, 40.0, 700.0, 12.0]).with(&o).draw();
+                d.barplot().height([3.0, 40.0, 700.0, 12.0]).with(&o).draw();
             },
         },
         Case {
@@ -263,7 +268,8 @@ fn cases() -> Vec<Case> {
                     ylog: true,
                     ..Default::default()
                 };
-                d.barplot(&[vec![2.0, 5.0], vec![30.0, 60.0], vec![400.0, 100.0]])
+                d.barplot()
+                    .height(&[vec![2.0, 5.0], vec![30.0, 60.0], vec![400.0, 100.0]])
                     .with(&o)
                     .draw();
             },
@@ -280,7 +286,8 @@ fn cases() -> Vec<Case> {
                     xlim: Some((1.0, 100.0)),
                     ..Default::default()
                 };
-                d.barplot(&[vec![2.0, 5.0], vec![30.0, 60.0]])
+                d.barplot()
+                    .height(&[vec![2.0, 5.0], vec![30.0, 60.0]])
                     .with(&o)
                     .draw();
             },
@@ -297,10 +304,11 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..Default::default()
                 };
-                d.plot(&x, &x).with(&o).draw();
+                d.plot().x(&x).y(&x).with(&o).draw();
                 let fg = ColorSpec::Index(1);
                 let labels = ["a", "b", "c"].map(String::from).to_vec();
-                d.axis(1)
+                d.axis()
+                    .side(1)
                     .with(&AxisOptions {
                         at: Some(vec![2.0, 5.0, 8.0]),
                         labels: Some(labels).map(|v| {
@@ -330,12 +338,13 @@ fn cases() -> Vec<Case> {
                     xlab: Some("value".into()),
                     ..Default::default()
                 };
-                d.boxplot(&[
-                    vec![1.0, 2.0, 2.5, 3.0, 7.0],
-                    vec![2.0, 3.0, 3.5, 4.0, 4.2, 5.0],
-                ])
-                .with(&o)
-                .draw();
+                d.boxplot()
+                    .x(&[
+                        vec![1.0, 2.0, 2.5, 3.0, 7.0],
+                        vec![2.0, 3.0, 3.5, 4.0, 4.2, 5.0],
+                    ])
+                    .with(&o)
+                    .draw();
             },
         },
         Case {
@@ -347,13 +356,14 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.par().lab([10, 3, 7]).draw();
                 let o = PlotOptions { xlab: Some("x".into()), ylab: Some("y".into()), ..Default::default() };
-                d.plot(&[0.0, 1.0], &[0.0, 1.0]).with(&o).draw();
+                d.plot().x(&[0.0, 1.0]).y(&[0.0, 1.0]).with(&o).draw();
                 d.par().new(true).draw();
                 d.par().lab([2, 12, 7]).draw();
                 let o = PlotOptions { xlog: true, ylog: true, axes: false, ..Default::default() };
-                d.plot(&[1.0, 1e6], &[1.0, 50.0]).with(&o).draw();
+                d.plot().x(&[1.0, 1e6]).y(&[1.0, 50.0]).with(&o).draw();
                 let fg = ColorSpec::Index(1);
-                d.axis(3)
+                d.axis()
+                    .side(3)
                     .with(&AxisOptions {
                         col: Some(fg),
                         col_axis: Some(fg),
@@ -363,7 +373,8 @@ fn cases() -> Vec<Case> {
                         ..AxisOptions::default()
                     })
                     .draw();
-                d.axis(4)
+                d.axis()
+                    .side(4)
                     .with(&AxisOptions {
                         col: Some(fg),
                         col_axis: Some(fg),

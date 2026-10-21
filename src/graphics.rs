@@ -10,9 +10,11 @@
 //! [`Device`] (which draws) and [`Figure`](crate::recording::Figure) (which
 //! records, to draw later).
 //!
-//! Each method starts a call for one R function, taking R's data
-//! arguments; the call's chainable setters take R's other arguments, and
-//! `.draw()` runs it. As in R, numbers may be integers or floats: data
+//! Each method starts a call for one R function; the call's chainable
+//! setters take all of R's arguments, named as in R (data too: `.x(&x)`),
+//! and `.draw()` runs it. An argument R requires (one without a default)
+//! that is left out panics at `.draw()` with R's message (`argument "x" is
+//! missing, with no default`), also when a `Figure` records the call. As in R, numbers may be integers or floats: data
 //! vectors are any [`Numbers`] (`&x`, `&[1, 2, 3]`, `1..=10` for R's
 //! `1:10`; `f64` data is borrowed without copying), and numeric setters
 //! take integers too (`.cex(2)`, `.xlim(0, 10)`):
@@ -20,7 +22,7 @@
 //! ```no_run
 //! # use rs_graphics::prelude::*;
 //! let mut dev = Device::svg("plot.svg").width(5.0).height(5.0).open()?;
-//! dev.plot(&[1.0, 2.0, 3.0], &[2.0, 4.0, 3.0]).pch(19).main("Title").draw();
+//! dev.plot().x(&[1.0, 2.0, 3.0]).y(&[2.0, 4.0, 3.0]).pch(19).main("Title").draw();
 //! dev.abline().h(3.0).col("grey").lty("dashed").draw();
 //! dev.close()?;
 //! # Ok::<(), std::io::Error>(())
@@ -34,8 +36,8 @@
 //! # let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
 //! # dev.plot_new();
 //! let grey = SegmentsOptions::default().col("grey").lty("dashed");
-//! dev.segments(&[0.1], &[0.2], &[0.9], &[0.2]).with(&grey).draw();
-//! dev.segments(&[0.1], &[0.8], &[0.9], &[0.8]).with(&grey).lwd(2.0).draw();
+//! dev.segments().x0(&[0.1]).y0(&[0.2]).x1(&[0.9]).y1(&[0.2]).with(&grey).draw();
+//! dev.segments().x0(&[0.1]).y0(&[0.8]).x1(&[0.9]).y1(&[0.8]).with(&grey).lwd(2.0).draw();
 //! ```
 //!
 //! Nothing is drawn until `.draw()`; the calls are `#[must_use]`, so a
@@ -61,7 +63,7 @@ use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions,
 };
-use crate::numbers::{Groups, Numbers, Pair};
+use crate::numbers::{Groups, Numbers};
 use crate::par::ParOptions;
 use crate::plotmath::{Label, Labels};
 
@@ -103,7 +105,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// plot regions.
     ///
     /// - **Coordinates:** like R, it leaves linear user coordinates of
-    ///   0..1 on both axes (as `plot_window((0, 1), (0, 1))`:
+    ///   0..1 on both axes (as `plot_window().xlim(0, 1).ylim(0, 1)`:
     ///   -0.04..1.04 with the default `xaxs = yaxs = "r"`) and their
     ///   default ticks, so you can draw straight away. Call
     ///   [`plot_window`](Graphics::plot_window) next for other limits or
@@ -146,60 +148,42 @@ pub trait Graphics: sealed::Sealed + Sized {
     // ---- high-level plots ----
 
     /// `plot(x, y, ...)`: `plot.new()` + `plot.window()` + the requested
-    /// point/line geometry + (optionally) `axis()`/`box()`/`title()`;
-    /// options in [`PlotOptions`]. A high-level plot: it starts a new plot
-    /// with [`plot_new`](Graphics::plot_new), so on a multi-panel page it
-    /// moves to the next panel.
+    /// point/line geometry + (optionally) `axis()`/`box()`/`title()`. R's
+    /// `x` and `y` are [`x`](PlotCall::x) (required) and
+    /// [`y`](PlotCall::y); with `x` alone, its values are plotted against
+    /// their index, with x axis title "Index" (R's `plot(v)`). Other
+    /// arguments in [`PlotOptions`]. A high-level plot: it starts a new
+    /// plot with [`plot_new`](Graphics::plot_new), so on a multi-panel page
+    /// it moves to the next panel.
     ///
     /// # Panics
-    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
-    /// 'y' lengths differ").
-    fn plot<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> PlotCall<'a, Self> {
-        let (x, y) = xy_coords(x, y);
-        PlotCall {
-            target: self,
-            x,
-            y,
-            opts: PlotOptions::default(),
-        }
+    /// At `.draw()`, if `x` is missing (R's `argument "x" is missing, with
+    /// no default`) or `x` and `y` have different lengths (R's
+    /// `xy.coords()`: "'x' and 'y' lengths differ").
+    fn plot(&mut self) -> PlotCall<'_, Self> {
+        PlotCall::start(self)
     }
 
-    /// R's one-vector `plot(y)`: `y` against its index `1, 2, ..., n`,
-    /// with R's x axis title "Index" (`xy.coords()`'s; change it with
-    /// `.xlab(..)`). Otherwise as [`plot`](Graphics::plot), with the same
-    /// options.
-    fn plot_index<'a>(&'a mut self, y: impl Numbers<'a>) -> PlotCall<'a, Self> {
-        let y = y.into_numbers();
-        let x: Vec<f64> = (1..=y.len()).map(|i| i as f64).collect();
-        PlotCall {
-            target: self,
-            x: x.into(),
-            y,
-            opts: PlotOptions {
-                xlab: Some("Index".into()),
-                ..PlotOptions::default()
-            },
-        }
-    }
-
-    /// `hist(x, ...)`; options in [`HistOptions`]. A high-level plot: it
+    /// `hist(x, ...)`: R's `x` is [`x`](HistCall::x) (required); other
+    /// arguments in [`HistOptions`]. A high-level plot: it
     /// starts a new plot with [`plot_new`](Graphics::plot_new), so on a
     /// multi-panel page it moves to the next panel, unless `add` (R's
     /// `add = TRUE`), which draws the bars on the current plot. `.draw()`
     /// returns the bins and counts (R's `"histogram"` object).
-    fn hist<'a>(&'a mut self, x: impl Numbers<'a>) -> HistCall<'a, Self> {
-        HistCall {
-            target: self,
-            x: x.into_numbers(),
-            opts: HistOptions::default(),
-        }
+    ///
+    /// # Panics
+    /// At `.draw()`, if `x` is missing (R's message).
+    fn hist(&mut self) -> HistCall<'_, Self> {
+        HistCall::start(self)
     }
 
-    /// `barplot(height, ...)`; options in [`BarplotOptions`]. A high-level
+    /// `barplot(height, ...)`: R's `height` is
+    /// [`height`](BarplotCall::height) (required); other arguments in
+    /// [`BarplotOptions`]. A high-level
     /// plot: it starts a new plot with [`plot_new`](Graphics::plot_new), so
     /// on a multi-panel page it moves to the next panel, unless `add` (R's
-    /// `add = TRUE`), which draws the bars on the current plot. `heights` is a
-    /// vector (one bar per value) or a matrix given as its columns (see
+    /// `add = TRUE`), which draws the bars on the current plot. `height` is
+    /// a vector (one bar per value) or a matrix given as its columns (see
     /// [`BarHeights`]), drawn stacked unless `beside`.
     ///
     /// `.draw()` returns the bar-centre coordinates along the category
@@ -209,59 +193,52 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// otherwise one per column).
     ///
     /// # Panics
-    /// At `.draw()`, as R errors: if `heights` is empty or a matrix's
+    /// At `.draw()`, as R errors: if `height` is missing or empty, or a matrix's
     /// columns are empty or of different lengths; if `names` has neither
     /// one name per bar nor (for `beside`) one per column; and, with a log
     /// value axis, if any `height + offset`, or a given limit of a log
     /// axis, is <= 0.
-    fn barplot(&mut self, heights: impl Into<BarHeights>) -> BarplotCall<'_, Self> {
-        BarplotCall {
-            target: self,
-            heights: heights.into(),
-            opts: BarplotOptions::default(),
-        }
+    fn barplot(&mut self) -> BarplotCall<'_, Self> {
+        BarplotCall::start(self)
     }
 
-    /// `boxplot(x, ...)` where `x` is the groups (R's `list`/formula input
-    /// reduced to its common case): any [`Groups`], e.g. `&[a, b]` or
-    /// `&groups` for `Vec`s of numbers, `f64` or integer; a single group is
-    /// `boxplot(&[x])`. Options in [`BoxplotOptions`]. A high-level plot:
+    /// `boxplot(x, ...)`: R's `x` is [`x`](BoxplotCall::x) (required), the
+    /// groups (R's `list`/formula input reduced to its common case): any
+    /// [`Groups`], e.g. `&[a, b]` or `&groups` for `Vec`s of numbers, `f64`
+    /// or integer; a single group is `.x(&[v])`. Other arguments in
+    /// [`BoxplotOptions`]. A high-level plot:
     /// it starts a new plot with [`plot_new`](Graphics::plot_new), so on a
     /// multi-panel page it moves to the next panel, unless `add` (R's
     /// `add = TRUE`), which draws the boxes on the current plot. `.draw()`
     /// returns each group's statistics.
     ///
     /// # Panics
-    /// If `groups` is empty, or `at` or `width` doesn't have one value per
+    /// At `.draw()`, if `x` is missing or has no groups, or `at` or `width`
+    /// doesn't have one value per
     /// group (or a width isn't positive), as R errors.
-    fn boxplot<'a>(&'a mut self, groups: impl Groups<'a>) -> BoxplotCall<'a, Self> {
-        BoxplotCall {
-            target: self,
-            groups: groups.into_groups(),
-            opts: BoxplotOptions::default(),
-        }
+    fn boxplot(&mut self) -> BoxplotCall<'_, Self> {
+        BoxplotCall::start(self)
     }
 
-    /// `pie(x, ...)`; options in [`PieOptions`]. A high-level plot: it
+    /// `pie(x, ...)`: R's `x` is [`x`](PieCall::x) (required), the slice
+    /// sizes; other arguments in [`PieOptions`]. A high-level plot: it
     /// starts a new plot with [`plot_new`](Graphics::plot_new), so on a
     /// multi-panel page it moves to the next panel.
     ///
     /// # Panics
-    /// At `.draw()`, if `x` is empty or has a negative or non-finite value
+    /// At `.draw()`, if `x` is missing or empty or has a negative or non-finite value
     /// (R: "'x' values must be positive").
-    fn pie<'a>(&'a mut self, x: impl Numbers<'a>) -> PieCall<'a, Self> {
-        PieCall {
-            target: self,
-            x: x.into_numbers(),
-            opts: PieOptions::default(),
-        }
+    fn pie(&mut self) -> PieCall<'_, Self> {
+        PieCall::start(self)
     }
 
     // ---- low-level functions ----
 
     /// `plot.window(xlim, ylim, log, asp)`: sets up the user coordinates
-    /// of the current plot region; options in [`PlotWindowOptions`]. Call
-    /// it after [`plot_new`](Graphics::plot_new) and before drawing.
+    /// of the current plot region. R's `xlim` and `ylim` are
+    /// [`xlim`](PlotWindowCall::xlim) and [`ylim`](PlotWindowCall::ylim)
+    /// (both required); other arguments in [`PlotWindowOptions`]. Call it
+    /// after [`plot_new`](Graphics::plot_new) and before drawing.
     ///
     /// - `xlim`/`ylim` are in data units, also on a log axis, and may be
     ///   decreasing (a reversed axis).
@@ -284,163 +261,115 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   R's `GAxisPars()`) from the new range and `par.lab`. Later calls
     ///   to `axis()` without `at` read them. Changing `par.lab` afterwards
     ///   doesn't change them, as in R.
-    fn plot_window(&mut self, xlim: impl Pair, ylim: impl Pair) -> PlotWindowCall<'_, Self> {
-        PlotWindowCall {
-            target: self,
-            xlim: xlim.into_pair(),
-            ylim: ylim.into_pair(),
-            opts: PlotWindowOptions::default(),
-        }
+    ///
+    /// # Panics
+    /// At `.draw()`, if `xlim` or `ylim` is missing (R's message).
+    fn plot_window(&mut self) -> PlotWindowCall<'_, Self> {
+        PlotWindowCall::start(self)
     }
 
     /// `points(x, y, ...)`: R's `plot.xy(type = "p")` unless `type_` says
-    /// otherwise; options in [`XyOptions`]. Points with a non-finite
+    /// otherwise. R's `x` and `y` are [`x`](PointsCall::x) (required) and
+    /// [`y`](PointsCall::y) (`x` alone: against its index); other arguments
+    /// in [`XyOptions`]. Points with a non-finite
     /// coordinate (including values <= 0 on a log axis) are skipped.
     ///
     /// # Panics
-    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
-    /// 'y' lengths differ").
-    fn points<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> PointsCall<'a, Self> {
-        let (x, y) = xy_coords(x, y);
-        PointsCall {
-            target: self,
-            x,
-            y,
-            opts: XyOptions::default(),
-        }
+    /// At `.draw()`, if `x` is missing (R's message) or `x` and `y` have
+    /// different lengths (R's `xy.coords()`: "'x' and 'y' lengths differ").
+    fn points(&mut self) -> PointsCall<'_, Self> {
+        PointsCall::start(self)
     }
 
     /// `lines(x, y, ...)`: R's `plot.xy(type = "l")` unless `type_` says
-    /// otherwise; options in [`XyOptions`]. The polyline breaks at
+    /// otherwise. R's `x` and `y` are [`x`](LinesCall::x) (required) and
+    /// [`y`](LinesCall::y) (`x` alone: against its index); other arguments
+    /// in [`XyOptions`]. The polyline breaks at
     /// non-finite coordinates (R's `NA`, or values <= 0 on a log axis).
     ///
     /// # Panics
-    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
-    /// 'y' lengths differ").
-    fn lines<'a>(&'a mut self, x: impl Numbers<'a>, y: impl Numbers<'a>) -> LinesCall<'a, Self> {
-        let (x, y) = xy_coords(x, y);
-        LinesCall {
-            target: self,
-            x,
-            y,
-            opts: XyOptions::default(),
-        }
+    /// At `.draw()`, if `x` is missing (R's message) or `x` and `y` have
+    /// different lengths (R's `xy.coords()`: "'x' and 'y' lengths differ").
+    fn lines(&mut self) -> LinesCall<'_, Self> {
+        LinesCall::start(self)
     }
 
-    /// `segments(x0, y0, x1, y1, ...)` in data units; options in
-    /// [`SegmentsOptions`]. The four coordinate slices and the styles are
-    /// recycled to the longest; a segment with a non-finite end after
-    /// conversion (including values <= 0 on a log axis) is skipped, as
-    /// `C_segments`.
-    fn segments<'a>(
-        &'a mut self,
-        x0: impl Numbers<'a>,
-        y0: impl Numbers<'a>,
-        x1: impl Numbers<'a>,
-        y1: impl Numbers<'a>,
-    ) -> SegmentsCall<'a, Self> {
-        SegmentsCall {
-            target: self,
-            x0: x0.into_numbers(),
-            y0: y0.into_numbers(),
-            x1: x1.into_numbers(),
-            y1: y1.into_numbers(),
-            opts: SegmentsOptions::default(),
-        }
+    /// `segments(x0, y0, x1, y1, ...)` in data units: R's coordinates are
+    /// [`x0`](SegmentsCall::x0) and [`y0`](SegmentsCall::y0) (required),
+    /// [`x1`](SegmentsCall::x1) and [`y1`](SegmentsCall::y1) (default `x0`
+    /// and `y0`); other arguments in [`SegmentsOptions`]. The four
+    /// coordinate slices and the styles are recycled to the longest; a
+    /// segment with a non-finite end after conversion (including values <=
+    /// 0 on a log axis) is skipped, as `C_segments`.
+    ///
+    /// # Panics
+    /// At `.draw()`, if `x0` or `y0` is missing (R's message).
+    fn segments(&mut self) -> SegmentsCall<'_, Self> {
+        SegmentsCall::start(self)
     }
 
-    /// `arrows(x0, y0, x1, y1, ...)`, a port of `C_arrows` / `GArrow()`;
-    /// options in [`ArrowsOptions`]: each segment with open heads - two
+    /// `arrows(x0, y0, x1, y1, ...)`, a port of `C_arrows` / `GArrow()`,
+    /// with the coordinates as for [`segments`](Graphics::segments)
+    /// ([`x0`](ArrowsCall::x0) and [`y0`](ArrowsCall::y0) required) and
+    /// other arguments in [`ArrowsOptions`]: each segment with open heads - two
     /// lines of `length` inches at `angle` degrees to the shaft - at its
     /// start, end or both (`code`). Coordinates and styles are recycled
     /// to the longest. As in R, an arrow with a non-finite end after
     /// conversion (including values <= 0 on a log axis) is skipped, and
     /// the heads of a segment shorter than 1/1000 inch are not drawn (R
     /// also warns).
-    fn arrows<'a>(
-        &'a mut self,
-        x0: impl Numbers<'a>,
-        y0: impl Numbers<'a>,
-        x1: impl Numbers<'a>,
-        y1: impl Numbers<'a>,
-    ) -> ArrowsCall<'a, Self> {
-        ArrowsCall {
-            target: self,
-            x0: x0.into_numbers(),
-            y0: y0.into_numbers(),
-            x1: x1.into_numbers(),
-            y1: y1.into_numbers(),
-            opts: ArrowsOptions::default(),
-        }
+    ///
+    /// # Panics
+    /// At `.draw()`, if `x0` or `y0` is missing (R's message).
+    fn arrows(&mut self) -> ArrowsCall<'_, Self> {
+        ArrowsCall::start(self)
     }
 
-    /// `rect(xleft, ybottom, xright, ytop, ...)` in data units; options in
-    /// [`RectOptions`]. Coordinates and styles are recycled to the
+    /// `rect(xleft, ybottom, xright, ytop, ...)` in data units: the four
+    /// coordinates are setters named as R's (all required); other arguments
+    /// in [`RectOptions`]. Coordinates and styles are recycled to the
     /// longest. Rectangles with a non-finite corner (e.g. at 0 on a log
     /// axis) are skipped, as in R.
-    fn rect<'a>(
-        &'a mut self,
-        xleft: impl Numbers<'a>,
-        ybottom: impl Numbers<'a>,
-        xright: impl Numbers<'a>,
-        ytop: impl Numbers<'a>,
-    ) -> RectCall<'a, Self> {
-        RectCall {
-            target: self,
-            x0: xleft.into_numbers(),
-            y0: ybottom.into_numbers(),
-            x1: xright.into_numbers(),
-            y1: ytop.into_numbers(),
-            opts: RectOptions::default(),
-        }
+    ///
+    /// # Panics
+    /// At `.draw()`, if a coordinate is missing (R's message).
+    fn rect(&mut self) -> RectCall<'_, Self> {
+        RectCall::start(self)
     }
 
-    /// `polygon(x, y, ...)`; options in [`PolygonOptions`]: one polygon
+    /// `polygon(x, y, ...)`: R's `x` and `y` are [`x`](PolygonCall::x)
+    /// (required) and [`y`](PolygonCall::y); other arguments in
+    /// [`PolygonOptions`]. One polygon
     /// per run of at least two finite points (non-finite coordinates, R's
     /// `NA`, separate them), with `col`, `border` and `lty` recycled over
     /// the polygons drawn, as `C_polygon` (a shorter run is skipped and
     /// uses up no colour).
     ///
     /// # Panics
-    /// If `x` and `y` have different lengths (R's `xy.coords()`: "'x' and
-    /// 'y' lengths differ").
-    fn polygon<'a>(
-        &'a mut self,
-        x: impl Numbers<'a>,
-        y: impl Numbers<'a>,
-    ) -> PolygonCall<'a, Self> {
-        let (x, y) = xy_coords(x, y);
-        PolygonCall {
-            target: self,
-            x,
-            y,
-            opts: PolygonOptions::default(),
-        }
+    /// At `.draw()`, if `x` is missing (R's message) or `x` and `y` have
+    /// different lengths (R's `xy.coords()`: "'x' and 'y' lengths differ").
+    fn polygon(&mut self) -> PolygonCall<'_, Self> {
+        PolygonCall::start(self)
     }
 
-    /// `text(x, y, labels, ...)` in data units; options in
-    /// [`TextOptions`]. Each label (text, or a plotmath expression such as
-    /// `Label::math("alpha^2")`) goes at its point, with `x`/`y` recycled
-    /// to the longer and labels recycled over the points (extra labels
-    /// are ignored; R truncates them with a warning). Empty `labels` are
-    /// R's default, the indices `"1"`, `"2"`, .... Placement follows
+    /// `text(x, y, labels, ...)` in data units: R's `x`, `y` and `labels`
+    /// are [`x`](TextCall::x) (required), [`y`](TextCall::y) (`x` alone:
+    /// against its index) and [`labels`](TextCall::labels); other arguments
+    /// in [`TextOptions`]. Each label (text, or a plotmath expression such
+    /// as `Label::math("alpha^2")`) goes at its point, with `x`/`y`
+    /// recycled to the longer and labels recycled over the points (extra
+    /// labels are ignored; R truncates them with a warning). Without
+    /// `labels` (or with none), they are R's default, the indices `"1"`,
+    /// `"2"`, .... Placement follows
     /// `GEText()`/`GEMathText()`: horizontally `adj` of the width;
     /// vertically see [`TextOptions::vadj`]; rotated by `srt`, else
     /// `par(srt)`. A label at a non-finite position (R's `NA`, or a value
     /// <= 0 on a log axis) is skipped, as in R.
-    fn text<'a, L: Clone + Into<Label>>(
-        &'a mut self,
-        x: impl Numbers<'a>,
-        y: impl Numbers<'a>,
-        labels: &[L],
-    ) -> TextCall<'a, Self> {
-        TextCall {
-            target: self,
-            x: x.into_numbers(),
-            y: y.into_numbers(),
-            labels: labels.iter().cloned().map(Into::into).collect(),
-            opts: TextOptions::default(),
-        }
+    ///
+    /// # Panics
+    /// At `.draw()`, if `x` is missing (R's message).
+    fn text(&mut self) -> TextCall<'_, Self> {
+        TextCall::start(self)
     }
 
     /// `box(which, ...)`: outlines the plot region, figure, inner region
@@ -449,36 +378,29 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `GBox()`: `"o"` all four, `"l"`, `"7"`, `"c"`, `"u"`, `"]"`, or
     /// `"n"` none.
     fn box_(&mut self) -> BoxCall<'_, Self> {
-        BoxCall {
-            target: self,
-            opts: BoxOptions::default(),
-        }
+        BoxCall::start(self)
     }
 
-    /// `axis(side, ...)` with all of R's arguments; options in
-    /// [`AxisOptions`]. `side` is a [`Side`] or R's number for it (1 to
-    /// 4).
+    /// `axis(side, ...)` with all of R's arguments: R's `side` is
+    /// [`side`](AxisCall::side) (required), a [`Side`] or R's number for it
+    /// (1 to 4); the others are in [`AxisOptions`].
     ///
     /// On a [`Device`], `.draw()` returns R's value: the tick positions
     /// (`at`, or the default ticks) in data units, sorted, with `NaN`
     /// (R's `NA`) last, including ticks outside the plot that weren't
     /// drawn; empty (R's `NULL`) when `at` is empty or the axis type is
-    /// `"n"`. So `let at = dev.axis(2).draw();` then
+    /// `"n"`. So `let at = dev.axis().side(2).draw();` then
     /// `dev.abline().h(at).col("grey").draw();` puts grid lines at the
     /// ticks, as R's `abline(h = axis(2))`. On a
     /// [`Figure`](crate::recording::Figure) it returns `()`; the positions
     /// come from [`Device::add_figure`].
     ///
     /// # Panics
-    /// If `side` is a number other than 1 to 4 (here), or, at `.draw()`,
-    /// if `labels` is given without `at` or their lengths differ (R's
-    /// errors).
-    fn axis(&mut self, side: impl Into<Side>) -> AxisCall<'_, Self> {
-        AxisCall {
-            target: self,
-            side: side.into(),
-            opts: AxisOptions::default(),
-        }
+    /// If `side` is a number other than 1 to 4 (in the setter), or, at
+    /// `.draw()`, if `side` is missing (R's message), or `labels` is given
+    /// without `at` or their lengths differ (R's errors).
+    fn axis(&mut self) -> AxisCall<'_, Self> {
+        AxisCall::start(self)
     }
 
     /// `abline(a, b, h, v, untf, col, lty, lwd, xpd)`; options in
@@ -491,15 +413,14 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// a=, b= specification"; R itself ignores a lone `b`), or if the
     /// line's values aren't finite (R: "'a' and 'b' must be finite").
     fn abline(&mut self) -> AblineCall<'_, Self> {
-        AblineCall {
-            target: self,
-            opts: AblineOptions::default(),
-        }
+        AblineCall::start(self)
     }
 
-    /// `legend(pos, legend, ...)`, a port of R's `legend()`: one key per
-    /// label (text or plotmath expressions; one or several, see
-    /// [`Labels`]), placed by `pos`; R's other arguments in
+    /// `legend(x, y, legend, ...)`, a port of R's `legend()`: one key per
+    /// label ([`labels`](LegendCall::labels), R's `legend`: text or
+    /// plotmath expressions; one or several, see [`Labels`]), placed by
+    /// [`pos`](LegendCall::pos) (R's `x` and `y`), both required; R's
+    /// other arguments in
     /// [`LegendOptions`], whose per-key ones (`col`, `pch`, `lty`, `lwd`,
     /// `fill`, ...) are recycled over the keys, as in R. On a [`Device`],
     /// `.draw()` returns where the box and labels went (R's return value,
@@ -513,43 +434,35 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
-    /// # dev.plot(&[1.0, 10.0], &[1.0, 30.0]).draw();
+    /// # dev.plot().x(&[1.0, 10.0]).y(&[1.0, 30.0]).draw();
     /// // legend("topright", legend = c("a", "b"), pch = 19, col = 1:2)
-    /// dev.legend("topright", ["a", "b"]).pch(19).col([1, 2]).draw();
+    /// dev.legend().pos("topright").labels(["a", "b"]).pch(19).col([1, 2]).draw();
     /// // legend(5, 20, legend = "fit", lty = 2, lwd = 2)
-    /// dev.legend((5.0, 20.0), "fit").lty(2).lwd(2).draw();
+    /// dev.legend().pos((5.0, 20.0)).labels("fit").lty(2).lwd(2).draw();
     /// ```
     ///
     /// # Panics
     /// If `pos` is a string that isn't one of R's nine keywords (or a
-    /// unique prefix of one), and at `.draw()` with R's errors: no labels
-    /// ("'legend' is of length 0"), or a `text_width` that is negative or
-    /// has `NaN` among several values.
-    fn legend(&mut self, pos: impl Into<LegendPos>, labels: impl Labels) -> LegendCall<'_, Self> {
-        LegendCall {
-            target: self,
-            pos: pos.into(),
-            labels: labels.into_labels(),
-            opts: LegendOptions::default(),
-        }
+    /// unique prefix of one), and at `.draw()` with R's errors: `pos` or
+    /// `labels` missing, no labels ("'legend' is of length 0"), or a
+    /// `text_width` that is negative or has `NaN` among several values.
+    fn legend(&mut self) -> LegendCall<'_, Self> {
+        LegendCall::start(self)
     }
 
     /// `mtext(text, side, line, outer, at, adj, padj, cex, col, font)`,
-    /// with rotation from `par(las)`; options in [`MtextOptions`]. `text`
-    /// is text (placed by `GMtext()`) or a plotmath expression
+    /// with rotation from `par(las)`. R's `text` and `side` are
+    /// [`text`](MtextCall::text) (required) and [`side`](MtextCall::side)
+    /// (default 3, the top); the others are in [`MtextOptions`]. `text` is
+    /// text (placed by `GMtext()`) or a plotmath expression
     /// (`Label::math(...)`, placed by `GMMathText()`: its bounding box
-    /// aligned by `adj`/`padj`, in the plain font). `side` is a [`Side`]
-    /// or R's number for it (1 to 4); R's default is 3 (top).
+    /// aligned by `adj`/`padj`, in the plain font).
     ///
     /// # Panics
-    /// If `side` is a number other than 1 to 4.
-    fn mtext(&mut self, text: impl Labels, side: impl Into<Side>) -> MtextCall<'_, Self> {
-        MtextCall {
-            target: self,
-            text: text.into_labels(),
-            side: side.into(),
-            opts: MtextOptions::default(),
-        }
+    /// If `side` is a number other than 1 to 4 (in the setter), or, at
+    /// `.draw()`, if `text` is missing (R's message).
+    fn mtext(&mut self) -> MtextCall<'_, Self> {
+        MtextCall::start(self)
     }
 
     /// `title(main=, sub=, xlab=, ylab=)`; options in [`TitleOptions`],
@@ -563,10 +476,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// (`main`: box centred on its line) and `GMMathText()` (the others:
     /// box bottom on the nudged line).
     fn title(&mut self) -> TitleCall<'_, Self> {
-        TitleCall {
-            target: self,
-            opts: TitleOptions::default(),
-        }
+        TitleCall::start(self)
     }
 
     /// `par(...)`: changes graphical parameters; options in
@@ -602,11 +512,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// fig.par().mfrow(1, 2).draw(); // error: no method `mfrow`
     /// ```
     fn par(&mut self) -> ParCall<'_, Self> {
-        ParCall {
-            target: self,
-            page: ParPage::default(),
-            opts: ParOptions::default(),
-        }
+        ParCall::start(self)
     }
 
     // ---- what `.draw()` calls; not part of the public API ----
@@ -771,37 +677,84 @@ impl<B: Backend> Graphics for Device<B> {
     }
 }
 
-/// R's `xy.coords()` check for `plot()`, `points()`, `lines()` and
-/// `polygon()`: `x` and `y` of one length (R doesn't recycle them there,
-/// unlike `text()`).
-fn xy_coords<'a>(x: impl Numbers<'a>, y: impl Numbers<'a>) -> (Cow<'a, [f64]>, Cow<'a, [f64]>) {
-    let (x, y) = (x.into_numbers(), y.into_numbers());
-    assert!(x.len() == y.len(), "'x' and 'y' lengths differ");
-    (x, y)
+/// R's `xy.coords()` for `plot()`, `points()`, `lines()`, `polygon()` and
+/// `text()`: `x` is required; without `y`, `x` is plotted against its
+/// index `1, 2, ...` (R's one-vector form, `plot(v)`), and the returned
+/// flag says so. Unless `recycle` (`text()`: R's `xy.coords(recycle =
+/// TRUE)`), `x` and `y` must have one length.
+fn xy_coords<'a>(
+    x: Option<Cow<'a, [f64]>>,
+    y: Option<Cow<'a, [f64]>>,
+    recycle: bool,
+) -> (Cow<'a, [f64]>, Cow<'a, [f64]>, bool) {
+    let x = required(x, "x");
+    match y {
+        Some(y) => {
+            assert!(recycle || x.len() == y.len(), "'x' and 'y' lengths differ");
+            (x, y, false)
+        }
+        None => {
+            let index: Vec<f64> = (1..=x.len()).map(|i| i as f64).collect();
+            (index.into(), x, true)
+        }
+    }
 }
 
-/// Declares a call: its struct (target, data fields, options) and its
-/// `.draw()`, which passes them to the target's `emit_*` method.
+/// An R argument without a default: its value, or R's error.
+fn required<T>(value: Option<T>, name: &str) -> T {
+    value.unwrap_or_else(|| panic!("argument \"{name}\" is missing, with no default"))
+}
+
+/// Declares a call: its struct (target, R's arguments, options), a
+/// constructor, a setter for each argument and its `.draw()`.
+///
+/// Each argument is stored as an `Option` (`None` until its setter is
+/// called); `setter: Type => conversion` generates the setter, and an
+/// argument without one has its setters written by hand. `state` fields
+/// aren't R arguments. The `draw` block resolves the arguments (R's
+/// defaults, or [`required`]) and calls the target's `emit_*` method.
 macro_rules! call {
+    (@setter [$(#[$doc:meta])*] $field:ident (manual)) => {};
+    (@setter [$(#[$doc:meta])*] $field:ident ($aty:ty => $conv:expr)) => {
+        $(#[$doc])*
+        pub fn $field(mut self, value: $aty) -> Self {
+            self.$field = Some(($conv)(value));
+            self
+        }
+    };
     (
         $(#[$doc:meta])*
-        $name:ident, $opts:ty, $emit:ident -> $ret:ty,
-        { $($field:ident : $fty:ty),* $(,)? },
-        |$t:ident, $o:ident| ($($arg:expr),* $(,)?)
+        $name:ident, $opts:ty => $ret:ty,
+        args { $( $(#[$fdoc:meta])* $field:ident : $fty:ty = $setter:tt ),* $(,)? },
+        $(state { $($sfield:ident : $sty:ty),* $(,)? },)?
+        |$t:ident, $o:ident| $body:block
     ) => {
         $(#[$doc])*
         #[must_use = "nothing is drawn until `.draw()`"]
         pub struct $name<'a, G: Graphics> {
             pub(crate) target: &'a mut G,
-            $(pub(crate) $field: $fty,)*
+            $(pub(crate) $field: Option<$fty>,)*
+            $($(pub(crate) $sfield: $sty,)*)?
             pub(crate) opts: $opts,
         }
 
         impl<'a, G: Graphics> $name<'a, G> {
-            /// Runs the call with the options set so far.
+            pub(crate) fn start(target: &'a mut G) -> Self {
+                $name {
+                    target,
+                    $($field: None,)*
+                    $($($sfield: Default::default(),)*)?
+                    opts: <$opts>::default(),
+                }
+            }
+
+            $( call!(@setter [$(#[$fdoc])*] $field $setter); )*
+
+            /// Runs the call with the arguments and options set so far.
             pub fn draw(self) -> $ret {
-                let $name { target: $t, $($field,)* opts: $o } = self;
-                $t.$emit($($arg),*)
+                #[allow(unused_variables)]
+                let $name { target: $t, $($field,)* $($($sfield,)*)? opts: $o } = self;
+                $body
             }
         }
     };
@@ -809,124 +762,292 @@ macro_rules! call {
 
 call!(
     /// [`Graphics::plot`]'s call.
-    PlotCall, PlotOptions, emit_plot -> (),
-    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
-    |t, o| (&x, &y, o)
+    PlotCall, PlotOptions => (),
+    args {
+        /// R's `x`: the x coordinates (required), or, without
+        /// [`y`](PlotCall::y), the values to plot against their index (R's
+        /// `plot(v)`, with x axis title "Index").
+        x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y`: the y coordinates, as many as `x`.
+        y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| {
+        let (x, y, index) = xy_coords(x, y, false);
+        let mut o = o;
+        if index && o.xlab.is_none() {
+            o.xlab = Some("Index".into());
+        }
+        t.emit_plot(&x, &y, o)
+    }
 );
 call!(
     /// [`Graphics::hist`]'s call.
-    HistCall, HistOptions, emit_hist -> HistResult,
-    { x: Cow<'a, [f64]> },
-    |t, o| (&x, o)
+    HistCall, HistOptions => HistResult,
+    args {
+        /// R's `x`: the values (required).
+        x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| { t.emit_hist(&required(x, "x"), o) }
 );
 call!(
     /// [`Graphics::barplot`]'s call.
-    BarplotCall, BarplotOptions, emit_barplot -> Vec<f64>,
-    { heights: BarHeights },
-    |t, o| (heights, o)
+    BarplotCall, BarplotOptions => Vec<f64>,
+    args {
+        /// R's `height` (required): a vector, one bar per value, or a
+        /// matrix given as its columns (see [`BarHeights`]).
+        height: BarHeights = (impl Into<BarHeights> => Into::into),
+    },
+    |t, o| { t.emit_barplot(required(height, "height"), o) }
 );
 call!(
     /// [`Graphics::boxplot`]'s call.
-    BoxplotCall, BoxplotOptions, emit_boxplot -> Vec<BoxStats>,
-    { groups: Cow<'a, [Vec<f64>]> },
-    |t, o| (&groups, o)
+    BoxplotCall, BoxplotOptions => Vec<BoxStats>,
+    args {
+        /// R's `x` (required): the groups, any [`Groups`] (e.g. `&[a, b]`
+        /// or `&groups`; a single group is `&[x]`).
+        x: Cow<'a, [Vec<f64>]> = (impl Groups<'a> => Groups::into_groups),
+    },
+    |t, o| { t.emit_boxplot(&required(x, "x"), o) }
 );
 call!(
     /// [`Graphics::pie`]'s call.
-    PieCall, PieOptions, emit_pie -> (),
-    { x: Cow<'a, [f64]> },
-    |t, o| (&x, o)
+    PieCall, PieOptions => (),
+    args {
+        /// R's `x`: the slice sizes (required).
+        x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| { t.emit_pie(&required(x, "x"), o) }
 );
 call!(
     /// [`Graphics::plot_window`]'s call.
-    PlotWindowCall, PlotWindowOptions, emit_plot_window -> (),
-    { xlim: (f64, f64), ylim: (f64, f64) },
-    |t, o| (xlim, ylim, o)
+    PlotWindowCall, PlotWindowOptions => (),
+    args { xlim: (f64, f64) = (manual), ylim: (f64, f64) = (manual) },
+    |t, o| { t.emit_plot_window(required(xlim, "xlim"), required(ylim, "ylim"), o) }
 );
+
+impl<G: Graphics> PlotWindowCall<'_, G> {
+    /// R's `xlim` (required): the x limits in data units, also on a log
+    /// axis; decreasing for a reversed axis.
+    pub fn xlim(mut self, from: impl Into<f64>, to: impl Into<f64>) -> Self {
+        self.xlim = Some((from.into(), to.into()));
+        self
+    }
+
+    /// R's `ylim` (required): as [`xlim`](PlotWindowCall::xlim).
+    pub fn ylim(mut self, from: impl Into<f64>, to: impl Into<f64>) -> Self {
+        self.ylim = Some((from.into(), to.into()));
+        self
+    }
+}
+
 call!(
     /// [`Graphics::points`]'s call.
-    PointsCall, XyOptions, emit_points -> (),
-    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
-    |t, o| (&x, &y, o)
+    PointsCall, XyOptions => (),
+    args {
+        /// R's `x`: the x coordinates (required), or, without
+        /// [`y`](PointsCall::y), the values to plot against their index.
+        x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y`: the y coordinates, as many as `x`.
+        y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| {
+        let (x, y, _) = xy_coords(x, y, false);
+        t.emit_points(&x, &y, o)
+    }
 );
 call!(
     /// [`Graphics::lines`]'s call.
-    LinesCall, XyOptions, emit_lines -> (),
-    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
-    |t, o| (&x, &y, o)
+    LinesCall, XyOptions => (),
+    args {
+        /// R's `x`: the x coordinates (required), or, without
+        /// [`y`](LinesCall::y), the values to draw against their index.
+        x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y`: the y coordinates, as many as `x`.
+        y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| {
+        let (x, y, _) = xy_coords(x, y, false);
+        t.emit_lines(&x, &y, o)
+    }
 );
 call!(
     /// [`Graphics::segments`]'s call.
-    SegmentsCall, SegmentsOptions, emit_segments -> (),
-    { x0: Cow<'a, [f64]>, y0: Cow<'a, [f64]>, x1: Cow<'a, [f64]>, y1: Cow<'a, [f64]> },
-    |t, o| (&x0, &y0, &x1, &y1, o)
+    SegmentsCall, SegmentsOptions => (),
+    args {
+        /// R's `x0`: the x coordinates of the starts (required).
+        x0: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y0`: the y coordinates of the starts (required).
+        y0: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `x1`: the x coordinates of the ends; default `x0`.
+        x1: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y1`: the y coordinates of the ends; default `y0`.
+        y1: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| {
+        let [x0, y0, x1, y1] = segment_ends(x0, y0, x1, y1);
+        t.emit_segments(&x0, &y0, &x1, &y1, o)
+    }
 );
 call!(
     /// [`Graphics::arrows`]'s call.
-    ArrowsCall, ArrowsOptions, emit_arrows -> (),
-    { x0: Cow<'a, [f64]>, y0: Cow<'a, [f64]>, x1: Cow<'a, [f64]>, y1: Cow<'a, [f64]> },
-    |t, o| (&x0, &y0, &x1, &y1, o)
+    ArrowsCall, ArrowsOptions => (),
+    args {
+        /// R's `x0`: the x coordinates of the starts (required).
+        x0: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y0`: the y coordinates of the starts (required).
+        y0: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `x1`: the x coordinates of the ends; default `x0`.
+        x1: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y1`: the y coordinates of the ends; default `y0`.
+        y1: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| {
+        let [x0, y0, x1, y1] = segment_ends(x0, y0, x1, y1);
+        t.emit_arrows(&x0, &y0, &x1, &y1, o)
+    }
 );
 call!(
     /// [`Graphics::rect`]'s call.
-    RectCall, RectOptions, emit_rect -> (),
-    { x0: Cow<'a, [f64]>, y0: Cow<'a, [f64]>, x1: Cow<'a, [f64]>, y1: Cow<'a, [f64]> },
-    |t, o| (&x0, &y0, &x1, &y1, o)
+    RectCall, RectOptions => (),
+    args {
+        /// R's `xleft` (required).
+        xleft: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `ybottom` (required).
+        ybottom: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `xright` (required).
+        xright: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `ytop` (required).
+        ytop: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| {
+        t.emit_rect(
+            &required(xleft, "xleft"),
+            &required(ybottom, "ybottom"),
+            &required(xright, "xright"),
+            &required(ytop, "ytop"),
+            o,
+        )
+    }
 );
 call!(
     /// [`Graphics::polygon`]'s call.
-    PolygonCall, PolygonOptions, emit_polygon -> (),
-    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]> },
-    |t, o| (&x, &y, o)
+    PolygonCall, PolygonOptions => (),
+    args {
+        /// R's `x`: the x coordinates of the vertices (required), or,
+        /// without [`y`](PolygonCall::y), the y values against their index.
+        x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y`: the y coordinates, as many as `x`.
+        y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+    },
+    |t, o| {
+        let (x, y, _) = xy_coords(x, y, false);
+        t.emit_polygon(&x, &y, o)
+    }
 );
 call!(
     /// [`Graphics::text`]'s call.
-    TextCall, TextOptions, emit_text -> (),
-    { x: Cow<'a, [f64]>, y: Cow<'a, [f64]>, labels: Vec<Label> },
-    |t, o| (&x, &y, labels, o)
+    TextCall, TextOptions => (),
+    args {
+        /// R's `x`: the x coordinates (required), or, without
+        /// [`y`](TextCall::y), the y values against their index.
+        x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `y`: the y coordinates; `x` and `y` are recycled to the
+        /// longer.
+        y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
+        /// R's `labels`: text or plotmath expressions, one or several (see
+        /// [`Labels`]); default `"1"`, `"2"`, ....
+        labels: Vec<Label> = (impl Labels => Labels::into_labels),
+    },
+    |t, o| {
+        let (x, y, _) = xy_coords(x, y, true);
+        t.emit_text(&x, &y, labels.unwrap_or_default(), o)
+    }
 );
 call!(
     /// [`Graphics::box_`]'s call.
-    BoxCall, BoxOptions, emit_box -> (),
-    {},
-    |t, o| (o)
+    BoxCall, BoxOptions => (),
+    args {},
+    |t, o| { t.emit_box(o) }
 );
 call!(
     /// [`Graphics::axis`]'s call.
-    AxisCall, AxisOptions, emit_axis -> G::AxisResult,
-    { side: Side },
-    |t, o| (side, o)
+    AxisCall, AxisOptions => G::AxisResult,
+    args {
+        /// R's `side` (required): a [`Side`] or R's number for it (1 to 4).
+        ///
+        /// # Panics
+        /// If the number isn't 1 to 4.
+        side: Side = (impl Into<Side> => Into::into),
+    },
+    |t, o| { t.emit_axis(required(side, "side"), o) }
 );
 call!(
     /// [`Graphics::abline`]'s call.
-    AblineCall, AblineOptions, emit_abline -> (),
-    {},
-    |t, o| (o)
+    AblineCall, AblineOptions => (),
+    args {},
+    |t, o| { t.emit_abline(o) }
 );
 call!(
     /// [`Graphics::legend`]'s call.
-    LegendCall, LegendOptions, emit_legend -> G::LegendResult,
-    { pos: LegendPos, labels: Vec<Label> },
-    |t, o| (pos, labels, o)
+    LegendCall, LegendOptions => G::LegendResult,
+    args {
+        /// Where the legend goes (required; R's `x` and `y`): a keyword such
+        /// as `"topright"`, a point `(x, y)`, or two corners `((xa, xb),
+        /// (ya, yb))`; see [`LegendPos`].
+        ///
+        /// # Panics
+        /// If a string isn't one of R's nine keywords (or a unique prefix
+        /// of one).
+        pos: LegendPos = (impl Into<LegendPos> => Into::into),
+        /// The keys' labels (required; R's `legend`): text or plotmath
+        /// expressions, one or several (see [`Labels`]).
+        labels: Vec<Label> = (impl Labels => Labels::into_labels),
+    },
+    |t, o| { t.emit_legend(required(pos, "pos"), required(labels, "labels"), o) }
 );
 call!(
     /// [`Graphics::mtext`]'s call.
-    MtextCall, MtextOptions, emit_mtext -> (),
-    { text: Vec<Label>, side: Side },
-    |t, o| (text, side, o)
+    MtextCall, MtextOptions => (),
+    args {
+        /// R's `text` (required): text or plotmath expressions, one or
+        /// several (see [`Labels`]), recycled with the other arguments.
+        text: Vec<Label> = (impl Labels => Labels::into_labels),
+        /// R's `side`: a [`Side`] or R's number for it (1 to 4); default 3
+        /// (top).
+        ///
+        /// # Panics
+        /// If the number isn't 1 to 4.
+        side: Side = (impl Into<Side> => Into::into),
+    },
+    |t, o| { t.emit_mtext(required(text, "text"), side.unwrap_or(Side::Top), o) }
 );
 call!(
     /// [`Graphics::title`]'s call.
-    TitleCall, TitleOptions, emit_title -> (),
-    {},
-    |t, o| (o)
+    TitleCall, TitleOptions => (),
+    args {},
+    |t, o| { t.emit_title(o) }
 );
 call!(
     /// [`Graphics::par`]'s call.
-    ParCall, ParOptions, emit_par -> (),
-    { page: ParPage },
-    |t, o| (o, page)
+    ParCall, ParOptions => (),
+    args {},
+    state { page: ParPage },
+    |t, o| { t.emit_par(o, page) }
 );
+
+/// `segments()`/`arrows()`'s ends: `x0` and `y0` required, `x1` and `y1`
+/// defaulting to them, as in R.
+fn segment_ends<'a>(
+    x0: Option<Cow<'a, [f64]>>,
+    y0: Option<Cow<'a, [f64]>>,
+    x1: Option<Cow<'a, [f64]>>,
+    y1: Option<Cow<'a, [f64]>>,
+) -> [Cow<'a, [f64]>; 4] {
+    let (x0, y0) = (required(x0, "x0"), required(y0, "y0"));
+    let x1 = x1.unwrap_or_else(|| x0.clone());
+    let y1 = y1.unwrap_or_else(|| y0.clone());
+    [x0, y0, x1, y1]
+}
 
 /// A `par()` call's page layout arguments (`mfrow`/`mfcol`, `mfg`, `fig`,
 /// `fin`), which only a [`Device`] takes.

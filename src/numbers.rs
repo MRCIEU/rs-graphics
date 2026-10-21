@@ -7,8 +7,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Numeric arguments that take integers as well as `f64`, as R's numbers
-//! do: data vectors ([`Numbers`]: `dev.plot(&[1, 2, 3], &y)` or
-//! `dev.plot(1..=10, &y)`, R's `plot(1:10, y)`), groups of them
+//! do: data vectors ([`Numbers`]: `dev.plot().x(&[1, 2, 3]).y(&y)` or
+//! `dev.plot().x(1..=10).y(&y)`, R's `plot(1:10, y)`), groups of them
 //! ([`Groups`], for `boxplot()`) and pairs ([`Pair`]: `(5, 20)`).
 //!
 //! `f64` data is borrowed as it is; other numbers are converted to `f64`

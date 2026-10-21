@@ -231,8 +231,10 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         main: Some(Label::math("alpha^2")),
         ..PlotOptions::default()
     };
-    dev.plot(&x, &x).with(&opts).draw();
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), "a")
+    dev.plot().x(&x).y(&x).with(&opts).draw();
+    dev.legend()
+        .pos(LegendPos::Keyword(LegendKeyword::TopLeft))
+        .labels("a")
         .col("red")
         .pch(46)
         .draw();
@@ -242,7 +244,7 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         cex: vec![Some(0.5)],
         ..PlotOptions::default()
     };
-    dev.plot(&x, &[3.0, 1.0, 2.0]).with(&dots).draw();
+    dev.plot().x(&x).y(&[3.0, 1.0, 2.0]).with(&dots).draw();
 }
 
 #[test]

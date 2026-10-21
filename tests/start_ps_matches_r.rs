@@ -53,11 +53,15 @@ fn draw_ours(start: f64, ps: f64) -> String {
         ylab: Some("y".into()),
         ..PlotOptions::default()
     };
-    dev.plot(&[1.0, 2.0, 3.0, 4.0], &[1.0, 3.0, 2.0, 4.0])
+    dev.plot()
+        .x(&[1.0, 2.0, 3.0, 4.0])
+        .y(&[1.0, 3.0, 2.0, 4.0])
         .with(&opts)
         .draw();
     let black = ColorSpec::Index(1);
-    dev.legend(LegendPos::Keyword(LegendKeyword::TopLeft), ["a", "bb"])
+    dev.legend()
+        .pos(LegendPos::Keyword(LegendKeyword::TopLeft))
+        .labels(["a", "bb"])
         .col(black)
         .pch(1)
         .lty(LineType::from_code(1))

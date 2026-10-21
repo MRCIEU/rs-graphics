@@ -85,7 +85,7 @@ fn breaks_and_counts_match_r_sturges() {
 
         let backend = PdfBackend::new(6.0, 4.0).with_compression(false);
         let mut dev = Device::new(backend, Par::default());
-        let result = dev.hist(data).draw();
+        let result = dev.hist().x(data).draw();
 
         assert_eq!(
             result.breaks.len(),
@@ -127,7 +127,7 @@ fn breaks_as_a_count_or_unsorted_edges_match_r() {
     for (r_breaks, breaks) in cases {
         let (expected_breaks, expected_counts) = r_hist(&data, r_breaks);
         let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-        let result = dev.hist(&data).breaks(breaks).draw();
+        let result = dev.hist().x(&data).breaks(breaks).draw();
         assert_eq!(
             result.breaks.len(),
             expected_breaks.len(),
@@ -148,14 +148,14 @@ fn breaks_as_a_count_or_unsorted_edges_match_r() {
 #[should_panic(expected = "invalid number of 'breaks'")]
 fn zero_breaks_panics_like_r() {
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-    dev.hist(&[1.0, 2.0, 3.0]).breaks(0).draw();
+    dev.hist().x(&[1.0, 2.0, 3.0]).breaks(0).draw();
 }
 
 #[test]
 #[should_panic(expected = "invalid number of 'breaks'")]
 fn nan_breaks_panics_like_r() {
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-    dev.hist(&[1.0, 2.0, 3.0]).breaks(f64::NAN).draw();
+    dev.hist().x(&[1.0, 2.0, 3.0]).breaks(f64::NAN).draw();
 }
 
 /// R's output of `expr` (an R expression evaluated with `x` set to `data`),
@@ -208,7 +208,7 @@ fn breaks_rules_and_functions_match_r() {
                 &format!("hist(x, breaks = {r_breaks}, plot = FALSE)$breaks"),
             );
             let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-            let result = dev.hist(data).breaks(breaks.clone()).draw();
+            let result = dev.hist().x(data).breaks(breaks.clone()).draw();
             assert_eq!(
                 result.breaks, expected,
                 "breaks = {r_breaks}, data {data:?}"
@@ -222,7 +222,8 @@ fn breaks_rules_and_functions_match_r() {
     );
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
     let result = dev
-        .hist(&skewed)
+        .hist()
+        .x(&skewed)
         .breaks(HistBreaks::function(|x| {
             let hi = x.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             vec![hi, -10.0, 0.0, 20.0]
@@ -240,7 +241,8 @@ fn breaks_rules_and_functions_match_r() {
     );
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
     let result = dev
-        .hist(&skewed)
+        .hist()
+        .x(&skewed)
         .breaks(HistBreaks::function(|_| vec![4.0]))
         .draw();
     assert_eq!(result.breaks, count);
@@ -251,7 +253,7 @@ fn breaks_rules_and_functions_match_r() {
         "{ pdf(NULL); hist(x, xlim = c(-20, 30), ylim = c(0, 10)); par('usr') }",
     );
     let mut dev = Device::new(PdfBackend::new(7.0, 7.0), Par::default());
-    dev.hist(&skewed).xlim(-20, 30).ylim(0, 10).draw();
+    dev.hist().x(&skewed).xlim(-20, 30).ylim(0, 10).draw();
     let (a, b, c, d) = dev.usr();
     for (ours, r) in [a, b, c, d].iter().zip(&usr) {
         assert!((ours - r).abs() < 1e-9, "usr {:?} vs {usr:?}", (a, b, c, d));
@@ -291,7 +293,7 @@ fn right_include_lowest_and_fuzz_match_r() {
             &format!("hist(x, breaks = c(0, 1, 2, 3, 5), {r_args}, plot = FALSE)$counts"),
         );
         let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-        let mut call = dev.hist(&data).breaks(edges);
+        let mut call = dev.hist().x(&data).breaks(edges);
         if let Some(r) = right {
             call = call.right(r);
         }
@@ -309,7 +311,7 @@ fn right_include_lowest_and_fuzz_match_r() {
 #[should_panic(expected = "some 'x' not counted")]
 fn breaks_not_covering_the_data_panic_like_r() {
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-    dev.hist(&[1.0, 2.0, 5.0]).breaks([1, 2, 3]).draw();
+    dev.hist().x(&[1.0, 2.0, 5.0]).breaks([1, 2, 3]).draw();
 }
 
 /// With `include.lowest = FALSE` a value on the first edge isn't counted,
@@ -318,7 +320,8 @@ fn breaks_not_covering_the_data_panic_like_r() {
 #[should_panic(expected = "some 'x' not counted")]
 fn include_lowest_false_leaves_the_first_edge_out_like_r() {
     let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-    dev.hist(&[0.0, 1.0, 2.0])
+    dev.hist()
+        .x(&[0.0, 1.0, 2.0])
         .breaks([0, 1, 2])
         .include_lowest(false)
         .draw();

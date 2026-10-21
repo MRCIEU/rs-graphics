@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // R: pdf("scatter.pdf"); plot(x, y, ...); abline(h = 6); legend(...); dev.off()
     let mut dev = Device::pdf("scatter.pdf").open()?;
-    dev.plot(&x, &y)
+    dev.plot().x(&x).y(&y)
         .pch(19)
         .col("steelblue")
         .main(Label::math("y == beta[0] + beta[1] * x"))
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dev.abline().h(6.0).col("grey").lty("dashed").draw();
     // R: legend("topleft", legend = c("observed", "threshold"),
     //           col = c("steelblue", "grey"), pch = c(19, NA), lty = c(NA, 2))
-    dev.legend("topleft", ["observed", "threshold"])
+    dev.legend().pos("topleft").labels(["observed", "threshold"])
         .col(["steelblue", "grey"])
         .pch([Some(19), None])
         .lty([None, Some(2)])
@@ -49,13 +49,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Each R function is a method with R's name. It takes R's data arguments;
-chained setters take the others, and `.draw()` runs the call. Arguments
-you leave out get R's defaults (mostly the current `par()` values), and
-calls without `.draw()` draw nothing (the compiler warns). Every
-setter is documented on its options struct, e.g. `XyOptions` for
-`points()`. As in R, numbers may be integers or floats:
-`dev.plot(1..=10, &y).cex(2).xlim(0, 12)` (`1..=10` is R's `1:10`), and
+Each R function is a method with R's name. Chained setters, named as R's
+arguments, take all of them, data included (`.x(&x)`), and `.draw()` runs
+the call. A required argument you leave out panics at `.draw()` with R's
+message. Arguments with defaults that you leave out get R's defaults (mostly the current `par()` values), and
+calls without `.draw()` draw nothing (the compiler warns). The
+argument setters are documented on the call (e.g. `PointsCall::x`), and
+the rest on its options struct, e.g. `XyOptions` for `points()`. As in R, numbers may be integers or floats:
+`dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (`1..=10` is R's `1:10`), and
 data vectors may hold any number type. R's `NA` in a style vector is
 `None`: R's `pch = c(19, NA)` is `.pch([Some(19), None])`.
 
@@ -73,11 +74,11 @@ let mut dev = Device::png("points.png").width(6.0).height(4.0).res(300.0).open()
 // R: par(las = 1, mar = c(4, 4, 2, 1))
 dev.par().las(1).mar([4.0, 4.0, 2.0, 1.0]).draw();
 // R: plot(x, y, pch = 19, col = groups, xlab = "Dose", ylab = "Response")
-dev.plot(&x, &y).pch(19).col(groups).xlab("Dose").ylab("Response").draw();
+dev.plot().x(&x).y(&y).pch(19).col(groups).xlab("Dose").ylab("Response").draw();
 // R: text(x, y, labels = c("a", "b", "c", "d", "e"), adj = -0.5)
-dev.text(&x, &y, &["a", "b", "c", "d", "e"]).adj(-0.5).draw();
+dev.text().x(&x).y(&y).labels(&["a", "b", "c", "d", "e"]).adj(-0.5).draw();
 // R: legend("topleft", legend = c("control", "treated"), pch = 19, col = 1:2)
-dev.legend("topleft", ["control", "treated"]).pch(19).col([1, 2]).draw();
+dev.legend().pos("topleft").labels(["control", "treated"]).pch(19).col([1, 2]).draw();
 // R: dev.off()
 dev.close()?;
 ```
@@ -107,18 +108,18 @@ let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
 dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 
 let x = [4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7];
-let h = dev.hist(&x).col("lightblue").main("Histogram").draw(); // panel 1
+let h = dev.hist().x(&x).col("lightblue").main("Histogram").draw(); // panel 1
 dev.abline().v(h.mids[2]).lty("dashed").draw();
 
 let centres = dev // panel 2: bar centres, for labelling the bars
-    .barplot([3.0, 5.0, 2.0])
+    .barplot().height([3.0, 5.0, 2.0])
     .names(["A", "B", "C"])
     .ylim(0.0, 6.0)
     .draw();
-dev.text(&centres, &[3.3, 5.3, 2.3], &["3", "5", "2"]).draw();
+dev.text().x(&centres).y(&[3.3, 5.3, 2.3]).labels(&["3", "5", "2"]).draw();
 
 // R: mtext("Two panels", outer = TRUE, line = 0.5, font = 2)
-dev.mtext("Two panels", 3).outer(true).line(0.5).font(2).draw();
+dev.mtext().text("Two panels").side(3).outer(true).line(0.5).font(2).draw();
 dev.close()?;
 ```
 
@@ -154,13 +155,13 @@ let response = [1.8, 3.1, 3.9, 5.2, 5.8, 7.1];
 let fitted = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
 
 let mut fig = Figure::new();
-fig.plot(&dose, &response)
+fig.plot().x(&dose).y(&response)
     .xlab("Dose")
     .ylab("Response")
     .main(Label::math("y == alpha + beta * x"))
     .draw();
-fig.lines(&dose, &fitted).col("red").draw();
-fig.legend("bottomright", ["observed", "fitted"])
+fig.lines().x(&dose).y(&fitted).col("red").draw();
+fig.legend().pos("bottomright").labels(["observed", "fitted"])
     .col(["black", "red"])
     .pch([Some(1), None])
     .lty([None, Some(1)])
@@ -208,7 +209,7 @@ trait Diagnostics {
 
 impl<G: Graphics> Diagnostics for G {
     fn obs_vs_exp(&mut self, exp: &[f64], obs: &[f64]) {
-        self.plot(exp, obs).pch(20).xlab("Expected").ylab("Observed").draw();
+        self.plot().x(exp).y(obs).pch(20).xlab("Expected").ylab("Observed").draw();
         self.abline().a(0).b(1).col("red").draw();
     }
 }

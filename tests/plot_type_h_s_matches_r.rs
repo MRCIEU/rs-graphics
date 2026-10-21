@@ -50,7 +50,9 @@ const CASES: [Case; 6] = [
         r: "plot(x, y, type = 'h', col = c('red', NA, 'blue'), lwd = 3, axes = FALSE, ann = FALSE)",
         ours: |dev| {
             let opts = plot(PlotType::Histogram);
-            dev.plot(&X, &Y)
+            dev.plot()
+                .x(&X)
+                .y(&Y)
                 .with(&opts)
                 .col(["red".into(), ColorSpec::None, "blue".into()])
                 .lwd(3.0)
@@ -63,7 +65,7 @@ const CASES: [Case; 6] = [
         ours: |dev| {
             let y: Vec<f64> = Y.iter().map(|v| v + 10.0).collect();
             let opts = plot(PlotType::Histogram);
-            dev.plot(&X, &y).with(&opts).draw();
+            dev.plot().x(&X).y(&y).with(&opts).draw();
         },
     },
     Case {
@@ -71,7 +73,7 @@ const CASES: [Case; 6] = [
         r: "plot(x, ylog, type = 'h', log = 'y', axes = FALSE, ann = FALSE)",
         ours: |dev| {
             let opts = plot(PlotType::Histogram).ylog(true);
-            dev.plot(&X, &Y_LOG).with(&opts).draw();
+            dev.plot().x(&X).y(&Y_LOG).with(&opts).draw();
         },
     },
     Case {
@@ -79,7 +81,9 @@ const CASES: [Case; 6] = [
         r: "plot(x, y, type = 's', lty = 2, col = 'darkgreen', axes = FALSE, ann = FALSE)",
         ours: |dev| {
             let opts = plot(PlotType::Steps);
-            dev.plot(&X, &Y)
+            dev.plot()
+                .x(&X)
+                .y(&Y)
                 .with(&opts)
                 .lty(LineType::DASHED)
                 .col("darkgreen")
@@ -91,7 +95,7 @@ const CASES: [Case; 6] = [
         r: "plot(x, y, type = 'S', log = 'x', lwd = 2, axes = FALSE, ann = FALSE)",
         ours: |dev| {
             let opts = plot(PlotType::StepsVerticalFirst).xlog(true);
-            dev.plot(&X, &Y).with(&opts).lwd(2.0).draw();
+            dev.plot().x(&X).y(&Y).with(&opts).lwd(2.0).draw();
         },
     },
     Case {
@@ -102,16 +106,22 @@ const CASES: [Case; 6] = [
             lines(x, ylog, type = 'S', lwd = 2)",
         ours: |dev| {
             let opts = plot(PlotType::None).ylog(true);
-            dev.plot(&X, &Y_LOG).with(&opts).draw();
-            dev.lines(&X, &Y_LOG)
+            dev.plot().x(&X).y(&Y_LOG).with(&opts).draw();
+            dev.lines()
+                .x(&X)
+                .y(&Y_LOG)
                 .type_(PlotType::Steps)
                 .col("blue")
                 .draw();
-            dev.points(&X, &Y_LOG)
+            dev.points()
+                .x(&X)
+                .y(&Y_LOG)
                 .type_(PlotType::Histogram)
                 .col(["red", "grey"])
                 .draw();
-            dev.lines(&X, &Y_LOG)
+            dev.lines()
+                .x(&X)
+                .y(&Y_LOG)
                 .type_(PlotType::StepsVerticalFirst)
                 .lwd(2.0)
                 .draw();

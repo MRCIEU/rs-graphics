@@ -117,7 +117,7 @@ fn draw_ours(c: &Case) -> String {
     par.cex = c.par_cex;
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.plot_new();
-    dev.plot_window((0.0, 8.0), (0.0, 6.0)).draw();
+    dev.plot_window().xlim(0.0, 8.0).ylim(0.0, 6.0).draw();
     let col = ColorSpec::Color(Color::parse(c.col).unwrap());
     let bg = c
         .bg
@@ -125,7 +125,9 @@ fn draw_ours(c: &Case) -> String {
     dev.par().lwd(c.lwd).draw();
     for pch in 0..26 {
         let (x, y) = pch_pos(pch);
-        dev.points(&[x], &[y])
+        dev.points()
+            .x(&[x])
+            .y(&[y])
             .with(&XyOptions {
                 pch: vec![Some(pch as i32)],
                 col: vec![col],
@@ -138,7 +140,9 @@ fn draw_ours(c: &Case) -> String {
     dev.par().lwd(1.0).draw();
     for (i, &ch) in CHARS.iter().enumerate() {
         let (x, y) = char_pos(i);
-        dev.points(&[x], &[y])
+        dev.points()
+            .x(&[x])
+            .y(&[y])
             .with(&XyOptions {
                 pch: vec![Some(ch as i32)],
                 col: vec![col],

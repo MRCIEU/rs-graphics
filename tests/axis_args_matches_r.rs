@@ -73,13 +73,15 @@ fn cases() -> Vec<Case> {
             xlim: (0.0, 10.0),
             setup: |_| {},
             draw: |d| {
-                d.axis(1)
+                d.axis()
+                    .side(1)
                     .with(&AxisOptions {
                         line: Some(1.0),
                         ..Default::default()
                     })
                     .draw();
-                d.axis(2)
+                d.axis()
+                    .side(2)
                     .with(&AxisOptions {
                         line: Some(-1.0),
                         ..Default::default()
@@ -90,9 +92,9 @@ fn cases() -> Vec<Case> {
                     las: Some(2),
                     ..Default::default()
                 };
-                d.axis(3).with(&o).draw();
+                d.axis().side(3).with(&o).draw();
                 let o = AxisOptions { line: Some(0.5), las: Some(1), ..Default::default() };
-                d.axis(4).with(&o).draw();
+                d.axis().side(4).with(&o).draw();
             },
         },
         Case {
@@ -103,7 +105,8 @@ fn cases() -> Vec<Case> {
             xlim: (0.0, 10.0),
             setup: |_| {},
             draw: |d| {
-                d.axis(1)
+                d.axis()
+                    .side(1)
                     .with(&AxisOptions {
                         pos: Some(2.0),
                         ..Default::default()
@@ -114,10 +117,11 @@ fn cases() -> Vec<Case> {
                     las: Some(1),
                     ..Default::default()
                 };
-                d.axis(2).with(&o).draw();
+                d.axis().side(2).with(&o).draw();
                 let o = AxisOptions { pos: Some(8.0), line: Some(3.0), ..Default::default() };
-                d.axis(3).with(&o).draw();
-                d.axis(4)
+                d.axis().side(3).with(&o).draw();
+                d.axis()
+                    .side(4)
                     .with(&AxisOptions {
                         pos: Some(12.0),
                         ..Default::default()
@@ -133,7 +137,8 @@ fn cases() -> Vec<Case> {
             xlim: (0.0, 10.0),
             setup: |p| p.oma = Sides::new(2.0, 3.0, 2.0, 1.0),
             draw: |d| {
-                d.axis(1)
+                d.axis()
+                    .side(1)
                     .with(&AxisOptions {
                         outer: true,
                         ..Default::default()
@@ -144,11 +149,11 @@ fn cases() -> Vec<Case> {
                     line: Some(1.0),
                     ..Default::default()
                 };
-                d.axis(2).with(&o).draw();
+                d.axis().side(2).with(&o).draw();
                 let o = AxisOptions { outer: true, line: Some(-1.0), ..Default::default() };
-                d.axis(3).with(&o).draw();
+                d.axis().side(3).with(&o).draw();
                 let o = AxisOptions { outer: true, las: Some(2), ..Default::default() };
-                d.axis(4).with(&o).draw();
+                d.axis().side(4).with(&o).draw();
             },
         },
         Case {
@@ -159,13 +164,15 @@ fn cases() -> Vec<Case> {
             xlim: (0.0, 10.0),
             setup: |_| {},
             draw: |d| {
-                d.axis(1)
+                d.axis()
+                    .side(1)
                     .with(&AxisOptions {
                         tck: Some(0.02),
                         ..Default::default()
                     })
                     .draw();
-                d.axis(2)
+                d.axis()
+                    .side(2)
                     .with(&AxisOptions {
                         tck: Some(-0.03),
                         ..Default::default()
@@ -176,8 +183,9 @@ fn cases() -> Vec<Case> {
                     col_ticks: col("grey"),
                     ..Default::default()
                 };
-                d.axis(3).with(&o).draw();
-                d.axis(4)
+                d.axis().side(3).with(&o).draw();
+                d.axis()
+                    .side(4)
                     .with(&AxisOptions {
                         tcl: Some(0.4),
                         ..Default::default()
@@ -195,18 +203,18 @@ fn cases() -> Vec<Case> {
             setup: |_| {},
             draw: |d| {
                 let o = AxisOptions { hadj: Some(0.0), padj: vec![0.0, 1.0], ..Default::default() };
-                d.axis(1).with(&o).draw();
+                d.axis().side(1).with(&o).draw();
                 let o = AxisOptions {
                     las: Some(1),
                     hadj: Some(0.5),
                     padj: vec![-0.5],
                     ..Default::default()
                 };
-                d.axis(2).with(&o).draw();
+                d.axis().side(2).with(&o).draw();
                 let o = AxisOptions { las: Some(2), hadj: Some(0.2), ..Default::default() };
-                d.axis(3).with(&o).draw();
+                d.axis().side(3).with(&o).draw();
                 let o = AxisOptions { padj: vec![1.0, f64::NAN, 0.5], ..Default::default() };
-                d.axis(4).with(&o).draw();
+                d.axis().side(4).with(&o).draw();
             },
         },
         Case {
@@ -221,9 +229,9 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 let at = Some(seq(0.0, 10.0, 0.5));
                 let o = AxisOptions { at: at.clone(), gap_axis: Some(-0.5), ..Default::default() };
-                d.axis(1).with(&o).draw();
+                d.axis().side(1).with(&o).draw();
                 let o = AxisOptions { at, gap_axis: Some(2.0), ..Default::default() };
-                d.axis(3).with(&o).draw();
+                d.axis().side(3).with(&o).draw();
                 let at = Some(seq(0.0, 10.0, 0.25));
                 let o = AxisOptions {
                     at: at.clone(),
@@ -231,9 +239,9 @@ fn cases() -> Vec<Case> {
                     gap_axis: Some(0.0),
                     ..Default::default()
                 };
-                d.axis(2).with(&o).draw();
+                d.axis().side(2).with(&o).draw();
                 let o = AxisOptions { at, las: Some(1), gap_axis: Some(3.0), ..Default::default() };
-                d.axis(4).with(&o).draw();
+                d.axis().side(4).with(&o).draw();
             },
         },
         Case {
@@ -257,26 +265,26 @@ fn cases() -> Vec<Case> {
                     font: Some(2),
                     ..Default::default()
                 };
-                d.axis(1).with(&o).draw();
+                d.axis().side(1).with(&o).draw();
                 let o = AxisOptions {
                     lty: Some(LineType::from_code(2)),
                     draw_labels: false,
                     ..Default::default()
                 };
-                d.axis(2).with(&o).draw();
+                d.axis().side(2).with(&o).draw();
                 let o = AxisOptions {
                     tick: false,
                     at: Some(vec![2.0, 5.0, 7.0]),
                     labels: Some(labels(&["a", "bb", "ccc"])),
                     ..Default::default()
                 };
-                d.axis(3).with(&o).draw();
+                d.axis().side(3).with(&o).draw();
                 let o = AxisOptions {
                     lwd: Some(0.0),
                     lwd_ticks: Some(2.0),
                     ..Default::default()
                 };
-                d.axis(4).with(&o).draw();
+                d.axis().side(4).with(&o).draw();
             },
         },
         Case {
@@ -286,12 +294,12 @@ fn cases() -> Vec<Case> {
             xlim: (0.0, 10.0),
             setup: |p| p.xaxt = AxisType::None,
             draw: |d| {
-                d.axis(1).draw();
+                d.axis().side(1).draw();
                 let o = AxisOptions { axt: Some(AxisType::Standard), ..Default::default() };
-                d.axis(3).with(&o).draw();
+                d.axis().side(3).with(&o).draw();
                 let o = AxisOptions { axt: Some(AxisType::None), ..Default::default() };
-                d.axis(2).with(&o).draw();
-                d.axis(4).draw();
+                d.axis().side(2).with(&o).draw();
+                d.axis().side(4).draw();
             },
         },
         Case {
@@ -303,7 +311,7 @@ fn cases() -> Vec<Case> {
             xlim: (10.0, 0.0),
             setup: |_| {},
             draw: |d| {
-                d.axis(3).draw();
+                d.axis().side(3).draw();
                 d.par().xpd(Xpd::Figure).draw();
                 // Letters, not negative numbers: R's `pdf()` draws `-` as
                 // the wider `/minus` glyph, which we deliberately don't.
@@ -312,20 +320,20 @@ fn cases() -> Vec<Case> {
                     labels: Some(labels(&["a", "b", "c", "d", "e"])),
                     ..Default::default()
                 };
-                d.axis(1).with(&o).draw();
+                d.axis().side(1).with(&o).draw();
                 let o = AxisOptions {
                     at: Some(vec![-2.0, 5.0, 12.0]),
                     labels: Some(labels(&["lo", "mid", "hi"])),
                     las: Some(1),
                     ..Default::default()
                 };
-                d.axis(2).with(&o).draw();
+                d.axis().side(2).with(&o).draw();
                 let o = AxisOptions {
                     at: Some(vec![8.0, 2.0]),
                     labels: Some(labels(&["eight", "two"])),
                     ..Default::default()
                 };
-                d.axis(4).with(&o).draw();
+                d.axis().side(4).with(&o).draw();
             },
         },
         Case {
@@ -342,7 +350,7 @@ fn cases() -> Vec<Case> {
                     labels: Some(labels(&["a", "NA", "c", "NA", "e"])),
                     ..Default::default()
                 };
-                d.axis(1).with(&o).draw();
+                d.axis().side(1).with(&o).draw();
                 // NA between labels spaced so that `gap.axis` would drop
                 // every one of them if the NAs took part.
                 let o = AxisOptions {
@@ -350,13 +358,13 @@ fn cases() -> Vec<Case> {
                     labels: Some(alternating_na()),
                     ..Default::default()
                 };
-                d.axis(3).with(&o).draw();
+                d.axis().side(3).with(&o).draw();
                 let o = AxisOptions {
                     at: Some(vec![1.0, 5.0, 9.0]),
                     labels: Some(labels(&["NA", "NA", "NA"])),
                     ..Default::default()
                 };
-                d.axis(2).with(&o).draw();
+                d.axis().side(2).with(&o).draw();
             },
         },
         Case {
@@ -367,11 +375,11 @@ fn cases() -> Vec<Case> {
             xlim: (0.0, 10.0),
             setup: |p| p.mgp = [2.0, 0.7, 0.2],
             draw: |d| {
-                d.axis(1).mgp([3.0, 0.3, 0.0]).draw();
+                d.axis().side(1).mgp([3.0, 0.3, 0.0]).draw();
                 // `par(mgp)` when not given inline.
-                d.axis(2).draw();
-                d.axis(3).mgp([3.0, 1.5, 0.5]).line(1).draw();
-                d.axis(4).mgp([3.0, 0.2, -0.5]).pos(9).las(1).draw();
+                d.axis().side(2).draw();
+                d.axis().side(3).mgp([3.0, 1.5, 0.5]).line(1).draw();
+                d.axis().side(4).mgp([3.0, 0.2, -0.5]).pos(9).las(1).draw();
             },
         },
         Case {
@@ -386,13 +394,13 @@ fn cases() -> Vec<Case> {
                 p.mgp = [2.5, 0.8, 0.0];
             },
             draw: |d| {
-                d.axis(1).draw();
-                d.axis(2).draw();
-                d.axis(3).las(2).draw();
-                d.axis(4).las(1).draw();
+                d.axis().side(1).draw();
+                d.axis().side(2).draw();
+                d.axis().side(3).las(2).draw();
+                d.axis().side(4).las(1).draw();
                 d.title().main("M").sub("S").xlab("X").ylab("Y").draw();
-                d.mtext("A", 3).line(1).draw();
-                d.mtext("B", 4).line(1).draw();
+                d.mtext().text("A").side(3).line(1).draw();
+                d.mtext().text("B").side(4).line(1).draw();
             },
         },
         Case {
@@ -404,13 +412,13 @@ fn cases() -> Vec<Case> {
             xlim: (0.0, 10.0),
             setup: |p| p.mex = 0.7,
             draw: |d| {
-                d.axis(1).draw();
-                d.axis(2).draw();
-                d.axis(3).las(2).draw();
-                d.axis(4).las(1).draw();
+                d.axis().side(1).draw();
+                d.axis().side(2).draw();
+                d.axis().side(3).las(2).draw();
+                d.axis().side(4).las(1).draw();
                 d.title().main("M").sub("S").xlab("X").ylab("Y").draw();
-                d.mtext("A", 3).line(1).draw();
-                d.mtext("B", 4).line(1).draw();
+                d.mtext().text("A").side(3).line(1).draw();
+                d.mtext().text("B").side(4).line(1).draw();
             },
         },
         Case {
@@ -425,7 +433,7 @@ fn cases() -> Vec<Case> {
                     labels: Some(alternating_na()),
                     ..Default::default()
                 };
-                d.axis(1).with(&o).draw();
+                d.axis().side(1).with(&o).draw();
             },
         },
     ]
@@ -453,7 +461,10 @@ fn draw_ours(c: &Case) -> String {
         par,
     );
     dev.plot_new();
-    dev.plot_window(c.xlim, (0.0, 10.0)).draw();
+    dev.plot_window()
+        .xlim(c.xlim.0, c.xlim.1)
+        .ylim(0.0, 10.0)
+        .draw();
     (c.draw)(&mut dev);
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
@@ -684,23 +695,24 @@ fn axis_returns_tick_positions_like_r() {
 
     fn scene<G: Graphics>(g: &mut G) -> Vec<G::AxisResult> {
         g.plot_new();
-        g.plot_window((0, 10), (0, 10)).draw();
+        g.plot_window().xlim(0, 10).ylim(0, 10).draw();
         let mut out = vec![
-            g.axis(1).draw(),
-            g.axis(2)
+            g.axis().side(1).draw(),
+            g.axis()
+                .side(2)
                 // A negative NaN too (as `0.0 / 0.0` gives on x86), which a
                 // plain `total_cmp` sorts first.
                 .at([f64::INFINITY, -f64::NAN, 3.0, f64::NEG_INFINITY, 1.0])
                 .draw(),
-            g.axis(3).at([12, 5, -3]).draw(),
-            g.axis(4).at(Vec::<f64>::new()).draw(),
-            g.axis(1).axt("n").draw(),
-            g.axis(2).draw_labels(false).tick(false).draw(),
+            g.axis().side(3).at([12, 5, -3]).draw(),
+            g.axis().side(4).at(Vec::<f64>::new()).draw(),
+            g.axis().side(1).axt("n").draw(),
+            g.axis().side(2).draw_labels(false).tick(false).draw(),
         ];
         g.plot_new();
-        g.plot_window((1, 1000), (1, 10)).xlog(true).draw();
-        out.push(g.axis(1).draw());
-        out.push(g.axis(3).at([100, 5, 2000]).draw());
+        g.plot_window().xlim(1, 1000).ylim(1, 10).xlog(true).draw();
+        out.push(g.axis().side(1).draw());
+        out.push(g.axis().side(3).at([100, 5, 2000]).draw());
         out
     }
     let show = |v: &[f64]| {

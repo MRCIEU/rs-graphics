@@ -51,7 +51,7 @@ fn pl(dev: &mut Dev, y: &[f64], main: Option<&str>, axes: bool) {
         ylab: axes.then(|| "y".into()),
         ..PlotOptions::default()
     };
-    dev.plot(&xs(), y).with(&opts).draw();
+    dev.plot().x(&xs()).y(y).with(&opts).draw();
 }
 
 fn squares() -> Vec<f64> {
@@ -90,13 +90,13 @@ fn cases() -> Vec<Case> {
                     col: vec![ColorSpec::Color(Color::parse("red").unwrap())],
                     ..PlotOptions::default()
                 };
-                d.plot(&xs(), &roots()).with(&opts).draw();
-                d.axis(4).draw();
+                d.plot().x(&xs()).y(&roots()).with(&opts).draw();
+                d.axis().side(4).draw();
                 let o = MtextOptions {
                     line: vec![3.0],
                     ..Default::default()
                 };
-                d.mtext("sqrt", 4).with(&o).draw();
+                d.mtext().text("sqrt").side(4).with(&o).draw();
             },
         },
         Case {
@@ -128,8 +128,8 @@ fn cases() -> Vec<Case> {
                 d.par().new(true).draw();
                 d.plot_new();
                 d.plot_new();
-                d.plot_window((0.0, 20.0), (0.0, 1.0)).draw();
-                d.axis(3).draw();
+                d.plot_window().xlim(0.0, 20.0).ylim(0.0, 1.0).draw();
+                d.axis().side(3).draw();
                 pl(d, &xs(), Some("B"), true);
             },
         },
@@ -144,7 +144,9 @@ fn cases() -> Vec<Case> {
                 pl(d, &squares(), Some("A"), true);
                 d.par().new(true).draw();
                 let black = ColorSpec::Index(1);
-                d.points(&[5.0], &[50.0])
+                d.points()
+                    .x(&[5.0])
+                    .y(&[50.0])
                     .with(&XyOptions {
                         pch: vec![Some(19)],
                         col: vec![black],
@@ -169,7 +171,7 @@ fn cases() -> Vec<Case> {
                     outer: true,
                     ..Default::default()
                 };
-                d.mtext("Outer", 3).with(&o).draw();
+                d.mtext().text("Outer").side(3).with(&o).draw();
                 assert!(d.is_new());
                 pl(d, &falling(), None, false);
                 pl(d, &xs(), Some("B"), true);

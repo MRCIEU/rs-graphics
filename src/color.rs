@@ -274,12 +274,23 @@ mod tests {
     #[test]
     fn na_and_transparent() {
         assert_eq!(Color::parse("NA"), None);
-        assert_eq!(Color::parse("transparent"), Some(Color::rgba(255, 255, 255, 0)));
+        assert_eq!(
+            Color::parse("transparent"),
+            Some(Color::rgba(255, 255, 255, 0))
+        );
         // Neither draws anything.
         for spec in ["NA", "transparent", "#FF000000"] {
-            assert_eq!(ColorSpec::from(spec).resolve(&DEFAULT_PALETTE), None, "{spec}");
+            assert_eq!(
+                ColorSpec::from(spec).resolve(&DEFAULT_PALETTE),
+                None,
+                "{spec}"
+            );
         }
-        assert!(ColorSpec::from("#FF000001").resolve(&DEFAULT_PALETTE).is_some());
+        assert!(
+            ColorSpec::from("#FF000001")
+                .resolve(&DEFAULT_PALETTE)
+                .is_some()
+        );
     }
 
     #[test]
