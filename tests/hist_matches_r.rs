@@ -263,3 +263,63 @@ fn breaks_rules_and_functions_match_r() {
 fn unknown_breaks_rule_panics() {
     let _ = HistBreaks::from("f");
 }
+
+/// `right`, `include.lowest` and `fuzz` with integer data on the edges.
+#[test]
+fn right_include_lowest_and_fuzz_match_r() {
+    if !common::r_available() {
+        return;
+    }
+    // 1.2 is within `fuzz = 0.3` of the edge at 1.
+    let data = [0.0, 1.0, 1.2, 2.0, 2.0, 2.0, 3.0, 4.0, 4.0, 4.5];
+    let edges = [0.0, 1.0, 2.0, 3.0, 5.0];
+    let cases: [(&str, Option<bool>, Option<bool>, Option<f64>); 5] = [
+        ("right = FALSE", Some(false), None, None),
+        (
+            "right = FALSE, include.lowest = FALSE",
+            Some(false),
+            Some(false),
+            None,
+        ),
+        ("right = TRUE, fuzz = 0", None, None, Some(0.0)),
+        ("right = FALSE, fuzz = 0.3", Some(false), None, Some(0.3)),
+        ("fuzz = 0.3", None, None, Some(0.3)),
+    ];
+    for (r_args, right, lowest, fuzz) in cases {
+        let expected = r_values(
+            &data,
+            &format!("hist(x, breaks = c(0, 1, 2, 3, 5), {r_args}, plot = FALSE)$counts"),
+        );
+        let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+        let mut call = dev.hist(&data).breaks(edges);
+        if let Some(r) = right {
+            call = call.right(r);
+        }
+        if let Some(l) = lowest {
+            call = call.include_lowest(l);
+        }
+        if let Some(f) = fuzz {
+            call = call.fuzz(f);
+        }
+        assert_eq!(call.draw().counts, expected, "{r_args}");
+    }
+}
+
+#[test]
+#[should_panic(expected = "some 'x' not counted")]
+fn breaks_not_covering_the_data_panic_like_r() {
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    dev.hist(&[1.0, 2.0, 5.0]).breaks([1, 2, 3]).draw();
+}
+
+/// With `include.lowest = FALSE` a value on the first edge isn't counted,
+/// which R reports as an error.
+#[test]
+#[should_panic(expected = "some 'x' not counted")]
+fn include_lowest_false_leaves_the_first_edge_out_like_r() {
+    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    dev.hist(&[0.0, 1.0, 2.0])
+        .breaks([0, 1, 2])
+        .include_lowest(false)
+        .draw();
+}

@@ -30,7 +30,7 @@ pub mod plot;
 
 pub use barplot::{BarHeights, BarplotOptions, OrderH};
 pub use boxplot::{BoxStats, BoxplotOptions, boxplot_stats};
-pub use hist::{HistBreaks, HistOptions, HistResult};
+pub use hist::{HistBreaks, HistLabels, HistOptions, HistResult};
 pub use pie::PieOptions;
 pub use plot::{PlotOptions, PlotType};
 

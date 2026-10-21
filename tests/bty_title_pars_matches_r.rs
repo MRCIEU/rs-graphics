@@ -311,6 +311,30 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "hist_labels_col_border",
+            r: "par(mfrow = c(1, 3))\n\
+                hist(h, labels = TRUE, col = c('red', 'blue'), border = c('black', 'green'),\n\
+                     lty = c(1, 2), ann = FALSE)\n\
+                hist(h, breaks = c(0, 3, 7), labels = TRUE, ann = FALSE)\n\
+                hist(h, breaks = c(0, 4, 7), labels = c('p', 'q'), ann = FALSE)",
+            ours: |d| {
+                d.par().mfrow(1, 3).draw();
+                d.hist(&H)
+                    .labels(true)
+                    .col(["red", "blue"])
+                    .border(["black", "green"])
+                    .lty(["solid", "dashed"])
+                    .ann(false)
+                    .draw();
+                d.hist(&H).breaks([0, 3, 7]).labels(true).ann(false).draw();
+                d.hist(&H)
+                    .breaks([0, 4, 7])
+                    .labels(["p", "q"])
+                    .ann(false)
+                    .draw();
+            },
+        },
+        Case {
             name: "plot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\

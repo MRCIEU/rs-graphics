@@ -9,14 +9,19 @@
 //! `hist(x, ...)`, ported from `hist.default`/`plot.histogram` in
 //! `r-source/src/library/graphics/R/hist.R`, with every form of `breaks`
 //! (edges, a number of classes, the `"Sturges"`/`"Scott"`/`"FD"` rules, a
-//! function; see [`HistBreaks`]), `xlim`/`ylim`, and no
-//! `include.lowest`/`right`/`fuzz` customization (R's defaults,
-//! `include.lowest = TRUE`, `right = TRUE`, are always used).
+//! function; see [`HistBreaks`]), `xlim`/`ylim`, R's binning with
+//! `right`/`include.lowest`/`fuzz`, `labels` and per-bar `col`/`border`/
+//! `lty`. Not supported: hatched bars (`density`/`angle`), `plot = FALSE`
+//! (a recorded [`Figure`](crate::recording::Figure) returns the result
+//! without a device) and `panel.first`.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
-use crate::device::{AxisOptions, Device, PlotWindowOptions, RectOptions, TitleOptions};
+use crate::device::{
+    AxisOptions, Device, PlotWindowOptions, RectOptions, TextOptions, TitleOptions,
+};
 use crate::error::from_r_string;
+use crate::lty::LineType;
 use crate::numbers::Num;
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
@@ -240,36 +245,124 @@ impl<T: Num> From<&[T]> for HistBreaks {
     }
 }
 
-/// Bin `data` (assumed sorted or not, finite-only) into intervals
-/// `(breaks[i], breaks[i+1]]`, except the first bin which also includes
-/// its left edge (`include.lowest = TRUE`, `right = TRUE`, R's defaults).
-/// Uses a small fixed epsilon (`1e-9` of the break span, at least `1e-9`)
-/// rather than R's `fuzz`-based boundary adjustment (`1e-7` of the median
-/// bin width).
-fn bin_counts(data: &[f64], breaks: &[f64]) -> Vec<f64> {
+/// `hist.default`'s counts: the edges moved by `fuzz` times a typical bin
+/// width (so values "effectively on" an edge fall the intended way), then
+/// R's `C_bincount()` with `right` (bins `(a, b]`, else `[a, b)`) and
+/// `include_lowest` (the first bin closed on the left, or with `right =
+/// false` the last closed on the right).
+///
+/// # Panics
+/// If some values fall outside the edges (R: "some 'x' not counted; maybe
+/// 'breaks' do not span range of 'x'").
+fn bin_counts(
+    data: &[f64],
+    breaks: &[f64],
+    right: bool,
+    include_lowest: bool,
+    fuzz: f64,
+) -> Vec<f64> {
     let nb = breaks.len();
     let mut counts = vec![0.0; nb.saturating_sub(1)];
     if nb < 2 {
         return counts;
     }
-    let span = (breaks[nb - 1] - breaks[0]).abs().max(1.0);
-    let eps = span * 1e-9;
-    for &v in data {
-        for i in 0..nb - 1 {
-            let lo = breaks[i];
-            let hi = breaks[i + 1];
-            let in_bin = if i == 0 {
-                v >= lo - eps && v <= hi + eps
+    // `diddle <- fuzz * if (nB > 5) median(h) else if (nB <= 3)
+    // diff(range(x)) else min(h[h > 0])`.
+    let h: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
+    let typical = if nb > 5 {
+        let mut sorted = h.clone();
+        sorted.sort_by(f64::total_cmp);
+        let m = sorted.len();
+        if m % 2 == 1 {
+            sorted[m / 2]
+        } else {
+            0.5 * (sorted[m / 2 - 1] + sorted[m / 2])
+        }
+    } else if nb <= 3 {
+        spread(data)
+    } else {
+        h.iter()
+            .copied()
+            .filter(|&w| w > 0.0)
+            .fold(f64::INFINITY, f64::min)
+    };
+    let diddle = fuzz * typical;
+    let fuzzy: Vec<f64> = (0..nb)
+        .map(|i| {
+            let d = if right {
+                if i == 0 && include_lowest {
+                    -diddle
+                } else {
+                    diddle
+                }
+            } else if i == nb - 1 && include_lowest {
+                diddle
             } else {
-                v > lo + eps && v <= hi + eps
+                -diddle
             };
-            if in_bin {
-                counts[i] += 1.0;
-                break;
+            breaks[i] + d
+        })
+        .collect();
+    // `C_bincount()`.
+    let last = nb - 1;
+    let mut counted = 0;
+    for &x in data {
+        if fuzzy[0] <= x && (x < fuzzy[last] || (x == fuzzy[last] && include_lowest)) {
+            let (mut lo, mut hi) = (0, last);
+            while hi - lo >= 2 {
+                let mid = (hi + lo) / 2;
+                if x > fuzzy[mid] || (!right && x == fuzzy[mid]) {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
             }
+            counts[lo] += 1.0;
+            counted += 1;
         }
     }
+    assert!(
+        counted == data.len(),
+        "some 'x' not counted; maybe 'breaks' do not span range of 'x'"
+    );
     counts
+}
+
+/// R's `hist(labels = )`: what to write above each bar.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum HistLabels {
+    /// Nothing (R's `labels = FALSE`, the default).
+    #[default]
+    None,
+    /// Each bar's count, or its density to 3 decimals (R's `labels = TRUE`).
+    Values,
+    /// These labels, one per bar (R's character `labels`).
+    Text(Vec<Label>),
+}
+
+impl From<bool> for HistLabels {
+    /// `true`: [`HistLabels::Values`]; `false`: none.
+    fn from(b: bool) -> Self {
+        if b {
+            HistLabels::Values
+        } else {
+            HistLabels::None
+        }
+    }
+}
+
+impl<L: Into<Label>, const N: usize> From<[L; N]> for HistLabels {
+    /// These labels.
+    fn from(v: [L; N]) -> Self {
+        HistLabels::Text(v.into_iter().map(Into::into).collect())
+    }
+}
+
+impl<L: Into<Label>> From<Vec<L>> for HistLabels {
+    /// These labels.
+    fn from(v: Vec<L>) -> Self {
+        HistLabels::Text(v.into_iter().map(Into::into).collect())
+    }
 }
 
 /// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
@@ -296,10 +389,27 @@ pub struct HistOptions {
     pub xlim: Option<(f64, f64)>,
     /// y axis limits (R's `ylim`); `None`: 0 to the tallest bar.
     pub ylim: Option<(f64, f64)>,
-    /// Bar fill; `None`: `"lightgray"` (R's default).
-    pub col: Option<ColorSpec>,
-    /// Bar borders; `None`: `par(fg)` (R's default).
-    pub border: Option<ColorSpec>,
+    /// Bar fills, recycled over the bars; empty: `"lightgray"` (R's
+    /// default).
+    pub col: Vec<ColorSpec>,
+    /// Bar borders, recycled; empty: `par(fg)` (R's default).
+    pub border: Vec<ColorSpec>,
+    /// Bar border line types, recycled; empty: `par(lty)`.
+    pub lty: Vec<LineType>,
+    /// R's `labels`: [`HistLabels::Values`] writes each bar's count (or,
+    /// with densities, its density to 3 decimals) above it, `Text` the
+    /// given labels; default none.
+    pub labels: HistLabels,
+    /// Bins are `(a, b]` (R's `right = TRUE`, the default), else `[a, b)`.
+    /// `None`: `true`.
+    pub right: Option<bool>,
+    /// The first bin is also closed on the left (the last on the right
+    /// when not `right`) (R's `include.lowest`); `None`: `true`. Always
+    /// `true` for computed breaks, as R (which warns).
+    pub include_lowest: Option<bool>,
+    /// How far, as a fraction of a typical bin width, values on an edge may
+    /// stray and still count as on it (R's `fuzz`); `None`: `1e-7`.
+    pub fuzz: Option<f64>,
     /// Main title, as for `plot()` (text or a plotmath expression);
     /// `None`: "Histogram of x".
     pub main: Option<Label>,
@@ -368,8 +478,13 @@ crate::setters::setters!(HistOptions => [HistCall] {
     freq: option bool,
     xlim: pair f64,
     ylim: pair f64,
-    col: option ColorSpec,
-    border: option ColorSpec,
+    col: values ColorSpec,
+    border: values ColorSpec,
+    lty: values LineType,
+    labels: value HistLabels,
+    right: option bool,
+    include_lowest: option bool,
+    fuzz: option f64,
     main: option Label,
     xlab: option Label,
     ylab: option Label,
@@ -401,8 +516,13 @@ impl Default for HistOptions {
             freq: None,
             xlim: None,
             ylim: None,
-            col: None,
-            border: None,
+            col: Vec::new(),
+            border: Vec::new(),
+            lty: Vec::new(),
+            labels: HistLabels::None,
+            right: None,
+            include_lowest: None,
+            fuzz: None,
             main: None,
             xlab: None,
             ylab: None,
@@ -492,7 +612,15 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
         }
     };
 
-    let counts = bin_counts(&data, &breaks);
+    // R forces `include.lowest` (with a warning) unless edges were given.
+    let include_lowest = !use_br || opts.include_lowest.unwrap_or(true);
+    let counts = bin_counts(
+        &data,
+        &breaks,
+        opts.right.unwrap_or(true),
+        include_lowest,
+        opts.fuzz.unwrap_or(1e-7),
+    );
     let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
     let density: Vec<f64> = counts
         .iter()
@@ -613,15 +741,48 @@ impl<B: Backend> Device<B> {
         }
 
         // `rect(breaks[-nB], 0, breaks[-1L], y, col = col, border = border)`.
+        let or = |v: &[ColorSpec], default: ColorSpec| {
+            if v.is_empty() {
+                vec![default]
+            } else {
+                v.to_vec()
+            }
+        };
         let bars = RectOptions {
-            col: vec![
-                opts.col
-                    .unwrap_or_else(|| ColorSpec::Color(Color::parse("lightgray").unwrap())),
-            ],
-            border: vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))],
+            col: or(
+                &opts.col,
+                ColorSpec::Color(Color::parse("lightgray").unwrap()),
+            ),
+            border: or(&opts.border, ColorSpec::Color(self.par.fg)),
+            lty: opts.lty.clone(),
             ..RectOptions::default()
         };
         self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
+        // `text(x$mids, y, labels, adj = c(0.5, -0.5))`: counts, or
+        // densities rounded to 3 decimals, or the given labels.
+        let labels: Vec<Label> = match &opts.labels {
+            HistLabels::None => Vec::new(),
+            HistLabels::Values => heights
+                .iter()
+                .map(|&v| {
+                    let v = if freq {
+                        v
+                    } else {
+                        (v * 1000.0).round() / 1000.0
+                    };
+                    Label::from(format!("{v}"))
+                })
+                .collect(),
+            HistLabels::Text(t) => t.clone(),
+        };
+        if !labels.is_empty() {
+            let at = TextOptions {
+                adj: Some(0.5),
+                vadj: Some(-0.5),
+                ..TextOptions::default()
+            };
+            self.text_impl(&mids, &heights, &labels, &at);
+        }
 
         HistResult {
             breaks,
