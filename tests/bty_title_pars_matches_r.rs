@@ -362,6 +362,20 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "plot_index",
+            r: "par(mfrow = c(1, 2))\n\
+                plot(y, ylab = '')\n\
+                plot(c(3, 1, 4, 1, 5, 9, 2), type = 'b', xlab = 'i', ylab = '')",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                d.plot_index(&Y).draw();
+                d.plot_index(&[3, 1, 4, 1, 5, 9, 2])
+                    .type_("b")
+                    .xlab("i")
+                    .draw();
+            },
+        },
+        Case {
             name: "plot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\
@@ -599,6 +613,7 @@ fn interpret(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
         let mut stack: Vec<Gs> = Vec::new();
         let mut nums: Vec<f64> = Vec::new();
         let mut array: Option<Vec<f64>> = None;
+        let mut pending_array: Vec<f64> = Vec::new();
         let mut path: Vec<(f64, f64)> = Vec::new();
         let mut curved = false;
         let (mut font, mut tf_size, mut m) = (String::new(), 0.0, [0.0; 6]);
@@ -607,7 +622,12 @@ fn interpret(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
         for t in tokens(content) {
             let t = match t {
                 Tok::Str(s) => {
-                    last_str = s;
+                    // Inside a `TJ` array the pieces make up one string.
+                    if array.is_some() {
+                        last_str.push_str(&s);
+                    } else {
+                        last_str = s;
+                    }
                     continue;
                 }
                 Tok::Word(w) => w,
@@ -621,11 +641,16 @@ fn interpret(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
             }
             let last = |k: usize| nums[nums.len() - k..].to_vec();
             match t.as_str() {
-                "[" => array = Some(Vec::new()),
+                "[" => {
+                    array = Some(Vec::new());
+                    last_str.clear();
+                }
+                // The array is a dash pattern (`d`) or `TJ`'s kerning.
                 "]" => {
-                    gs.dash = array.take().unwrap_or_default();
+                    pending_array = array.take().unwrap_or_default();
                     continue;
                 }
+                "d" => gs.dash = std::mem::take(&mut pending_array),
                 "q" => stack.push(gs.clone()),
                 "Q" => gs = stack.pop().unwrap(),
                 "rg" | "scn" => gs.fill = last(3).try_into().unwrap(),
@@ -663,7 +688,7 @@ fn interpret(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
                     tf_size = nums[nums.len() - 1];
                 }
                 "Tm" => m = last(6).try_into().unwrap(),
-                "Tj" => texts.push(Text {
+                "Tj" | "TJ" => texts.push(Text {
                     string: std::mem::take(&mut last_str),
                     origin: (m[4], m[5]),
                     font: font.clone(),

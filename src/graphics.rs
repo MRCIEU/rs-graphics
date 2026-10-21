@@ -164,6 +164,24 @@ pub trait Graphics: sealed::Sealed + Sized {
         }
     }
 
+    /// R's one-vector `plot(y)`: `y` against its index `1, 2, ..., n`,
+    /// with R's x axis title "Index" (`xy.coords()`'s; change it with
+    /// `.xlab(..)`). Otherwise as [`plot`](Graphics::plot), with the same
+    /// options.
+    fn plot_index<'a>(&'a mut self, y: impl Numbers<'a>) -> PlotCall<'a, Self> {
+        let y = y.into_numbers();
+        let x: Vec<f64> = (1..=y.len()).map(|i| i as f64).collect();
+        PlotCall {
+            target: self,
+            x: x.into(),
+            y,
+            opts: PlotOptions {
+                xlab: Some("Index".into()),
+                ..PlotOptions::default()
+            },
+        }
+    }
+
     /// `hist(x, ...)`; options in [`HistOptions`]. A high-level plot: it
     /// starts a new plot with [`plot_new`](Graphics::plot_new), so on a
     /// multi-panel page it moves to the next panel, unless `add` (R's
