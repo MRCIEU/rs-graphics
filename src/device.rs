@@ -53,7 +53,7 @@ mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
 pub use legend::{LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
-pub use mtext::MtextOptions;
+pub use mtext::{MtextLabels, MtextOptions};
 pub use open::DeviceBuilder;
 pub use primitives::{
     ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,

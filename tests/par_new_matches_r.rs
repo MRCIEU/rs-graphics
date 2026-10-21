@@ -93,7 +93,7 @@ fn cases() -> Vec<Case> {
                 d.plot(&xs(), &roots()).with(&opts).draw();
                 d.axis(4).draw();
                 let o = MtextOptions {
-                    line: Some(3.0),
+                    line: vec![3.0],
                     ..Default::default()
                 };
                 d.mtext("sqrt", 4).with(&o).draw();

@@ -158,7 +158,7 @@ enum Call {
     Axis(Side, AxisOptions),
     Abline(AblineOptions),
     Legend(LegendPos, Vec<LegendEntry>, LegendOptions),
-    Mtext(Label, Side, MtextOptions),
+    Mtext(Vec<Label>, Side, MtextOptions),
     Title(TitleOptions),
 }
 
@@ -243,7 +243,7 @@ impl Graphics for Figure {
     fn emit_legend(&mut self, pos: LegendPos, entries: &[LegendEntry], opts: LegendOptions) {
         self.calls.push(Call::Legend(pos, entries.to_vec(), opts));
     }
-    fn emit_mtext(&mut self, text: Label, side: Side, opts: MtextOptions) {
+    fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions) {
         self.calls.push(Call::Mtext(text, side, opts));
     }
     fn emit_title(&mut self, opts: TitleOptions) {

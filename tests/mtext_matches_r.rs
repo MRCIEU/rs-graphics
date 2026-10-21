@@ -152,14 +152,14 @@ fn mtext_placement_matches_r() {
     for c in &cases {
         dev.mtext(c.text, c.side)
             .with(&MtextOptions {
-                line: Some(c.line),
+                line: vec![c.line],
                 outer: c.outer,
-                at: c.at,
-                adj: c.adj,
-                padj: c.padj,
-                cex: c.cex,
-                col: None::<ColorSpec>,
-                font: c.font,
+                at: c.at.into_iter().collect(),
+                adj: c.adj.into_iter().collect(),
+                padj: c.padj.into_iter().collect(),
+                cex: c.cex.into_iter().collect(),
+                col: Vec::<ColorSpec>::new(),
+                font: c.font.into_iter().collect(),
                 las: Some(c.las),
             })
             .draw();

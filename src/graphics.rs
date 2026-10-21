@@ -54,8 +54,8 @@ use std::borrow::Cow;
 use crate::backend::Backend;
 use crate::device::{
     AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendEntry, LegendLayout,
-    LegendOptions, LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions,
-    SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
+    LegendOptions, LegendPos, MtextLabels, MtextOptions, PlotWindowOptions, PolygonOptions,
+    RectOptions, SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
 };
 use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
@@ -524,10 +524,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// # Panics
     /// If `side` is a number other than 1 to 4.
-    fn mtext(&mut self, text: impl Into<Label>, side: impl Into<Side>) -> MtextCall<'_, Self> {
+    fn mtext(&mut self, text: impl MtextLabels, side: impl Into<Side>) -> MtextCall<'_, Self> {
         MtextCall {
             target: self,
-            text: text.into(),
+            text: text.into_labels(),
             side: side.into(),
             opts: MtextOptions::default(),
         }
@@ -639,7 +639,7 @@ pub trait Graphics: sealed::Sealed + Sized {
         opts: LegendOptions,
     ) -> Self::LegendResult;
     #[doc(hidden)]
-    fn emit_mtext(&mut self, text: Label, side: Side, opts: MtextOptions);
+    fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions);
     #[doc(hidden)]
     fn emit_title(&mut self, opts: TitleOptions);
     #[doc(hidden)]
@@ -716,8 +716,8 @@ impl<B: Backend> Graphics for Device<B> {
     ) -> Option<LegendLayout> {
         self.legend_impl(pos, entries, &opts)
     }
-    fn emit_mtext(&mut self, text: Label, side: Side, opts: MtextOptions) {
-        self.mtext_impl(text, side, &opts)
+    fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions) {
+        self.mtext_impl(&text, side, &opts)
     }
     fn emit_title(&mut self, opts: TitleOptions) {
         self.title_impl(&opts)
@@ -893,7 +893,7 @@ call!(
 call!(
     /// [`Graphics::mtext`]'s call.
     MtextCall, MtextOptions, emit_mtext -> (),
-    { text: Label, side: Side },
+    { text: Vec<Label>, side: Side },
     |t, o| (text, side, o)
 );
 call!(

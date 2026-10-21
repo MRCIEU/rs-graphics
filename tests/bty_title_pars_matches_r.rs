@@ -274,6 +274,31 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "mtext_recycling",
+            r: "plot.new(); plot.window(c(0, 10), c(0, 5))\n\
+                mtext(c('a', 'b', 'c'), side = 1, at = c(2, 5, 8), line = c(0, 1),\n\
+                      col = c('red', 'blue'), cex = c(1, 1.5, 2), font = c(1, 2))\n\
+                mtext('x', side = 3, at = c(1, 4, 9), adj = c(0, 1))\n\
+                mtext(c('p', 'q'), side = 2, line = c(1, 2.5))\n\
+                mtext(expression(alpha, beta), side = 4, at = c(1, 4))",
+            ours: |d| {
+                d.plot_new();
+                d.plot_window((0, 10), (0, 5)).draw();
+                d.mtext(["a", "b", "c"], 1)
+                    .at([2, 5, 8])
+                    .line([0, 1])
+                    .col(["red", "blue"])
+                    .cex([1.0, 1.5, 2.0])
+                    .font([1, 2])
+                    .draw();
+                d.mtext("x", 3).at([1, 4, 9]).adj([0, 1]).draw();
+                d.mtext(["p", "q"], 2).line([1.0, 2.5]).draw();
+                d.mtext([Label::math("alpha"), Label::math("beta")], 4)
+                    .at([1, 4])
+                    .draw();
+            },
+        },
+        Case {
             name: "plot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\
@@ -713,5 +738,24 @@ fn bty_and_title_pars_match_r() {
                 "origin differs. {ctx}"
             );
         }
+    }
+}
+
+/// An `NA` (`NaN`) `mtext()` line leaves that label out. R writes it with a
+/// `nan` coordinate, which makes the PDF invalid (an R bug, not copied).
+#[test]
+fn mtext_nan_line_skips_the_label() {
+    let mut dev = Device::new(
+        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
+        Par::default(),
+    );
+    dev.plot_new();
+    dev.mtext(["p", "q"], 2).line([1.0, f64::NAN]).draw();
+    let pdf = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
+    let (_, texts) = interpret(&pdf);
+    let strings: Vec<&str> = texts.iter().map(|t| t.string.as_str()).collect();
+    assert_eq!(strings, ["p"]);
+    for t in &texts {
+        assert!(t.origin.0.is_finite() && t.origin.1.is_finite());
     }
 }

@@ -26,35 +26,41 @@ use crate::plotmath::Label;
 use super::{Device, Side, Xpd};
 
 /// The arguments of R's `mtext()` other than `text` and `side`, with
-/// R's defaults.
-/// `None` is R's `NA`.
+/// R's defaults. As in R, the text and the vector arguments are recycled
+/// over the longest: `mtext(["a", "b"], 3).at([1, 2])` writes two labels.
+/// Empty: R's default for every label; a `NaN` entry is R's `NA`, the
+/// default for that label.
 #[derive(Clone, Debug, Default)]
 pub struct MtextOptions {
     /// Margin line, starting at 0 next to the plot region (or the inner
-    /// region for `outer`); may be negative or fractional. `None`: 0 (R's
-    /// default).
-    pub line: Option<f64>,
+    /// region for `outer`); may be negative or fractional. Empty: 0 (R's
+    /// default). A `NaN` entry (R's `NA`) leaves its label out; R writes
+    /// it with a `nan` coordinate, an invalid PDF (an R bug, not copied).
+    pub line: Vec<f64>,
     /// Draw in the outer margins (`par(oma)`) rather than the figure's.
     /// Default `false`.
     pub outer: bool,
     /// Position along the side: a user coordinate for inner margins, or a
-    /// fraction (0 to 1) of the inner region for outer ones. `None`: from
-    /// `adj` (text parallel to the side) or centred (perpendicular).
-    pub at: Option<f64>,
-    /// Justification along the text; `None`: 0.5 for text parallel to the
-    /// side, otherwise justified at the end nearest the plot (1 on sides 1
-    /// and 2, 0 on sides 3 and 4).
-    pub adj: Option<f64>,
-    /// Justification across the text; `None`: depends on `side` and `las`
-    /// (0, i.e. baseline on the line, for `las = 0`).
-    pub padj: Option<f64>,
-    /// `None`: 1. Unlike most text, *not* scaled by `par(cex)` (so neither
-    /// by the multi-panel reduction), as in R.
-    pub cex: Option<f64>,
-    /// `None`: `par(col)`.
-    pub col: Option<ColorSpec>,
-    /// `None`: `par(font)`.
-    pub font: Option<i32>,
+    /// fraction (0 to 1) of the inner region for outer ones. Empty or
+    /// `NaN`: from `adj` (text parallel to the side) or centred
+    /// (perpendicular).
+    pub at: Vec<f64>,
+    /// Justification along the text; empty or `NaN`: 0.5 for text
+    /// parallel to the side, otherwise justified at the end nearest the
+    /// plot (1 on sides 1 and 2, 0 on sides 3 and 4).
+    pub adj: Vec<f64>,
+    /// Justification across the text; empty or `NaN`: depends on `side`
+    /// and `las` (0, i.e. baseline on the line, for `las = 0`).
+    pub padj: Vec<f64>,
+    /// Empty or `NaN`: 1. Unlike most text, *not* scaled by `par(cex)` (so
+    /// neither by the multi-panel reduction), as in R. (For an `NA` after a
+    /// finite value, R keeps the previous label's size, as `C_mtext`
+    /// forgets to reset it; that bug isn't copied.)
+    pub cex: Vec<f64>,
+    /// Empty: `par(col)`.
+    pub col: Vec<ColorSpec>,
+    /// Empty: `par(font)`.
+    pub font: Vec<i32>,
     /// Text orientation (R's inline `las`, through `mtext()`'s `...`): 0
     /// parallel to the side, 1 horizontal, 2 perpendicular to the side, 3
     /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
@@ -63,16 +69,87 @@ pub struct MtextOptions {
 }
 
 crate::setters::setters!(MtextOptions => [MtextCall] {
-    line: option f64,
+    line: values f64,
     outer: value bool,
-    at: option f64,
-    adj: option f64,
-    padj: option f64,
-    cex: option f64,
-    col: option ColorSpec,
-    font: option i32,
+    at: values f64,
+    adj: values f64,
+    padj: values f64,
+    cex: values f64,
+    col: values ColorSpec,
+    font: values i32,
     las: option i32,
 });
+
+/// One label's arguments, after recycling (`None`: R's default).
+struct One {
+    line: Option<f64>,
+    outer: bool,
+    at: Option<f64>,
+    adj: Option<f64>,
+    padj: Option<f64>,
+    cex: Option<f64>,
+    col: Option<ColorSpec>,
+    font: Option<i32>,
+    las: Option<i32>,
+}
+
+/// `mtext()`'s text: one label (`&str`, `String`, [`Label`], an
+/// [`Expression`](crate::plotmath::Expression)) or several (a slice, array
+/// or `Vec` of them), recycled with the other arguments.
+pub trait MtextLabels {
+    /// The labels, in order.
+    fn into_labels(self) -> Vec<Label>;
+}
+
+macro_rules! one_label {
+    ($($t:ty),*) => {
+        $(
+            impl MtextLabels for $t {
+                fn into_labels(self) -> Vec<Label> {
+                    vec![self.into()]
+                }
+            }
+        )*
+    };
+}
+one_label!(
+    &str,
+    &&str,
+    String,
+    &String,
+    Label,
+    crate::plotmath::Expression
+);
+
+impl<L: Clone + Into<Label>> MtextLabels for &[L] {
+    fn into_labels(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>, const N: usize> MtextLabels for [L; N] {
+    fn into_labels(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>, const N: usize> MtextLabels for &[L; N] {
+    fn into_labels(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>> MtextLabels for Vec<L> {
+    fn into_labels(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>> MtextLabels for &Vec<L> {
+    fn into_labels(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
 
 /// `ComputeAdjValue()`.
 fn default_adj(side: Side, las: i32) -> f64 {
@@ -110,14 +187,50 @@ impl<B: Backend> Device<B> {
     /// Draws R's `mtext()`; the public entry is
     /// [`Graphics::mtext`](crate::graphics::Graphics::mtext), whose docs
     /// describe it.
-    pub(crate) fn mtext_impl(
-        &mut self,
-        text: impl Into<Label>,
-        side: impl Into<Side>,
-        opts: &MtextOptions,
-    ) {
-        let text = text.into();
-        let side = side.into();
+    pub(crate) fn mtext_impl(&mut self, texts: &[Label], side: Side, opts: &MtextOptions) {
+        // `C_mtext`: everything recycled over the longest argument.
+        assert!(!texts.is_empty(), "zero-length 'text' specified");
+        let n = [
+            texts.len(),
+            opts.line.len(),
+            opts.at.len(),
+            opts.adj.len(),
+            opts.padj.len(),
+            opts.cex.len(),
+            opts.col.len(),
+            opts.font.len(),
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or(1);
+        let pick = |v: &[f64], i: usize| {
+            (!v.is_empty())
+                .then(|| v[i % v.len()])
+                .filter(|x| !x.is_nan())
+        };
+        for i in 0..n {
+            // An `NA` line puts the label nowhere: R draws nothing for it.
+            let line = (!opts.line.is_empty()).then(|| opts.line[i % opts.line.len()]);
+            if line.is_some_and(f64::is_nan) {
+                continue;
+            }
+            let one = One {
+                line,
+                outer: opts.outer,
+                at: pick(&opts.at, i),
+                adj: pick(&opts.adj, i),
+                padj: pick(&opts.padj, i),
+                cex: pick(&opts.cex, i),
+                col: (!opts.col.is_empty()).then(|| opts.col[i % opts.col.len()]),
+                font: (!opts.font.is_empty()).then(|| opts.font[i % opts.font.len()]),
+                las: opts.las,
+            };
+            self.mtext_one(texts[i % texts.len()].clone(), side, &one);
+        }
+    }
+
+    /// One label of `mtext()`, as `C_mtext`'s loop body.
+    fn mtext_one(&mut self, text: Label, side: Side, opts: &One) {
         let las = opts.las.unwrap_or(self.par.las);
         let adj = opts.adj.unwrap_or_else(|| default_adj(side, las));
         let padj = opts.padj.unwrap_or_else(|| default_padj(side, las));
