@@ -17,8 +17,8 @@
 //! `mfcol`, and `Device::layout()`) set `cex` (0.83 for 2 x 2, 0.66
 //! beyond that) and `mex` just as R's `par(mfrow=)` does.
 
-use crate::afm::FontFace;
 use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};
+use crate::font::FontFace;
 use crate::lty::LineType;
 
 use super::backend::{LineEnd, LineJoin};
@@ -305,18 +305,18 @@ pub struct Par {
     /// `par(cex.sub)`: size of `sub`, relative to `cex`. Default 1.
     pub cex_sub: f64,
 
-    /// `par(font)`: font of text, as R's numbers: 1 plain (the default),
-    /// 2 bold, 3 italic, 4 bold italic, 5 Symbol. Other numbers are drawn
+    /// `par(font)`: font of text ([`FontFace`]; the setter takes R's
+    /// numbers 1 to 5, the names or the enum). Default plain.
+    pub font: FontFace,
+    /// `par(font.axis)`: font of axis tick labels, as `font`. Default
     /// plain.
-    pub font: i32,
-    /// `par(font.axis)`: font of axis tick labels, as `font`. Default 1.
-    pub font_axis: i32,
-    /// `par(font.lab)`: font of `xlab`/`ylab`, as `font`. Default 1.
-    pub font_lab: i32,
-    /// `par(font.main)`: font of `main`, as `font`. Default 2 (bold).
-    pub font_main: i32,
-    /// `par(font.sub)`: font of `sub`, as `font`. Default 1.
-    pub font_sub: i32,
+    pub font_axis: FontFace,
+    /// `par(font.lab)`: font of `xlab`/`ylab`, as `font`. Default plain.
+    pub font_lab: FontFace,
+    /// `par(font.main)`: font of `main`, as `font`. Default bold.
+    pub font_main: FontFace,
+    /// `par(font.sub)`: font of `sub`, as `font`. Default plain.
+    pub font_sub: FontFace,
 
     /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
     /// horizontal, 2 = perpendicular to axis, 3 = vertical.
@@ -414,11 +414,11 @@ impl Default for Par {
             cex_main: 1.2,
             cex_sub: 1.0,
 
-            font: 1,
-            font_axis: 1,
-            font_lab: 1,
-            font_main: 2,
-            font_sub: 1,
+            font: FontFace::Plain,
+            font_axis: FontFace::Plain,
+            font_lab: FontFace::Plain,
+            font_main: FontFace::Bold,
+            font_sub: FontFace::Plain,
 
             las: 0,
             xaxt: AxisType::Standard,
@@ -448,12 +448,6 @@ impl Par {
             ColorSpec::Index(0) => Some(self.bg).filter(|c| c.a > 0),
             _ => spec.resolve(&self.palette),
         }
-    }
-
-    /// The face for R's font code `code` (1 plain, 2 bold, 3 italic, 4
-    /// bold italic, 5 Symbol).
-    pub(crate) fn font_face(&self, code: i32) -> FontFace {
-        FontFace::from_r_font_code(code)
     }
 }
 
@@ -592,11 +586,11 @@ par_options!(
     cex_lab: option f64,
     cex_main: option f64,
     cex_sub: option f64,
-    font: option i32,
-    font_axis: option i32,
-    font_lab: option i32,
-    font_main: option i32,
-    font_sub: option i32,
+    font: option FontFace,
+    font_axis: option FontFace,
+    font_lab: option FontFace,
+    font_main: option FontFace,
+    font_sub: option FontFace,
     las: option i32,
     xaxt: option AxisType,
     yaxt: option AxisType,

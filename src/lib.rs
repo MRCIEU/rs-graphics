@@ -159,6 +159,7 @@ pub mod backend;
 pub mod color;
 pub mod device;
 pub mod error;
+pub mod font;
 pub mod geometry;
 pub mod graphics;
 pub mod highlevel;

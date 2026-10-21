@@ -27,6 +27,7 @@
 //! `.order_h("decr")`); an invalid string panics, as R errors.
 
 use crate::color::{Color, ColorSpec};
+use crate::font::FontFace;
 use crate::lty::LineType;
 
 /// One value or several, for a field R recycles per element: `"red"`,
@@ -167,6 +168,7 @@ na_values!(f64: f64::from; f64, f32, i32, u32);
 na_values!(i32: i32::from; i32, i16, u8, u16);
 na_values!(i32: char_pch; char);
 na_values!(LineType: LineType::from; LineType, &str, String, &String, i32);
+na_values!(FontFace: FontFace::from; FontFace, i32, &str, String, &String);
 
 /// Element `i` of a recycled [`NaValues`] vector: `Some(default)` when
 /// the vector is empty (R's default), `None` for an `NA` element.
@@ -434,8 +436,8 @@ mod tests {
         );
         assert_eq!(axis.las, Some(1));
 
-        let ab = AblineOptions::default().coef(1.0, 2.0).h(3.0);
-        assert_eq!((ab.coef, ab.h), (Some((1.0, 2.0)), vec![3.0]));
+        let ab = AblineOptions::default().a(1.0).b([2, 3]).h(3.0);
+        assert_eq!((ab.a, ab.b, ab.h), (vec![1.0], vec![2.0, 3.0], vec![3.0]));
 
         let plot = PlotOptions::default()
             .xlim(0.0, 10.0)
@@ -472,6 +474,31 @@ mod tests {
         assert_eq!(call.opts.at, Some(vec![1.0, 2.0]));
         assert_eq!(call.opts.lwd, Some(0.5));
         assert_eq!(saved.lwd, Some(3.0));
+    }
+
+    #[test]
+    fn font_setters_take_numbers_names_and_faces() {
+        use crate::device::{AxisOptions, LegendOptions, TextOptions};
+        use crate::par::ParOptions;
+        assert_eq!(AxisOptions::default().font(2).font, Some(FontFace::Bold));
+        assert_eq!(
+            AxisOptions::default().font("bold.italic").font,
+            Some(FontFace::BoldItalic)
+        );
+        assert_eq!(
+            ParOptions::default().font_main(FontFace::Italic).font_main,
+            Some(FontFace::Italic)
+        );
+        assert_eq!(
+            TextOptions::default().font([1, 2]).font,
+            vec![Some(FontFace::Plain), Some(FontFace::Bold)]
+        );
+        assert_eq!(
+            LegendOptions::default()
+                .text_font([Some("italic"), None])
+                .text_font,
+            vec![Some(FontFace::Italic), None]
+        );
     }
 
     #[test]

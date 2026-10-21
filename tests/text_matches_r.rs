@@ -108,7 +108,7 @@ fn text_placement_matches_r() {
                 srt: Some(srt),
                 col: vec![black],
                 cex: vec![Some(cex)],
-                font: vec![Some(font)],
+                font: vec![Some(FontFace::from(font))],
                 ..TextOptions::default()
             })
             .draw();

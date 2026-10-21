@@ -92,7 +92,7 @@ fn zero_ticks_match_r() {
                 col: Some(black),
                 col_axis: Some(black),
                 cex_axis: Some(1.0),
-                font: Some(1),
+                font: Some(FontFace::Plain),
                 las: Some(0),
                 ..AxisOptions::default()
             })
@@ -103,7 +103,7 @@ fn zero_ticks_match_r() {
                 col: Some(black),
                 col_axis: Some(black),
                 cex_axis: Some(1.0),
-                font: Some(1),
+                font: Some(FontFace::Plain),
                 las: Some(0),
                 ..AxisOptions::default()
             })

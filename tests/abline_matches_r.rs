@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks `abline()` with vectors of `h`/`v` and recycled `col`/
-//! `lty`/`lwd`, `a`/`b` and `coef =`, against a real R `pdf()` device's uncompressed output: every
+//! `lty`/`lwd` and `a`/`b` (several lines, and R's `coef =`), against a real R `pdf()` device's uncompressed output: every
 //! stroked path in drawing order (vertices, colour, width, dash pattern),
 //! on linear and log axes, and dashes with square and butt line ends. Skipped if `Rscript` isn't available.
 
@@ -64,7 +64,7 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
-            name: "coef_first",
+            name: "a_b_first",
             r: "abline(a = 1, b = 0.5, h = c(4, 6), v = 9, \
                        col = c('darkgreen', 'orange', 'purple'), lwd = 3)",
             log: "",
@@ -72,7 +72,8 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.abline()
                     .with(&AblineOptions {
-                        coef: Some((1.0, 0.5)),
+                        a: vec![1.0],
+                        b: vec![0.5],
                         h: vec![4.0, 6.0],
                         v: vec![9.0],
                         col: col(&["darkgreen", "orange", "purple"]),
@@ -83,10 +84,11 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
-            name: "coef",
+            // R's `coef =` (here a fitted line) is `a`/`b`.
+            name: "fitted_line",
             r: "x <- 1:10; y <- c(2.1, 2.9, 4.2, 4.8, 6.3, 6.9, 8.1, 9.2, 9.8, 11.4)\n\
                 abline(coef = coef(lm(y ~ x)), col = 'red')\n\
-                abline(coef = c(2, -0.3, 99), lty = 2)",
+                abline(coef = c(2, -0.3), lty = 2)",
             log: "",
             lims: ((0.0, 10.0), (0.0, 12.0)),
             draw: |d| {
@@ -99,18 +101,13 @@ fn cases() -> Vec<Case> {
                 let slope = sxy / sxx;
                 let red = col(&["red"])[0];
                 let fit = AblineOptions {
-                    coef: Some((my - slope * mx, slope)),
+                    a: vec![my - slope * mx],
+                    b: vec![slope],
                     col: vec![red],
                     ..AblineOptions::default()
                 };
                 d.abline().with(&fit).draw();
-                // R ignores coef values after the first two.
-                let first_two = AblineOptions {
-                    coef: Some((2.0, -0.3)),
-                    lty: vec![Some(LineType::DASHED)],
-                    ..AblineOptions::default()
-                };
-                d.abline().with(&first_two).draw();
+                d.abline().a(2).b(-0.3).lty("dashed").draw();
             },
         },
         Case {
@@ -146,15 +143,36 @@ fn cases() -> Vec<Case> {
         Case {
             name: "a_and_b",
             r: "abline(a = 1, b = 0.5, col = 'red')\n\
-                suppressWarnings(abline(a = 9, b = -1, coef = c(2, 0.3), lty = 2))\n\
                 abline(1, 0.8, h = 3)",
             log: "",
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
                 d.abline().a(1).b(0.5).col("red").draw();
-                // `coef` wins over `a`/`b`, as in R.
-                d.abline().a(9).b(-1).coef(2, 0.3).lty("dashed").draw();
                 d.abline().b(0.8).a(1).h(3).draw();
+            },
+        },
+        Case {
+            // Several `a`/`b` lines (not in R: drawn there as one call per
+            // line), styles recycled over them and then `h`; a single `b`
+            // pairs with each `a`.
+            name: "several_a_b",
+            r: "abline(a = 1, b = 0.2, lty = 1, col = 'red')\n\
+                abline(a = 2, b = 0.3, lty = 2, col = 'blue')\n\
+                abline(h = 3, lty = 3, col = 'red')\n\
+                abline(h = 5, lty = 4, col = 'blue')\n\
+                abline(a = 6, b = -0.5, lwd = 2)\n\
+                abline(a = 8, b = -0.5, lwd = 2)",
+            log: "",
+            lims: ((0.0, 10.0), (0.0, 10.0)),
+            draw: |d| {
+                d.abline()
+                    .a([1, 2])
+                    .b([0.2, 0.3])
+                    .h(&[3.0, 5.0][..])
+                    .lty([1, 2, 3, 4])
+                    .col(["red", "blue"])
+                    .draw();
+                d.abline().a([6, 8]).b(-0.5).lwd(2).draw();
             },
         },
         Case {
@@ -177,7 +195,8 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.abline()
                     .with(&AblineOptions {
-                        coef: Some((1.0, 1.0)),
+                        a: vec![1.0],
+                        b: vec![1.0],
                         untf: true,
                         h: vec![50.0],
                         col: col(&["red", "blue"]),
@@ -364,7 +383,7 @@ fn abline_a_and_b_record_in_a_figure() {
     let (mut a, mut b) = (window(), window());
     a.add_figure(&fig);
     b.plot_new();
-    b.abline().coef(0.2, 0.5).draw();
+    b.abline().a([0.2]).b([0.5]).draw();
     assert!(a.finish() == b.finish());
 }
 
@@ -376,14 +395,12 @@ fn abline_ab_must_be_finite() {
 
 #[test]
 #[should_panic(expected = "'a' and 'b' must be finite")]
-fn abline_coef_must_be_finite() {
-    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
-    dev.plot_new();
-    dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
-    dev.abline()
-        .with(&AblineOptions {
-            coef: Some((f64::NAN, 1.0)),
-            ..AblineOptions::default()
-        })
-        .draw();
+fn abline_every_a_b_must_be_finite() {
+    window().abline().a([1.0, f64::NAN]).b(1).draw();
+}
+
+#[test]
+#[should_panic(expected = "'a' and 'b' lengths differ")]
+fn abline_a_b_lengths_must_match() {
+    window().abline().a([1, 2, 3]).b([1, 2]).draw();
 }

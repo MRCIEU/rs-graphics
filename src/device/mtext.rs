@@ -19,6 +19,7 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
+use crate::font::FontFace;
 use crate::geometry::Point;
 
 use crate::plotmath::Label;
@@ -62,7 +63,7 @@ pub struct MtextOptions {
     pub col: Vec<ColorSpec>,
     /// Empty: `par(font)`.
     /// `None` (R's `NA`): `par(font)`.
-    pub font: Vec<Option<i32>>,
+    pub font: Vec<Option<FontFace>>,
     /// Text orientation (R's inline `las`, through `mtext()`'s `...`): 0
     /// parallel to the side, 1 horizontal, 2 perpendicular to the side, 3
     /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
@@ -78,7 +79,7 @@ crate::setters::setters!(MtextOptions => [MtextCall] {
     padj: values f64,
     cex: na_values f64,
     col: values ColorSpec,
-    font: na_values i32,
+    font: na_values FontFace,
     las: option i32,
 });
 
@@ -91,7 +92,7 @@ struct One {
     padj: Option<f64>,
     cex: Option<f64>,
     col: Option<ColorSpec>,
-    font: Option<i32>,
+    font: Option<FontFace>,
     las: Option<i32>,
 }
 

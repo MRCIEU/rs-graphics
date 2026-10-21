@@ -262,7 +262,7 @@ fn cases() -> Vec<Case> {
                     col_ticks: col("blue"),
                     col_axis: col("darkgreen"),
                     cex_axis: Some(0.8),
-                    font: Some(2),
+                    font: Some(FontFace::Bold),
                     ..Default::default()
                 };
                 d.axis().side(1).with(&o).draw();

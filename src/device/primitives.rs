@@ -19,6 +19,7 @@
 use super::{Device, Xpd};
 use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::{Color, ColorSpec};
+use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
 use crate::lty::LineType;
@@ -283,10 +284,10 @@ pub struct TextOptions {
     pub cex: Vec<Option<f64>>,
     /// Recycled per label; empty: `par(col)`.
     pub col: Vec<ColorSpec>,
-    /// Recycled per label (1 plain, 2 bold, 3 italic, 4 bold italic, 5
-    /// Symbol); empty: `par(font)`.
+    /// Fonts ([`FontFace`]: R's numbers 1 to 5, names or the enum),
+    /// recycled per label; empty: `par(font)`.
     /// `None` (R's `NA`): `par(font)`.
-    pub font: Vec<Option<i32>>,
+    pub font: Vec<Option<FontFace>>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
     /// `par(xpd)`.
@@ -306,7 +307,7 @@ crate::setters::setters!(TextOptions => [TextCall] {
     srt: option f64,
     cex: na_values f64,
     col: values ColorSpec,
-    font: na_values i32,
+    font: na_values FontFace,
     xpd: option Xpd,
     pos: values i32,
     offset: option f64,

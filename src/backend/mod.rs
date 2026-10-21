@@ -123,8 +123,9 @@ impl Stroke {
     }
 }
 
-/// The font faces: plain, bold, italic, bold italic and Symbol (font 5).
-pub use crate::afm::FontFace;
+/// The font faces (see [`crate::font`]): plain, bold, italic, bold italic
+/// and Symbol (font 5).
+pub use crate::font::FontFace;
 
 /// Text-painting parameters. Note there is deliberately no
 /// horizontal/vertical justification field here: the `crate::device`

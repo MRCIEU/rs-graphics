@@ -18,6 +18,7 @@ use std::fmt;
 /// [`LegendKeyword`](crate::device::LegendKeyword),
 /// [`LegendBty`](crate::device::LegendBty),
 /// [`OrderH`](crate::highlevel::OrderH), [`Bty`](crate::par::Bty),
+/// [`FontFace`](crate::font::FontFace),
 /// [`Format`](crate::backend::Format) and the `par()` enums.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {

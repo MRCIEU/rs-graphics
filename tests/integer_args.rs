@@ -59,7 +59,7 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .labels(["a", "b"])
         .cex(2)
         .draw();
-    g.abline().h(3).v([1, 2]).coef(0, 1).lwd(2).draw();
+    g.abline().h(3).v([1, 2]).a(0).b(1).lwd(2).draw();
     g.axis().side(3).at([1, 2, 3]).lwd(2).draw();
     let keys = LegendOptions::default()
         .col(["blue", "black"])
@@ -156,7 +156,8 @@ fn with_floats<G: Graphics>(g: &mut G) {
     g.abline()
         .h(3.0)
         .v([1.0, 2.0])
-        .coef(0.0, 1.0)
+        .a(0.0)
+        .b(1.0)
         .lwd(2.0)
         .draw();
     g.axis().side(3).at([1.0, 2.0, 3.0]).lwd(2.0).draw();

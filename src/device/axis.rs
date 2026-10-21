@@ -22,6 +22,7 @@
 use crate::afm;
 use crate::backend::Backend;
 use crate::color::ColorSpec;
+use crate::font::FontFace;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::AxisType;
@@ -65,7 +66,7 @@ pub struct AxisOptions {
     /// than the plot region. Default `false`.
     pub outer: bool,
     /// Label font; `None`: `par(font.axis)`.
-    pub font: Option<i32>,
+    pub font: Option<FontFace>,
     /// Line type of the axis line and ticks; `None`: solid (R's default,
     /// not `par(lty)`).
     pub lty: Option<LineType>,
@@ -125,7 +126,7 @@ crate::setters::setters!(AxisOptions => [AxisCall] {
     line: option f64,
     pos: option f64,
     outer: value bool,
-    font: option i32,
+    font: option FontFace,
     lty: option LineType,
     lwd: option f64,
     lwd_ticks: option f64,
@@ -380,7 +381,7 @@ impl<B: Backend> Device<B> {
         let font = opts.font.unwrap_or(self.par.font_axis);
         let cex = opts.cex_axis.unwrap_or(self.par.cex_axis);
         let col_axis = opts.col_axis.unwrap_or(ColorSpec::Color(self.par.col_axis));
-        let face = self.par.font_face(font);
+        let face = font;
         let size_pt = self.font_size_pt(cex);
         let m_h = afm::m_height_inches(face, size_pt, 1.0);
         let gap = opts

@@ -479,7 +479,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
             adj: Some(0.5),
             col: vec![black],
             cex: vec![Some(1.0)],
-            font: vec![Some(1)],
+            font: vec![Some(FontFace::Plain)],
             ..TextOptions::default()
         })
         .draw();
@@ -493,7 +493,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
             srt: Some(30.0),
             col: vec![black],
             cex: vec![Some(1.5)],
-            font: vec![Some(1)],
+            font: vec![Some(FontFace::Plain)],
             ..TextOptions::default()
         })
         .draw();
@@ -506,7 +506,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
             adj: Some(0.5),
             col: vec![red],
             cex: vec![Some(1.0)],
-            font: vec![Some(1)],
+            font: vec![Some(FontFace::Plain)],
             ..TextOptions::default()
         })
         .draw();

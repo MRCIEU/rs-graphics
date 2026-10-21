@@ -371,10 +371,10 @@ against a real R installation by shelling out to `Rscript`:
   `barplot()` on log axes (vector, stacked with legend, horizontal beside
   with `xlim`), and `par(lab)` on linear and log axes: every painted path
   and text item in order.
-- `tests/abline_matches_r.rs` - `abline()` with vectors of `h`/`v` and
-  recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log axes), and
-  `coef =` (a fitted `lm()` line, extra values ignored): every
-  line's vertices, colour, width and dash pattern.
+- `tests/abline_matches_r.rs` - `abline()` with vectors of `h`/`v`,
+  `a`/`b` (several lines, drawn as successive R calls; a fitted `lm()`
+  line) and recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log
+  axes): every line's vertices, colour, width and dash pattern.
 - `tests/par_page_layout.rs` (no R needed) - a device's `par()` page
   layout arguments: one call gives the same output as separate calls, the
   last grid wins, a `cex`/`mex` in the same call wins, `fig`/`fin`/`mfg`

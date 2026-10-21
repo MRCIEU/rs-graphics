@@ -125,7 +125,8 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.abline()
                     .with(&AblineOptions {
-                        coef: Some((0.0, 1.0)),
+                        a: vec![0.0],
+                        b: vec![1.0],
                         col: vec![black],
                         lwd: vec![Some(1.0)],
                         lty: vec![Some(solid())],
@@ -134,7 +135,8 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.abline()
                     .with(&AblineOptions {
-                        coef: Some((5.0, 2.0)),
+                        a: vec![5.0],
+                        b: vec![2.0],
                         untf: true,
                         col: vec![black],
                         lwd: vec![Some(1.0)],
@@ -153,7 +155,8 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.abline()
                     .with(&AblineOptions {
-                        coef: Some((-50.0, 3.0)),
+                        a: vec![-50.0],
+                        b: vec![3.0],
                         untf: true,
                         col: vec![red()],
                         lwd: vec![Some(1.0)],
@@ -183,7 +186,8 @@ fn cases() -> Vec<Case> {
                 let black = ColorSpec::Index(1);
                 d.abline()
                     .with(&AblineOptions {
-                        coef: Some((1.0, 2.0)),
+                        a: vec![1.0],
+                        b: vec![2.0],
                         col: vec![black],
                         lwd: vec![Some(1.0)],
                         lty: vec![Some(solid())],
@@ -192,7 +196,8 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.abline()
                     .with(&AblineOptions {
-                        coef: Some((1.0, 0.01)),
+                        a: vec![1.0],
+                        b: vec![0.01],
                         untf: true,
                         col: vec![black],
                         lwd: vec![Some(1.0)],
@@ -319,7 +324,7 @@ fn cases() -> Vec<Case> {
                         col: Some(fg),
                         col_axis: Some(fg),
                         cex_axis: Some(1.0),
-                        font: Some(1),
+                        font: Some(FontFace::Plain),
                         las: Some(0),
                         ..AxisOptions::default()
                     })
@@ -368,7 +373,7 @@ fn cases() -> Vec<Case> {
                         col: Some(fg),
                         col_axis: Some(fg),
                         cex_axis: Some(1.0),
-                        font: Some(1),
+                        font: Some(FontFace::Plain),
                         las: Some(0),
                         ..AxisOptions::default()
                     })
@@ -379,7 +384,7 @@ fn cases() -> Vec<Case> {
                         col: Some(fg),
                         col_axis: Some(fg),
                         cex_axis: Some(1.0),
-                        font: Some(1),
+                        font: Some(FontFace::Plain),
                         las: Some(0),
                         ..AxisOptions::default()
                     })

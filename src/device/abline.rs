@@ -24,22 +24,24 @@ use crate::setters::pick_na;
 
 use super::Device;
 
-/// The arguments of R's `abline()` (`reg` goes in `coef`, through its
-/// coefficients), with R's defaults. Empty `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/
-/// `par("lwd")`; otherwise they are recycled over the lines in drawing
-/// order: the `a`/`b` line, then each `h`, then each `v`.
+/// The arguments of R's `abline()`, with R's defaults. Empty
+/// `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/`par("lwd")`;
+/// otherwise they are recycled over the lines in drawing order: each
+/// `a`/`b` line, then each `h`, then each `v`.
+///
+/// Unlike R, `a` and `b` take several values (one line per pair), so every
+/// kind of line can be given several times. R's `coef = c(a, b)` (and
+/// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
 #[derive(Clone, Debug, Default)]
 pub struct AblineOptions {
-    /// Intercept and slope of a line, as R's `coef = c(a, b)`; takes
-    /// precedence over `a`/`b`, as in R. `None`: use `a` and `b`.
-    pub coef: Option<(f64, f64)>,
-    /// R's `a`, the intercept of the `a`/`b` line; needs `b` too. `None`
-    /// (with `b` and `coef`): no such line.
-    pub a: Option<f64>,
-    /// R's `b`, the slope of the `a`/`b` line; needs `a` too.
-    pub b: Option<f64>,
-    /// `untf = TRUE`: on log axes, draw `y = a + b * x` in data units (a
-    /// curve) rather than a straight line in log units. Default `false`.
+    /// Intercepts of the `a`/`b` lines `y = a + b * x`, paired with `b`
+    /// (one of them may have a single value, used for every line); empty
+    /// (with `b`): no such lines.
+    pub a: Vec<f64>,
+    /// Slopes of the `a`/`b` lines, paired with `a`.
+    pub b: Vec<f64>,
+    /// `untf = TRUE`: on log axes, draw each `y = a + b * x` in data units
+    /// (a curve) rather than a straight line in log units. Default `false`.
     pub untf: bool,
     /// Horizontal lines at these y values; empty: none.
     pub h: Vec<f64>,
@@ -68,9 +70,8 @@ pub struct AblineOptions {
 }
 
 crate::setters::setters!(AblineOptions => [AblineCall] {
-    coef: pair f64,
-    a: option f64,
-    b: option f64,
+    a: values f64,
+    b: values f64,
     untf: value bool,
     h: values f64,
     v: values f64,
@@ -84,27 +85,36 @@ crate::setters::setters!(AblineOptions => [AblineCall] {
 });
 
 impl AblineOptions {
-    /// The `a`/`b` line's intercept and slope: `coef`, else `a` and `b`.
+    /// The `a`/`b` lines' intercepts and slopes, `a` and `b` paired (a
+    /// single value pairs with each of the other's).
     ///
     /// # Panics
     /// If only one of `a` and `b` is given (R: "invalid a=, b=
     /// specification"). R only errors for `a` alone and silently draws
     /// nothing for `b` alone; that looks like an oversight in `C_abline`,
-    /// so both are errors here. Also if the values aren't finite (R: "'a'
-    /// and 'b' must be finite").
-    fn line(&self) -> Option<(f64, f64)> {
-        let line = self.coef.or(match (self.a, self.b) {
-            (Some(a), Some(b)) => Some((a, b)),
-            (None, None) => None,
-            _ => panic!("invalid a=, b= specification"),
-        });
-        if let Some((a, b)) = line {
-            assert!(
-                a.is_finite() && b.is_finite(),
-                "abline: 'a' and 'b' must be finite"
-            );
+    /// so both are errors here. If both have several values but not the
+    /// same number ("'a' and 'b' lengths differ"), or a value isn't finite
+    /// (R: "'a' and 'b' must be finite").
+    fn lines(&self) -> Vec<(f64, f64)> {
+        let (a, b) = (&self.a, &self.b);
+        if a.is_empty() && b.is_empty() {
+            return Vec::new();
         }
-        line
+        assert!(
+            !a.is_empty() && !b.is_empty(),
+            "invalid a=, b= specification"
+        );
+        assert!(
+            a.len() == b.len() || a.len() == 1 || b.len() == 1,
+            "abline: 'a' and 'b' lengths differ"
+        );
+        let n = a.len().max(b.len());
+        let lines: Vec<(f64, f64)> = (0..n).map(|i| (a[i % a.len()], b[i % b.len()])).collect();
+        assert!(
+            lines.iter().all(|(a, b)| a.is_finite() && b.is_finite()),
+            "abline: 'a' and 'b' must be finite"
+        );
+        lines
     }
 }
 
@@ -118,7 +128,7 @@ impl<B: Backend> Device<B> {
     }
 
     fn abline_draw(&mut self, opts: &AblineOptions) {
-        let line = opts.line();
+        let lines = opts.lines();
         let mut nlines = 0;
         // The style of the `n`th line: `col`, `lty` and `lwd` recycled.
         let style = |dev: &Self, n: usize| {
@@ -136,8 +146,8 @@ impl<B: Backend> Device<B> {
         self.push_clip_for(xpd);
         let (x0, x1) = self.xpd_limits(true, xpd);
         let (y0, y1) = self.xpd_limits(false, xpd);
-        if let Some((a, b)) = line {
-            if let Some(stroke) = style(self, 0) {
+        for &(a, b) in &lines {
+            if let Some(stroke) = style(self, nlines) {
                 if opts.untf && (self.xlog || self.ylog) {
                     if let Some(pts) = self.untf_points(a, b, xpd) {
                         self.backend.draw_polyline(&pts, &stroke);

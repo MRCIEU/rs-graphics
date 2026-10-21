@@ -85,11 +85,11 @@ enum Style {
 
 const ITALIC_FACTOR: f64 = 0.15;
 const DELIM_SYMBOL_MAG: f64 = 1.25;
-const PLAIN: i32 = 1;
-const BOLD: i32 = 2;
-const ITALIC: i32 = 3;
-const BOLD_ITALIC: i32 = 4;
-const SYMBOL: i32 = 5;
+const PLAIN: FontFace = FontFace::Plain;
+const BOLD: FontFace = FontFace::Bold;
+const ITALIC: FontFace = FontFace::Italic;
+const BOLD_ITALIC: FontFace = FontFace::BoldItalic;
+const SYMBOL: FontFace = FontFace::Symbol;
 
 /// `mathContext` plus the parts of the graphics context plotmath changes
 /// (`gc->cex`, `gc->fontface`).
@@ -98,7 +98,7 @@ struct Math<'d, B: Backend> {
     base_cex: f64,
     style: Style,
     cex: f64,
-    font: i32,
+    font: FontFace,
     reference: Point,
     current: Point,
     angle: f64,
@@ -120,24 +120,18 @@ impl<B: Backend> Device<B> {
     /// `strwidth(label, "inches", cex = cex, font = font)`, single-line
     /// text or an expression; `cex` is multiplied by `par(cex)`, as in
     /// [`Graphics::text`](crate::graphics::Graphics::text).
-    pub(super) fn label_width(&mut self, label: &Label, font: i32, cex: f64) -> f64 {
+    pub(super) fn label_width(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(t) => {
-                let face = self.par.font_face(font);
-                afm::str_width_inches(t, face, self.font_size_pt(cex), 1.0)
-            }
+            Label::Text(t) => afm::str_width_inches(t, font, self.font_size_pt(cex), 1.0),
             Label::Math(e) => self.expression_metrics(e, self.par.cex * cex).2,
         }
     }
 
     /// `strheight(label, "inches", cex = cex, font = font)`: the height of
     /// "M" for single-line text, height + depth for an expression.
-    pub(super) fn label_height(&mut self, label: &Label, font: i32, cex: f64) -> f64 {
+    pub(super) fn label_height(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(_) => {
-                let face = self.par.font_face(font);
-                afm::m_height_inches(face, self.font_size_pt(cex), 1.0)
-            }
+            Label::Text(_) => afm::m_height_inches(font, self.font_size_pt(cex), 1.0),
             Label::Math(e) => {
                 let (h, d, _) = self.expression_metrics(e, self.par.cex * cex);
                 h + d
@@ -160,7 +154,7 @@ impl<B: Backend> Device<B> {
         rotation_deg: f64,
         col: ColorSpec,
         cex: f64,
-        font: i32,
+        font: FontFace,
     ) {
         match label {
             Label::Text(t) => {
@@ -334,7 +328,7 @@ impl<'d, B: Backend> Math<'d, B> {
     // --- fonts, sizes and metrics -------------------------------------
 
     fn face(&self) -> FontFace {
-        FontFace::from_r_font_code(self.font)
+        self.font
     }
 
     /// The point size text is set at (rounded on PDF, as R's `pdf()`).
@@ -410,7 +404,7 @@ impl<'d, B: Backend> Math<'d, B> {
         self.font == ITALIC || self.font == BOLD_ITALIC
     }
 
-    fn set_font(&mut self, font: i32) -> i32 {
+    fn set_font(&mut self, font: FontFace) -> FontFace {
         std::mem::replace(&mut self.font, font)
     }
 
@@ -676,7 +670,7 @@ impl<'d, B: Backend> Math<'d, B> {
         }
     }
 
-    fn with_font(&mut self, font: i32, e: &Expr, draw: bool) -> BBox {
+    fn with_font(&mut self, font: FontFace, e: &Expr, draw: bool) -> BBox {
         let prev = self.set_font(font);
         let bbox = self.element(e, draw);
         self.set_font(prev);

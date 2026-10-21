@@ -161,7 +161,11 @@ fn mtext_placement_matches_r() {
                 padj: c.padj.into_iter().collect(),
                 cex: c.cex.into_iter().map(Some).collect(),
                 col: Vec::<ColorSpec>::new(),
-                font: c.font.into_iter().map(Some).collect(),
+                font: c
+                    .font
+                    .into_iter()
+                    .map(|f| Some(FontFace::from(f)))
+                    .collect(),
                 las: Some(c.las),
             })
             .draw();

@@ -28,6 +28,7 @@ pub use crate::device::{
     PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
     TitleOptions, XyOptions,
 };
+pub use crate::font::FontFace;
 pub use crate::geometry::{Point, Rect};
 pub use crate::graphics::Graphics;
 pub use crate::highlevel::{

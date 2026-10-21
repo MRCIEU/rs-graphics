@@ -404,14 +404,17 @@ pub trait Graphics: sealed::Sealed + Sized {
     }
 
     /// `abline(a, b, h, v, untf, col, lty, lwd, xpd)`; options in
-    /// [`AblineOptions`]: `.a(1).b(2)`, or `.coef(1, 2)` (R's `coef = `,
-    /// which wins over `a`/`b`). For R's `abline(reg = )`, pass the
-    /// model's intercept and slope.
+    /// [`AblineOptions`]: lines `y = a + b * x` (`.a(1).b(2)`; unlike R,
+    /// several: `.a([1, 2]).b([2, 3])`), horizontal (`.h(..)`) and vertical
+    /// (`.v(..)`) lines, with `col`, `lty` and `lwd` recycled over all of
+    /// them in that order. For R's `abline(coef = )` or `abline(reg = )`,
+    /// pass the intercept and slope as `a` and `b`.
     ///
     /// # Panics
     /// At `.draw()`, if only one of `a` and `b` is given (R: "invalid
-    /// a=, b= specification"; R itself ignores a lone `b`), or if the
-    /// line's values aren't finite (R: "'a' and 'b' must be finite").
+    /// a=, b= specification"; R itself ignores a lone `b`), if both have
+    /// several values but not as many, or if a value isn't finite (R: "'a'
+    /// and 'b' must be finite").
     fn abline(&mut self) -> AblineCall<'_, Self> {
         AblineCall::start(self)
     }

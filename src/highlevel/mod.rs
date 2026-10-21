@@ -28,6 +28,8 @@ pub mod hist;
 pub mod pie;
 pub mod plot;
 
+use crate::font::FontFace;
+
 pub use barplot::{BarHeights, BarplotOptions, OrderH};
 pub use boxplot::{BoxStats, BoxplotOptions, boxplot_stats};
 pub use hist::{HistBreaks, HistLabels, HistOptions, HistResult};
@@ -60,7 +62,7 @@ pub(crate) struct InlineAxis {
     pub las: Option<i32>,
     pub cex_axis: Option<f64>,
     pub col_axis: Option<crate::color::ColorSpec>,
-    pub font_axis: Option<i32>,
+    pub font_axis: Option<FontFace>,
     pub mgp: Option<[f64; 3]>,
     pub tck: Option<f64>,
     pub tcl: Option<f64>,

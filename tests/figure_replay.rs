@@ -74,7 +74,7 @@ fn scatter<G: Graphics>(g: &mut G) {
         .at([1.0, 3.0, 5.0])
         .labels(["a", "b", "c"])
         .draw();
-    g.abline().coef(1.0, 1.0).h([3.5]).col("darkgreen").draw();
+    g.abline().a(1.0).b(1.0).h([3.5]).col("darkgreen").draw();
     g.legend()
         .pos(LegendPos::Keyword(LegendKeyword::BottomRight))
         .labels(["points", "fit"])
@@ -411,13 +411,13 @@ fn legend_shorthand_draws_the_same() {
 }
 
 /// `par` comes back after `add_figure` even when a recorded call panics
-/// (here `abline()` with a non-finite `coef`) and the panic is caught.
+/// (here `abline()` with a non-finite `a`) and the panic is caught.
 #[test]
 fn add_figure_restores_par_after_a_panic() {
     let mut fig = Figure::new();
     fig.par().cex(2).las(1).draw();
     fig.plot().x(&[1, 2]).y(&[1, 2]).draw();
-    fig.abline().coef(f64::NAN, 1).draw();
+    fig.abline().a(f64::NAN).b(1).draw();
     let mut dev = device(Format::Pdf);
     let before = format!("{:?}", dev.current_par());
     let hook = std::panic::take_hook();

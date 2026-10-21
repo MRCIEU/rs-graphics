@@ -42,6 +42,7 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
+use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
 use crate::numbers::Pair;
@@ -446,7 +447,7 @@ pub struct LegendOptions {
     /// right) and its justification there; `None`: 0.5 (centred).
     pub title_adj: Option<f64>,
     /// `title.font`; `None` = the first `text_font`.
-    pub title_font: Option<i32>,
+    pub title_font: Option<FontFace>,
     /// `inset` as fractions of the plot region, `(x, y)`, for keyword
     /// positions; `None`: `(0, 0)`.
     pub inset: Option<(f64, f64)>,
@@ -455,7 +456,7 @@ pub struct LegendOptions {
     /// `text.font`: label fonts (also for measuring them); empty:
     /// `par("font")`.
     /// `None` (R's `NA`): `par("font")`.
-    pub text_font: Vec<Option<i32>>,
+    pub text_font: Vec<Option<FontFace>>,
     /// `box.lwd`: line width of the legend box; `None`: `par("lwd")`.
     pub box_lwd: Option<f64>,
     /// `box.lty`: line type of the legend box; `None`: `par("lty")`.
@@ -499,10 +500,10 @@ crate::setters::setters!(LegendOptions => [LegendCall] {
     title_cex: option f64,
     title_col: option ColorSpec,
     title_adj: option f64,
-    title_font: option i32,
+    title_font: option FontFace,
     inset: option_pair (f64, f64),
     text_col: values ColorSpec,
-    text_font: na_values i32,
+    text_font: na_values FontFace,
     box_lwd: option f64,
     box_lty: option LineType,
     box_col: option ColorSpec,

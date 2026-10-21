@@ -34,43 +34,16 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// The font faces R exposes via `par(font=)`/`par(font.axis=)` etc.: `1` =
-/// plain, `2` = bold, `3` = italic, `4` = bold italic, `5` = symbol.
-///
-/// Text in [`FontFace::Symbol`] is in Adobe Symbol encoding, one `char`
-/// per code (e.g. `'a'` is alpha, `'\u{B1}'` plus-minus), as R's
-/// `pdf()` writes it; [`symbol_to_unicode`] maps it for devices that need
-/// Unicode.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum FontFace {
-    Plain,
-    Bold,
-    Italic,
-    BoldItalic,
-    Symbol,
-}
+pub use crate::font::FontFace;
 
-impl FontFace {
-    /// The face for R's font number `code` (1 to 5, as above); any other
-    /// number gives [`FontFace::Plain`].
-    pub fn from_r_font_code(code: i32) -> Self {
-        match code {
-            2 => FontFace::Bold,
-            3 => FontFace::Italic,
-            4 => FontFace::BoldItalic,
-            5 => FontFace::Symbol,
-            _ => FontFace::Plain,
-        }
-    }
-
-    fn afm_source(self) -> &'static str {
-        match self {
-            FontFace::Plain => include_str!("../assets/afm/Helvetica.afm"),
-            FontFace::Bold => include_str!("../assets/afm/Helvetica-Bold.afm"),
-            FontFace::Italic => include_str!("../assets/afm/Helvetica-Oblique.afm"),
-            FontFace::BoldItalic => include_str!("../assets/afm/Helvetica-BoldOblique.afm"),
-            FontFace::Symbol => include_str!("../assets/afm/Symbol.afm"),
-        }
+/// The AFM file for `face`.
+fn afm_source(face: FontFace) -> &'static str {
+    match face {
+        FontFace::Plain => include_str!("../assets/afm/Helvetica.afm"),
+        FontFace::Bold => include_str!("../assets/afm/Helvetica-Bold.afm"),
+        FontFace::Italic => include_str!("../assets/afm/Helvetica-Oblique.afm"),
+        FontFace::BoldItalic => include_str!("../assets/afm/Helvetica-BoldOblique.afm"),
+        FontFace::Symbol => include_str!("../assets/afm/Symbol.afm"),
     }
 }
 
@@ -435,7 +408,7 @@ fn metrics_table(face: FontFace) -> &'static FontMetrics {
         FontFace::BoldItalic => &BOLD_ITALIC,
         FontFace::Symbol => &SYMBOL,
     };
-    cell.get_or_init(|| FontMetrics::parse(face.afm_source(), face == FontFace::Symbol))
+    cell.get_or_init(|| FontMetrics::parse(afm_source(face), face == FontFace::Symbol))
 }
 
 /// Width of `s`, in inches, set in `face` at `pointsize * cex` points -

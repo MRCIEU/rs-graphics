@@ -229,7 +229,7 @@ fn cases() -> Vec<Case> {
                 let vec_text = TextOptions {
                     col: cols(&["red", "blue"]),
                     cex: vec![Some(1.0), Some(1.5), Some(2.0)],
-                    font: vec![Some(1), Some(2)],
+                    font: vec![Some(FontFace::Plain), Some(FontFace::Bold)],
                     ..TextOptions::default()
                 };
                 d.text()

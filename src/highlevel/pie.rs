@@ -15,6 +15,7 @@ use crate::color::{Color, ColorSpec};
 use crate::device::{
     Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
 };
+use crate::font::FontFace;
 use crate::par::Xpd;
 use crate::plotmath::Label;
 
@@ -44,7 +45,7 @@ pub struct PieOptions {
     pub cex: Option<f64>,
     /// Font of the labels (R's inline `font`, passed to `text()`); `None`:
     /// `par(font)`.
-    pub font: Option<i32>,
+    pub font: Option<FontFace>,
     /// Pie radius in user units, where the plot region's shorter side
     /// spans `[-1, 1]` before the usual 4% axis extension; `None`: 0.8
     /// (R's default).
@@ -63,9 +64,9 @@ pub struct PieOptions {
     /// Colour of `main` (R's `col.main`, passed to `title()`);
     /// `None`: `par(col.main)`.
     pub col_main: Option<ColorSpec>,
-    /// Font of `main` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// Font of `main` (a [`FontFace`]; R's
     /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
-    pub font_main: Option<i32>,
+    pub font_main: Option<FontFace>,
     /// Approximate number of polygon edges for a full circle; `None`: 200
     /// (R's default).
     pub edges: Option<usize>,
@@ -80,14 +81,14 @@ crate::setters::setters!(PieOptions => [PieCall] {
     labels: list Label,
     srt: option f64,
     cex: option f64,
-    font: option i32,
+    font: option FontFace,
     radius: option f64,
     col: values ColorSpec,
     border: option ColorSpec,
     main: option Label,
     cex_main: option f64,
     col_main: option ColorSpec,
-    font_main: option i32,
+    font_main: option FontFace,
     edges: option usize,
     clockwise: value bool,
     init_angle: option f64,

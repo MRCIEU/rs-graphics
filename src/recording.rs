@@ -282,7 +282,7 @@ impl<B: Backend> Device<B> {
     ///
     /// # Panics
     /// Where the recorded calls would panic on the device (e.g. `abline()`
-    /// with a non-finite `coef`).
+    /// with a non-finite `a`).
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
         // `par` comes back afterwards, also if a recorded call panics.
         let mut dev = self.par_scope(|now, saved| *now = saved.clone());

@@ -33,6 +33,7 @@ use crate::device::{
     AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions, TitleOptions,
 };
 use crate::error::{from_r_string, from_str_via_parse};
+use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
 use crate::par::{AxisStyle, Xpd};
@@ -122,27 +123,27 @@ pub struct BarplotOptions {
     /// Colour of `main` (R's `col.main`, passed to `title()`);
     /// `None`: `par(col.main)`.
     pub col_main: Option<ColorSpec>,
-    /// Font of `main` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// Font of `main` (a [`FontFace`]; R's
     /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
-    pub font_main: Option<i32>,
+    pub font_main: Option<FontFace>,
     /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
     /// to `title()`); `None`: `par(cex.sub)`.
     pub cex_sub: Option<f64>,
     /// Colour of `sub` (R's `col.sub`, passed to `title()`);
     /// `None`: `par(col.sub)`.
     pub col_sub: Option<ColorSpec>,
-    /// Font of `sub` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// Font of `sub` (a [`FontFace`]; R's
     /// `font.sub`, passed to `title()`); `None`: `par(font.sub)`.
-    pub font_sub: Option<i32>,
+    pub font_sub: Option<FontFace>,
     /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
     /// to `title()`); `None`: `par(cex.lab)`.
     pub cex_lab: Option<f64>,
     /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
     /// `None`: `par(col.lab)`.
     pub col_lab: Option<ColorSpec>,
-    /// Font of `xlab` and `ylab` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
     /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
-    pub font_lab: Option<i32>,
+    pub font_lab: Option<FontFace>,
     /// Draw the value axis; default `true`.
     pub axes: bool,
     /// Draw the names (R's `axisnames`); default `true`.
@@ -161,7 +162,7 @@ pub struct BarplotOptions {
     /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
     pub col_axis: Option<ColorSpec>,
     /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
-    pub font_axis: Option<i32>,
+    pub font_axis: Option<FontFace>,
     /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
     /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
     pub mgp: Option<[f64; 3]>,
@@ -206,13 +207,13 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     ylab: option Label,
     cex_main: option f64,
     col_main: option ColorSpec,
-    font_main: option i32,
+    font_main: option FontFace,
     cex_sub: option f64,
     col_sub: option ColorSpec,
-    font_sub: option i32,
+    font_sub: option FontFace,
     cex_lab: option f64,
     col_lab: option ColorSpec,
-    font_lab: option i32,
+    font_lab: option FontFace,
     axes: value bool,
     axisnames: value bool,
     cex_names: option f64,
@@ -220,7 +221,7 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     las: option i32,
     cex_axis: option f64,
     col_axis: option ColorSpec,
-    font_axis: option i32,
+    font_axis: option FontFace,
     mgp: array [f64; 3],
     tck: option f64,
     tcl: option f64,

@@ -141,7 +141,7 @@ fn latin1_text_matches_r() {
                     vadj: Some(0.0),
                     col: vec![black],
                     cex: vec![Some(1.0)],
-                    font: vec![Some(1 + (i % 2) as i32)],
+                    font: vec![Some(FontFace::from(1 + (i % 2) as i32))],
                     ..TextOptions::default()
                 })
                 .draw();

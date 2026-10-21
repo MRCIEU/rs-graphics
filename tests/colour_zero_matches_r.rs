@@ -90,7 +90,7 @@ fn draw_ours(c: &Case) -> String {
             adj: Some(0.5),
             col: vec![zero],
             cex: vec![Some(1.0)],
-            font: vec![Some(1)],
+            font: vec![Some(FontFace::Plain)],
             ..TextOptions::default()
         })
         .draw();

@@ -29,6 +29,7 @@
 //! of `GE*` engine calls.
 
 use crate::afm::{self};
+use crate::font::FontFace;
 use std::fs::File;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
@@ -194,27 +195,27 @@ pub struct TitleOptions {
     /// Colour of `main` (R's inline `col.main`); `None`:
     /// `par(col.main)`.
     pub col_main: Option<ColorSpec>,
-    /// Font of `main` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// Font of `main` (a [`FontFace`]; R's
     /// inline `font.main`); `None`: `par(font.main)`.
-    pub font_main: Option<i32>,
+    pub font_main: Option<FontFace>,
     /// Size of `sub`, relative to `par(cex)` (R's inline `cex.sub`);
     /// `None`: `par(cex.sub)`.
     pub cex_sub: Option<f64>,
     /// Colour of `sub` (R's inline `col.sub`); `None`:
     /// `par(col.sub)`.
     pub col_sub: Option<ColorSpec>,
-    /// Font of `sub` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// Font of `sub` (a [`FontFace`]; R's
     /// inline `font.sub`); `None`: `par(font.sub)`.
-    pub font_sub: Option<i32>,
+    pub font_sub: Option<FontFace>,
     /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's inline `cex.lab`);
     /// `None`: `par(cex.lab)`.
     pub cex_lab: Option<f64>,
     /// Colour of `xlab` and `ylab` (R's inline `col.lab`); `None`:
     /// `par(col.lab)`.
     pub col_lab: Option<ColorSpec>,
-    /// Font of `xlab` and `ylab` (1 plain, 2 bold, 3 italic, 4 bold italic; R's
+    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
     /// inline `font.lab`); `None`: `par(font.lab)`.
-    pub font_lab: Option<i32>,
+    pub font_lab: Option<FontFace>,
     /// Where each title sits along its side of the plot region, and how
     /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
     /// right (top) (R's inline `adj`); `None`: `par(adj)`.
@@ -240,13 +241,13 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     ylab: option Label,
     cex_main: option f64,
     col_main: option ColorSpec,
-    font_main: option i32,
+    font_main: option FontFace,
     cex_sub: option f64,
     col_sub: option ColorSpec,
-    font_sub: option i32,
+    font_sub: option FontFace,
     cex_lab: option f64,
     col_lab: option ColorSpec,
-    font_lab: option i32,
+    font_lab: option FontFace,
     adj: option f64,
     mgp: array [f64; 3],
     line: option f64,
@@ -965,7 +966,7 @@ impl<B: Backend> Device<B> {
             // A negative `pch` is minus a Unicode code point, as in R.
             let code = pch.unsigned_abs();
             let ch = char::from_u32(code).unwrap_or('?').to_string();
-            let face = self.par.font_face(self.par.font);
+            let face = self.par.font;
             let size_pt = self.backend.effective_font_size(self.par.ps * cex);
             if size_pt <= 0.0 {
                 return;
@@ -1182,9 +1183,14 @@ impl<B: Backend> Device<B> {
     /// (after the backend's font-size rounding). The width is that of the
     /// widest line; the height is the ascent of "M" plus one line height
     /// (`par(lheight) * 1.2 * ps / 72` inches, times the cex) per `\n`.
-    pub fn text_metrics(&self, text: &str, font: i32, cex: impl Into<f64>) -> (f64, f64) {
+    pub fn text_metrics(
+        &self,
+        text: &str,
+        font: impl Into<FontFace>,
+        cex: impl Into<f64>,
+    ) -> (f64, f64) {
         let cex = cex.into();
-        let face = self.par.font_face(font);
+        let face = font.into();
         let size = self.font_size_pt(cex);
         let width = text
             .split('\n')
@@ -1215,7 +1221,7 @@ impl<B: Backend> Device<B> {
         rotation_deg: f64,
         col: ColorSpec,
         cex: f64,
-        font: i32,
+        font: FontFace,
     ) {
         let Some(color) = self.resolve(col) else {
             return;
@@ -1223,7 +1229,7 @@ impl<B: Backend> Device<B> {
         if label.is_empty() {
             return;
         }
-        let face = self.par.font_face(font);
+        let face = font;
         let size_pt = self.font_size_pt(cex);
         if size_pt <= 0.0 {
             return;
