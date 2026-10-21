@@ -16,8 +16,9 @@ use crate::backend::Backend;
 use crate::color::ColorSpec;
 use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions};
 use crate::lty::LineType;
-use crate::par::{AxisType, Bty};
+use crate::par::{AxisStyle, AxisType, Bty};
 use crate::plotmath::Label;
+use crate::recording::Figure;
 
 use super::{InlineAxis, data_range};
 
@@ -186,6 +187,25 @@ pub struct PlotOptions {
     pub tck: Option<f64>,
     /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
     pub tcl: Option<f64>,
+    /// R's `asp`: one x unit is `asp` y units long (`plot(x, y, asp = 1)`
+    /// for equal scales); ignored on log axes. `None` (R's `NA`): none.
+    pub asp: Option<f64>,
+    /// x axis style (R's inline `xaxs`, passed to `plot.window()`): `"r"`
+    /// adds 4% at each end, `"i"` none; `None`: `par(xaxs)`.
+    pub xaxs: Option<AxisStyle>,
+    /// As `xaxs`, for the y axis; `None`: `par(yaxs)`.
+    pub yaxs: Option<AxisStyle>,
+    /// Approximate numbers of x and y ticks (R's inline `lab`, passed to
+    /// `plot.window()`); `None`: `par(lab)`.
+    pub lab: Option<[i32; 3]>,
+    /// Drawn after the window is set and before the points (R's
+    /// `panel.first`, e.g. grid lines): a [`Figure`] of low-level calls,
+    /// added with [`Device::add_figure`](crate::device::Device::add_figure)
+    /// (so its `par()` changes don't last). `None`: nothing.
+    pub panel_first: Option<Figure>,
+    /// As `panel_first`, drawn after the points and before the axes (R's
+    /// `panel.last`).
+    pub panel_last: Option<Figure>,
 }
 
 crate::setters::setters!(PlotOptions => [PlotCall] {
@@ -226,6 +246,12 @@ crate::setters::setters!(PlotOptions => [PlotCall] {
     mgp: array [f64; 3],
     tck: option f64,
     tcl: option f64,
+    asp: option f64,
+    xaxs: option AxisStyle,
+    yaxs: option AxisStyle,
+    lab: option [i32; 3],
+    panel_first: option Figure,
+    panel_last: option Figure,
 });
 
 impl Default for PlotOptions {
@@ -268,6 +294,12 @@ impl Default for PlotOptions {
             mgp: None,
             tck: None,
             tcl: None,
+            asp: None,
+            xaxs: None,
+            yaxs: None,
+            lab: None,
+            panel_first: None,
+            panel_last: None,
         }
     }
 }
@@ -291,12 +323,19 @@ impl<B: Backend> Device<B> {
         let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
 
         self.plot_new_impl();
+        // `localWindow(xlim, ylim, log, asp, ...)`.
         let window = PlotWindowOptions {
             xlog: opts.xlog,
             ylog: opts.ylog,
-            ..PlotWindowOptions::default()
+            asp: opts.asp,
+            xaxs: opts.xaxs,
+            yaxs: opts.yaxs,
+            lab: opts.lab,
         };
         self.plot_window_impl(xlim, ylim, &window);
+        if let Some(panel) = &opts.panel_first {
+            self.add_figure(panel);
+        }
 
         // `plot.xy(xy, type, ...)`.
         let xy = XyOptions {
@@ -310,6 +349,9 @@ impl<B: Backend> Device<B> {
             ..XyOptions::default()
         };
         self.points_impl(x, y, &xy);
+        if let Some(panel) = &opts.panel_last {
+            self.add_figure(panel);
+        }
 
         if opts.axes {
             // `localAxis()`: `axis(side, ...)` with the inline axis pars

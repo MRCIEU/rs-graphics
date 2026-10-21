@@ -243,6 +243,37 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "plot_window_pars_and_panels",
+            r: "par(mfrow = c(2, 2))\n\
+                plot(x, y, asp = 1, ann = FALSE)\n\
+                plot(x, y, xaxs = 'i', yaxs = 'i', lab = c(10, 3, 7), ann = FALSE)\n\
+                plot(x, y, ann = FALSE, panel.first = abline(h = 1:5, col = 'grey'),\n\
+                     panel.last = points(3, 3, pch = 19, col = 'red'))\n\
+                plot.new(); plot.window(c(0, 10), c(0, 10), xaxs = 'i', lab = c(3, 8, 7))\n\
+                axis(1); axis(2)\n\
+                plot.window(c(0, 10), c(0, 10)); axis(3)",
+            ours: |d| {
+                d.par().mfrow(2, 2).draw();
+                d.plot(&X, &Y).asp(1).draw();
+                d.plot(&X, &Y).xaxs("i").yaxs("i").lab([10, 3, 7]).draw();
+                let mut grid = Figure::new();
+                grid.abline().h([1, 2, 3, 4, 5]).col("grey").draw();
+                let mut mark = Figure::new();
+                mark.points(&[3], &[3]).pch(19).col("red").draw();
+                d.plot(&X, &Y).panel_first(grid).panel_last(mark).draw();
+                d.plot_new();
+                d.plot_window((0, 10), (0, 10))
+                    .xaxs("i")
+                    .lab([3, 8, 7])
+                    .draw();
+                d.axis(1).draw();
+                d.axis(2).draw();
+                // The inline xaxs and lab didn't last.
+                d.plot_window((0, 10), (0, 10)).draw();
+                d.axis(3).draw();
+            },
+        },
+        Case {
             name: "plot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\

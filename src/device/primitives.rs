@@ -22,7 +22,7 @@ use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
 use crate::lty::LineType;
-use crate::par::Bty;
+use crate::par::{AxisStyle, Bty};
 use crate::plotmath::Label;
 
 /// `v[i]`, recycling `v`; `default` when `v` is empty.
@@ -364,12 +364,24 @@ pub struct PlotWindowOptions {
     /// R's `asp`: one x unit is `asp` y units long on the page. Ignored on
     /// log axes, as in R. `None` (R's `NA`): no constraint.
     pub asp: Option<f64>,
+    /// x axis style for this window (R's inline `xaxs`: `"r"` adds 4% at
+    /// each end, `"i"` none); `None`: `par(xaxs)`.
+    pub xaxs: Option<AxisStyle>,
+    /// As `xaxs`, for the y axis; `None`: `par(yaxs)`.
+    pub yaxs: Option<AxisStyle>,
+    /// Approximate numbers of x and y ticks (and label length) for the
+    /// default ticks this window sets (R's inline `lab`); `None`:
+    /// `par(lab)`.
+    pub lab: Option<[i32; 3]>,
 }
 
 crate::setters::setters!(PlotWindowOptions => [PlotWindowCall] {
     xlog: value bool,
     ylog: value bool,
     asp: option f64,
+    xaxs: option AxisStyle,
+    yaxs: option AxisStyle,
+    lab: option [i32; 3],
 });
 
 impl<B: Backend> Device<B> {
@@ -386,6 +398,26 @@ impl<B: Backend> Device<B> {
         ylim: (f64, f64),
         opts: &PlotWindowOptions,
     ) {
+        // R's inline `xaxs`/`yaxs`/`lab` hold for this call only; the
+        // `xaxp`/`yaxp` it sets stay.
+        let mut dev = self.par_scope(|now, saved| {
+            now.xaxs = saved.xaxs;
+            now.yaxs = saved.yaxs;
+            now.lab = saved.lab;
+        });
+        if let Some(x) = opts.xaxs {
+            dev.par.xaxs = x;
+        }
+        if let Some(y) = opts.yaxs {
+            dev.par.yaxs = y;
+        }
+        if let Some(lab) = opts.lab {
+            dev.par.lab = lab;
+        }
+        dev.plot_window_draw(xlim, ylim, opts);
+    }
+
+    fn plot_window_draw(&mut self, xlim: (f64, f64), ylim: (f64, f64), opts: &PlotWindowOptions) {
         let asp = opts.asp.filter(|a| a.is_finite() && *a > 0.0);
         let (Some(asp), false, false) = (asp, opts.xlog, opts.ylog) else {
             self.set_window(xlim, ylim, opts.xlog, opts.ylog);
