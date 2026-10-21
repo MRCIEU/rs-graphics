@@ -18,8 +18,8 @@
 //! `axisnames`, `cex.names`, `axis.lty` and R's inline axis parameters
 //! (`las`, `cex.axis`, ...).
 //!
-//! Not supported: hatched fills (`density`/`angle`), `xpd` (always
-//! `TRUE`, R's default), `plot = FALSE` and `panel.first`/`panel.last`.
+//! Also `xpd` and `plot = FALSE`. Not supported: hatched fills
+//! (`density`/`angle`) and `panel.first`/`panel.last`.
 //!
 //! **R bug not copied:** for stacked bars R works out the default value
 //! axis limits with `offset` recycled over every element of the matrix of
@@ -174,6 +174,12 @@ pub struct BarplotOptions {
     /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
     /// R's default.
     pub gap_axis: Option<f64>,
+    /// Clipping of the bars, names and legend (R's `xpd`; the setter also
+    /// takes `false`/`true`); `None`: [`Xpd::Figure`] (R's `TRUE`).
+    pub xpd: Option<Xpd>,
+    /// `false` works out the bars' centres and returns them without drawing
+    /// (R's `plot = FALSE`); `None`: `true`.
+    pub plot: Option<bool>,
 }
 
 crate::setters::setters!(BarplotOptions => [BarplotCall] {
@@ -220,6 +226,8 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     tck: option f64,
     tcl: option f64,
     gap_axis: option f64,
+    xpd: option Xpd,
+    plot: option bool,
 });
 
 impl Default for BarplotOptions {
@@ -268,6 +276,8 @@ impl Default for BarplotOptions {
             tck: None,
             tcl: None,
             gap_axis: None,
+            xpd: None,
+            plot: None,
         }
     }
 }
@@ -632,6 +642,9 @@ impl<B: Backend> Device<B> {
         opts: &BarplotOptions,
     ) -> Vec<f64> {
         let layout = bar_layout(&heights.into(), opts);
+        if !opts.plot.unwrap_or(true) {
+            return layout.w_m;
+        }
         // R's `opar <- par(yaxs = "i")` (`xaxs` when `horiz`), then
         // `par(xpd = TRUE)`, restored `on.exit`.
         let mut dev = self.par_scope(|now, saved| {
@@ -675,9 +688,9 @@ impl<B: Backend> Device<B> {
             self.plot_window_impl(xlim, ylim, &window);
         }
 
-        // R draws everything with `par(xpd = TRUE)` (restored by
-        // `barplot_impl`).
-        self.par.xpd = Xpd::Figure;
+        // R draws everything with `par(xpd = xpd)`, `TRUE` by default
+        // (restored by `barplot_impl`).
+        self.par.xpd = opts.xpd.unwrap_or(Xpd::Figure);
 
         for &(k, base, top, ci) in &bars {
             let style = RectOptions {

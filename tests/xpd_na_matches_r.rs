@@ -97,6 +97,17 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "barplot_xpd",
+            r: "par(mfrow = c(1, 2))\n\
+                barplot(c(3, 5, 2), ylim = c(0, 4), xpd = FALSE)\n\
+                barplot(c(3, 5, 2), ylim = c(0, 4))",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                d.barplot([3, 5, 2]).ylim(0, 4).xpd(false).draw();
+                d.barplot([3, 5, 2]).ylim(0, 4).draw();
+            },
+        },
+        Case {
             name: "inline_xpd_abline",
             r: "par(mfrow = c(1, 2)); plot(x, y, ann = FALSE)\n\
                 abline(h = 2, xpd = TRUE, col = 'blue'); abline(v = 3, xpd = NA, col = 'red')\n\

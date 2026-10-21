@@ -335,6 +335,33 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "frame_names_xpd_plot_false",
+            r: "par(mfrow = c(2, 3))\n\
+                plot(x, y, frame.plot = FALSE, ann = FALSE)\n\
+                plot(x, y, axes = FALSE, frame.plot = TRUE, ann = FALSE)\n\
+                boxplot(list(a = c(1, 2, 3, 9)), show.names = TRUE)\n\
+                boxplot(list(a = c(1, 2, 3, 9), b = c(2, 3, 4)), show.names = FALSE, frame.plot = FALSE)\n\
+                barplot(c(3, 5, 2), ylim = c(0, 4), xpd = FALSE)\n\
+                invisible(hist(h, plot = FALSE)); invisible(barplot(c(1, 2), plot = FALSE))",
+            ours: |d| {
+                d.par().mfrow(2, 3).draw();
+                d.plot(&X, &Y).frame_plot(false).draw();
+                d.plot(&X, &Y).axes(false).frame_plot(true).draw();
+                d.boxplot(&[vec![1, 2, 3, 9]])
+                    .names(["a"])
+                    .show_names(true)
+                    .draw();
+                d.boxplot(&[vec![1, 2, 3, 9], vec![2, 3, 4]])
+                    .names(["a", "b"])
+                    .show_names(false)
+                    .frame_plot(false)
+                    .draw();
+                d.barplot([3, 5, 2]).ylim(0, 4).xpd(false).draw();
+                d.hist(&H).plot(false).draw();
+                d.barplot([1, 2]).plot(false).draw();
+            },
+        },
+        Case {
             name: "plot_inline_axis_pars",
             r: "par(mfrow = c(1, 2))\n\
                 plot(x, y, las = 1, cex.axis = 0.8, col.axis = 'blue', font.axis = 2,\n\
@@ -794,4 +821,25 @@ fn mtext_nan_line_skips_the_label() {
     for t in &texts {
         assert!(t.origin.0.is_finite() && t.origin.1.is_finite());
     }
+}
+
+/// `plot = FALSE` returns what drawing returns, and draws nothing.
+#[test]
+fn plot_false_returns_the_result_without_drawing() {
+    let blank = || {
+        Device::new(
+            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
+            Par::default(),
+        )
+    };
+    let (mut a, mut b) = (blank(), blank());
+    assert_eq!(
+        a.barplot([3, 5, 2]).plot(false).draw(),
+        b.barplot([3, 5, 2]).draw()
+    );
+    let h = a.hist(&H).plot(false).draw();
+    let drawn = b.hist(&H).draw();
+    assert_eq!((h.breaks, h.counts), (drawn.breaks, drawn.counts));
+    let (paths, texts) = interpret(&String::from_utf8_lossy(&a.into_backend().finish()));
+    assert!(paths.is_empty() && texts.is_empty());
 }

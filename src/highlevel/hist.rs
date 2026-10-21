@@ -11,9 +11,8 @@
 //! (edges, a number of classes, the `"Sturges"`/`"Scott"`/`"FD"` rules, a
 //! function; see [`HistBreaks`]), `xlim`/`ylim`, R's binning with
 //! `right`/`include.lowest`/`fuzz`, `labels` and per-bar `col`/`border`/
-//! `lty`. Not supported: hatched bars (`density`/`angle`), `plot = FALSE`
-//! (a recorded [`Figure`](crate::recording::Figure) returns the result
-//! without a device) and `panel.first`.
+//! `lty`, and `plot = FALSE`. Not supported: hatched bars
+//! (`density`/`angle`) and `panel.first`.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
@@ -471,6 +470,9 @@ pub struct HistOptions {
     /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
     /// R's default.
     pub gap_axis: Option<f64>,
+    /// `false` returns the bins without drawing (R's `plot = FALSE`);
+    /// `None`: `true`.
+    pub plot: Option<bool>,
 }
 
 crate::setters::setters!(HistOptions => [HistCall] {
@@ -507,6 +509,7 @@ crate::setters::setters!(HistOptions => [HistCall] {
     tck: option f64,
     tcl: option f64,
     gap_axis: option f64,
+    plot: option bool,
 });
 
 impl Default for HistOptions {
@@ -545,6 +548,7 @@ impl Default for HistOptions {
             tck: None,
             tcl: None,
             gap_axis: None,
+            plot: None,
         }
     }
 }
@@ -657,6 +661,9 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::hist`](crate::graphics::Graphics::hist), whose docs
     /// describe it.
     pub(crate) fn hist_impl(&mut self, x: &[f64], opts: &HistOptions) -> HistResult {
+        if !opts.plot.unwrap_or(true) {
+            return hist_bins(x, opts);
+        }
         let HistResult {
             breaks,
             counts,

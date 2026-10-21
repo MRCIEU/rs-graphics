@@ -297,6 +297,12 @@ pub struct BoxplotOptions {
     pub xaxp: Option<[f64; 3]>,
     /// As `xaxp`, for the y axis; `None`: `par(yaxp)`.
     pub yaxp: Option<[f64; 3]>,
+    /// Draw the box around the plot region (R's `frame.plot`); `None`:
+    /// `axes`.
+    pub frame_plot: Option<bool>,
+    /// Label the boxes with `names` (R's `show.names`); `None`: when there
+    /// is more than one box.
+    pub show_names: Option<bool>,
 }
 
 crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
@@ -364,6 +370,8 @@ crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
     yaxt: option AxisType,
     xaxp: array [f64; 3],
     yaxp: array [f64; 3],
+    frame_plot: option bool,
+    show_names: option bool,
 });
 
 impl Default for BoxplotOptions {
@@ -433,6 +441,8 @@ impl Default for BoxplotOptions {
             yaxt: None,
             xaxp: None,
             yaxp: None,
+            frame_plot: None,
+            show_names: None,
         }
     }
 }
@@ -736,7 +746,7 @@ impl<B: Backend> Device<B> {
                     ..AxisOptions::default()
                 }
             };
-            if n > 1 {
+            if opts.show_names.unwrap_or(n > 1) {
                 let labels = opts
                     .names
                     .clone()
@@ -767,7 +777,7 @@ impl<B: Backend> Device<B> {
             });
         }
 
-        if opts.axes {
+        if opts.frame_plot.unwrap_or(opts.axes) {
             self.box_impl(&BoxOptions::default());
         }
 

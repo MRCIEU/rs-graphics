@@ -206,6 +206,9 @@ pub struct PlotOptions {
     /// As `panel_first`, drawn after the points and before the axes (R's
     /// `panel.last`).
     pub panel_last: Option<Figure>,
+    /// Draw the box around the plot region (R's `frame.plot`, shaped by
+    /// `bty`); `None`: `axes`.
+    pub frame_plot: Option<bool>,
 }
 
 crate::setters::setters!(PlotOptions => [PlotCall] {
@@ -252,6 +255,7 @@ crate::setters::setters!(PlotOptions => [PlotCall] {
     lab: option [i32; 3],
     panel_first: option Figure,
     panel_last: option Figure,
+    frame_plot: option bool,
 });
 
 impl Default for PlotOptions {
@@ -300,6 +304,7 @@ impl Default for PlotOptions {
             lab: None,
             panel_first: None,
             panel_last: None,
+            frame_plot: None,
         }
     }
 }
@@ -374,7 +379,9 @@ impl<B: Backend> Device<B> {
                 };
                 self.axis_impl(side, &inline.apply(o));
             }
-            // `localBox(...)`: `box()` with the inline `bty`.
+        }
+        // `if (frame.plot) localBox(...)`: `box()` with the inline `bty`.
+        if opts.frame_plot.unwrap_or(opts.axes) {
             self.box_impl(&BoxOptions {
                 bty: opts.bty,
                 ..BoxOptions::default()
