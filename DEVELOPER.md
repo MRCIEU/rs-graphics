@@ -233,8 +233,9 @@ A few fidelity-relevant decisions worth calling out:
   has a C integer format for the page number, as R's
   `png("Rplot%03d.png")` (`FileName` in `src/device/open.rs`, R's
   `checkIntFormat()` rules); otherwise they hold the last page. A PDF
-  file name is formatted with page 1 (R's `onefile = TRUE`; `onefile =
-  FALSE` isn't implemented).
+  keeps every page in one file named for page 1 (R's `onefile = TRUE`),
+  or with `DeviceBuilder::onefile(false)` writes one file per page as PNG
+  and SVG do.
 - **Page background.** As in R, `par("bg")` starts as the device's
   background: transparent for PDF (R's `pdf()`), white for SVG, and the
   canvas colour for PNG. Set one with `DeviceBuilder::bg`

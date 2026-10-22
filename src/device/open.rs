@@ -54,6 +54,12 @@ pub struct DeviceBuilder {
     /// PDF only: compress the page contents (R's `compress`); `None`:
     /// `true`. Ignored for SVG and PNG.
     pub compress: Option<bool>,
+    /// PDF only: all pages in one file (R's `onefile`); `false` writes a
+    /// file per page, named with the page number in `file` (as
+    /// `"Rplot%03d.pdf"`; without one, the file holds the last page, as in
+    /// R). `None`: `true`. Ignored for SVG and PNG, which always write a
+    /// file per page when `file` has a page number.
+    pub onefile: Option<bool>,
 }
 
 crate::setters::setters!(DeviceBuilder {
@@ -63,6 +69,7 @@ crate::setters::setters!(DeviceBuilder {
     bg: option ColorSpec,
     res: option f64,
     compress: option bool,
+    onefile: option bool,
 }; no_setter: format, file);
 
 impl DeviceBuilder {
@@ -77,7 +84,9 @@ impl DeviceBuilder {
     /// `Rplot002.png`, ...), each when the next page starts and the last
     /// at `close()`. Without one, the file holds the last page, as in R. A
     /// PDF keeps every page in one file, named for page 1 (R's
-    /// `pdf(onefile = TRUE)`). Any other `%` is an
+    /// `pdf(onefile = TRUE)`), unless [`onefile`](DeviceBuilder::onefile)
+    /// is `false`: then it writes a file per page as PNG and SVG do. Any
+    /// other `%` is an
     /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid
     /// 'file' argument"), as R's `checkIntFormat()`.
     ///
@@ -129,9 +138,14 @@ impl DeviceBuilder {
         dev.output = Some(Output {
             file,
             // One file per page for PNG and SVG when the name has a page
-            // number; PDF keeps every page in its one file, as R's
-            // `pdf(onefile = TRUE)`.
-            per_page: name.numbered() && self.format != Format::Pdf,
+            // number (otherwise they keep only the last page anyway); a PDF
+            // keeps every page in its one file unless `onefile = FALSE`, as
+            // R's `pdf()` (then, without a page number, each page replaces
+            // the last in the same file).
+            per_page: match self.format {
+                Format::Pdf => !self.onefile.unwrap_or(true),
+                Format::Png | Format::Svg => name.numbered(),
+            },
             name,
             page: 1,
             error: None,
@@ -390,11 +404,13 @@ impl Device<AnyBackend> {
             bg: None,
             res: None,
             compress: None,
+            onefile: None,
         }
     }
 
     /// R's `pdf(file, ...)`: [`Device::format`] with PDF, whatever `file`'s
-    /// extension. Default page 7 x 7 inches, transparent background.
+    /// extension. Default page 7 x 7 inches, transparent background, all
+    /// pages in one file (see [`onefile`](DeviceBuilder::onefile)).
     ///
     /// ```no_run
     /// use rs_graphics::prelude::*;

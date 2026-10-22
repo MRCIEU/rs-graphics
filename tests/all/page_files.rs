@@ -9,7 +9,9 @@
 //! One file per page, as R's `png("Rplot%03d.png")`: a PNG or SVG file
 //! name with a C integer format gets one file per page, each the page as
 //! drawn on its own; without one the file holds the last page; a PDF keeps
-//! every page in one file named for page 1. Page numbers are formatted as
+//! every page in one file named for page 1, or with `onefile(false)` one
+//! file per page as R's `pdf(onefile = FALSE)` (file names and page counts
+//! cross-checked with R). Page numbers are formatted as
 //! R's `sprintf()` (cross-checked with R when it's available), and names
 //! with other `%` conversions are refused at `open()`, as R's
 //! `checkIntFormat()`.
@@ -45,6 +47,7 @@ fn page<B: Backend>(dev: &mut Device<B>, k: usize) {
 fn alone(format: &str, k: usize, bg: Option<Color>) -> Vec<u8> {
     let backend: AnyBackend = match format {
         "png" => RasterBackend::new(4, 3, 72, bg.unwrap_or(Color::WHITE)).into(),
+        "pdf" => PdfBackend::new(4, 3).into(),
         _ => SvgBackend::new(4, 3).into(),
     };
     let mut dev = Device::new(backend, Par::default());
@@ -139,6 +142,124 @@ fn a_pdf_keeps_its_pages_in_one_file_named_for_page_one() {
     let pdf = std::fs::read(d.join("Rplot001.pdf")).unwrap();
     assert!(String::from_utf8_lossy(&pdf).contains("/Count 3"));
     assert_eq!(std::fs::read_dir(&d).unwrap().count(), 1);
+}
+
+/// The files in `d`, sorted.
+fn files(d: &std::path::Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(d)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_pdf_with_onefile_false_gets_a_file_per_page() {
+    let d = dir("pdf_onefile_false");
+    let mut dev = Device::pdf(d.join("Rplot%03d.pdf"))
+        .width(4)
+        .height(3)
+        .onefile(false)
+        .open()
+        .unwrap();
+    for k in 0..3 {
+        page(&mut dev, k);
+    }
+    dev.close().unwrap();
+    let want: Vec<String> = (1..=3).map(|k| format!("Rplot{k:03}.pdf")).collect();
+    assert_eq!(files(&d), want);
+    for (k, name) in want.iter().enumerate() {
+        let got = std::fs::read(d.join(name)).unwrap();
+        assert!(got == alone("pdf", k, None), "page {}", k + 1);
+    }
+
+    // Without a page number, the file holds the last page.
+    let d = dir("pdf_onefile_false_last");
+    let mut dev = Device::pdf(d.join("plot.pdf"))
+        .width(4)
+        .height(3)
+        .onefile(false)
+        .open()
+        .unwrap();
+    for k in 0..3 {
+        page(&mut dev, k);
+    }
+    dev.close().unwrap();
+    assert_eq!(files(&d), ["plot.pdf"]);
+    assert!(std::fs::read(d.join("plot.pdf")).unwrap() == alone("pdf", 2, None));
+}
+
+#[test]
+fn onefile_is_for_pdf_only() {
+    let d = dir("onefile_png");
+    let mut dev = Device::png(d.join("p%d.png"))
+        .width(4)
+        .height(3)
+        .onefile(true)
+        .open()
+        .unwrap();
+    for k in 0..2 {
+        page(&mut dev, k);
+    }
+    dev.close().unwrap();
+    assert_eq!(files(&d), ["p1.png", "p2.png"]);
+}
+
+/// R's `pdf()` with and without `onefile`: the same files, with the same
+/// numbers of pages.
+#[test]
+fn pdf_files_and_pages_match_r() {
+    if !common::r_available() {
+        return;
+    }
+    for onefile in [true, false] {
+        let r_dir = dir(&format!("r_pdf_{onefile}"));
+        let ours = dir(&format!("our_pdf_{onefile}"));
+        let flag = if onefile { "TRUE" } else { "FALSE" };
+        let script = format!(
+            "pdf(file = '{}', onefile = {flag}, width = 4, height = 3)\n\
+             for (k in 1:3) plot(1:5, main = k)\ninvisible(dev.off())\n",
+            r_dir.join("Rplot%03d.pdf").display()
+        );
+        let path = std::env::temp_dir().join(format!("rs_graphics_page_files_{onefile}.R"));
+        std::fs::write(&path, script).unwrap();
+        let out = Command::new("Rscript")
+            .arg(&path)
+            .output()
+            .expect("run Rscript");
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        let mut dev = Device::pdf(ours.join("Rplot%03d.pdf"))
+            .width(4)
+            .height(3)
+            .onefile(onefile)
+            .open()
+            .unwrap();
+        for k in 0..3 {
+            page(&mut dev, k);
+        }
+        dev.close().unwrap();
+
+        assert_eq!(files(&ours), files(&r_dir), "onefile = {flag}");
+        // R's files are compressed too; its page tree says how many pages.
+        let pages = |d: &std::path::Path| -> Vec<bool> {
+            files(d)
+                .iter()
+                .map(|f| {
+                    let pdf =
+                        String::from_utf8_lossy(&std::fs::read(d.join(f)).unwrap()).into_owned();
+                    pdf.contains(if onefile { "/Count 3" } else { "/Count 1" })
+                })
+                .collect()
+        };
+        assert!(pages(&r_dir).iter().all(|&b| b), "R, onefile = {flag}");
+        assert!(pages(&ours).iter().all(|&b| b), "ours, onefile = {flag}");
+    }
 }
 
 #[test]
