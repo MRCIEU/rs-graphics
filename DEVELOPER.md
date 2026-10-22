@@ -65,7 +65,10 @@ usage, see [README.md](README.md).
   (`sum`, `prod`, `integral`, `union`, `intersect`, `lim`, `min`, `max`,
   `inf`, `sup`, ...), font styles, and generic `f(x)`. In PNG output the
   Symbol glyphs that Liberation Sans lacks (delimiter and integral
-  pieces, `%in%`, the double arrows, ...) are drawn as missing glyphs.
+  pieces, `%in%`, the double arrows, ...) are drawn as missing glyphs;
+  bundling a fallback maths font (e.g. Noto Sans Math, OFL) for them
+  would fix this, but the delimiter and integral pieces may not join
+  cleanly at Symbol's metrics.
   Used by `axis()` (labels), `title()` (`TitleOptions`), `mtext()`,
   `text()` and `legend()` (entry labels and title), each
   placed as R's `GMMathText`/`GMathText` do; `legend()` sizes rows and
