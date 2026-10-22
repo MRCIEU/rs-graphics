@@ -61,6 +61,7 @@ mod plot_new_matches_r;
 mod plot_type_b_matches_r;
 mod plot_type_h_s_matches_r;
 mod plotmath_axis_matches_r;
+mod plotmath_extras_matches_r;
 mod pretty_matches_r;
 mod primitives_matches_r;
 mod region_errors_matches_r;

@@ -57,15 +57,21 @@ usage, see [README.md](README.md).
   Greek letters and maths symbols from the Symbol font (`FontFace::Symbol`,
   R's `font = 5`; PDF uses the standard `/Symbol` font, SVG/PNG its
   Unicode equivalents), operators, relations, spacing, `paste()`,
-  `list()`, parentheses and `group()`, font styles, and generic `f(x)`.
+  `list()`, parentheses, `group()` and `bgroup()` (delimiters grown from
+  the Symbol font's pieces), `{}`, fractions (`frac`/`over`/`atop`, in
+  TeX's cramped and numerator/denominator styles), `sqrt()` (with an
+  index), accents (`hat`, `tilde`, `dot`, `ring`, `bar`, `widehat`,
+  `widetilde`), `abs()`, `underline()`, big operators with limits
+  (`sum`, `prod`, `integral`, `union`, `intersect`, `lim`, `min`, `max`,
+  `inf`, `sup`, ...), font styles, and generic `f(x)`. In PNG output the
+  Symbol glyphs that Liberation Sans lacks (delimiter and integral
+  pieces, `%in%`, the double arrows, ...) are drawn as missing glyphs.
   Used by `axis()` (labels), `title()` (`TitleOptions`), `mtext()`,
   `text()` and `legend()` (entry labels and title), each
   placed as R's `GMMathText`/`GMathText` do; `legend()` sizes rows and
   columns by the expressions' boxes. The high-level plots' titles
   (`main`/`sub`/`xlab`/`ylab` in `PlotOptions`, `HistOptions`,
   `BarplotOptions`, `BoxplotOptions`, `PieOptions`) are `Label`s too.
-  Accents, fractions, `sqrt`, big
-  operators and `bgroup` are rejected as not yet supported.
   `legend()`
   (`Graphics::legend`, `src/device/legend.rs`) is a port of R's layout
   algorithm incl. keyword positions, `inset`, `ncol`/`horiz`, `title`,
@@ -154,8 +160,7 @@ To keep this a tractable "core functionality" port, the following R
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
 `image()`/raster images, `symbols()`, `smoothScatter()`,
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
-fonts, the plotmath constructs listed above, and interactive input
-(`identify()`/`locator()`). These would be
+fonts, and interactive input (`identify()`/`locator()`). These would be
 reasonable follow-ups but are left for future work.
 
 ## Design notes
@@ -332,6 +337,10 @@ against a real R installation by shelling out to `Rscript`:
   `title()`, `mtext()` (inner, outer, perpendicular), `text()` (`adj`,
   `srt`, `cex`, `col`) and `legend()` (labels incl. a tall one, title):
   every text item's font, size, origin and string, and every stroke.
+- `tests/all/plotmath_extras_matches_r.rs` - fractions, radicals,
+  accents, `abs`, `underline`, `bgroup`, big operators and `{}` in
+  `text()`, in display and script styles, rotated and scaled: every text
+  item and every stroke (fraction bars, radicals, accents).
 - `tests/all/hatch_matches_r.rs` - shading lines (`density`/`angle`) in
   `polygon()`, `rect()`, `barplot()` (beside, stacked, `orderH`,
   horizontal, legend) and `legend()`: both hatching branches, winding,

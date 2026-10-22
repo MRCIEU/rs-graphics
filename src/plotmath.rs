@@ -20,16 +20,20 @@
 //! binary `+ - * / :`, `!`, `%+-%`, `%*%`, `%/%`, `%.%`, `%intersection%`,
 //! `%union%`, relations (`==`, `!=`, `<`, `<=`, `%~~%`, arrows, set
 //! relations, ...), spacing with `~`, juxtaposition with `*` and
-//! `paste()`, `list()`, parentheses and `group()`, `plain()`, `bold()`,
-//! `italic()`, `bolditalic()`, `symbol()`, the `*style()` sizes,
-//! `phantom()`/`vphantom()`, `cdots`/`ldots`, and any other function call
-//! `f(x, y)`, drawn as R does.
+//! `paste()`, `list()`, parentheses, `group()` and `bgroup()`, braces
+//! `{}` (`{}^14*C`), fractions (`frac`, `over`, `atop`), `sqrt(x)` and
+//! `sqrt(x, n)`, accents (`hat`, `tilde`, `dot`, `ring`, `bar`,
+//! `widehat`, `widetilde`), `abs()`, `underline()`, big operators with
+//! limits (`sum(x[i], i == 1, n)`, `prod`, `integral`, `union`,
+//! `intersect`, `lim`, `liminf`, `limsup`, `min`, `max`, `inf`, `sup`),
+//! `plain()`, `bold()`, `italic()`, `bolditalic()`, `symbol()`, the
+//! `*style()` sizes, `phantom()`/`vphantom()`, `cdots`/`ldots`, and any
+//! other function call `f(x, y)`, drawn as R does.
 //!
-//! Not supported yet (an error, so nothing is drawn wrongly): accents
-//! (`hat`, `bar`, `tilde`, `dot`, `ring`, `widehat`, `widetilde`),
-//! fractions (`frac`, `over`, `atop`), `sqrt`, `abs`, `underline`,
-//! `bgroup`, big operators (`sum`, `prod`, `integral`, `union`,
-//! `intersect`, `lim`, `min`, `max`, `inf`, `sup`) and braces `{}`.
+//! These constructs must have the number of arguments R uses (`frac(a,
+//! b)`, `hat(x)`, `sum(body, lower, upper)` with 1 to 3); others are a
+//! parse error rather than drawn wrongly. Not supported: `;` inside `{}`,
+//! and `TRUE`, `NULL`, `NA` and R's control flow.
 
 use std::fmt;
 
@@ -71,8 +75,9 @@ pub struct Expression {
 
 impl Expression {
     /// Parses R syntax, e.g. `"10^5"`, `"alpha[i]^2"`, `"x == 0.05"` or
-    /// `"paste(\"Mean \", bar)"`. Fails on a syntax error or a construct
-    /// listed as unsupported in the [module docs](self).
+    /// `"frac(1, sqrt(n))"`. Fails on a syntax error, a construct the
+    /// [module docs](self) list as unsupported, or a construct with the
+    /// wrong number of arguments (`frac(a)`).
     pub fn parse(source: &str) -> Result<Expression, ParseError> {
         let tokens = tokenize(source)?;
         let mut p = Parser { tokens, pos: 0 };
@@ -317,8 +322,9 @@ fn tokenize(src: &str) -> Result<Vec<(Tok, usize)>, ParseError> {
                 _ => c.to_string(),
             };
             match op.as_str() {
-                "+" | "-" | "*" | "/" | "^" | "~" | "!" | "(" | ")" | "[" | "]" | "," | "<"
-                | ">" | "==" | "!=" | "<=" | ">=" | ":" | "&" | "|" | "&&" | "||" | "**" => {}
+                "+" | "-" | "*" | "/" | "^" | "~" | "!" | "(" | ")" | "[" | "]" | "{" | "}"
+                | "," | "<" | ">" | "==" | "!=" | "<=" | ">=" | ":" | "&" | "|" | "&&" | "||"
+                | "**" => {}
                 _ => return Err(err(&format!("`{op}` is not supported in plotmath"), off)),
             }
             i += op.chars().count();
@@ -554,6 +560,17 @@ impl Parser {
                 self.expect(")")?;
                 Ok(call("(", vec![inner]))
             }
+            // `{x}` groups without drawing anything; `{}` is empty (as in
+            // `{}^14*C`).
+            Tok::Op(o) if o == "{" => {
+                if self.is_op("}") {
+                    self.pos += 1;
+                    return Ok(call("{", vec![]));
+                }
+                let inner = self.expr(0)?;
+                self.expect("}")?;
+                Ok(call("{", vec![inner]))
+            }
             Tok::Op(o) => {
                 self.pos -= 1;
                 Err(self.error(&format!("unexpected `{o}`")))
@@ -572,43 +589,58 @@ fn format_number(v: f64) -> String {
     crate::device::format_axis_labels(&[v]).remove(0)
 }
 
-/// Plotmath constructs not implemented yet.
-const UNSUPPORTED: &[&str] = &[
-    "hat",
-    "widehat",
-    "tilde",
-    "widetilde",
-    "bar",
-    "dot",
-    "ring",
-    "frac",
-    "over",
-    "atop",
-    "sqrt",
-    "abs",
-    "underline",
-    "bgroup",
-    "sum",
-    "prod",
-    "integral",
-    "union",
-    "intersect",
-    "lim",
-    "min",
-    "max",
-    "inf",
-    "sup",
-    "{",
+/// The number of arguments the plotmath constructs that need a fixed
+/// number take (R errors for some others, or ignores extra arguments;
+/// here they are an error, so nothing is drawn wrongly).
+const ARITY: &[(&str, usize, usize)] = &[
+    ("hat", 1, 1),
+    ("widehat", 1, 1),
+    ("tilde", 1, 1),
+    ("widetilde", 1, 1),
+    ("bar", 1, 1),
+    ("dot", 1, 1),
+    ("ring", 1, 1),
+    ("frac", 2, 2),
+    ("over", 2, 2),
+    ("atop", 2, 2),
+    ("sqrt", 1, 2),
+    ("root", 1, 2),
+    ("abs", 1, 1),
+    ("underline", 1, 1),
+    ("group", 3, 3),
+    ("bgroup", 3, 3),
+    ("integral", 1, 3),
+    ("sum", 1, 3),
+    ("prod", 1, 3),
+    ("union", 1, 3),
+    ("intersect", 1, 3),
+    ("lim", 1, 3),
+    ("liminf", 1, 3),
+    ("limsup", 1, 3),
+    ("min", 1, 3),
+    ("max", 1, 3),
+    ("inf", 1, 3),
+    ("sup", 1, 3),
 ];
 
 fn check_supported(e: &Expr) -> Result<(), ParseError> {
     if let Expr::Call(f, args) = e {
         if let Expr::Name(n) = f.as_ref() {
-            if UNSUPPORTED.contains(&n.as_str()) {
-                return Err(ParseError {
-                    message: format!("plotmath `{n}()` is not supported yet"),
-                    offset: 0,
-                });
+            if let Some(&(_, lo, hi)) = ARITY.iter().find(|a| a.0 == n) {
+                if !(lo..=hi).contains(&args.len()) {
+                    let want = if lo == hi {
+                        lo.to_string()
+                    } else {
+                        format!("{lo} to {hi}")
+                    };
+                    return Err(ParseError {
+                        message: format!(
+                            "plotmath `{n}()` takes {want} argument(s), not {}",
+                            args.len()
+                        ),
+                        offset: 0,
+                    });
+                }
             }
         }
         check_supported(f)?;
@@ -657,6 +689,9 @@ mod tests {
         assert_eq!(p("x[i, j]"), "[(x, i, j)");
         assert_eq!(p("1e5 + 0.1234567891 + 5L"), "+(+(1e+05, 0.1234568), 5)");
         assert_eq!(p("'a\\tb' * `my name`"), "*(\"a\\tb\", my name)");
+        assert_eq!(p("{}^14*C"), "*(^({(), 14), C)");
+        assert_eq!(p("{a + b}^2"), "^({(+(a, b)), 2)");
+        assert_eq!(p("frac(1, sqrt(x, 3))"), "frac(1, sqrt(x, 3))");
     }
 
     #[test]
@@ -668,9 +703,13 @@ mod tests {
             "a b",
             "x <- 1",
             "TRUE",
-            "sqrt(x)",
-            "hat(beta)",
-            "{x}",
+            "sqrt(x, 2, 3)",
+            "hat(beta, 1)",
+            "frac(a)",
+            "group(\"(\", x)",
+            "sum()",
+            "{x",
+            "{x; y}",
             "'open",
         ] {
             assert!(Expression::parse(bad).is_err(), "{bad:?}");
