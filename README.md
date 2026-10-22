@@ -229,7 +229,8 @@ GPL-3.0-or-later), so it is licensed under version 3 of the GPL, as R's
 distributed under GPL-3.0 (or a later version).
 
 The ported parts of R remain copyright The R Core Team, The R Foundation,
-Robert Gentleman and Ross Ihaka, and Paul Murrell and Ross Ihaka.
+Robert Gentleman and Ross Ihaka, Paul Murrell and Ross Ihaka, and Kevin
+Buhr (polygon hatching).
 [NOTICE](NOTICE) lists these notices, the R source files the code was
 translated from, and when. Programs that use rs-graphics should carry the
 same section in their notices.

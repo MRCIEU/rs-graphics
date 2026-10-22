@@ -46,6 +46,7 @@ use crate::pretty::{axis_pars, create_at_vector};
 
 mod abline;
 mod axis;
+mod hatch;
 mod legend;
 mod mtext;
 mod open;

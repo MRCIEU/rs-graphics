@@ -57,10 +57,19 @@ fn scatter<G: Graphics>(g: &mut G) {
         .ytop([2.8])
         .col("lightblue")
         .draw();
+    g.rect()
+        .xleft([2.2])
+        .ybottom([4.2])
+        .xright([2.8])
+        .ytop([4.8])
+        .density(20)
+        .angle(30)
+        .draw();
     g.polygon()
         .x([1.2, 1.8, 1.5, f64::NAN, 4.2, 4.8, 4.5])
         .y([3.0, 3.0, 3.6, f64::NAN, 2.0, 2.0, 2.6])
         .col(["pink", "yellow"])
+        .density([None, Some(15.0)])
         .draw();
     g.text().x([2.0, 4.0]).y([2.5, 4.5]).draw();
     g.text()
@@ -109,6 +118,7 @@ fn bars<G: Graphics>(g: &mut G) {
         .height(m)
         .names(["a", "b", "c"])
         .legend_text(["r1", "r2", "r3"])
+        .density([10, 20, 30])
         .main("Bars")
         .draw();
     g.box_().draw();
@@ -449,4 +459,31 @@ fn barplot_and_legend_restore_their_par_changes() {
         .xpd(Xpd::Device)
         .draw();
     assert_eq!(dev.current_par().xpd, Xpd::Plot);
+}
+
+/// `barplot()` can't shade on a log axis (R's error), on a device and
+/// when a `Figure` records the call.
+#[test]
+fn barplot_shading_on_a_log_axis_panics() {
+    for figure in [false, true] {
+        let r = std::panic::catch_unwind(|| {
+            if figure {
+                let mut fig = Figure::new();
+                fig.barplot().height([1, 2]).ylog(true).density(10).draw();
+            } else {
+                let mut dev = Device::new(PdfBackend::new(5, 5), Par::default());
+                dev.barplot().height([1, 2]).ylog(true).density(10).draw();
+            }
+        });
+        let msg = r.unwrap_err();
+        let msg = msg
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| msg.downcast_ref::<&str>().copied())
+            .unwrap_or_default();
+        assert!(
+            msg.contains("Cannot use shading lines in bars when log scale is used"),
+            "{msg}"
+        );
+    }
 }

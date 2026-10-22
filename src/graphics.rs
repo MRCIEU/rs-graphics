@@ -330,7 +330,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// coordinates are setters named as R's (all required); other arguments
     /// in [`RectOptions`]. Coordinates and styles are recycled to the
     /// longest. Rectangles with a non-finite corner (e.g. at 0 on a log
-    /// axis) are skipped, as in R.
+    /// axis) are skipped, as in R. With `density`, the rectangles are
+    /// shaded with lines (R's hatching), drawn as polygons as R does.
     ///
     /// # Panics
     /// At `.draw()`, if a coordinate is missing (R's message).
@@ -344,7 +345,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// per run of at least two finite points (non-finite coordinates, R's
     /// `NA`, separate them), with `col`, `border` and `lty` recycled over
     /// the polygons drawn, as `C_polygon` (a shorter run is skipped and
-    /// uses up no colour).
+    /// uses up no colour). With `density`, each polygon is shaded with
+    /// lines instead of filled (R's hatching; see
+    /// [`PolygonOptions::density`]), then all borders are drawn.
     ///
     /// # Panics
     /// At `.draw()`, if `x` is missing (R's message) or `x` and `y` have

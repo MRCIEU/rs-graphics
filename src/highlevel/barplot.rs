@@ -15,16 +15,21 @@
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
 //! `gray.colors(nrow)`), `names.arg`, `legend.text` (and `args.legend`),
 //! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH`, `add`,
-//! `axisnames`, `cex.names`, `axis.lty` and R's inline axis parameters
-//! (`las`, `cex.axis`, ...).
+//! `axisnames`, `cex.names`, `axis.lty`, shading lines (`density`/
+//! `angle`) and R's inline axis parameters (`las`, `cex.axis`, ...).
 //!
-//! Also `xpd` and `plot = FALSE`. Not supported: hatched fills
-//! (`density`/`angle`) and `panel.first`/`panel.last`.
+//! Also `xpd` and `plot = FALSE`. Not supported: `panel.first`/
+//! `panel.last`.
 //!
-//! **R bug not copied:** for stacked bars R works out the default value
-//! axis limits with `offset` recycled over every element of the matrix of
-//! stacked sums instead of once per column (so `offset = c(0, 10, 0)` on a
-//! 3-column matrix gives limits that cut off the bars it draws). We use
+//! **R bugs not copied:** with `orderH`, R reorders the colours of each
+//! stack's segments but not `density`/`angle`, so the shading moves to
+//! other rows; here it stays with its row, as the colour does. For the
+//! legend, R reverses `density`/`angle` before recycling them over the
+//! labels; here they are recycled first, as the colours are. And for
+//! stacked bars R works out the default value axis limits with `offset`
+//! recycled over every element of the matrix of stacked sums instead of
+//! once per column (so `offset = c(0, 10, 0)` on a 3-column matrix gives
+//! limits that cut off the bars it draws). We use
 //! each column's own offset, as R does when drawing the bars.
 
 use crate::backend::Backend;
@@ -58,6 +63,15 @@ pub struct BarplotOptions {
     pub col: Vec<ColorSpec>,
     /// Bar borders; `None`: `par(fg)` (R's default).
     pub border: Option<ColorSpec>,
+    /// Shading lines per inch in the bars (R's `density`), recycled as
+    /// `col` is; the lines take the bar's `col`. `None` (R's `NA`) or
+    /// negative fills the bar instead, 0 leaves it empty; see
+    /// [`RectOptions::density`]. Empty: no shading. The legend's boxes are
+    /// shaded the same way. Not allowed with a log axis.
+    pub density: Vec<Option<f64>>,
+    /// Angle of the shading lines in degrees (R's `angle`), recycled as
+    /// `density` is; empty: 45.
+    pub angle: Vec<f64>,
     /// Bar widths, recycled; empty: 1 (R's default).
     pub width: Vec<f64>,
     /// Space before each bar as a fraction of the mean bar width: one value,
@@ -186,6 +200,8 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     names: list Label,
     col: values ColorSpec,
     border: option ColorSpec,
+    density: na_values f64,
+    angle: values f64,
     width: values f64,
     space: option_values f64,
     beside: value bool,
@@ -236,6 +252,8 @@ impl Default for BarplotOptions {
             names: None,
             col: Vec::new(),
             border: None,
+            density: Vec::new(),
+            angle: Vec::new(),
             width: Vec::new(),
             space: None,
             beside: false,
@@ -381,7 +399,7 @@ impl<T: Num, const N: usize> From<&[Vec<T>; N]> for BarHeights {
     }
 }
 
-fn recycle(v: &[f64], n: usize) -> Vec<f64> {
+fn recycle<T: Copy>(v: &[T], n: usize) -> Vec<T> {
     (0..n).map(|k| v[k % v.len()]).collect()
 }
 
@@ -481,6 +499,11 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
         let k = if beside { i } else { j };
         offset[k % offset.len()]
     };
+
+    assert!(
+        !((opts.xlog || opts.ylog) && !opts.density.is_empty()),
+        "Cannot use shading lines in bars when log scale is used"
+    );
 
     // --- log scale in the data direction: where bars start ---
     let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
@@ -679,17 +702,46 @@ impl<B: Backend> Device<B> {
         // (restored by `barplot_impl`).
         self.par.xpd = opts.xpd.unwrap_or(Xpd::Figure);
 
-        for &(k, base, top, ci) in &bars {
+        // One `rect()` call for all bars beside each other, one per stack
+        // otherwise, as R (which matters for the order shading lines and
+        // borders are drawn in); `col`, `density` and `angle` per bar.
+        let border = vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))];
+        let mut start = 0;
+        while start < bars.len() {
+            let end = if beside {
+                bars.len()
+            } else {
+                start
+                    + bars[start..]
+                        .iter()
+                        .take_while(|b| b.0 == bars[start].0)
+                        .count()
+            };
+            let group = &bars[start..end];
+            let (mut x0, mut y0, mut x1, mut y1) = (vec![], vec![], vec![], vec![]);
+            for &(k, base, top, _) in group {
+                let (lo, hi) = (w_l[k], w_r[k]);
+                if horiz {
+                    x0.push(base);
+                    y0.push(lo);
+                    x1.push(top);
+                    y1.push(hi);
+                } else {
+                    x0.push(lo);
+                    y0.push(base);
+                    x1.push(hi);
+                    y1.push(top);
+                }
+            }
             let style = RectOptions {
-                col: vec![colors[ci % colors.len()]],
-                border: vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))],
+                col: group.iter().map(|b| colors[b.3 % colors.len()]).collect(),
+                border: border.clone(),
+                density: per_bar(&opts.density, group),
+                angle: per_bar(&opts.angle, group),
                 ..RectOptions::default()
             };
-            if horiz {
-                self.rect_impl(&[base], &[w_l[k]], &[top], &[w_r[k]], &style);
-            } else {
-                self.rect_impl(&[w_l[k]], &[base], &[w_r[k]], &[top], &style);
-            }
+            self.rect_impl(&x0, &y0, &x1, &y1, &style);
+            start = end;
         }
 
         // R passes `...` to both axes; the value axis gets `cex.axis`, the
@@ -725,9 +777,24 @@ impl<B: Backend> Device<B> {
             let mut fill: Vec<ColorSpec> = (0..labels.len())
                 .map(|i| colors[i % colors.len()])
                 .collect();
+            let mut density: Vec<Option<f64>> = if opts.density.is_empty() {
+                Vec::new()
+            } else {
+                recycle(&opts.density, labels.len())
+            };
+            let mut angle: Vec<f64> = if opts.angle.is_empty() {
+                Vec::new()
+            } else {
+                recycle(&opts.angle, labels.len())
+            };
+            // (R reverses `density` and `angle` before `legend()` recycles
+            // them, so with fewer values than labels they don't follow
+            // the reversed labels; we recycle first, as for `fill`.)
             if (horiz && beside) || (!horiz && !beside) {
                 labels.reverse();
                 fill.reverse();
+                density.reverse();
+                angle.reverse();
             }
             // By default 0.1 inch in from the top-right corner of the plot
             // region. (On a log axis R passes the log10 `par("usr")` values
@@ -747,6 +814,12 @@ impl<B: Backend> Device<B> {
             lopts.yjust.get_or_insert(1.0);
             if lopts.fill.is_empty() {
                 lopts.fill = fill;
+            }
+            if lopts.density.is_empty() {
+                lopts.density = density;
+            }
+            if lopts.angle.is_empty() {
+                lopts.angle = angle;
             }
             self.legend_impl(pos, &labels, &lopts);
         }
@@ -783,6 +856,16 @@ impl<B: Backend> Device<B> {
         }
 
         w_m
+    }
+}
+
+/// `v` per bar of `group`, recycled as `col` is (by each bar's colour
+/// index); empty stays empty.
+fn per_bar<T: Copy>(v: &[T], group: &[(usize, f64, f64, usize)]) -> Vec<T> {
+    if v.is_empty() {
+        Vec::new()
+    } else {
+        group.iter().map(|b| v[b.3 % v.len()]).collect()
     }
 }
 

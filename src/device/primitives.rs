@@ -16,6 +16,7 @@
 //! needed. `xpd` is R's inline `xpd = ` (clip to the figure region rather
 //! than the plot region); `None` uses `par(xpd)`.
 
+use super::hatch::{ShapeStyle, shading};
 use super::{Device, Xpd};
 use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::{Color, ColorSpec};
@@ -28,7 +29,7 @@ use crate::plotmath::Label;
 use crate::setters::pick_na;
 
 /// `v[i]`, recycling `v`; `default` when `v` is empty.
-fn pick<T: Copy>(v: &[T], i: usize, default: T) -> T {
+pub(super) fn pick<T: Copy>(v: &[T], i: usize, default: T) -> T {
     if v.is_empty() {
         default
     } else {
@@ -210,6 +211,16 @@ pub struct RectOptions {
     /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
     /// `par(lmitre)`.
     pub lmitre: Option<f64>,
+    /// Shading lines per inch (R's `density`), recycled per rectangle: `None`
+    /// (R's `NA`) or negative fills with `col` instead, 0 draws neither
+    /// lines nor fill. Empty (or all `None`/negative): no shading. With
+    /// shading, `col` is the colour of the lines (empty or `None`:
+    /// `par(fg)`) and `border` defaults to `col`; the lines are skipped on
+    /// log axes, as R does (with a warning).
+    pub density: Vec<Option<f64>>,
+    /// Angle of the shading lines in degrees, anticlockwise (R's
+    /// `angle`), recycled per rectangle; empty: 45.
+    pub angle: Vec<f64>,
 }
 
 crate::setters::setters!(RectOptions => [RectCall] {
@@ -221,6 +232,8 @@ crate::setters::setters!(RectOptions => [RectCall] {
     lend: option LineEnd,
     ljoin: option LineJoin,
     lmitre: option f64,
+    density: na_values f64,
+    angle: values f64,
 });
 
 /// Arguments of `polygon()`. A non-finite coordinate (R's `NA`) ends one
@@ -251,6 +264,16 @@ pub struct PolygonOptions {
     /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
     /// `par(lmitre)`.
     pub lmitre: Option<f64>,
+    /// Shading lines per inch (R's `density`), recycled per polygon: `None`
+    /// (R's `NA`) or negative fills with `col` instead, 0 draws neither
+    /// lines nor fill. Empty (or all `None`/negative): no shading. With
+    /// shading, `col` is the colour of the lines (empty or `None`:
+    /// `par(fg)`) and `border` defaults to `col`; the lines are skipped on
+    /// log axes, as R does (with a warning).
+    pub density: Vec<Option<f64>>,
+    /// Angle of the shading lines in degrees, anticlockwise (R's
+    /// `angle`), recycled per polygon; empty: 45.
+    pub angle: Vec<f64>,
 }
 
 crate::setters::setters!(PolygonOptions => [PolygonCall] {
@@ -262,6 +285,8 @@ crate::setters::setters!(PolygonOptions => [PolygonCall] {
     lend: option LineEnd,
     ljoin: option LineJoin,
     lmitre: option f64,
+    density: na_values f64,
+    angle: values f64,
 });
 
 /// Arguments of `text()`.
@@ -706,10 +731,44 @@ impl<B: Backend> Device<B> {
     }
 
     fn rect_draw(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: &RectOptions) {
+        self.push_clip_region(self.clip_for(opts.xpd));
+        let style = ShapeStyle {
+            col: &opts.col,
+            border: &opts.border,
+            lty: &opts.lty,
+            lwd: &opts.lwd,
+            density: &opts.density,
+            angle: &opts.angle,
+        };
+        self.rects(x0, y0, x1, y1, &style);
+        self.pop_clip();
+    }
+
+    /// The rectangles of `rect()`, without setting a clip. With shading
+    /// (see [`shading`]), as R's `rect()`: each rectangle becomes a polygon
+    /// (bottom-left, bottom-right, top-right, top-left) and goes to
+    /// `polygon()`; otherwise `C_rect`: each is filled with `col` (empty:
+    /// none) and outlined with `border` (empty: `par(fg)`).
+    pub(crate) fn rects(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], s: &ShapeStyle) {
         let n = recycled_len(&[x0.len(), y0.len(), x1.len(), y1.len()]);
+        if shading(s.density) {
+            // `rbind(NA, xleft, xright, xright, xleft)[-1]`, likewise for y.
+            let (mut x, mut y) = (Vec::with_capacity(5 * n), Vec::with_capacity(5 * n));
+            for i in 0..n {
+                if i > 0 {
+                    x.push(f64::NAN);
+                    y.push(f64::NAN);
+                }
+                let (a, b) = (x0[i % x0.len()], x1[i % x1.len()]);
+                let (c, d) = (y0[i % y0.len()], y1[i % y1.len()]);
+                x.extend([a, b, b, a]);
+                y.extend([c, c, d, d]);
+            }
+            self.polygons(&x, &y, s);
+            return;
+        }
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
-        self.push_clip_region(self.clip_for(opts.xpd));
         for i in 0..n {
             let p0 = self.user_to_inches(x0[i % x0.len()], y0[i % y0.len()]);
             let p1 = self.user_to_inches(x1[i % x1.len()], y1[i % y1.len()]);
@@ -718,16 +777,15 @@ impl<B: Backend> Device<B> {
             }
             // An `NA` `lwd` or `lty` leaves out the border (R does this for
             // `lwd`), as an `NA` border colour does; the fill is drawn.
-            let fill = self.resolve(pick(&opts.col, i, ColorSpec::None));
-            let border = self.resolve(pick(&opts.border, i, fg));
-            let line = pick_na(&opts.lwd, i, lwd).zip(pick_na(&opts.lty, i, lty));
+            let fill = self.resolve(pick(s.col, i, ColorSpec::None));
+            let border = self.resolve(pick(s.border, i, fg));
+            let line = pick_na(s.lwd, i, lwd).zip(pick_na(s.lty, i, lty));
             let stroke = border
                 .zip(line)
                 .map(|(c, (lwd, lty))| self.stroke_of(c, lwd, lty));
             self.backend
                 .draw_rect(Rect::new(p0.x, p0.y, p1.x, p1.y), fill, stroke.as_ref());
         }
-        self.pop_clip();
     }
 
     /// Draws R's `polygon()`; the public entry is
@@ -739,32 +797,17 @@ impl<B: Backend> Device<B> {
     }
 
     fn polygon_draw(&mut self, x: &[f64], y: &[f64], opts: &PolygonOptions) {
-        let fg = ColorSpec::Color(self.par.fg);
-        let (lty, lwd) = (self.par.lty, opts.lwd.unwrap_or(self.par.lwd));
         self.push_clip_region(self.clip_for(opts.xpd));
-        let mut num = 0;
-        let mut run: Vec<Point> = Vec::new();
-        let n = x.len().min(y.len());
-        for i in 0..=n {
-            let p = (i < n).then(|| self.user_to_inches(x[i], y[i]));
-            if let Some(p) = p.filter(|p| p.x.is_finite() && p.y.is_finite()) {
-                run.push(p);
-                continue;
-            }
-            // As `C_polygon`: a run needs at least two points; a shorter one
-            // is skipped without using up a `col`/`border`/`lty` value.
-            if run.len() >= 2 {
-                // An `NA` `lty` leaves out the border, as for `rect()`.
-                let fill = self.resolve(pick(&opts.col, num, ColorSpec::None));
-                let border = self.resolve(pick(&opts.border, num, fg));
-                let stroke = border
-                    .zip(pick_na(&opts.lty, num, lty))
-                    .map(|(c, lty)| self.stroke_of(c, lwd, lty));
-                self.backend.draw_polygon(&run, fill, stroke.as_ref());
-                num += 1;
-            }
-            run.clear();
-        }
+        let lwd: Vec<Option<f64>> = opts.lwd.map(Some).into_iter().collect();
+        let style = ShapeStyle {
+            col: &opts.col,
+            border: &opts.border,
+            lty: &opts.lty,
+            lwd: &lwd,
+            density: &opts.density,
+            angle: &opts.angle,
+        };
+        self.polygons(x, y, &style);
         self.pop_clip();
     }
 

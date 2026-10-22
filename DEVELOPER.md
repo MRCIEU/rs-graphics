@@ -155,8 +155,7 @@ To keep this a tractable "core functionality" port, the following R
 `image()`/raster images, `symbols()`, `smoothScatter()`,
 `cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
 fonts, the plotmath constructs listed above, and interactive input
-(`identify()`/`locator()`). `barplot()` doesn't
-support `density`/`angle` hatching. These would be
+(`identify()`/`locator()`). These would be
 reasonable follow-ups but are left for future work.
 
 ## Design notes
@@ -333,6 +332,11 @@ against a real R installation by shelling out to `Rscript`:
   `title()`, `mtext()` (inner, outer, perpendicular), `text()` (`adj`,
   `srt`, `cex`, `col`) and `legend()` (labels incl. a tall one, title):
   every text item's font, size, origin and string, and every stroke.
+- `tests/all/hatch_matches_r.rs` - shading lines (`density`/`angle`) in
+  `polygon()`, `rect()`, `barplot()` (beside, stacked, `orderH`,
+  horizontal, legend) and `legend()`: both hatching branches, winding,
+  `NA`/0/negative densities, reversed and log axes; every painted path
+  and text item.
 - `tests/all/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
   `legend()` spacing come from the device's starting point size, not a
   later `par(ps)`, as R's `cra`.

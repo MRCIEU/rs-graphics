@@ -26,8 +26,8 @@
 //! R draws them with `text()`, they are rotated by `par(srt)`.
 //!
 //! The per-key arguments are R's vectors, recycled over the keys
-//! ([`LegendOptions`]). Not implemented: `density`/`angle` hatched fills
-//! and `trace`. Two R bugs are not copied: R's `colwise()` gives any
+//! ([`LegendOptions`]), including shaded boxes (`density`/`angle`). Not
+//! implemented: `trace`. Two R bugs are not copied: R's `colwise()` gives any
 //! column whose widths are all 0 (e.g. `x.intersp = 0`, or empty labels
 //! with `text.width = NA`) the widest column's value, meant for empty
 //! columns only, which are the only ones that get it here; and with
@@ -50,6 +50,7 @@ use crate::numbers::Pair;
 use crate::plotmath::Label;
 use crate::setters::{char_pch, pick_na};
 
+use super::hatch::ShapeStyle;
 use super::{Device, Xpd};
 
 /// Where to put a legend: R's `legend(x, y)` forms.
@@ -367,8 +368,8 @@ legend_pch_impls!(@each char, |c: char| Some(char_pch(c)), |c: Option<char>| c.m
 /// `text_col`, `text_font`) are recycled over the keys, as in R. A `None`
 /// element is R's `NA` for that key (`.pch([Some(19), None])`): the
 /// field says what it does. Which parts a key has follows R's rules:
-/// - a box, if `fill` is given (every key gets one; a `None` fill is an
-///   empty box);
+/// - a box, if `fill` or `density` is given (every key gets one; a `None`
+///   fill is an empty box), shaded with lines if `density` is;
 /// - a line, if `lty` has a line type other than blank, or `lwd` is given
 ///   (R: "one of these two must be specified for line drawing"; `lty` is
 ///   then solid); keys whose `lty` or `lwd` is `None`, or whose `lty` is
@@ -396,6 +397,15 @@ pub struct LegendOptions {
     pub fill: Vec<ColorSpec>,
     /// Border colours of box keys; empty: black (R's default).
     pub border: Vec<ColorSpec>,
+    /// Shading lines per inch in the box keys (R's `density`; giving any
+    /// draws boxes), as for [`rect()`](crate::graphics::Graphics::rect):
+    /// the lines take the `fill` colour (empty: `par(fg)`); `None` (R's
+    /// `NA`) or negative fills the box instead, 0 leaves it empty. Empty:
+    /// no shading.
+    pub density: Vec<Option<f64>>,
+    /// Angle of the shading lines in degrees (R's `angle`), recycled over
+    /// the keys; empty: 45.
+    pub angle: Vec<f64>,
     /// `pt.bg`: fill of `pch` 21 to 25; empty: none (R's `NA`).
     pub pt_bg: Vec<ColorSpec>,
     /// `pt.cex`: size of the points; empty: `cex`.
@@ -489,6 +499,8 @@ crate::setters::setters!(LegendOptions => [LegendCall] {
     lwd: na_values f64,
     fill: values ColorSpec,
     border: values ColorSpec,
+    density: na_values f64,
+    angle: values f64,
     pt_bg: values ColorSpec,
     pt_cex: na_values f64,
     pt_lwd: na_values f64,
@@ -693,7 +705,8 @@ impl<B: Backend> Device<B> {
         let ychartitle = yextra[0] + ymaxtitle;
         let title_extra_h = if title.is_some() { ychartitle } else { 0.0 };
 
-        let has_fill = !opts.fill.is_empty();
+        // R's `mfill <- !missing(fill) || !missing(density)`.
+        let has_fill = !opts.fill.is_empty() || !opts.density.is_empty();
         let xbox: Vec<f64> = xc.iter().map(|x| x * 0.8).collect();
         let ybox: Vec<f64> = yc.iter().map(|y| y * 0.5).collect();
         let dx_fill = xbox.iter().copied().fold(0.0, f64::max);
@@ -826,23 +839,42 @@ impl<B: Backend> Device<B> {
 
         let black = ColorSpec::Color(crate::color::Color::BLACK);
         if has_fill {
-            for i in 0..n {
-                if plot {
-                    let fill = self.resolve(opts.fill[i % opts.fill.len()]);
-                    let border = self.resolve(rep(&opts.border, n, black)[i]);
-                    let stroke = border.map(|c| self.stroke_of(c, self.par.lwd, self.par.lty));
-                    self.backend.draw_rect(
-                        Rect::new(
-                            xt[i],
-                            yt[i] - ybox[i] / 2.0,
-                            xt[i] + xbox[i],
-                            yt[i] + ybox[i] / 2.0,
-                        ),
-                        fill,
-                        stroke.as_ref(),
-                    );
-                }
-                xt[i] += dx_fill;
+            if plot {
+                // `rect2(left = xt, top = yt + ybox/2, dx = xbox, dy = ybox,
+                // col = fill, density, angle, border)`: one `rect()` call,
+                // `fill` recycled over the keys. The corners go to `rect()`
+                // in data units, since shading lines are placed in them.
+                let corners: Vec<((f64, f64), (f64, f64))> = (0..n)
+                    .map(|i| {
+                        let top = yt[i] + ybox[i] / 2.0;
+                        (
+                            self.inches_to_user(Point::new(xt[i], top)),
+                            self.inches_to_user(Point::new(xt[i] + xbox[i], top - ybox[i])),
+                        )
+                    })
+                    .collect();
+                let x0: Vec<f64> = corners.iter().map(|c| c.0.0).collect();
+                let y0: Vec<f64> = corners.iter().map(|c| c.0.1).collect();
+                let x1: Vec<f64> = corners.iter().map(|c| c.1.0).collect();
+                let y1: Vec<f64> = corners.iter().map(|c| c.1.1).collect();
+                let fill = if opts.fill.is_empty() {
+                    Vec::new()
+                } else {
+                    rep(&opts.fill, n, ColorSpec::None)
+                };
+                let border = rep(&opts.border, n, black);
+                let style = ShapeStyle {
+                    col: &fill,
+                    border: &border,
+                    lty: &[],
+                    lwd: &[],
+                    density: &opts.density,
+                    angle: &opts.angle,
+                };
+                self.rects(&x0, &y0, &x1, &y1, &style);
+            }
+            for x in xt.iter_mut() {
+                *x += dx_fill;
             }
         }
 
