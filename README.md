@@ -91,6 +91,8 @@ device's arguments (`width`, `height`, `pointsize`, `bg`, `res` for PNG,
 `Device::pdf("plot.pdf").open()?` is R's `pdf("plot.pdf")`, 7 x 7 inches.
 As in R, opening the device creates the file, so a bad path fails
 before anything is drawn, and `dev.close()` (R's `dev.off()`) writes it.
+A page number in a PNG or SVG file name gives one file per page, as R's
+`png("Rplot%03d.png")`.
 Sizes are in inches for every format. The format is the function's, not
 the file name's. `Device::format(format, file)` takes the format as a
 value or a name (`"pdf"`, `"svg"`, `"png"`), for choosing it at run

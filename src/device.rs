@@ -30,8 +30,6 @@
 
 use crate::afm::{self};
 use crate::font::FontFace;
-use std::fs::File;
-use std::io::Write;
 use std::ops::{Deref, DerefMut};
 
 use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
@@ -163,9 +161,9 @@ pub struct Device<B: Backend> {
     /// `par.ps` when the device was created: R's `startps`, which sets the
     /// device's character size `cra` (`1.2 * startps` points high).
     start_ps: f64,
-    /// The file created by [`DeviceBuilder::open`], which
+    /// The file(s) of a device opened with [`DeviceBuilder::open`], which
     /// [`close`](Device::close) writes; `None` for [`Device::new`].
-    file: Option<File>,
+    output: Option<open::Output>,
 }
 
 /// A figure region set with `fig()` or `fin()`.
@@ -295,7 +293,7 @@ impl<B: Backend> Device<B> {
             hold_figure: false,
             used: false,
             start_ps: par_ps,
-            file: None,
+            output: None,
         };
         dev.recompute_layout();
         dev
@@ -317,20 +315,23 @@ impl<B: Backend> Device<B> {
 
     /// Closes the device (R's `dev.off()`): finishes the output and writes
     /// it to the file created when the device was opened
-    /// ([`DeviceBuilder::open`]). A device dropped without `close()`
-    /// leaves that file empty. A device made with [`Device::new`] has no
-    /// file: this returns an [`InvalidInput`](std::io::ErrorKind::InvalidInput)
-    /// error; use [`finish`](Device::finish) for its bytes.
+    /// ([`DeviceBuilder::open`]); with one file per page (a PNG or SVG
+    /// file name with `%d`), the last page's file. A device dropped
+    /// without `close()` leaves that file empty. Also returns the first
+    /// error from writing an earlier page's file.
+    ///
+    /// A device made with [`Device::new`] has no file: this returns an
+    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error; use
+    /// [`finish`](Device::finish) for its bytes.
     pub fn close(mut self) -> std::io::Result<()> {
-        let Some(mut file) = self.file.take() else {
+        let Some(output) = self.output.take() else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "no file to close: the device was made with Device::new; \
                  open one with Device::pdf/svg/png/format, or use finish()",
             ));
         };
-        file.write_all(&self.finish())?;
-        file.flush()
+        output.close(&self.finish())
     }
 
     /// Page width in inches (R's `par("din")[1]`).
@@ -604,6 +605,7 @@ impl<B: Backend> Device<B> {
     /// describe it.
     pub(crate) fn plot_new_impl(&mut self) {
         let mut new_page = false;
+        let had_page = self.used;
         if !self.hold_figure || !self.used {
             self.current_figure += 1;
             if self.current_figure > self.arrangement.last_figure() || !self.used {
@@ -614,6 +616,9 @@ impl<B: Backend> Device<B> {
         self.used = true;
         self.recompute_layout();
         if new_page {
+            if had_page {
+                self.next_page_file();
+            }
             self.backend.new_page();
             if self.par.bg.a > 0 {
                 self.backend.draw_rect(

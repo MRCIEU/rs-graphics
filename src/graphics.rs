@@ -128,8 +128,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   next call, also on margin text (`title()`, `mtext()`,
     ///   `axis(outer = )`), which R would place with the new `mar`/`oma`.
     /// - **New page:** what happens depends on the backend. PDF starts
-    ///   a new page in the file, SVG discards the previous page, and PNG
-    ///   paints over it. The page is then filled with `par.bg`, unless
+    ///   a new page in the file; SVG and PNG start an empty page, after
+    ///   writing the finished one to its own file if the file name has a
+    ///   page number (`"plot%03d.png"`; see
+    ///   [`DeviceBuilder::open`](crate::device::DeviceBuilder::open)), or
+    ///   else discarding it. The page is then filled with `par.bg`, unless
     ///   that is fully transparent, which it is by default on PDF (as R's
     ///   `pdf()`).
     ///

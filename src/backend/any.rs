@@ -162,6 +162,9 @@ impl Backend for AnyBackend {
     fn new_page(&mut self) {
         forward!(self, b => b.new_page())
     }
+    fn take_page(&mut self) -> Vec<u8> {
+        forward!(self, b => b.take_page())
+    }
     fn into_bytes(self) -> Vec<u8> {
         forward!(self, b => b.into_bytes())
     }

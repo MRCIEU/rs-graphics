@@ -229,9 +229,12 @@ A few fidelity-relevant decisions worth calling out:
 - **Pages.** PDF output has one page per R page, as R's `pdf()` does: a
   new page starts at each `plot_new()` on a one-figure page, when a
   multi-figure page wraps round, and after `par(fig = )` without
-  `new = TRUE`. SVG and PNG hold a single page, so a new page
-  replaces the old one (SVG) or is painted over it (PNG); R would write
-  numbered files (`png("plot%03d.png")`), which isn't implemented.
+  `new = TRUE`. SVG and PNG write one file per page when the file name
+  has a C integer format for the page number, as R's
+  `png("Rplot%03d.png")` (`FileName` in `src/device/open.rs`, R's
+  `checkIntFormat()` rules); otherwise they hold the last page. A PDF
+  file name is formatted with page 1 (R's `onefile = TRUE`; `onefile =
+  FALSE` isn't implemented).
 - **Page background.** As in R, `par("bg")` starts as the device's
   background: transparent for PDF (R's `pdf()`), white for SVG, and the
   canvas colour for PNG. Set one with `DeviceBuilder::bg`

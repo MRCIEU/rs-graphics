@@ -216,10 +216,17 @@ pub trait Backend {
     fn default_bg(&self) -> Color;
 
     /// Start a new page. The PDF backend keeps the finished page and starts
-    /// another (one PDF page per R page); SVG, which holds a single page,
-    /// discards what was drawn; the raster backend does nothing, and the
-    /// new page's background is painted over the old one instead.
+    /// another (one PDF page per R page); SVG and the raster backend, which
+    /// hold a single page, discard what was drawn (the raster canvas goes
+    /// back to its background colour).
     fn new_page(&mut self);
+
+    /// The output so far as a finished file (what [`into_bytes`] would
+    /// give), leaving the backend as newly made with the same options:
+    /// how a device writes one file per page (R's `png("Rplot%03d.png")`).
+    ///
+    /// [`into_bytes`]: Backend::into_bytes
+    fn take_page(&mut self) -> Vec<u8>;
 
     /// The finished file: PDF or PNG bytes, or the SVG document as UTF-8.
     /// The same as each backend's own `finish()`, but available to code

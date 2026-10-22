@@ -287,6 +287,11 @@ impl Backend for SvgBackend {
         Color::WHITE
     }
 
+    fn take_page(&mut self) -> Vec<u8> {
+        let fresh = SvgBackend::new(self.width_in, self.height_in);
+        std::mem::replace(self, fresh).finish().into_bytes()
+    }
+
     fn new_page(&mut self) {
         self.body.clear();
         self.pending = None;

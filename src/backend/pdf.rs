@@ -466,6 +466,13 @@ impl Backend for PdfBackend {
         1.0 / 72.0
     }
 
+    fn take_page(&mut self) -> Vec<u8> {
+        let fresh = PdfBackend::new(self.width_in, self.height_in)
+            .with_background(self.background)
+            .with_compression(self.compress);
+        std::mem::replace(self, fresh).finish()
+    }
+
     fn new_page(&mut self) {
         let page = std::mem::take(&mut self.content);
         if self.started {

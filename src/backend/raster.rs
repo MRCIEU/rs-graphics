@@ -1466,8 +1466,22 @@ impl Backend for RasterBackend {
         requested_pt
     }
 
-    /// A new page's background is painted over the old one.
-    fn new_page(&mut self) {}
+    /// A new page starts from the background colour.
+    fn new_page(&mut self) {
+        // Pending drawing belongs to the old page.
+        self.commands.clear();
+        self.strokes.clear();
+        let bg = to_sk_color(self.background);
+        for tile in &mut self.tiles {
+            tile.pixmap.fill(bg);
+        }
+    }
+
+    fn take_page(&mut self) -> Vec<u8> {
+        let fresh = RasterBackend::new(self.width_in, self.height_in, self.dpi, self.background)
+            .with_threads(self.threads);
+        std::mem::replace(self, fresh).finish()
+    }
 
     fn push_clip(&mut self, rect: Rect) {
         let (x0, y1) = self.to_px(Point::new(rect.x0, rect.y1));
@@ -1655,6 +1669,23 @@ impl Backend for RasterBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A new page starts from the background, also when the old page's
+    /// drawing has already been painted (flushed) into the tiles.
+    #[test]
+    fn new_page_clears_painted_drawing() {
+        for threads in [1, 4] {
+            let blank = RasterBackend::new(2.0, 2.0, 72.0, Color::TRANSPARENT)
+                .with_threads(threads)
+                .finish();
+            let mut b =
+                RasterBackend::new(2.0, 2.0, 72.0, Color::TRANSPARENT).with_threads(threads);
+            b.draw_circle(Point::new(1.0, 1.0), 0.5, Some(Color::rgb(255, 0, 0)), None);
+            b.flush();
+            b.new_page();
+            assert!(b.finish() == blank, "{threads} threads");
+        }
+    }
 
     /// Stamping blends exactly as tiny-skia paints the same shape at the
     /// same coordinates: opaque and translucent, with and without a clip.

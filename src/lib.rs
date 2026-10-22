@@ -58,7 +58,9 @@
 //! opens the device and creates the file (so a bad path fails before any
 //! drawing), and [`close`](device::Device::close) (R's `dev.off()`)
 //! writes it. The format is always the constructor's, never the
-//! file name's (`Device::pdf("x.png")` writes a PDF, as R's `pdf()`).
+//! file name's (`Device::pdf("x.png")` writes a PDF, as R's `pdf()`). A
+//! page number in a PNG or SVG file name (`"Rplot%03d.png"`) gives one
+//! file per page, as in R.
 //! [`Device::new`](device::Device::new) takes a backend directly instead:
 //! for output kept in memory ([`finish`](device::Device::finish)) and
 //! backend options the builder doesn't cover.
