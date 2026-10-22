@@ -36,8 +36,12 @@
 //! one by one: each distinct shape is rasterized once per sub-pixel
 //! position used (on a 1/16-pixel grid) and its coverage is stamped, with
 //! the shape moved by at most 1/32 of a pixel (`Stamps`). This is several
-//! times faster on any number of threads.
+//! times faster on any number of threads. Finding the repeated shapes is
+//! itself done in parallel, in chunks of commands, and stroked circles and
+//! straight lines (outlined symbols) are recorded without building their
+//! paths (`StrokeGeom`), which the painting threads build if needed.
 
+use std::borrow::Cow;
 use std::sync::{Mutex, OnceLock};
 
 use ab_glyph::{Font, FontArc, Glyph as AbGlyph};
@@ -135,7 +139,7 @@ enum Op {
     },
     /// `stroke` indexes `RasterBackend::strokes`.
     Stroke {
-        path: Box<Path>,
+        geom: StrokeGeom,
         color: Color,
         stroke: u32,
     },
@@ -152,6 +156,48 @@ enum Op {
         samples: Box<[(i32, i32, f32)]>,
         color: Color,
     },
+}
+
+/// What an `Op::Stroke` draws: a path, or a circle or straight line kept
+/// unbuilt (as `Op::Circle`), whose path the painting thread builds.
+/// Outlined plotting symbols are these, and building millions of paths
+/// while recording, on one thread, was most of their drawing time.
+enum StrokeGeom {
+    Path(Box<Path>),
+    Circle { cx: f32, cy: f32, r: f32 },
+    Line([f32; 4]),
+}
+
+impl StrokeGeom {
+    /// The path (built for a circle or line).
+    fn path(&self) -> Option<Cow<'_, Path>> {
+        match self {
+            StrokeGeom::Path(p) => Some(Cow::Borrowed(p)),
+            StrokeGeom::Circle { cx, cy, r } => {
+                PathBuilder::from_circle(*cx, *cy, *r).map(Cow::Owned)
+            }
+            StrokeGeom::Line([x0, y0, x1, y1]) => {
+                let mut pb = PathBuilder::new();
+                pb.move_to(*x0, *y0);
+                pb.line_to(*x1, *y1);
+                pb.finish().map(Cow::Owned)
+            }
+        }
+    }
+
+    /// The path's bounds `(left, top, right, bottom)`.
+    fn bounds(&self) -> (f32, f32, f32, f32) {
+        match self {
+            StrokeGeom::Path(p) => {
+                let b = p.bounds();
+                (b.left(), b.top(), b.right(), b.bottom())
+            }
+            StrokeGeom::Circle { cx, cy, r } => (cx - r, cy - r, cx + r, cy + r),
+            StrokeGeom::Line([x0, y0, x1, y1]) => {
+                (x0.min(*x1), y0.min(*y1), x0.max(*x1), y0.max(*y1))
+            }
+        }
+    }
 }
 
 struct Command {
@@ -200,6 +246,9 @@ enum ShapeKind {
     Fill,
     /// A stroked path (an `Op::Stroke`) in this style.
     Stroke(SkStroke),
+    /// A stroked circle of this radius (an `Op::Stroke` of a
+    /// `StrokeGeom::Circle`) in this style, its reference point the centre.
+    StrokeCircle(f32, SkStroke),
 }
 
 /// A shape that repeats across commands (e.g. a plotting symbol), drawn by
@@ -227,7 +276,9 @@ impl StampShape {
     fn new(kind: ShapeKind, verbs: Vec<u8>, points: Vec<(i32, i32)>) -> Self {
         let (mut x0, mut y0, mut x1, mut y1) = (0f32, 0f32, 0f32, 0f32);
         match kind {
-            ShapeKind::Circle(r) => (x0, y0, x1, y1) = (-r, -r, r, r),
+            ShapeKind::Circle(r) | ShapeKind::StrokeCircle(r, _) => {
+                (x0, y0, x1, y1) = (-r, -r, r, r)
+            }
             _ => {
                 for &(x, y) in &points {
                     let (x, y) = (x as f32 / SHAPE_SUB, y as f32 / SHAPE_SUB);
@@ -238,10 +289,12 @@ impl StampShape {
         // Room for anti-aliasing, and for the stroke: mitre joins can reach
         // `miter_limit * width / 2` out, square caps `width / sqrt(2)`.
         let pad = match &kind {
-            ShapeKind::Stroke(s) if s.line_join == tiny_skia::LineJoin::Miter => {
+            ShapeKind::Stroke(s) | ShapeKind::StrokeCircle(_, s)
+                if s.line_join == tiny_skia::LineJoin::Miter =>
+            {
                 s.width * s.miter_limit.max(1.5) / 2.0 + 2.0
             }
-            ShapeKind::Stroke(s) => s.width * 0.75 + 2.0,
+            ShapeKind::Stroke(s) | ShapeKind::StrokeCircle(_, s) => s.width * 0.75 + 2.0,
             _ => 2.0,
         };
         let dx = (x0 - pad).floor() as i32;
@@ -276,7 +329,9 @@ impl StampShape {
             let paint = paint_for(Color::BLACK);
             let id = Transform::identity();
             match &self.kind {
-                ShapeKind::Stroke(stroke) => pixmap.stroke_path(&path, &paint, stroke, id, None),
+                ShapeKind::Stroke(stroke) | ShapeKind::StrokeCircle(_, stroke) => {
+                    pixmap.stroke_path(&path, &paint, stroke, id, None)
+                }
                 _ => pixmap.fill_path(&path, &paint, FillRule::Winding, id, None),
             }
         }
@@ -286,7 +341,9 @@ impl StampShape {
     /// The shape's path with its reference point at `(ox, oy)`.
     fn path_at(&self, ox: f32, oy: f32) -> Option<Path> {
         match self.kind {
-            ShapeKind::Circle(r) => PathBuilder::from_circle(ox, oy, r),
+            ShapeKind::Circle(r) | ShapeKind::StrokeCircle(r, _) => {
+                PathBuilder::from_circle(ox, oy, r)
+            }
             _ => {
                 let mut pb = PathBuilder::new();
                 let mut pts = self
@@ -332,9 +389,12 @@ const VERB_CLOSE: u8 = 4;
 fn reference_point(op: &Op) -> Option<(f32, f32)> {
     match op {
         Op::Circle { cx, cy, .. } => Some((*cx, *cy)),
-        Op::Fill { path, .. } | Op::Stroke { path, .. } => {
-            path.points().first().map(|p| (p.x, p.y))
-        }
+        Op::Stroke { geom, .. } => match geom {
+            StrokeGeom::Path(path) => path.points().first().map(|p| (p.x, p.y)),
+            StrokeGeom::Circle { cx, cy, .. } => Some((*cx, *cy)),
+            StrokeGeom::Line([x0, y0, ..]) => Some((*x0, *y0)),
+        },
+        Op::Fill { path, .. } => path.points().first().map(|p| (p.x, p.y)),
         Op::Glyphs { .. } => None,
     }
 }
@@ -369,116 +429,252 @@ struct Stamps {
     sprites: Vec<Vec<u8>>,
 }
 
+/// A command's stamp key: its kind (with the stroke style) and, for
+/// paths and lines, its verbs and points relative to its reference point
+/// (left in the `verbs`/`points` buffers passed with it).
+#[derive(Clone, Copy, PartialEq)]
+enum Key<'a> {
+    Circle(f32),
+    Fill,
+    Stroke(&'a SkStroke),
+    StrokeCircle(f32, &'a SkStroke),
+}
+
+/// The key of command `c`, or `None` if it isn't stamped (too big, dashed,
+/// a translucent hairline, glyphs).
+fn stamp_key<'a>(
+    c: &Command,
+    strokes: &'a [SkStroke],
+    verbs: &mut Vec<u8>,
+    points: &mut Vec<(i32, i32)>,
+) -> Option<Key<'a>> {
+    let (rx, ry) = reference_point(&c.op)?;
+    verbs.clear();
+    points.clear();
+    let rel = |x: f32, y: f32| {
+        (
+            ((x - rx) * SHAPE_SUB).round() as i32,
+            ((y - ry) * SHAPE_SUB).round() as i32,
+        )
+    };
+    let mut path_key = |path: &Path| {
+        verbs.extend(path.segments().map(|seg| match seg {
+            tiny_skia::PathSegment::MoveTo(_) => VERB_MOVE,
+            tiny_skia::PathSegment::LineTo(_) => VERB_LINE,
+            tiny_skia::PathSegment::QuadTo(..) => VERB_QUAD,
+            tiny_skia::PathSegment::CubicTo(..) => VERB_CUBIC,
+            tiny_skia::PathSegment::Close => VERB_CLOSE,
+        }));
+        points.extend(path.points().iter().map(|p| rel(p.x, p.y)));
+    };
+    match &c.op {
+        Op::Circle { r, .. } if *r <= STAMP_MAX_SIZE / 2.0 => Some(Key::Circle(*r)),
+        Op::Fill { path, .. } if small(path) => {
+            path_key(path);
+            Some(Key::Fill)
+        }
+        Op::Stroke {
+            geom,
+            stroke,
+            color,
+        } => {
+            let s = &strokes[*stroke as usize];
+            let (l, t, r, b) = geom.bounds();
+            let small = r - l <= STAMP_MAX_SIZE && b - t <= STAMP_MAX_SIZE;
+            if !small || s.dash.is_some() || s.width > STAMP_MAX_STROKE {
+                return None;
+            }
+            // tiny-skia scales a hairline's colour by its width. For an
+            // opaque colour stamping matches that to two levels, but a
+            // translucent one compounds the rounding.
+            if s.width <= 1.0 && color.a != 255 {
+                return None;
+            }
+            match geom {
+                StrokeGeom::Circle { r, .. } => return Some(Key::StrokeCircle(*r, s)),
+                StrokeGeom::Path(path) => path_key(path),
+                // As the path `move_to(x0, y0)`, `line_to(x1, y1)` would give.
+                StrokeGeom::Line([x0, y0, x1, y1]) => {
+                    verbs.extend([VERB_MOVE, VERB_LINE]);
+                    points.extend([rel(*x0, *y0), rel(*x1, *y1)]);
+                }
+            }
+            Some(Key::Stroke(s))
+        }
+        _ => None,
+    }
+}
+
+/// Whether `shape` is the shape of `key` with `verbs`/`points`.
+fn same_shape(shape: &StampShape, key: Key, verbs: &[u8], points: &[(i32, i32)]) -> bool {
+    match (&shape.kind, key) {
+        (ShapeKind::Circle(a), Key::Circle(r)) => *a == r,
+        (ShapeKind::StrokeCircle(a, sa), Key::StrokeCircle(r, s)) => *a == r && sa == s,
+        (ShapeKind::Fill, Key::Fill) => shape.verbs == verbs && shape.points == points,
+        (ShapeKind::Stroke(a), Key::Stroke(s)) => {
+            a == s && shape.verbs == verbs && shape.points == points
+        }
+        _ => false,
+    }
+}
+
+/// The key of an existing shape (its verbs and points are its own).
+fn shape_key(shape: &StampShape) -> Key<'_> {
+    match &shape.kind {
+        ShapeKind::Circle(r) => Key::Circle(*r),
+        ShapeKind::Fill => Key::Fill,
+        ShapeKind::Stroke(s) => Key::Stroke(s),
+        ShapeKind::StrokeCircle(r, s) => Key::StrokeCircle(*r, s),
+    }
+}
+
+/// Distinct shapes found so far, looked up by key.
+#[derive(Default)]
+struct ShapeTable {
+    shapes: Vec<StampShape>,
+    by_hash: std::collections::HashMap<u64, Vec<u32>>,
+    /// The last shape found (most commands repeat the previous one).
+    last: Option<u32>,
+}
+
+impl ShapeTable {
+    /// The shape of `key` with `verbs`/`points`, added if new and there
+    /// are fewer than `STAMP_MAX_SHAPES`.
+    fn find_or_add(&mut self, key: Key, verbs: &[u8], points: &[(i32, i32)]) -> Option<u32> {
+        if let Some(k) = self
+            .last
+            .filter(|&k| same_shape(&self.shapes[k as usize], key, verbs, points))
+        {
+            return Some(k);
+        }
+        let hash = shape_hash(key, verbs, points);
+        let found = self.by_hash.get(&hash).and_then(|ks| {
+            ks.iter()
+                .copied()
+                .find(|&k| same_shape(&self.shapes[k as usize], key, verbs, points))
+        });
+        let k = match found {
+            Some(k) => k,
+            None if self.shapes.len() < STAMP_MAX_SHAPES => {
+                let kind = match key {
+                    Key::Circle(r) => ShapeKind::Circle(r),
+                    Key::Fill => ShapeKind::Fill,
+                    Key::Stroke(s) => ShapeKind::Stroke(s.clone()),
+                    Key::StrokeCircle(r, s) => ShapeKind::StrokeCircle(r, s.clone()),
+                };
+                let k = self.shapes.len() as u32;
+                self.shapes
+                    .push(StampShape::new(kind, verbs.to_vec(), points.to_vec()));
+                self.by_hash.entry(hash).or_default().push(k);
+                k
+            }
+            None => return None,
+        };
+        self.last = Some(k);
+        Some(k)
+    }
+}
+
+/// Commands per chunk of `Stamps::plan`'s parallel pass (fixed, so the
+/// plan doesn't depend on the number of threads).
+const PLAN_CHUNK: usize = 1 << 16;
+
+/// A command of a chunk whose shape the chunk's own table couldn't hold.
+const UNRESOLVED: u32 = u32::MAX - 1;
+
 impl Stamps {
-    /// Choose the stamped commands of `commands`.
-    fn plan(commands: &[Command], strokes: &[SkStroke]) -> Self {
+    /// Choose the stamped commands of `commands`, on up to `threads`
+    /// threads.
+    ///
+    /// Finding each command's shape (its key, compared with the shapes
+    /// seen) is the costly part, so chunks of `PLAN_CHUNK` commands are
+    /// done in parallel, each with its own table of shapes; then, in
+    /// order, each chunk's shapes are looked up in (or added to) the
+    /// final table and each command gets its sprite. Shapes are added in
+    /// order of first use either way, as when done in one pass.
+    fn plan(commands: &[Command], strokes: &[SkStroke], threads: usize) -> Self {
+        // Per chunk: its shapes, and each command's shape in them (or
+        // `NO_SPRITE`, or `UNRESOLVED`).
+        let local = |chunk: &[Command]| -> (Vec<StampShape>, Vec<u32>) {
+            let mut table = ShapeTable::default();
+            let (mut verbs, mut points) = (Vec::new(), Vec::new());
+            let of = chunk
+                .iter()
+                .map(|c| match stamp_key(c, strokes, &mut verbs, &mut points) {
+                    None => NO_SPRITE,
+                    Some(key) => table
+                        .find_or_add(key, &verbs, &points)
+                        .unwrap_or(UNRESOLVED),
+                })
+                .collect();
+            (table.shapes, of)
+        };
+        let chunks: Vec<&[Command]> = commands.chunks(PLAN_CHUNK).collect();
+        let threads = threads.min(chunks.len()).max(1);
+        let locals: Vec<(Vec<StampShape>, Vec<u32>)> = if threads <= 1 {
+            chunks.iter().map(|c| local(c)).collect()
+        } else {
+            let next = std::sync::atomic::AtomicUsize::new(0);
+            let mut results: Vec<Option<(Vec<StampShape>, Vec<u32>)>> =
+                (0..chunks.len()).map(|_| None).collect();
+            let slots: Vec<Mutex<&mut Option<_>>> = results.iter_mut().map(Mutex::new).collect();
+            std::thread::scope(|s| {
+                for _ in 0..threads {
+                    s.spawn(|| {
+                        loop {
+                            let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let Some(chunk) = chunks.get(i) else { break };
+                            **slots[i].lock().unwrap() = Some(local(chunk));
+                        }
+                    });
+                }
+            });
+            drop(slots);
+            results
+                .into_iter()
+                .map(|r| r.expect("every chunk planned"))
+                .collect()
+        };
+
+        let mut table = ShapeTable::default();
         let mut stamps = Stamps {
             shapes: Vec::new(),
             sprite_of: vec![NO_SPRITE; commands.len()],
             sprite_keys: Vec::new(),
             sprites: Vec::new(),
         };
-        // Shapes by hash of their key, and the last shape found (most
-        // commands repeat the previous one).
-        let mut by_hash: std::collections::HashMap<u64, Vec<u32>> = Default::default();
-        let mut last: Option<u32> = None;
         let (mut verbs, mut points) = (Vec::new(), Vec::new());
-        for (i, c) in commands.iter().enumerate() {
-            let Some((rx, ry)) = reference_point(&c.op) else {
-                continue;
-            };
-            // The stroke style, or `None` for fills; skip what isn't stamped.
-            let stroke = match &c.op {
-                Op::Circle { r, .. } if *r <= STAMP_MAX_SIZE / 2.0 => None,
-                Op::Fill { path, .. } if small(path) => None,
-                Op::Stroke {
-                    path,
-                    stroke,
-                    color,
-                } => {
-                    let s = &strokes[*stroke as usize];
-                    if !small(path) || s.dash.is_some() || s.width > STAMP_MAX_STROKE {
+        for (n, (shapes, of)) in locals.iter().enumerate() {
+            let remap: Vec<Option<u32>> = shapes
+                .iter()
+                .map(|sh| table.find_or_add(shape_key(sh), &sh.verbs, &sh.points))
+                .collect();
+            for (j, &l) in of.iter().enumerate() {
+                let i = n * PLAN_CHUNK + j;
+                let c = &commands[i];
+                let shape = match l {
+                    NO_SPRITE => continue,
+                    UNRESOLVED => match stamp_key(c, strokes, &mut verbs, &mut points) {
+                        Some(key) => table.find_or_add(key, &verbs, &points),
+                        None => None,
+                    },
+                    l => remap[l as usize],
+                };
+                let Some(shape) = shape else { continue };
+                let (rx, ry) = reference_point(&c.op).expect("stamped commands have one");
+                let (_, _, sub) = snap(rx, ry);
+                let slot = &mut table.shapes[shape as usize].sprite[sub as usize];
+                if *slot == NO_SPRITE {
+                    if stamps.sprite_keys.len() == STAMP_MAX_SPRITES {
                         continue;
                     }
-                    // tiny-skia scales a hairline's colour by its width. For
-                    // an opaque colour stamping matches that to two levels,
-                    // but a translucent one compounds the rounding.
-                    if s.width <= 1.0 && color.a != 255 {
-                        continue;
-                    }
-                    Some(s)
+                    *slot = stamps.sprite_keys.len() as u32;
+                    stamps.sprite_keys.push((shape, sub));
                 }
-                _ => continue,
-            };
-            verbs.clear();
-            points.clear();
-            if let Op::Fill { path, .. } | Op::Stroke { path, .. } = &c.op {
-                verbs.extend(path.segments().map(|seg| match seg {
-                    tiny_skia::PathSegment::MoveTo(_) => VERB_MOVE,
-                    tiny_skia::PathSegment::LineTo(_) => VERB_LINE,
-                    tiny_skia::PathSegment::QuadTo(..) => VERB_QUAD,
-                    tiny_skia::PathSegment::CubicTo(..) => VERB_CUBIC,
-                    tiny_skia::PathSegment::Close => VERB_CLOSE,
-                }));
-                points.extend(path.points().iter().map(|p| {
-                    (
-                        ((p.x - rx) * SHAPE_SUB).round() as i32,
-                        ((p.y - ry) * SHAPE_SUB).round() as i32,
-                    )
-                }));
+                stamps.sprite_of[i] = *slot;
             }
-            let same = |shape: &StampShape| match (&shape.kind, &c.op) {
-                (ShapeKind::Circle(a), Op::Circle { r, .. }) => a == r,
-                (ShapeKind::Fill, Op::Fill { .. }) => {
-                    shape.verbs == verbs && shape.points == points
-                }
-                (ShapeKind::Stroke(a), Op::Stroke { .. }) => {
-                    Some(a) == stroke && shape.verbs == verbs && shape.points == points
-                }
-                _ => false,
-            };
-            let shape = match last.filter(|&k| same(&stamps.shapes[k as usize])) {
-                Some(k) => k,
-                None => {
-                    let hash = shape_hash(&c.op, stroke, &verbs, &points);
-                    let found = by_hash.get(&hash).and_then(|ks| {
-                        ks.iter()
-                            .copied()
-                            .find(|&k| same(&stamps.shapes[k as usize]))
-                    });
-                    match found {
-                        Some(k) => k,
-                        None if stamps.shapes.len() < STAMP_MAX_SHAPES => {
-                            let kind = match &c.op {
-                                Op::Circle { r, .. } => ShapeKind::Circle(*r),
-                                Op::Fill { .. } => ShapeKind::Fill,
-                                _ => ShapeKind::Stroke(stroke.expect("a stroke").clone()),
-                            };
-                            let k = stamps.shapes.len() as u32;
-                            stamps.shapes.push(StampShape::new(
-                                kind,
-                                verbs.clone(),
-                                points.clone(),
-                            ));
-                            by_hash.entry(hash).or_default().push(k);
-                            k
-                        }
-                        None => continue,
-                    }
-                }
-            };
-            last = Some(shape);
-            let (_, _, sub) = snap(rx, ry);
-            let slot = &mut stamps.shapes[shape as usize].sprite[sub as usize];
-            if *slot == NO_SPRITE {
-                if stamps.sprite_keys.len() == STAMP_MAX_SPRITES {
-                    continue;
-                }
-                *slot = stamps.sprite_keys.len() as u32;
-                stamps.sprite_keys.push((shape, sub));
-            }
-            stamps.sprite_of[i] = *slot;
         }
+        stamps.shapes = table.shapes;
         stamps
     }
 
@@ -542,15 +738,23 @@ fn small(path: &Path) -> bool {
 }
 
 /// A hash of a shape's key (see `Stamps::plan`).
-fn shape_hash(op: &Op, stroke: Option<&SkStroke>, verbs: &[u8], points: &[(i32, i32)]) -> u64 {
+fn shape_hash(key: Key, verbs: &[u8], points: &[(i32, i32)]) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    match op {
-        Op::Circle { r, .. } => (0u8, r.to_bits()).hash(&mut h),
-        _ => {
-            if let Some(s) = stroke {
-                (1u8, s.width.to_bits(), s.miter_limit.to_bits()).hash(&mut h);
-                (s.line_cap as u8, s.line_join as u8).hash(&mut h);
+    let style = |s: &SkStroke, h: &mut std::collections::hash_map::DefaultHasher| {
+        (s.width.to_bits(), s.miter_limit.to_bits()).hash(h);
+        (s.line_cap as u8, s.line_join as u8).hash(h);
+    };
+    match key {
+        Key::Circle(r) => (0u8, r.to_bits()).hash(&mut h),
+        Key::StrokeCircle(r, s) => {
+            (2u8, r.to_bits()).hash(&mut h);
+            style(s, &mut h);
+        }
+        Key::Fill | Key::Stroke(_) => {
+            if let Key::Stroke(s) = key {
+                1u8.hash(&mut h);
+                style(s, &mut h);
             }
             verbs.hash(&mut h);
             points.hash(&mut h);
@@ -817,6 +1021,10 @@ impl RasterBackend {
     }
 
     fn stroke_shape(&mut self, path: Path, stroke: &Stroke) {
+        self.stroke_geom(StrokeGeom::Path(Box::new(path)), stroke);
+    }
+
+    fn stroke_geom(&mut self, geom: StrokeGeom, stroke: &Stroke) {
         if matches!(stroke.lty, LineType::Blank) {
             return;
         }
@@ -826,15 +1034,10 @@ impl RasterBackend {
         if self.strokes.last() != Some(&sk_stroke) {
             self.strokes.push(sk_stroke);
         }
-        let b = path.bounds();
-        let bounds = (
-            b.left() - pad,
-            b.top() - pad,
-            b.right() + pad,
-            b.bottom() + pad,
-        );
+        let (l, t, r, b) = geom.bounds();
+        let bounds = (l - pad, t - pad, r + pad, b + pad);
         let op = Op::Stroke {
-            path: Box::new(path),
+            geom,
             color: stroke.color,
             stroke: (self.strokes.len() - 1) as u32,
         };
@@ -887,7 +1090,7 @@ impl RasterBackend {
         let (w, h) = (self.width_px as f32, self.height_px as f32);
         let in_canvas =
             |r: &SkRect| r.left() >= 0.0 && r.top() >= 0.0 && r.right() <= w && r.bottom() <= h;
-        let mut stamps = Stamps::plan(&self.commands, &self.strokes);
+        let mut stamps = Stamps::plan(&self.commands, &self.strokes, self.threads);
         stamps.render(self.threads);
         let mut bins: Vec<Vec<u32>> = vec![Vec::new(); self.tiles.len()];
         // Hairlines that a tile would cut (see `Prepainted`), in order.
@@ -962,13 +1165,14 @@ impl RasterBackend {
         let prepaint = |&i: &u32| -> Option<Prepainted> {
             let c = &self.commands[i as usize];
             let Op::Stroke {
-                path,
+                geom,
                 color,
                 stroke,
             } = &c.op
             else {
                 unreachable!("only strokes are hairlines")
             };
+            let path = geom.path()?;
             let r = hairline_bounds(c, &self.strokes)?;
             let x = r.left().floor().max(0.0) as i32;
             let y = r.top().floor().max(0.0) as i32;
@@ -977,7 +1181,7 @@ impl RasterBackend {
             let mut pixmap = Pixmap::new((x1 - x).max(0) as u32, (y1 - y).max(0) as u32)?;
             let to_pixmap = Transform::from_translate(-x as f32, -y as f32);
             let stroke = &self.strokes[*stroke as usize];
-            pixmap.stroke_path(path, &paint_for(*color), stroke, to_pixmap, None);
+            pixmap.stroke_path(&path, &paint_for(*color), stroke, to_pixmap, None);
             Some(Prepainted { x, y, pixmap })
         };
         let threads = self.threads.min(cut.len());
@@ -1053,18 +1257,18 @@ fn with_resolution(png: Vec<u8>, dpi: f64) -> Vec<u8> {
 /// output changes slightly along the whole segment wherever the pixmap
 /// edge cuts it, unlike wider strokes and fills.
 fn hairline_bounds(c: &Command, strokes: &[SkStroke]) -> Option<SkRect> {
-    let Op::Stroke { path, stroke, .. } = &c.op else {
+    let Op::Stroke { geom, stroke, .. } = &c.op else {
         return None;
     };
     if strokes[*stroke as usize].width > 1.0 {
         return None;
     }
-    let b = path.bounds();
+    let (l, t, r, b) = geom.bounds();
     SkRect::from_ltrb(
-        b.left() - HAIRLINE_MARGIN,
-        b.top() - HAIRLINE_MARGIN,
-        b.right() + HAIRLINE_MARGIN,
-        b.bottom() + HAIRLINE_MARGIN,
+        l - HAIRLINE_MARGIN,
+        t - HAIRLINE_MARGIN,
+        r + HAIRLINE_MARGIN,
+        b + HAIRLINE_MARGIN,
     )
 }
 
@@ -1110,7 +1314,7 @@ impl PaintContext<'_> {
                     pixmap.fill_path(path, &paint_for(*color), FillRule::Winding, to_tile, mask);
                 }
                 Op::Stroke {
-                    path,
+                    geom,
                     color,
                     stroke,
                 } => {
@@ -1130,7 +1334,9 @@ impl PaintContext<'_> {
                         continue;
                     }
                     let stroke = &self.strokes[*stroke as usize];
-                    pixmap.stroke_path(path, &paint_for(*color), stroke, to_tile, mask);
+                    if let Some(path) = geom.path() {
+                        pixmap.stroke_path(&path, &paint_for(*color), stroke, to_tile, mask);
+                    }
                 }
                 Op::Circle { cx, cy, r, color } => {
                     if let Some(path) = PathBuilder::from_circle(*cx, *cy, *r) {
@@ -1288,8 +1494,10 @@ impl Backend for RasterBackend {
     }
 
     fn draw_line(&mut self, p0: Point, p1: Point, stroke: &Stroke) {
-        if let Some(path) = self.path_from_points(&[p0, p1], false) {
-            self.stroke_shape(path, stroke);
+        let ((x0, y0), (x1, y1)) = (self.to_px(p0), self.to_px(p1));
+        // `PathBuilder` refuses paths with non-finite points; so do we.
+        if [x0, y0, x1, y1].iter().all(|v| v.is_finite()) {
+            self.stroke_geom(StrokeGeom::Line([x0, y0, x1, y1]), stroke);
         }
     }
 
@@ -1353,8 +1561,9 @@ impl Backend for RasterBackend {
             self.fill_circle(cx, cy, r.max(0.01), c);
         }
         if let Some(s) = stroke {
-            if let Some(path) = PathBuilder::from_circle(cx, cy, r.max(0.01)) {
-                self.stroke_shape(path, s);
+            let r = r.max(0.01);
+            if [cx, cy, r].iter().all(|v| v.is_finite()) {
+                self.stroke_geom(StrokeGeom::Circle { cx, cy, r }, s);
             }
         }
     }
@@ -1450,9 +1659,9 @@ mod tests {
     /// Stamping blends exactly as tiny-skia paints the same shape at the
     /// same coordinates: opaque and translucent, with and without a clip.
     /// Hairlines (strokes at most a pixel wide) are only stamped in opaque
-    /// colours, and may differ by two levels: tiny-skia scales their colour
-    /// by their width before blending, which rounds once more (twice where
-    /// segments overlap).
+    /// colours, and may differ by two levels (three on a curve): tiny-skia
+    /// scales their colour by their width before blending, which rounds
+    /// once more (twice where segments overlap).
     #[test]
     fn stamped_shapes_match_painted_paths() {
         let thick = SkStroke {
@@ -1482,15 +1691,23 @@ mod tests {
             ),
             (
                 StampShape::new(
-                    ShapeKind::Stroke(thick),
+                    ShapeKind::Stroke(thick.clone()),
                     poly(&square[..4]),
                     square[..4].to_vec(),
                 ),
                 0,
             ),
             (
-                StampShape::new(ShapeKind::Stroke(hair), poly(&tri), tri.to_vec()),
+                StampShape::new(ShapeKind::Stroke(hair.clone()), poly(&tri), tri.to_vec()),
                 2,
+            ),
+            (
+                StampShape::new(ShapeKind::StrokeCircle(3.1, thick), vec![], vec![]),
+                0,
+            ),
+            (
+                StampShape::new(ShapeKind::StrokeCircle(2.4, hair), vec![], vec![]),
+                3,
             ),
         ];
         let colors = [Color::rgb(200, 30, 30), Color::rgba(0, 0, 160, 128)];
@@ -1509,11 +1726,14 @@ mod tests {
                     let mut painted = Pixmap::new(shape.w, shape.h).unwrap();
                     painted.fill(tiny_skia::Color::from_rgba8(240, 230, 140, 255));
                     let mut stamped = painted.clone();
-                    let hairline = matches!(&shape.kind, ShapeKind::Stroke(s) if s.width <= 1.0);
+                    let hairline = matches!(&shape.kind,
+                        ShapeKind::Stroke(s) | ShapeKind::StrokeCircle(_, s) if s.width <= 1.0);
                     for color in colors.into_iter().filter(|c| !hairline || c.a == 255) {
                         let (paint, id) = (paint_for(color), Transform::identity());
                         match &shape.kind {
-                            ShapeKind::Stroke(s) => painted.stroke_path(&path, &paint, s, id, mask),
+                            ShapeKind::Stroke(s) | ShapeKind::StrokeCircle(_, s) => {
+                                painted.stroke_path(&path, &paint, s, id, mask)
+                            }
                             _ => painted.fill_path(&path, &paint, FillRule::Winding, id, mask),
                         }
                         blend_coverage(&mut stamped, mask, (0, 0), &cov, shape.w as i32, color);
