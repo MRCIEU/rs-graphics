@@ -207,8 +207,8 @@ A few fidelity-relevant decisions worth calling out:
   `par(ps)` doesn't change it, and it doesn't scale with the *current*
   `cex` of text drawn in the margins, only with `mex * par(cex)` (R's
   `cexbase`), which takes effect at the next `plot.new()`. This is
-  cross-checked exactly against R in `tests/device_layout_matches_r.rs`,
-  `tests/layout_matches_r.rs` and `tests/start_ps_matches_r.rs`.
+  cross-checked exactly against R in `tests/all/device_layout_matches_r.rs`,
+  `tests/all/layout_matches_r.rs` and `tests/all/start_ps_matches_r.rs`.
 - **Engine bugs are deliberately *not* replicated.** Per an explicit
   scoping decision, this crate does not chase R's own internal quirks
   when they'd add complexity without improving visual fidelity - e.g.
@@ -276,186 +276,193 @@ both of the commands above.
 ## Testing
 
 ```sh
-cargo test
+cargo test                                  # everything
+cargo test --test all legend_matches_r      # one file's tests
 ```
 
+The integration tests are modules of one test binary, `tests/all/`
+(`main.rs` lists them), so cargo builds and links a single binary and
+runs every test in parallel threads. Add a new file there and a `mod`
+line to `tests/all/main.rs`. Tests that run R name their temporary files
+`rs_graphics_<module>_...` so parallel tests don't clash.
+
 Most tests are self-contained. Several integration tests
-(`tests/*_matches_r.rs`) additionally cross-check numeric output
+(`tests/all/*_matches_r.rs`) additionally cross-check numeric output
 against a real R installation by shelling out to `Rscript`:
 
-- `tests/pretty_matches_r.rs` - `GEPretty()` vs. `par("xaxp")`.
-- `tests/afm_matches_r.rs` - `strwidth()` metrics (1% tolerance, see
+- `tests/all/pretty_matches_r.rs` - `GEPretty()` vs. `par("xaxp")`.
+- `tests/all/afm_matches_r.rs` - `strwidth()` metrics (1% tolerance, see
   the kerning-bug note above).
-- `tests/device_layout_matches_r.rs` - plot region size (`par("pin")`),
+- `tests/all/device_layout_matches_r.rs` - plot region size (`par("pin")`),
   margins (`par("mai")`), and the padded user coordinate system
   (`par("usr")`) after `plot.window()`, to 1e-6 tolerance.
-- `tests/hist_matches_r.rs` - bin edges/counts vs. `hist(x, plot =
+- `tests/all/hist_matches_r.rs` - bin edges/counts vs. `hist(x, plot =
   FALSE)`.
-- `tests/boxplot_matches_r.rs` - box/whisker/outlier stats vs.
+- `tests/all/boxplot_matches_r.rs` - box/whisker/outlier stats vs.
   `boxplot.stats()`.
-- `tests/boxplot_draw_matches_r.rs` - every painted path of `boxplot()`
+- `tests/all/boxplot_draw_matches_r.rs` - every painted path of `boxplot()`
   in drawing order (vertices, fill/stroke, colours, width, cap, dashes),
   incl. `notch`, `varwidth`, `horizontal` and all three together.
-- `tests/boxplot_extras_matches_r.rs` - `boxplot()`'s `at`/`width`,
+- `tests/all/boxplot_extras_matches_r.rs` - `boxplot()`'s `at`/`width`,
   `outline = FALSE`, drawing parameters, outlier lines, `add = TRUE`, log
   value and position axes, and `xlim`/`ylim` with `horizontal`: every
   painted path and every text item vs. R `pdf()`.
-- `tests/barplot_matches_r.rs` - bar rectangles and text origins vs. an
+- `tests/all/barplot_matches_r.rs` - bar rectangles and text origins vs. an
   uncompressed R `pdf()` for vector, stacked, `beside`, and `horiz`
   scenarios.
-- `tests/barplot_extras_matches_r.rs` - `barplot()`'s `offset` (vector,
+- `tests/all/barplot_extras_matches_r.rs` - `barplot()`'s `offset` (vector,
   `beside`, stacked), `orderH`, `add = TRUE` (with `ann` off by default)
   and `args.legend` (keyword position, `bty`, `inset`, `ncol`, `title`,
   `xjust`): every painted path and every text item vs. R `pdf()`.
-- `tests/layout_matches_r.rs` - bar rectangles and text origins for
+- `tests/all/layout_matches_r.rs` - bar rectangles and text origins for
   `mfrow`/`mfcol`/`mfg`/`oma`/`par(cex)` and `layout()` (spanning,
   `lcm()`, `respect`) vs. an uncompressed R `pdf()`.
-- `tests/pie_matches_r.rs` - every slice/tick-line vertex and text origin
+- `tests/all/pie_matches_r.rs` - every slice/tick-line vertex and text origin
   of `pie()` (square, wide and tall pages, `clockwise`, `init.angle`,
   `radius`, `par(xaxs = "i")`) vs. an uncompressed R `pdf()`.
-- `tests/text_matches_r.rs` - `text()` origins for single/two-element
+- `tests/all/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
-- `tests/text_metrics_matches_r.rs` - `Device::text_metrics` vs. R's
+- `tests/all/text_metrics_matches_r.rs` - `Device::text_metrics` vs. R's
   `strwidth()`/`strheight()`: `cex`, `font`, multi-line text, `par(ps)`,
   `par(lheight)` and a 2x2 `mfrow`.
-- `tests/colour_zero_matches_r.rs` - colour 0 is `par("bg")` (with
+- `tests/all/colour_zero_matches_r.rs` - colour 0 is `par("bg")` (with
   `pdf(bg = )`, the transparent default, and after `par(bg = )`): every
   painting operator and its colours.
-- `tests/plotmath_axis_matches_r.rs` - expression labels on all four
+- `tests/all/plotmath_axis_matches_r.rs` - expression labels on all four
   axis sides (rotation, `cex.axis`, `hadj`/`padj`, `las`), and in
   `title()`, `mtext()` (inner, outer, perpendicular), `text()` (`adj`,
   `srt`, `cex`, `col`) and `legend()` (labels incl. a tall one, title):
   every text item's font, size, origin and string, and every stroke.
-- `tests/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
+- `tests/all/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
   `legend()` spacing come from the device's starting point size, not a
   later `par(ps)`, as R's `cra`.
-- `tests/pch_matches_r.rs` - every `pch = 0:25` plus character symbols,
+- `tests/all/pch_matches_r.rs` - every `pch = 0:25` plus character symbols,
   for several `col`/`bg`/`cex`/`lwd`/`par(cex)` combinations: each painted
   path's bounding box, fill/stroke operator, colours, line width and cap,
   and each character's text origin/size, vs. an uncompressed R `pdf()`.
-- `tests/mtext_matches_r.rs` - `mtext()` on every side, inner and outer
+- `tests/all/mtext_matches_r.rs` - `mtext()` on every side, inner and outer
   margins, with `line`/`at`/`adj`/`padj`/`cex`/`font` and `las = 0..3`, in
   a 2x2 `mfrow` page with `oma`: text origins, sizes and rotations.
-- `tests/arrows_matches_r.rs` - every shaft and head vertex for heads at
+- `tests/all/arrows_matches_r.rs` - every shaft and head vertex for heads at
   either/both ends, `angle = 90` caps, an `NA` segment and a zero-length
   arrow.
-- `tests/axis_zero_tick_matches_r.rs` - default tick labels for axes that
+- `tests/all/axis_zero_tick_matches_r.rs` - default tick labels for axes that
   straddle zero (`CreateAtVector()`'s snapping of near-zero ticks to 0).
-- `tests/axis_args_matches_r.rs` - `axis()` with `line`, `pos`, `outer`,
+- `tests/all/axis_args_matches_r.rs` - `axis()` with `line`, `pos`, `outer`,
   `tck`/`tcl`, `hadj`/`padj`, `gap.axis`, line styles and colours, `NA`
   labels, and a reversed axis under `par(xpd = TRUE)`: every axis line and tick vertex,
   colour, width and dash, and every label origin, direction and colour.
-- `tests/par_new_matches_r.rs` - `par(new = TRUE)`: a second y axis,
+- `tests/all/par_new_matches_r.rs` - `par(new = TRUE)`: a second y axis,
   overlays in a 2x2 page, `plot.new()` not resetting it, drawing and outer
   `mtext()` (not) resetting it, and setting it before plotting; every text
   origin and data-line vertex.
-- `tests/log_axis_matches_r.rs` - `plot(..., log = )` over ranges that hit
+- `tests/all/log_axis_matches_r.rs` - `plot(..., log = )` over ranges that hit
   each of R's log tick rules (1-2-5, 1-5, decimated powers of ten, a
   linear small range, a reversed axis with `at` in data units), with
   non-positive values dropped: label strings and origins, axis and tick
   segments, and the number of points drawn.
-- `tests/plot_new_matches_r.rs` - the 0..1 user coordinates `plot.new()`
+- `tests/all/plot_new_matches_r.rs` - the 0..1 user coordinates `plot.new()`
   leaves without `plot.window()` (fresh, after a log plot, with `xaxs =
   "i"`): lines, points and labels.
-- `tests/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
+- `tests/all/plot_type_b_matches_r.rs` - `plot(type = "b")`'s gapped line
   segments (short ones dropped, broken at `NA`), with `par(cex)` and a log
   axis, and `type = "c"` (the same lines, no points).
-- `tests/plot_type_h_s_matches_r.rs` - `type = "h"` (lines from y = 0, or
+- `tests/all/plot_type_h_s_matches_r.rs` - `type = "h"` (lines from y = 0, or
   the bottom of the plot on a log y axis; colours recycled, `NA` colours
   and values skipped) and `"s"`/`"S"` steps (broken at `NA`, log axes,
   `lty`/`lwd`) in `plot()`, `lines()` and `points()`: every stroked
   path's vertices, colour, width and dash.
-- `tests/log_plots_matches_r.rs` - `segments()` with ends <= 0 or `NA` on
+- `tests/all/log_plots_matches_r.rs` - `segments()` with ends <= 0 or `NA` on
   log axes, `abline()` on log-log and log-x plots
   (`h`/`v`, `a`/`b`, `untf`, `xpd = TRUE`), `hist()` with `log = "x"`/`"y"`,
   `barplot()` on log axes (vector, stacked with legend, horizontal beside
   with `xlim`), and `par(lab)` on linear and log axes: every painted path
   and text item in order.
-- `tests/abline_matches_r.rs` - `abline()` with vectors of `h`/`v`,
+- `tests/all/abline_matches_r.rs` - `abline()` with vectors of `h`/`v`,
   `a`/`b` (several lines, drawn as successive R calls; a fitted `lm()`
   line) and recycled `col`/`lty`/`lwd` (incl. `par()` defaults and log
   axes): every line's vertices, colour, width and dash pattern.
-- `tests/par_page_layout.rs` (no R needed) - a device's `par()` page
+- `tests/all/par_page_layout.rs` (no R needed) - a device's `par()` page
   layout arguments: one call gives the same output as separate calls, the
   last grid wins, a `cex`/`mex` in the same call wins, `fig`/`fin`/`mfg`
   are applied before `new`, and `.with()` keeps the grid.
-- `tests/page_background.rs` (no R needed) - the device-dependent page
+- `tests/all/page_background.rs` (no R needed) - the device-dependent page
   background and new pages discarding the old one.
-- `tests/figure_legends_matches_r.rs` - recorded `Figure`s with legends
+- `tests/all/figure_legends_matches_r.rs` - recorded `Figure`s with legends
   drawn into multi-panel pages (`mfrow` with `add_figure_at`, a shared-key
   panel in a `layout()`, one figure added three times to a 3x2 page) vs.
   the same R code: every text item, every legend box, and each
   `FigureResult::legends` entry vs. R's `legend()` return value.
-- `tests/figure_replay.rs` (no R needed) - recorded `Figure`s drawn with
+- `tests/all/figure_replay.rs` (no R needed) - recorded `Figure`s drawn with
   `add_figure`/`add_figure_at` give byte-identical output to direct calls
   (every kind of call, all backends, mixed in multi-panel pages), `par`
   is restored, and recorded results match the device's.
-- `tests/tck_srt_matches_r.rs` - `par(tck)` (incl. `1` for a grid, an
+- `tests/all/tck_srt_matches_r.rs` - `par(tck)` (incl. `1` for a grid, an
   inline `axis(tck =)` over it, `NA` resetting it) and `par(srt)` on
   `text()`, `pie()` labels and `legend()` labels/title (R draws them
   with `text()`): paths and text (incl. rotation) vs. R `pdf()`.
-- `tests/bty_title_pars_matches_r.rs` - every `bty` (through `plot()`,
+- `tests/all/bty_title_pars_matches_r.rs` - every `bty` (through `plot()`,
   `par()`, `box(which = )` and `boxplot()`'s frame) and the inline title
   parameters of `plot()`, `title()`, `hist()`, `barplot()`, `boxplot()`
   and `pie()`: every painted path and every text item's string, origin,
   font, size and colour vs. R `pdf()`.
-- `tests/integer_args.rs` (no R needed) - integers wherever R takes
+- `tests/all/integer_args.rs` (no R needed) - integers wherever R takes
   numbers (data vectors, ranges, recycled and single setters, limits,
   arrays, pairs, `Layout` sizes, `fig()`, backend constructors) draw byte
   for byte what the same `f64`s do, on a device and in a `Figure`.
-- `tests/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
+- `tests/all/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
   and `DeviceBuilder`: every option byte-identical to `Device::new` with
   the same settings, R's defaults, the format by name only (never the
   file name's), `open()` creating the file (and failing on a bad path)
   and `close()` writing it.
-- `tests/backend_smoke.rs` (no R needed) - each backend's output is well
+- `tests/all/backend_smoke.rs` (no R needed) - each backend's output is well
   formed; compressed PDF, `.svgz` and the PNG `pHYs` chunk; PNG output
   independent of the thread count; `AnyBackend` gives the wrapped
   backend's bytes; format names.
-- `tests/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
+- `tests/all/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
   `plot_new()` move nothing until the next plot (R would move margin
   text but not the data).
-- `tests/axp_matches_r.rs` - `par("xaxp")`/`par("yaxp")` after
+- `tests/all/axp_matches_r.rs` - `par("xaxp")`/`par("yaxp")` after
   `plot.window()` (linear, log with each tick rule, reversed, `par(lab)`),
   and the ticks drawn with `xaxp`/`yaxp` changed afterwards, inline in
   `axis()` and in `plot()`.
-- `tests/xpd_na_matches_r.rs` - `xpd = NA` on a two-panel page:
+- `tests/all/xpd_na_matches_r.rs` - `xpd = NA` on a two-panel page:
   `par(xpd = NA)` for lines/points/text, `abline()` and `axis()` limits,
   inline `xpd = NA` on `text()`/`legend()`, `TRUE` next to `NA`: paths
   and text with the clip rectangle in effect for each, vs. R `pdf()`.
-- `tests/margins_regions_matches_r.rs` - `mai` (also with `cex`, and
+- `tests/all/margins_regions_matches_r.rs` - `mai` (also with `cex`, and
   `mar` resetting it), `omi`/`omd` with outer `mtext()` (and `mfrow`),
   `pin` (and `mar` resetting it), `pty` resetting `plt`, `fin`, and
   `par(oma)` starting a new page: paths and text vs. R `pdf()`.
-- `tests/line_pars_matches_r.rs` - inline `lend`/`ljoin`/`lmitre` on
+- `tests/all/line_pars_matches_r.rs` - inline `lend`/`ljoin`/`lmitre` on
   every primitive (incl. a `pch` symbol, which uses `par()`'s with a
   solid line): cap, join, mitre and width at each stroke vs R `pdf()`,
   and that they don't outlast the call.
-- `tests/xy_lengths_matches_r.rs` - `plot()`/`points()`/`lines()`/
+- `tests/all/xy_lengths_matches_r.rs` - `plot()`/`points()`/`lines()`/
   `polygon()` with `x` and `y` of different lengths panic with R's
   `xy.coords()` message (on a device and in a `Figure`); `text()`
   recycles, as R.
-- `tests/region_errors_matches_r.rs` - `plot_new()`'s panics with R's
+- `tests/all/region_errors_matches_r.rs` - `plot_new()`'s panics with R's
   messages ("figure margins too large", "figure region too large", "plot
   region too large") for small pages, large `oma`/`mai`, many panels,
   `fin`, `pin`, `plt` and `lcm()` layouts, cases that just fit, and the
   figure counter after an error (retrying the same figure, as R).
-- `tests/regions_matches_r.rs` - `par(pty = "s")` on wide and tall
+- `tests/all/regions_matches_r.rs` - `par(pty = "s")` on wide and tall
   pages, `par(plt=)` (also over `pty`), and `par(fig=)` with `new = TRUE`,
   `oma` and after `mfrow`: every painted path and text item in order.
-- `tests/multipage_matches_r.rs` - page count and each page's paths
+- `tests/all/multipage_matches_r.rs` - page count and each page's paths
   and text for separate plots, a wrapping `mfrow` and `fig` with and
   without `new = TRUE`, plus compressed pages inflating to the
   uncompressed ones.
-- `tests/latin1_text_matches_r.rs` - bytes written and text origins for
+- `tests/all/latin1_text_matches_r.rs` - bytes written and text origins for
   strings with Latin-1 characters (`±`, accents, `ß`, `©`, fractions).
-- `tests/axis_matches_r.rs` - tick-label, `xlab`/`ylab` and `main` text
+- `tests/all/axis_matches_r.rs` - tick-label, `xlab`/`ylab` and `main` text
   origins for `las = 0..3`.
-- `tests/legend_matches_r.rs` - legend box and label origins for keyword
+- `tests/all/legend_matches_r.rs` - legend box and label origins for keyword
   positions, `inset`, `ncol`/`horiz`, titles, filled boxes,
   `cex`/`intersp` and `par(cex)`, and `legend()`'s return value (also on
   log axes).
-- `tests/legend_extras_matches_r.rs` - `legend()` on reversed axes
+- `tests/all/legend_extras_matches_r.rs` - `legend()` on reversed axes
   (keyword, `(x, y)`, `ncol`, wide title, `text.width`), `box.lwd`/
   `box.lty`/`box.col` (also from `par()`, and `NA`), `title.col`/
   `title.adj`/`title.font`, per-entry `text.col`/`text.font`, `plot =
@@ -465,11 +472,11 @@ against a real R installation by shelling out to `Rscript`:
   `x.intersp`/`seg.len` with per-row `y.intersp`, `text.width = NA` and
   per column, and `adj`: every painted path and text item, and the
   return value.
-- `tests/required_args.rs` (no R needed) - every required argument left
+- `tests/all/required_args.rs` (no R needed) - every required argument left
   out panics with R's message (`argument "x" is missing, with no
   default`), on a device and in a `Figure`; arguments with R defaults can
   be left out.
-- `tests/primitives_matches_r.rs` - per-element recycling in `points()`,
+- `tests/all/primitives_matches_r.rs` - per-element recycling in `points()`,
   `segments()`, `arrows()`, `rect()`, `polygon()` and `text()`,
   `lines(type = )`, `par("fg")` defaults, polygons split at `NA`, default
   `text()` labels, `box(which = )`, `plot.window(asp = )` and `plot()`'s
@@ -480,7 +487,7 @@ These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but
 for any change touching layout, tick placement, or text metrics, please
 run with R available if you can. Setting `RS_GRAPHICS_REQUIRE_R=1` makes
-them fail instead of skipping (`tests/common/mod.rs`).
+them fail instead of skipping (`tests/all/common.rs`).
 
 ### Continuous integration
 
