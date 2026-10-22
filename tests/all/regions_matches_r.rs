@@ -302,9 +302,29 @@ fn fig_without_new_starts_a_new_page() {
     dev.par().fig([0.5, 1.0, 0.5, 1.0]).draw();
     pl(&mut dev, 3, "second");
     let out = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-    // Two pages: "first" on page one, "second" on page two.
+    // Two pages: "first" on page one, "second" on page two. (Kerned
+    // strings are `TJ` arrays, `[(sec) 15 (ond)]`: drop the kerns.)
     assert!(out.contains("/Count 2"), "{out}");
-    assert!(out.find("(first)").unwrap() < out.find("(second)").unwrap());
+    let mut flat = String::new();
+    let mut rest = out.as_str();
+    while let Some(i) = rest.find(") ") {
+        let tail = &rest[i + 2..];
+        let n = tail
+            .find(" (")
+            .filter(|&n| tail[..n].parse::<i64>().is_ok());
+        match n {
+            Some(n) => {
+                flat.push_str(&rest[..i]);
+                rest = &tail[n + 2..];
+            }
+            None => {
+                flat.push_str(&rest[..i + 2]);
+                rest = tail;
+            }
+        }
+    }
+    flat.push_str(rest);
+    assert!(flat.find("(first)").unwrap() < flat.find("(second)").unwrap());
 }
 
 #[test]

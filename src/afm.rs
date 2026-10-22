@@ -419,6 +419,17 @@ pub fn str_width_inches(s: &str, face: FontFace, pointsize: f64, cex: f64) -> f6
     metrics_table(face).str_width_units(s) / 1000.0 * pt / 72.0
 }
 
+/// The kerning between each character of `s` and the next, in 1/1000 em
+/// (AFM units; 0 where the AFM has no pair), in `face`: what R's `pdf()`
+/// writes inside a string's `TJ` array (`PDFWriteT1KerningString`, which
+/// shares the width calculation's kerning table, so the same pairs and
+/// the same space exclusion). `s.chars().count() - 1` values.
+pub(crate) fn kerning_units(s: &str, face: FontFace) -> Vec<f64> {
+    let m = metrics_table(face);
+    let chars: Vec<char> = s.chars().collect();
+    chars.windows(2).map(|w| m.kern_units(w[0], w[1])).collect()
+}
+
 /// Cumulative per-character x-offsets (in inches, from the string's left
 /// edge), including kerning between adjacent characters exactly as
 /// str_width_inches does. Returns `s.chars().count() + 1` values: the

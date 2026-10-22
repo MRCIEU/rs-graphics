@@ -245,8 +245,12 @@ A few fidelity-relevant decisions worth calling out:
   AFM's Standard Encoding codes), and the PDF backend writes them as
   WinAnsi bytes. Characters outside Latin-1 are drawn as `?` in PDF
   output (SVG/PNG draw them as-is). Kerning is applied to string widths
-  but, unlike R's `pdf()` (`TJ` arrays), not to glyph positions inside a
-  drawn string.
+  and, as R's `pdf()` does, inside drawn PDF strings (a string with
+  kerning pairs is a `TJ` array, `[(T) 74 (oyota)] TJ`; PNG places each
+  glyph at its kerned position; SVG leaves it to the viewer's font). R
+  never applies the last kerning pair of each first character (a bug in
+  `devPS.c`'s lookup); we apply every pair, so such strings (`F r` in
+  "Frequency") differ from R's by a fraction of a point.
 - **Joint tick-label formatting.** Default axis labels are formatted as
   a vector, like `formatReal()` (`0.0 0.5 1.0`; scientific only when
   strictly narrower).

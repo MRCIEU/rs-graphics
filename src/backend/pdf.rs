@@ -36,7 +36,7 @@ use std::fmt::Write as _;
 use super::compress::{DEFLATE_LEVEL, zlib_compress};
 use super::numfmt::push_fixed;
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
-use crate::afm::FontFace;
+use crate::afm::{self, FontFace};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
@@ -559,11 +559,28 @@ impl Backend for PdfBackend {
             self.content.push(' ');
         }
         self.op(&[x, y], 3, "Tm");
-        let _ = writeln!(
-            self.content,
-            "({}) Tj",
-            Self::escape_pdf_string(text, symbol)
-        );
+        // As R's `pdf()`: a string with kerning pairs is a `TJ` array, the
+        // pieces separated by each kern (negated: positive numbers move the
+        // next glyph left); otherwise a plain `Tj`.
+        let kerns = afm::kerning_units(text, style.face);
+        if kerns.iter().any(|&k| k != 0.0) {
+            self.content.push_str("[(");
+            let mut buf = [0u8; 4];
+            for (i, ch) in text.chars().enumerate() {
+                let piece = Self::escape_pdf_string(ch.encode_utf8(&mut buf), symbol);
+                self.content.push_str(&piece);
+                if let Some(&k) = kerns.get(i).filter(|&&k| k != 0.0) {
+                    let _ = write!(self.content, ") {} (", -(k as i64));
+                }
+            }
+            self.content.push_str(")] TJ\n");
+        } else {
+            let _ = writeln!(
+                self.content,
+                "({}) Tj",
+                Self::escape_pdf_string(text, symbol)
+            );
+        }
         self.content.push_str("ET\n");
     }
 }

@@ -41,6 +41,7 @@ mod frozen_margins;
 mod hatch_matches_r;
 mod hist_matches_r;
 mod integer_args;
+mod kerning_matches_r;
 mod latin1_text_matches_r;
 mod layout_matches_r;
 mod legend_extras_matches_r;
