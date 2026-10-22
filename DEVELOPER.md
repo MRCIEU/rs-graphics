@@ -343,6 +343,11 @@ against a real R installation by shelling out to `Rscript`:
 - `tests/all/mtext_matches_r.rs` - `mtext()` on every side, inner and outer
   margins, with `line`/`at`/`adj`/`padj`/`cex`/`font` and `las = 0..3`, in
   a 2x2 `mfrow` page with `oma`: text origins, sizes and rotations.
+- `tests/all/alpha_matches_r.rs` - semi-transparent colours on PDF:
+  fills, borders, text, symbols and lines with alpha, the same alpha
+  reused, opaque again after it, across a clip and a new page: every
+  path and text item with its colour and alpha (read through `ExtGState`
+  resources and `gs`).
 - `tests/all/arrows_matches_r.rs` - every shaft and head vertex for heads at
   either/both ends, `angle = 90` caps, an `NA` segment and a zero-length
   arrow.

@@ -19,6 +19,7 @@ mod common;
 
 mod abline_matches_r;
 mod afm_matches_r;
+mod alpha_matches_r;
 mod arrows_matches_r;
 mod axis_args_matches_r;
 mod axis_matches_r;
