@@ -106,10 +106,10 @@ pub struct Stroke {
 }
 
 impl Stroke {
-    pub fn simple(color: Color, lwd: f64) -> Self {
+    pub fn simple(color: Color, lwd: impl Into<f64>) -> Self {
         Stroke {
             color,
-            lwd,
+            lwd: lwd.into(),
             lty: LineType::SOLID,
             lend: LineEnd::Round,
             ljoin: LineJoin::Round,
@@ -123,8 +123,9 @@ impl Stroke {
     }
 }
 
-/// The font faces: plain, bold, italic, bold italic and Symbol (font 5).
-pub use crate::afm::FontFace;
+/// The font faces (see [`crate::font`]): plain, bold, italic, bold italic
+/// and Symbol (font 5).
+pub use crate::font::FontFace;
 
 /// Text-painting parameters. Note there is deliberately no
 /// horizontal/vertical justification field here: the `crate::device`
@@ -147,7 +148,8 @@ pub struct TextStyle {
 }
 
 impl TextStyle {
-    pub fn new(color: Color, face: FontFace, size_pt: f64) -> Self {
+    pub fn new(color: Color, face: FontFace, size_pt: impl Into<f64>) -> Self {
+        let size_pt = size_pt.into();
         TextStyle {
             color,
             face,
@@ -193,9 +195,7 @@ pub trait Backend {
     /// Size of one device unit in inches (R's `pch = "."` is at least one
     /// unit across). `1/72` for vector devices (R's `pdf()`/`svg()` use
     /// big points); a pixel for raster devices.
-    fn device_unit_inches(&self) -> f64 {
-        1.0 / 72.0
-    }
+    fn device_unit_inches(&self) -> f64;
 
     /// The point size this device actually sets text at, given the size
     /// R would request (`par(ps) * cex`). The `crate::device` layer routes
@@ -203,27 +203,30 @@ pub trait Backend {
     /// ascent/"M" height) and drawing - mirroring how R's own devices
     /// apply their quirks inside `strWidth`/`metricInfo`/`text`.
     ///
-    /// The default is the identity, which matches R's cairo and Quartz
-    /// devices (`svg()`, `png()`). R's `pdf()`/`postscript()` devices round
-    /// to a whole number of points, see [`pdf::PdfBackend`].
-    fn effective_font_size(&self, requested_pt: f64) -> f64 {
-        requested_pt
-    }
+    /// The identity for R's cairo and Quartz devices (`svg()`, `png()`).
+    /// R's `pdf()`/`postscript()` devices round to a whole number of
+    /// points, see [`pdf::PdfBackend`].
+    fn effective_font_size(&self, requested_pt: f64) -> f64;
 
     /// The device's background colour, which `par("bg")` starts as: white
     /// (R's `svg()`), the canvas colour for [`raster::RasterBackend`]
     /// (R's `png(bg = )`), or transparent for [`pdf::PdfBackend`] unless
     /// set with its `with_background` (R's `pdf(bg = )`). New pages and
     /// default `legend()` boxes are filled with `par("bg")`.
-    fn default_bg(&self) -> Color {
-        Color::WHITE
-    }
+    fn default_bg(&self) -> Color;
 
     /// Start a new page. The PDF backend keeps the finished page and starts
-    /// another (one PDF page per R page); SVG, which holds a single page,
-    /// discards what was drawn; elsewhere this does nothing, and the new
-    /// page's background is painted over the old one instead.
-    fn new_page(&mut self) {}
+    /// another (one PDF page per R page); SVG and the raster backend, which
+    /// hold a single page, discard what was drawn (the raster canvas goes
+    /// back to its background colour).
+    fn new_page(&mut self);
+
+    /// The output so far as a finished file (what [`into_bytes`] would
+    /// give), leaving the backend as newly made with the same options:
+    /// how a device writes one file per page (R's `png("Rplot%03d.png")`).
+    ///
+    /// [`into_bytes`]: Backend::into_bytes
+    fn take_page(&mut self) -> Vec<u8>;
 
     /// The finished file: PDF or PNG bytes, or the SVG document as UTF-8.
     /// The same as each backend's own `finish()`, but available to code

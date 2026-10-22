@@ -211,16 +211,27 @@ impl From<&String> for ColorSpec {
     }
 }
 
-impl From<Option<Color>> for ColorSpec {
-    fn from(c: Option<Color>) -> Self {
-        match c {
-            Some(c) => ColorSpec::Color(c),
-            None => ColorSpec::None,
-        }
-    }
+/// `None` is R's `NA` (draw nothing), so recycled colour vectors can mix
+/// colours and `NA`s: `.col([Some("red"), None])`.
+macro_rules! from_option {
+    ($($t:ty),*) => {
+        $(
+            impl From<Option<$t>> for ColorSpec {
+                fn from(c: Option<$t>) -> Self {
+                    c.map_or(ColorSpec::None, Into::into)
+                }
+            }
+        )*
+    };
 }
+from_option!(Color, ColorSpec, i32, &str, String, &String);
 
 crate::error::from_str_via_parse!(Color, "colour");
+crate::error::from_r_string!(
+    Color,
+    "colour",
+    "a colour name, \"#RRGGBB\", \"#RRGGBBAA\" or \"transparent\""
+);
 
 /// R's `gray.colors(n)` (`start = 0.3`, `end = 0.9`, `gamma = 2.2`).
 pub fn gray_colors(n: usize) -> Vec<ColorSpec> {
@@ -263,12 +274,23 @@ mod tests {
     #[test]
     fn na_and_transparent() {
         assert_eq!(Color::parse("NA"), None);
-        assert_eq!(Color::parse("transparent"), Some(Color::rgba(255, 255, 255, 0)));
+        assert_eq!(
+            Color::parse("transparent"),
+            Some(Color::rgba(255, 255, 255, 0))
+        );
         // Neither draws anything.
         for spec in ["NA", "transparent", "#FF000000"] {
-            assert_eq!(ColorSpec::from(spec).resolve(&DEFAULT_PALETTE), None, "{spec}");
+            assert_eq!(
+                ColorSpec::from(spec).resolve(&DEFAULT_PALETTE),
+                None,
+                "{spec}"
+            );
         }
-        assert!(ColorSpec::from("#FF000001").resolve(&DEFAULT_PALETTE).is_some());
+        assert!(
+            ColorSpec::from("#FF000001")
+                .resolve(&DEFAULT_PALETTE)
+                .is_some()
+        );
     }
 
     #[test]

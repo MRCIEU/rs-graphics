@@ -55,7 +55,7 @@ fn draw_scatter<B: Backend>(dev: &mut Device<B>) {
         .main("plot(): scatter")
         .xlab("x")
         .ylab("y");
-    dev.plot(&x, &y).with(&opts).draw();
+    dev.plot().x(&x).y(&y).with(&opts).draw();
 }
 
 fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
@@ -69,7 +69,7 @@ fn draw_lineplot<B: Backend>(dev: &mut Device<B>) {
         .main("plot(): line")
         .xlab("x")
         .ylab("sin(x)");
-    dev.plot(&x, &y).with(&opts).draw();
+    dev.plot().x(&x).y(&y).with(&opts).draw();
 }
 
 fn draw_log<B: Backend>(dev: &mut Device<B>) {
@@ -85,7 +85,7 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
         .main("plot(): log = \"xy\"")
         .xlab("x")
         .ylab("2 * x^1.5");
-    dev.plot(&x, &y).with(&opts).draw();
+    dev.plot().x(&x).y(&y).with(&opts).draw();
 }
 
 fn draw_types_h_s<B: Backend>(dev: &mut Device<B>) {
@@ -94,7 +94,9 @@ fn draw_types_h_s<B: Backend>(dev: &mut Device<B>) {
     // type = "h": counts as vertical lines.
     let k: Vec<f64> = (0..=8).map(f64::from).collect();
     let counts = [2.0, 5.0, 9.0, 14.0, 11.0, 7.0, 4.0, 2.0, 1.0];
-    dev.plot(&k, &counts)
+    dev.plot()
+        .x(&k)
+        .y(counts)
         .type_(PlotType::Histogram)
         .lwd(4.0)
         .col(4)
@@ -108,7 +110,9 @@ fn draw_types_h_s<B: Backend>(dev: &mut Device<B>) {
     x.sort_by(f64::total_cmp);
     let n = x.len() as f64;
     let fx: Vec<f64> = (1..=x.len()).map(|i| i as f64 / n).collect();
-    dev.plot(&x, &fx)
+    dev.plot()
+        .x(&x)
+        .y(&fx)
         .type_(PlotType::Steps)
         .main("plot(): type = \"s\"")
         .xlab("x")
@@ -131,7 +135,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .main("abline() on log axes")
         .xlab("x")
         .ylab("y");
-    dev.plot(&x, &y).with(&opts).draw();
+    dev.plot().x(&x).y(&y).with(&opts).draw();
     let grey = ColorSpec::from("grey");
     dev.abline()
         .h(1000.0)
@@ -139,20 +143,21 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .col(grey)
         .lty("dashed")
         .draw();
-    dev.abline().coef(2f64.log10(), 1.5).col(2).lwd(2.0).draw();
-    dev.abline()
-        .coef(2000.0, 20.0)
-        .untf(true)
-        .col(3)
-        .lwd(2.0)
-        .draw();
-    let entries = vec![
-        LegendEntry::line("abline(log10(2), 1.5)", 2, 2.0, "solid"),
-        LegendEntry::line("abline(2000, 20, untf = TRUE)", 3, 2.0, "solid"),
-        LegendEntry::line("abline(h = 1000, v = 10)", grey, 1.0, "dashed"),
+    dev.abline().a(2f64.log10()).b(1.5).col(2).lwd(2.0).draw();
+    dev.abline().a(2000).b(20).untf(true).col(3).lwd(2.0).draw();
+    let labels = [
+        "abline(log10(2), 1.5)",
+        "abline(2000, 20, untf = TRUE)",
+        "abline(h = 1000, v = 10)",
     ];
-    let o = LegendOptions::default().bg(Color::WHITE);
-    dev.legend("topleft", &entries).with(&o).draw();
+    dev.legend()
+        .pos("topleft")
+        .labels(labels)
+        .col([ColorSpec::Index(2), ColorSpec::Index(3), grey])
+        .lwd([2, 2, 1])
+        .lty(["solid", "solid", "dashed"])
+        .bg(Color::WHITE)
+        .draw();
 }
 
 fn draw_legend<B: Backend>(dev: &mut Device<B>) {
@@ -168,21 +173,23 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         .main("legend(\"topright\")")
         .xlab("x")
         .ylab("value");
-    dev.plot(&x, &sin).with(&opts).draw();
+    dev.plot().x(&x).y(&sin).with(&opts).draw();
     let cos_line = XyOptions::default().col(4).lwd(2.0).lty("dashed");
-    dev.lines(&x, &cos).with(&cos_line).draw();
-    let entries = vec![
-        LegendEntry::line("sin(x)", 2, 2.0, "solid"),
-        LegendEntry::line("cos(x)", 4, 2.0, "dashed"),
-    ];
-    let o = LegendOptions::default().title("Functions");
-    dev.legend("topright", &entries).with(&o).draw();
+    dev.lines().x(&x).y(&cos).with(&cos_line).draw();
+    dev.legend()
+        .pos("topright")
+        .labels(["sin(x)", "cos(x)"])
+        .col([2, 4])
+        .lwd(2)
+        .lty(["solid", "dashed"])
+        .title("Functions")
+        .draw();
 }
 
 fn draw_hist<B: Backend>(dev: &mut Device<B>) {
     let data = parse_data(include_str!("data/hist_x.txt"));
     let opts = HistOptions::default().main("hist(): approximately normal data");
-    dev.hist(&data).with(&opts).draw();
+    dev.hist().x(&data).with(&opts).draw();
 }
 
 fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
@@ -191,7 +198,7 @@ fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
         .names(["A", "B", "C", "D", "E"])
         .main("barplot()")
         .ylab("value");
-    dev.barplot(&heights).with(&opts).draw();
+    dev.barplot().height(&heights).with(&opts).draw();
 }
 
 fn barplot_sample_columns() -> Vec<Vec<f64>> {
@@ -213,12 +220,18 @@ fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions {
 
 fn draw_barplot_stacked<B: Backend>(dev: &mut Device<B>) {
     let opts = barplot_sample_opts("barplot(): stacked", false);
-    dev.barplot(barplot_sample_columns()).with(&opts).draw();
+    dev.barplot()
+        .height(barplot_sample_columns())
+        .with(&opts)
+        .draw();
 }
 
 fn draw_barplot_beside<B: Backend>(dev: &mut Device<B>) {
     let opts = barplot_sample_opts("barplot(): beside", true);
-    dev.barplot(barplot_sample_columns()).with(&opts).draw();
+    dev.barplot()
+        .height(barplot_sample_columns())
+        .with(&opts)
+        .draw();
 }
 
 fn boxplot_sample_groups() -> Vec<Vec<f64>> {
@@ -234,7 +247,7 @@ fn draw_boxplot<B: Backend>(dev: &mut Device<B>) {
         .names(["Ctrl", "Treat A", "Treat B"])
         .main("boxplot()")
         .ylab("value");
-    dev.boxplot(&boxplot_sample_groups()).with(&opts).draw();
+    dev.boxplot().x(boxplot_sample_groups()).with(&opts).draw();
 }
 
 fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
@@ -243,7 +256,7 @@ fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
         .horizontal(true)
         .main("boxplot(horizontal = TRUE)")
         .xlab("value");
-    dev.boxplot(&boxplot_sample_groups()).with(&opts).draw();
+    dev.boxplot().x(boxplot_sample_groups()).with(&opts).draw();
 }
 
 fn draw_pie<B: Backend>(dev: &mut Device<B>) {
@@ -251,28 +264,34 @@ fn draw_pie<B: Backend>(dev: &mut Device<B>) {
     let opts = PieOptions::default()
         .labels(["Alpha", "Beta", "Gamma", "Delta", "Epsilon"])
         .main("pie()");
-    dev.pie(&values).with(&opts).draw();
+    dev.pie().x(&values).with(&opts).draw();
 }
 
 /// A chart of every plotting symbol: `pch = 0:25` (with `col`, `bg`) plus
 /// some character symbols, each labelled underneath.
 fn draw_pch<B: Backend>(dev: &mut Device<B>) {
-    dev.par.mar = Sides::new(0.5, 0.5, 2.5, 0.5);
+    dev.par().mar([0.5, 0.5, 2.5, 0.5]).draw();
     dev.plot_new();
-    dev.plot_window((0.5, 7.5), (-0.2, 5.4)).draw();
+    dev.plot_window().xlim(0.5, 7.5).ylim(-0.2, 5.4).draw();
     let symbol = |pch: i32| XyOptions::default().pch(pch).col("blue").bg("red").cex(2.0);
     let label = TextOptions::default().col(Color::BLACK).cex(0.8);
     for pch in 0..26 {
         let (x, y) = ((pch % 7) as f64 + 1.0, 5.0 - (pch / 7) as f64);
-        dev.points(&[x], &[y]).with(&symbol(pch)).draw();
-        dev.text(&[x], &[y - 0.45], &[pch.to_string()])
+        dev.points().x([x]).y([y]).with(&symbol(pch)).draw();
+        dev.text()
+            .x([x])
+            .y([y - 0.45])
+            .labels(&[pch.to_string()])
             .with(&label)
             .draw();
     }
     for (i, ch) in ['.', 'a', 'M', '+', '*', '#', 'o'].into_iter().enumerate() {
         let x = i as f64 + 1.0;
-        dev.points(&[x], &[0.6]).with(&symbol(ch as i32)).draw();
-        dev.text(&[x], &[0.15], &[format!("\"{ch}\"")])
+        dev.points().x([x]).y([0.6]).with(&symbol(ch as i32)).draw();
+        dev.text()
+            .x([x])
+            .y([0.15])
+            .labels(&[format!("\"{ch}\"")])
             .with(&label)
             .draw();
     }

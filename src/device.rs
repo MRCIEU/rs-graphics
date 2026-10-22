@@ -29,21 +29,22 @@
 //! of `GE*` engine calls.
 
 use crate::afm::{self};
-use std::fs::File;
-use std::io::Write;
+use crate::font::FontFace;
+use std::ops::{Deref, DerefMut};
 
-use crate::backend::{Backend, Stroke, TextStyle};
+use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout};
 use crate::lty::LineType;
-use crate::par::{AxisStyle, Par, Pty, Sides};
+use crate::par::{AxisStyle, Par, Pty, Sides, Xpd};
 use crate::pch;
 use crate::plotmath::Label;
 use crate::pretty::{axis_pars, create_at_vector};
 
 mod abline;
 mod axis;
+mod hatch;
 mod legend;
 mod mtext;
 mod open;
@@ -51,7 +52,8 @@ mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
-pub use legend::{LegendBty, LegendEntry, LegendKeyword, LegendLayout, LegendOptions, LegendPos};
+pub(crate) use legend::check_legend;
+pub use legend::{LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos};
 pub use mtext::MtextOptions;
 pub use open::DeviceBuilder;
 pub use primitives::{
@@ -61,8 +63,8 @@ pub use primitives::{
 
 /// A side of the plot, figure or page, as R's `side` argument. Functions
 /// take `impl Into<Side>`, so R's numbers work too: `1` = bottom, `2` =
-/// left, `3` = top, `4` = right (`dev.axis(1)` is
-/// `dev.axis(Side::Bottom)`).
+/// left, `3` = top, `4` = right (`dev.axis().side(1)` is
+/// `dev.axis().side(Side::Bottom)`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     Bottom = 1,
@@ -102,9 +104,6 @@ impl From<i32> for Side {
     }
 }
 
-/// `dev->yLineBias` for R's pdf/png/svg devices (see `GMtext()`).
-const Y_LINE_BIAS: f64 = 0.2;
-
 /// A graphics device: a page (or several, for PDF) drawn onto a
 /// [`Backend`], plus R's `par()` state and the page layout. Open one for
 /// a file with [`Device::pdf`], [`Device::svg`], [`Device::png`] or
@@ -112,12 +111,11 @@ const Y_LINE_BIAS: f64 = 0.2;
 /// the [`Graphics`](crate::graphics::Graphics) methods.
 pub struct Device<B: Backend> {
     backend: B,
-    /// R's `par()` state. Set it with
-    /// [`par()`](crate::graphics::Graphics::par) calls or directly. As in
-    /// R, the margins and plot-region settings (`mar`, `oma`, `pty`,
-    /// `plt`, ...) take effect at the next `plot_new()`; the page layout
-    /// (`mfrow`, `layout`, `fig`) is device state, not part of `Par`.
-    pub par: Par,
+    /// R's `par()` state: changed by
+    /// [`par()`](crate::graphics::Graphics::par) calls, read with
+    /// [`Device::current_par`]. The page layout (`mfrow`, `layout`,
+    /// `fig`, ...) is device state, not part of `Par`.
+    pub(crate) par: Par,
     width_in: f64,
     height_in: f64,
     /// Inner region (the device minus the outer margins), as of the last
@@ -129,6 +127,14 @@ pub struct Device<B: Backend> {
     fig: Rect,
     /// Plot region (figure region minus `mar` margins).
     plt: Rect,
+    /// R's error for invalid regions as of the last layout (see
+    /// `region_error()`), raised by `plot_new()`.
+    region_error: Option<&'static str>,
+    /// `par(cex)` as of the last layout (R's `cexbase` in `xNDCPerChar`,
+    /// set by `mapNDC2Dev()` at `plot.new()` and region changes, not by a
+    /// later `par(cex = )`): the size of R's `CHARS` unit, e.g. `text()`'s
+    /// `offset`.
+    pub(crate) layout_cex: f64,
     /// `(x0, x1, y0, y1)` in "user" coordinates - already log10-
     /// transformed if `xlog`/`ylog` is set, matching `par("usr")`.
     usr: (f64, f64, f64, f64),
@@ -139,11 +145,11 @@ pub struct Device<B: Backend> {
     arrangement: Arrangement,
     /// `par("mfg")`'s `currentFigure`, 1-based.
     current_figure: usize,
-    /// `par(fig)` (R's `defaultFigure = FALSE`): the figure region as
-    /// fractions `[x0, x1, y0, y1]` of the inner region, overriding the
-    /// arrangement until `mfrow`/`mfcol`/`layout` is called.
-    fig_nic: Option<[f64; 4]>,
-    /// `par("new")`, set by [`Device::set_new`] and [`Device::mfg`]: the
+    /// `par(fig)` or `par(fin)` (R's `defaultFigure = FALSE`): one figure
+    /// region, overriding the arrangement until `mfrow`/`mfcol`/`layout`
+    /// is called.
+    fig_spec: Option<FigSpec>,
+    /// `par("new")`, set by `par(new = )` and `par(mfg = )`: the
     /// next `plot_new()` reuses the current figure instead of advancing.
     /// Cleared by drawing (see [`Device::dirty`]), not by `plot_new()`.
     hold_figure: bool,
@@ -152,21 +158,23 @@ pub struct Device<B: Backend> {
     /// `par.ps` when the device was created: R's `startps`, which sets the
     /// device's character size `cra` (`1.2 * startps` points high).
     start_ps: f64,
-    /// The file created by [`DeviceBuilder::open`], which
+    /// The file(s) of a device opened with [`DeviceBuilder::open`], which
     /// [`close`](Device::close) writes; `None` for [`Device::new`].
-    file: Option<File>,
+    output: Option<open::Output>,
 }
 
-/// Where drawing is clipped to: R's `xpd = FALSE` (plot region), `TRUE`
-/// (figure region) and `NA` (the whole device).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Clip {
-    Plot,
-    Figure,
-    Device,
+/// A figure region set with `fig()` or `fin()`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FigSpec {
+    /// `par(fig)`: fractions `[x0, x1, y0, y1]` of the inner region.
+    Nic([f64; 4]),
+    /// `par(fin)`: `[width, height]` in inches, centred.
+    Inches([f64; 2]),
 }
 
-/// The labels of [`Graphics::title`](crate::graphics::Graphics::title); `None` draws nothing.
+/// The labels of [`Graphics::title`](crate::graphics::Graphics::title) (`None` draws
+/// nothing) and R's inline `cex.main`/`col.main`/`font.main` and the
+/// `sub` and `lab` ones (`None`: the `par()` value).
 #[derive(Clone, Debug, Default)]
 pub struct TitleOptions {
     /// Main title, above the plot.
@@ -177,6 +185,53 @@ pub struct TitleOptions {
     pub xlab: Option<Label>,
     /// y axis label.
     pub ylab: Option<Label>,
+    /// Size of `main`, relative to `par(cex)` (R's inline `cex.main`);
+    /// `None`: `par(cex.main)`.
+    pub cex_main: Option<f64>,
+    /// Colour of `main` (R's inline `col.main`); `None`:
+    /// `par(col.main)`.
+    pub col_main: Option<ColorSpec>,
+    /// Font of `main` (a [`FontFace`]; R's
+    /// inline `font.main`); `None`: `par(font.main)`.
+    pub font_main: Option<FontFace>,
+    /// Size of `sub`, relative to `par(cex)` (R's inline `cex.sub`);
+    /// `None`: `par(cex.sub)`.
+    pub cex_sub: Option<f64>,
+    /// Colour of `sub` (R's inline `col.sub`); `None`:
+    /// `par(col.sub)`.
+    pub col_sub: Option<ColorSpec>,
+    /// Font of `sub` (a [`FontFace`]; R's
+    /// inline `font.sub`); `None`: `par(font.sub)`.
+    pub font_sub: Option<FontFace>,
+    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's inline `cex.lab`);
+    /// `None`: `par(cex.lab)`.
+    pub cex_lab: Option<f64>,
+    /// Colour of `xlab` and `ylab` (R's inline `col.lab`); `None`:
+    /// `par(col.lab)`.
+    pub col_lab: Option<ColorSpec>,
+    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
+    /// inline `font.lab`); `None`: `par(font.lab)`.
+    pub font_lab: Option<FontFace>,
+    /// Where each title sits along its side of the plot region, and how
+    /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
+    /// right (top) (R's inline `adj`); `None`: `par(adj)`.
+    pub adj: Option<f64>,
+    /// Margin lines for `xlab`/`ylab` (`mgp[0]`) and `sub` (`mgp[0] + 1`)
+    /// (R's inline `mgp`); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
+    /// Margin line for every title given (R's `line`), instead of their
+    /// defaults (half the top margin for `main`, `mgp[0]` for `xlab`/`ylab`,
+    /// `mgp[0] + 1` for `sub`); `main` then sits with its baseline on it.
+    /// `None` (or non-finite): the defaults.
+    pub line: Option<f64>,
+    /// Draw in the outer margins (`par(oma)`) instead, positioned along the
+    /// inner region (R's `outer = TRUE`); `main` defaults to half the top
+    /// outer margin. Default `false`.
+    pub outer: bool,
+    /// R's inline `xpd`: where the titles clip, at least the figure region
+    /// (`false` is `true` here, as in R; [`Xpd::Device`] for the whole
+    /// device); `None`: `par(xpd)`. `outer` titles clip to the device.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(TitleOptions => [TitleCall] {
@@ -184,6 +239,20 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     sub: option Label,
     xlab: option Label,
     ylab: option Label,
+    cex_main: option f64,
+    col_main: option ColorSpec,
+    font_main: option FontFace,
+    cex_sub: option f64,
+    col_sub: option ColorSpec,
+    font_sub: option FontFace,
+    cex_lab: option f64,
+    col_lab: option ColorSpec,
+    font_lab: option FontFace,
+    adj: option f64,
+    mgp: array [f64; 3],
+    line: option f64,
+    outer: value bool,
+    xpd: option Xpd,
 });
 
 impl<B: Backend> Device<B> {
@@ -211,6 +280,8 @@ impl<B: Backend> Device<B> {
             mar: Sides::new(0.0, 0.0, 0.0, 0.0),
             fig: Rect::new(0.0, 0.0, width_in, height_in),
             plt: Rect::new(0.0, 0.0, width_in, height_in),
+            region_error: None,
+            layout_cex: 1.0,
             usr: (0.0, 1.0, 0.0, 1.0),
             xlog: false,
             ylog: false,
@@ -220,25 +291,29 @@ impl<B: Backend> Device<B> {
                 by_col: false,
             },
             current_figure: 1,
-            fig_nic: None,
+            fig_spec: None,
             hold_figure: false,
             used: false,
             start_ps: par_ps,
-            file: None,
+            output: None,
         };
         dev.recompute_layout();
         dev
     }
 
     /// The backend, to finish it with its own `finish()` or set options.
-    /// On a device opened for a file this doesn't write the file (it stays
-    /// empty); use [`close`](Device::close) for that.
+    /// On a device opened for a file this doesn't write the file (the
+    /// current page's file stays empty; with one file per page, earlier
+    /// pages' files are already written and the backend holds only the
+    /// last page); use [`close`](Device::close) for that.
     pub fn into_backend(self) -> B {
         self.backend
     }
 
     /// The finished output's bytes (PDF, PNG, or SVG as UTF-8). On a device
-    /// opened for a file this doesn't write the file (it stays empty); use
+    /// opened for a file this doesn't write the file (the current page's
+    /// file stays empty; with one file per page, earlier pages' files are
+    /// already written and these are the last page's bytes); use
     /// [`close`](Device::close) for that.
     pub fn finish(self) -> Vec<u8> {
         self.backend.into_bytes()
@@ -246,20 +321,25 @@ impl<B: Backend> Device<B> {
 
     /// Closes the device (R's `dev.off()`): finishes the output and writes
     /// it to the file created when the device was opened
-    /// ([`DeviceBuilder::open`]). A device dropped without `close()`
-    /// leaves that file empty. A device made with [`Device::new`] has no
-    /// file: this returns an [`InvalidInput`](std::io::ErrorKind::InvalidInput)
-    /// error; use [`finish`](Device::finish) for its bytes.
+    /// ([`DeviceBuilder::open`]); with one file per page (a PNG or SVG
+    /// file name with a page number such as `%03d`, or a PDF with
+    /// [`onefile(false)`](DeviceBuilder::onefile)), the last page's file.
+    /// A device dropped
+    /// without `close()` leaves that file empty. Also returns the first
+    /// error from writing an earlier page's file.
+    ///
+    /// A device made with [`Device::new`] has no file: this returns an
+    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error; use
+    /// [`finish`](Device::finish) for its bytes.
     pub fn close(mut self) -> std::io::Result<()> {
-        let Some(mut file) = self.file.take() else {
+        let Some(output) = self.output.take() else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "no file to close: the device was made with Device::new; \
                  open one with Device::pdf/svg/png/format, or use finish()",
             ));
         };
-        file.write_all(&self.finish())?;
-        file.flush()
+        output.close(&self.finish())
     }
 
     /// Page width in inches (R's `par("din")[1]`).
@@ -282,13 +362,15 @@ impl<B: Backend> Device<B> {
     /// the plot region. As in R, a log axis's limits are log10 values
     /// (`par("usr")` of `plot(1:100, log = "x")` starts at about 0, not
     /// 1); everything that takes coordinates (`points()`, `axis(at = )`,
-    /// [`Device::user_to_inches`], ...) takes data units instead.
+    /// [`Device::user_to_inches`], ...) takes data units instead. Set by
+    /// `plot_window()` or `par(usr = )`.
     pub fn usr(&self) -> (f64, f64, f64, f64) {
         self.usr
     }
 
     /// Whether the x axis is logarithmic (R's `par("xlog")`), as set by
-    /// the last `plot_window()` (`plot_new()` resets it).
+    /// the last `plot_window()` or `par(xlog = )` (`plot_new()` resets
+    /// it).
     pub fn xlog(&self) -> bool {
         self.xlog
     }
@@ -300,6 +382,7 @@ impl<B: Backend> Device<B> {
     }
 
     fn recompute_layout(&mut self) {
+        self.layout_cex = self.par.cex;
         // Inner region: the device minus the outer margins; figures are
         // fractions (NIC) of it.
         let omi = self.omi();
@@ -310,28 +393,59 @@ impl<B: Backend> Device<B> {
             self.height_in - omi.top,
         );
         self.inner = inner;
-        self.mar = self.par.mar;
-        let [fx0, fx1, fy0, fy1] = self.fig_nic.unwrap_or_else(|| {
-            self.arrangement
-                .figure_region_nic(self.current_figure, inner.width(), inner.height())
-        });
+        // Margins in lines, for `title()` (R's `updateFigureMargins()`
+        // converts `mai` to `mar`).
+        let lh = self.line_height_inches();
+        self.mar = match self.par.mai {
+            Some(m) => Sides::new(m.bottom / lh, m.left / lh, m.top / lh, m.right / lh),
+            None => self.par.mar,
+        };
+        let [fx0, fx1, fy0, fy1] = match self.fig_spec {
+            Some(FigSpec::Nic(fig)) => fig,
+            // `updateFigureRegion()`: `fin` centred in the inner region.
+            Some(FigSpec::Inches([w, h])) => {
+                let (nw, nh) = (w / inner.width(), h / inner.height());
+                [
+                    0.5 - nw / 2.0,
+                    0.5 + nw / 2.0,
+                    0.5 - nh / 2.0,
+                    0.5 + nh / 2.0,
+                ]
+            }
+            None => self.arrangement.figure_region_nic(
+                self.current_figure,
+                inner.width(),
+                inner.height(),
+            ),
+        };
         self.fig = Rect::new(
             inner.x0 + fx0 * inner.width(),
             inner.y0 + fy0 * inner.height(),
             inner.x0 + fx1 * inner.width(),
             inner.y0 + fy1 * inner.height(),
         );
-        self.plt = match self.par.plt {
+        // Corners as computed, before `Rect::new` sorts them, so that
+        // `region_error()` sees margins that cross.
+        let [x0, x1, y0, y1] = match (self.par.pin, self.par.plt) {
+            // `par(pin)`: that size in inches, centred in the figure
+            // (`updatePlotRegion()`).
+            (Some([w, h]), _) => {
+                let (cx, cy) = (
+                    0.5 * (self.fig.x0 + self.fig.x1),
+                    0.5 * (self.fig.y0 + self.fig.y1),
+                );
+                [cx - w / 2.0, cx + w / 2.0, cy - h / 2.0, cy + h / 2.0]
+            }
             // `par(plt)`: fractions of the figure region.
-            Some([px0, px1, py0, py1]) => Rect::new(
+            (None, Some([px0, px1, py0, py1])) => [
                 self.fig.x0 + px0 * self.fig.width(),
-                self.fig.y0 + py0 * self.fig.height(),
                 self.fig.x0 + px1 * self.fig.width(),
+                self.fig.y0 + py0 * self.fig.height(),
                 self.fig.y0 + py1 * self.fig.height(),
-            ),
+            ],
             // `mapPlotRegion()`: the figure less `mar`, made square about
             // its centre for `pty = "s"`.
-            None => {
+            (None, None) => {
                 let mai = self.mai();
                 let (mut x0, mut x1) = (self.fig.x0 + mai.left, self.fig.x1 - mai.right);
                 let (mut y0, mut y1) = (self.fig.y0 + mai.bottom, self.fig.y1 - mai.top);
@@ -345,21 +459,23 @@ impl<B: Backend> Device<B> {
                         (y0, y1) = (c - 0.5 * w, c + 0.5 * w);
                     }
                 }
-                Rect::new(x0, y0, x1, y1)
+                [x0, x1, y0, y1]
             }
         };
+        self.plt = Rect::new(x0, y0, x1, y1);
+        // The plot region as fractions of the figure (R's NFC `plt`).
+        let (fw, fh) = (self.fig.width(), self.fig.height());
+        let plt_nfc = [
+            (x0 - self.fig.x0) / fw,
+            (x1 - self.fig.x0) / fw,
+            (y0 - self.fig.y0) / fh,
+            (y1 - self.fig.y0) / fh,
+        ];
+        self.region_error = region_error([fx0, fx1, fy0, fy1], plt_nfc);
     }
 
-    /// `par(fig = c(x0, x1, y0, y1))`: a single figure region, as fractions
-    /// of the inner region (the device less `par(oma)`), for placing plots
-    /// anywhere on the page. As in R, the next `plot_new()` starts a new
-    /// page unless [`Device::set_new`]`(true)` is called after this (to
-    /// add a plot to the current page), `par(cex)` is left as it is, and
-    /// `mfrow`/`mfcol`/`layout` cancel it.
-    ///
-    /// # Panics
-    /// Unless `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1` (R's error).
-    pub fn fig(&mut self, fig: [f64; 4]) {
+    /// `par(fig = )`; see [`ParCall::fig`](crate::graphics::ParCall::fig).
+    pub(crate) fn fig(&mut self, fig: [f64; 4]) {
         let [x0, x1, y0, y1] = fig;
         assert!(
             0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0,
@@ -371,20 +487,36 @@ impl<B: Backend> Device<B> {
             by_col: false,
         };
         self.current_figure = 1;
-        self.fig_nic = Some(fig);
+        self.fig_spec = Some(FigSpec::Nic(fig));
         self.recompute_layout();
     }
 
-    /// `par(mfrow = c(nrow, ncol))`: a grid of figures filled row by row.
-    /// Like R, also sets `par(cex)` to 0.83 (2 x 2) or 0.66 (more than 2
-    /// rows or columns) and `mex` to 1. The next `plot_new()` starts a new
-    /// page at the first figure. `dev.par().mfrow(nrow, ncol).draw()`
-    /// (see [`ParCall::mfrow`](crate::graphics::ParCall::mfrow)) does the
-    /// same, alongside other `par()` settings.
-    ///
-    /// # Panics
-    /// If `nrow` or `ncol` is zero.
-    pub fn mfrow(&mut self, nrow: usize, ncol: usize) {
+    /// R's `currentFigure = lastFigure`: the next `plot_new()` starts a
+    /// new page (for `par(oma = )` and co.).
+    pub(crate) fn eject_page(&mut self) {
+        self.current_figure = self.arrangement.last_figure();
+    }
+
+    /// `par(fin = )` (R's `fUnits = INCHES`); see
+    /// [`ParCall::fin`](crate::graphics::ParCall::fin).
+    pub(crate) fn fin(&mut self, fin: [f64; 2]) {
+        assert!(
+            fin.iter().all(|&v| v > 0.0 && v.is_finite()),
+            "invalid value specified for graphical parameter \"fin\""
+        );
+        self.arrangement = Arrangement::Grid {
+            nrow: 1,
+            ncol: 1,
+            by_col: false,
+        };
+        self.current_figure = 1;
+        self.fig_spec = Some(FigSpec::Inches(fin));
+        self.recompute_layout();
+    }
+
+    /// `par(mfrow = )`; see
+    /// [`ParCall::mfrow`](crate::graphics::ParCall::mfrow).
+    pub(crate) fn mfrow(&mut self, nrow: usize, ncol: usize) {
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
@@ -392,12 +524,9 @@ impl<B: Backend> Device<B> {
         });
     }
 
-    /// `par(mfcol = c(nrow, ncol))`: as [`Device::mfrow`] but filled
-    /// column by column (also `dev.par().mfcol(nrow, ncol).draw()`).
-    ///
-    /// # Panics
-    /// If `nrow` or `ncol` is zero.
-    pub fn mfcol(&mut self, nrow: usize, ncol: usize) {
+    /// `par(mfcol = )`; see
+    /// [`ParCall::mfcol`](crate::graphics::ParCall::mfcol).
+    pub(crate) fn mfcol(&mut self, nrow: usize, ncol: usize) {
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
@@ -406,8 +535,10 @@ impl<B: Backend> Device<B> {
     }
 
     /// `layout(mat, widths, heights, respect)`: see [`Layout`]. Sets
-    /// `par(cex)`/`mex` like [`Device::mfrow`] does, based on the layout
-    /// matrix's dimensions.
+    /// `par(cex)`/`mex` like `par(mfrow = )`
+    /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow)) does, based on
+    /// the layout matrix's dimensions, and replaces `mfrow`/`mfcol` and
+    /// `fig`/`fin`.
     pub fn layout(&mut self, layout: Layout) {
         self.set_arrangement(Arrangement::Layout(layout));
     }
@@ -423,22 +554,13 @@ impl<B: Backend> Device<B> {
         // wraps round to figure 1 on a fresh page.
         self.current_figure = arrangement.last_figure();
         self.arrangement = arrangement;
-        self.fig_nic = None;
+        self.fig_spec = None;
         self.hold_figure = false;
         self.recompute_layout();
     }
 
-    /// `par(mfg = c(row, col))`: makes the figure at (`row`, `col`)
-    /// (1-based) the one the next `plot_new()` draws into, without
-    /// advancing or starting a new page. As in R, the figure number is
-    /// derived from the `mfrow`/`mfcol` ordering even under `layout()`,
-    /// and it has no effect before anything has been plotted: the first
-    /// `plot_new()` always starts at figure 1 (see
-    /// [`add_figure_at`](Device::add_figure_at), which handles that).
-    ///
-    /// # Panics
-    /// If `row`/`col` are outside the current arrangement.
-    pub fn mfg(&mut self, row: usize, col: usize) {
+    /// `par(mfg = )`; see [`ParCall::mfg`](crate::graphics::ParCall::mfg).
+    pub(crate) fn mfg(&mut self, row: usize, col: usize) {
         let (nrow, ncol) = (self.arrangement.nrow(), self.arrangement.ncol());
         assert!(
             (1..=nrow).contains(&row) && (1..=ncol).contains(&col),
@@ -454,13 +576,8 @@ impl<B: Backend> Device<B> {
         self.recompute_layout();
     }
 
-    /// `par(new = new)`: with `true`, the next `plot_new()` draws into the
-    /// current figure without advancing or clearing it, so a second plot
-    /// can be overlaid on the first (e.g. with its own `plot_window()` and
-    /// an axis on side 4). As in R, drawing anything (other than
-    /// `mtext(outer = TRUE)`) resets it to `false`, `plot_new()` itself
-    /// does not, and it is ignored (R warns) before anything is plotted.
-    pub fn set_new(&mut self, new: bool) {
+    /// `par(new = )`; see [`ParOptions::new`](crate::par::ParOptions::new).
+    pub(crate) fn set_new(&mut self, new: bool) {
         if self.used {
             self.hold_figure = new;
         }
@@ -469,6 +586,13 @@ impl<B: Backend> Device<B> {
     /// Whether anything has been plotted yet.
     pub(crate) fn is_used(&self) -> bool {
         self.used
+    }
+
+    /// R's `par()` values as they are now (R's `par("cex")` is
+    /// `dev.current_par().cex`). Change them with
+    /// [`par()`](crate::graphics::Graphics::par).
+    pub fn current_par(&self) -> &Par {
+        &self.par
     }
 
     /// `par("new")`.
@@ -491,6 +615,7 @@ impl<B: Backend> Device<B> {
     /// describe it.
     pub(crate) fn plot_new_impl(&mut self) {
         let mut new_page = false;
+        let had_page = self.used;
         if !self.hold_figure || !self.used {
             self.current_figure += 1;
             if self.current_figure > self.arrangement.last_figure() || !self.used {
@@ -501,6 +626,9 @@ impl<B: Backend> Device<B> {
         self.used = true;
         self.recompute_layout();
         if new_page {
+            if had_page {
+                self.next_page_file();
+            }
             self.backend.new_page();
             if self.par.bg.a > 0 {
                 self.backend.draw_rect(
@@ -510,6 +638,15 @@ impl<B: Backend> Device<B> {
                 );
             }
         }
+        if let Some(msg) = self.region_error {
+            // R's `invalidError()`: back to the previous figure, so the
+            // next `plot_new()` retries this one.
+            self.current_figure -= 1;
+            if self.current_figure < 1 {
+                self.current_figure = self.arrangement.last_figure();
+            }
+            panic!("{msg}");
+        }
         // `C_plot_new`: linear axes, `GScale(0, 1)` on both.
         self.set_window((0.0, 1.0), (0.0, 1.0), false, false);
     }
@@ -517,6 +654,26 @@ impl<B: Backend> Device<B> {
     /// The user coordinates for limits `xlim`/`ylim` (data units) on
     /// linear or log axes, through `GScale()`, and `par.xaxp`/`yaxp`; see
     /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window).
+    /// R's `par(xlog = , ylog = )` (`None`: unchanged): only the flags, as
+    /// in R; `usr` and the mapping stay.
+    pub(crate) fn set_log(&mut self, xlog: Option<bool>, ylog: Option<bool>) {
+        if let Some(x) = xlog {
+            self.xlog = x;
+        }
+        if let Some(y) = ylog {
+            self.ylog = y;
+        }
+    }
+
+    /// R's `par(usr = )`: the plot region's user coordinates (log10 units
+    /// on a log axis), and the axis tick settings from them
+    /// (`GSetupAxis()`). Checked by `ParOptions::check`.
+    pub(crate) fn set_usr(&mut self, [x0, x1, y0, y1]: [f64; 4]) {
+        self.usr = (x0, x1, y0, y1);
+        self.par.xaxp = axis_pars(x0, x1, self.par.lab[0], self.xlog);
+        self.par.yaxp = axis_pars(y0, y1, self.par.lab[1], self.ylog);
+    }
+
     fn set_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), xlog: bool, ylog: bool) {
         self.xlog = xlog;
         self.ylog = ylog;
@@ -535,7 +692,11 @@ impl<B: Backend> Device<B> {
     /// value), and `xaxs = "r"` adds 4% at each end.
     fn gscale(min: f64, max: f64, style: AxisStyle, log: bool) -> (f64, f64) {
         const EPS_FAC_1: f64 = 16.0;
-        let (mut min, mut max) = if log { (min.log10(), max.log10()) } else { (min, max) };
+        let (mut min, mut max) = if log {
+            (min.log10(), max.log10())
+        } else {
+            (min, max)
+        };
         let fix = |v: f64| {
             if v.is_finite() {
                 v
@@ -573,7 +734,13 @@ impl<B: Backend> Device<B> {
                 0.04 * (max - min)
             };
             let clamp = |v: f64| {
-                if v.is_finite() { v } else if v < 0.0 { -f64::MAX } else { f64::MAX }
+                if v.is_finite() {
+                    v
+                } else if v < 0.0 {
+                    -f64::MAX
+                } else {
+                    f64::MAX
+                }
             };
             if log {
                 min -= d;
@@ -627,7 +794,8 @@ impl<B: Backend> Device<B> {
 
     /// Map a point in data units (not log10 on a log axis) to device
     /// inches.
-    pub fn user_to_inches(&self, x: f64, y: f64) -> Point {
+    pub fn user_to_inches(&self, x: impl Into<f64>, y: impl Into<f64>) -> Point {
+        let (x, y) = (x.into(), y.into());
         let ux = if self.xlog { x.log10() } else { x };
         let uy = if self.ylog { y.log10() } else { y };
         self.usr_to_inches(ux, uy)
@@ -661,21 +829,37 @@ impl<B: Backend> Device<B> {
     }
 
     /// R's `getxlimits()`/`getylimits()` in `usr` units: the `usr` range
-    /// with `par(xpd = FALSE)`, else the figure region's extent along the
-    /// axis.
-    fn xpd_limits(&self, x_axis: bool) -> (f64, f64) {
-        let (u0, u1, p0, p1, f0, f1) = if x_axis {
+    /// for `xpd = FALSE`, else the figure region's (`TRUE`) or the
+    /// device's (`NA`) extent along the axis.
+    fn xpd_limits(&self, x_axis: bool, xpd: Xpd) -> (f64, f64) {
+        let (u0, u1, p0, p1, f0, f1, d1) = if x_axis {
             let (u0, u1, ..) = self.usr;
-            (u0, u1, self.plt.x0, self.plt.x1, self.fig.x0, self.fig.x1)
+            (
+                u0,
+                u1,
+                self.plt.x0,
+                self.plt.x1,
+                self.fig.x0,
+                self.fig.x1,
+                self.width_in,
+            )
         } else {
             let (.., u0, u1) = self.usr;
-            (u0, u1, self.plt.y0, self.plt.y1, self.fig.y0, self.fig.y1)
+            (
+                u0,
+                u1,
+                self.plt.y0,
+                self.plt.y1,
+                self.fig.y0,
+                self.fig.y1,
+                self.height_in,
+            )
         };
-        if self.par.xpd {
-            let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
-            (to_usr(f0), to_usr(f1))
-        } else {
-            (u0, u1)
+        let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
+        match xpd {
+            Xpd::Plot => (u0, u1),
+            Xpd::Figure => (to_usr(f0), to_usr(f1)),
+            Xpd::Device => (to_usr(0.0), to_usr(d1)),
         }
     }
 
@@ -695,15 +879,27 @@ impl<B: Backend> Device<B> {
         self.par.mex * self.par.cex * 1.2 * self.start_ps / 72.0
     }
 
-    /// `par("mai")`: `par.mar` in inches (bottom, left, top, right).
+    /// `par("mai")`: the margins in inches (bottom, left, top, right):
+    /// `par.mai` if set, else `par.mar` converted.
     pub fn mai(&self) -> Sides<f64> {
+        if let Some(mai) = self.par.mai {
+            return mai;
+        }
         let lh = self.line_height_inches();
         let m = self.par.mar;
         Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)
     }
 
-    /// `par("omi")`: `par.oma` in inches (bottom, left, top, right).
+    /// `par("omi")`: the outer margins in inches (bottom, left, top,
+    /// right), from `par.omd`, else `par.omi`, else `par.oma`.
     pub fn omi(&self) -> Sides<f64> {
+        if let Some([x0, x1, y0, y1]) = self.par.omd {
+            let (w, h) = (self.width_in, self.height_in);
+            return Sides::new(y0 * h, x0 * w, (1.0 - y1) * h, (1.0 - x1) * w);
+        }
+        if let Some(omi) = self.par.omi {
+            return omi;
+        }
         let lh = self.line_height_inches();
         let m = self.par.oma;
         Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)
@@ -718,14 +914,23 @@ impl<B: Backend> Device<B> {
     }
 
     // ---------------------------------------------------------------
-    // Clipping (matches R's `xpd`: FALSE clips to the plot region, TRUE
-    // clips to the figure region. `par.xpd` is a bool, so R's `NA`, "clip
-    // to the device", is only available internally as `Clip::Device`,
-    // used by `axis()` and `mtext(outer = TRUE)`).
+    // Clipping, as R's `xpd`: FALSE clips to the plot region, TRUE to the
+    // figure region, NA to the device (`axis()` and `mtext(outer = TRUE)`
+    // always use the device, as R).
     // ---------------------------------------------------------------
 
-    fn push_clip_for(&mut self, xpd: bool) {
-        self.push_clip_region(if xpd { Clip::Figure } else { Clip::Plot });
+    /// Where margin text (`title()`, `mtext()`) clips: R raises `xpd` (the
+    /// inline one, else `par(xpd)`) to at least `TRUE`, the figure region
+    /// (`NA`, the device, stays), and `outer` text clips to the device.
+    fn margin_clip(&self, xpd: Option<Xpd>, outer: bool) -> Xpd {
+        match (outer, xpd.unwrap_or(self.par.xpd)) {
+            (true, _) | (_, Xpd::Device) => Xpd::Device,
+            _ => Xpd::Figure,
+        }
+    }
+
+    fn push_clip_for(&mut self, xpd: Xpd) {
+        self.push_clip_region(xpd);
     }
 
     /// Marks the current plot as drawn on, which resets `par(new)` (R's
@@ -735,12 +940,12 @@ impl<B: Backend> Device<B> {
         self.hold_figure = false;
     }
 
-    fn push_clip_region(&mut self, clip: Clip) {
+    fn push_clip_region(&mut self, clip: Xpd) {
         self.dirty();
         let rect = match clip {
-            Clip::Plot => self.plt,
-            Clip::Figure => self.fig,
-            Clip::Device => Rect::new(0.0, 0.0, self.width_in, self.height_in),
+            Xpd::Plot => self.plt,
+            Xpd::Figure => self.fig,
+            Xpd::Device => Rect::new(0.0, 0.0, self.width_in, self.height_in),
         };
         self.backend.push_clip(rect);
     }
@@ -763,7 +968,16 @@ impl<B: Backend> Device<B> {
         let cex = self.par.cex * cex;
         let size = pch::symbol_size_inches(self.start_ps, cex);
         if let Some(geom) = pch::pch_geometry(pch, p.x, p.y, size) {
-            let stroke = Stroke::simple(col, lwd);
+            // `GSymbol()`: `par(lend/ljoin/lmitre)`, always a solid line.
+            // Built as the constant default stroke unless `par()` differs,
+            // which keeps the per-point path as fast as before.
+            let mut stroke = Stroke::simple(col, lwd);
+            let (lend, ljoin, lmitre) = (self.par.lend, self.par.ljoin, self.par.lmitre);
+            if (lend, ljoin, lmitre) != (stroke.lend, stroke.ljoin, stroke.lmitre) {
+                stroke.lend = lend;
+                stroke.ljoin = ljoin;
+                stroke.lmitre = lmitre;
+            }
             for shape in &geom.outline_only {
                 self.paint_shape(shape, None, Some(&stroke));
             }
@@ -792,11 +1006,13 @@ impl<B: Backend> Device<B> {
                 Some(col),
                 None,
             );
-        } else if (32..=126).contains(&pch) {
+        } else if (32..=126).contains(&pch) || pch <= -32 {
             // `GEText(x, y, str, hadj = NA, yc = NA)`: centred on the
             // advance width, and vertically on the glyph's own bounding box.
-            let ch = char::from_u32(pch as u32).unwrap_or('?').to_string();
-            let face = self.par.font_face(self.par.font);
+            // A negative `pch` is minus a Unicode code point, as in R.
+            let code = pch.unsigned_abs();
+            let ch = char::from_u32(code).unwrap_or('?').to_string();
+            let face = self.par.font;
             let size_pt = self.backend.effective_font_size(self.par.ps * cex);
             if size_pt <= 0.0 {
                 return;
@@ -835,7 +1051,7 @@ impl<B: Backend> Device<B> {
         col: ColorSpec,
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let Some(col) = self.resolve(col) else {
             return;
@@ -872,7 +1088,7 @@ impl<B: Backend> Device<B> {
         col: ColorSpec,
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let Some(col) = self.resolve(col) else {
             return;
@@ -909,7 +1125,7 @@ impl<B: Backend> Device<B> {
         col: &[ColorSpec],
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let default = [ColorSpec::Color(self.par.col)];
         let col = if col.is_empty() { &default[..] } else { col };
@@ -949,7 +1165,7 @@ impl<B: Backend> Device<B> {
         col: ColorSpec,
         lwd: f64,
         lty: LineType,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let Some(col) = self.resolve(col) else {
             return;
@@ -987,13 +1203,6 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-    /// `rect()` variant taking a rectangle already in device inches. Not
-    /// clipped.
-    pub fn rect_inches(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>) {
-        self.dirty();
-        self.backend.draw_rect(rect, fill, stroke);
-    }
-
     fn stroke_of(&self, color: Color, lwd: f64, lty: LineType) -> Stroke {
         Stroke {
             color,
@@ -1020,8 +1229,14 @@ impl<B: Backend> Device<B> {
     /// (after the backend's font-size rounding). The width is that of the
     /// widest line; the height is the ascent of "M" plus one line height
     /// (`par(lheight) * 1.2 * ps / 72` inches, times the cex) per `\n`.
-    pub fn text_metrics(&self, text: &str, font: i32, cex: f64) -> (f64, f64) {
-        let face = self.par.font_face(font);
+    pub fn text_metrics(
+        &self,
+        text: &str,
+        font: impl Into<FontFace>,
+        cex: impl Into<f64>,
+    ) -> (f64, f64) {
+        let cex = cex.into();
+        let face = font.into();
         let size = self.font_size_pt(cex);
         let width = text
             .split('\n')
@@ -1029,7 +1244,10 @@ impl<B: Backend> Device<B> {
             .fold(0.0, f64::max);
         let newlines = text.matches('\n').count() as f64;
         let line = self.par.lheight * 1.2 * self.par.ps * self.par.cex * cex / 72.0;
-        (width, newlines * line + afm::m_height_inches(face, size, 1.0))
+        (
+            width,
+            newlines * line + afm::m_height_inches(face, size, 1.0),
+        )
     }
 
     /// Draws one line of text at `anchor` (device inches), clipped to
@@ -1041,7 +1259,7 @@ impl<B: Backend> Device<B> {
     #[allow(clippy::too_many_arguments)]
     fn text_at_clipped(
         &mut self,
-        clip: Clip,
+        clip: Xpd,
         anchor: Point,
         label: &str,
         hadj: f64,
@@ -1049,7 +1267,7 @@ impl<B: Backend> Device<B> {
         rotation_deg: f64,
         col: ColorSpec,
         cex: f64,
-        font: i32,
+        font: FontFace,
     ) {
         let Some(color) = self.resolve(col) else {
             return;
@@ -1057,7 +1275,7 @@ impl<B: Backend> Device<B> {
         if label.is_empty() {
             return;
         }
-        let face = self.par.font_face(font);
+        let face = font;
         let size_pt = self.font_size_pt(cex);
         if size_pt <= 0.0 {
             return;
@@ -1083,88 +1301,120 @@ impl<B: Backend> Device<B> {
         self.pop_clip();
     }
 
-
     // ---------------------------------------------------------------
     // title()
     // ---------------------------------------------------------------
+
+    /// `GMtext()`'s `yLineBias` nudge (`graphics.c`; `par(ylbias)`), in
+    /// margin lines, for text on `side`: `1 - bias` on sides 1 and 4, `bias`
+    /// on 2 and 3, divided
+    /// by `par(mex)` as R does (so the nudge stays the same size in inches);
+    /// 0 for text perpendicular to the side. Shared by `title()`, `axis()`
+    /// and `mtext()`.
+    pub(crate) fn line_bias(&self, side: Side, parallel: bool) -> f64 {
+        if !parallel {
+            return 0.0;
+        }
+        let bias = match side {
+            Side::Bottom | Side::Right => 1.0 - self.par.ylbias,
+            Side::Left | Side::Top => self.par.ylbias,
+        };
+        bias / self.par.mex
+    }
 
     /// Draws R's `title()`; the public entry is
     /// [`Graphics::title`](crate::graphics::Graphics::title), whose docs
     /// describe it.
     pub(crate) fn title_impl(&mut self, opts: &TitleOptions) {
-        let saved_xpd = self.par.xpd;
-        self.par.xpd = true;
         let lh = self.line_height_inches();
-        let x_mid = (self.plt.x0 + self.plt.x1) / 2.0;
-        let y_mid = (self.plt.y0 + self.plt.y1) / 2.0;
-        // Line offsets follow `C_title` + `GMtext()` (plot.c/graphics.c):
-        // `GMtext` nudges the line by `yLineBias` (0.2 on pdf/png/svg
-        // devices) - `1 - bias` on side 1, `bias` on sides 2/3.
+        // `C_title`: every title sits at `adj` along its side and is
+        // justified by `adj` (`GMtext` uses `par(adj)` in all cases); along
+        // the plot region (NPC), or with `outer` the inner region (NIC).
+        let adj = opts.adj.unwrap_or(self.par.adj);
+        let mgp = opts.mgp.unwrap_or(self.par.mgp);
+        let line = opts.line.filter(|l| l.is_finite());
+        let region = if opts.outer { self.inner } else { self.plt };
+        let clip = self.margin_clip(opts.xpd, opts.outer);
+        let x_at = region.x0 + adj * region.width();
+        let y_at = region.y0 + adj * region.height();
         if let Some(main) = &opts.main {
-            // `vpos = 0.5 * mar[2]`, `adjy = 0.5` (finite, so `GEText`
-            // uses `yc * height(M)`, not exact ink centring).
-            let y = self.plt.y1 + 0.5 * self.mar.top * lh;
+            // `GText(hpos, vpos, MAR3/OMA3, .., adj, adjy)`: at `line` with
+            // the baseline on it (`adjy = 0`), else half the top margin
+            // (`0.5 * mar[2]` or `oma[2]`) with `adjy = 0.5` (finite, so
+            // `GEText` uses `yc * height(M)`, not exact ink centring). An
+            // expression is always centred (`GMathText(.., adj, 0.5)`).
+            let (y, adjy) = match line {
+                Some(l) => (region.y1 + l * lh, 0.0),
+                None => {
+                    let margin = if opts.outer {
+                        self.height_in - self.inner.y1
+                    } else {
+                        self.mar.top * lh
+                    };
+                    (region.y1 + 0.5 * margin, 0.5)
+                }
+            };
+            let adjy = if matches!(main, Label::Math(_)) {
+                0.5
+            } else {
+                adjy
+            };
             self.draw_label(
-                Clip::Figure,
-                Point::new(x_mid, y),
+                clip,
+                Point::new(x_at, y),
                 main,
-                0.5,
-                Some(0.5),
+                adj,
+                Some(adjy),
                 0.0,
-                ColorSpec::Color(self.par.col_main),
-                self.par.cex_main,
-                self.par.font_main,
+                opts.col_main.unwrap_or(ColorSpec::Color(self.par.col_main)),
+                opts.cex_main.unwrap_or(self.par.cex_main),
+                opts.font_main.unwrap_or(self.par.font_main),
             );
         }
+        // The rest via `GMtext()`: at `line`, else `mgp[0]` (+ 1 for
+        // `sub`), nudged by `yLineBias` (see `line_bias`).
         if let Some(sub) = &opts.sub {
-            let y = self.plt.y0 - (self.par.mgp[0] + 1.0 + (1.0 - Y_LINE_BIAS)) * lh;
+            let l = line.unwrap_or(mgp[0] + 1.0) + self.line_bias(Side::Bottom, true);
             self.draw_label(
-                Clip::Figure,
-                Point::new(x_mid, y),
+                clip,
+                Point::new(x_at, region.y0 - l * lh),
                 sub,
-                0.5,
+                adj,
                 Some(0.0),
                 0.0,
-                ColorSpec::Color(self.par.col_sub),
-                self.par.cex_sub,
-                self.par.font_sub,
+                opts.col_sub.unwrap_or(ColorSpec::Color(self.par.col_sub)),
+                opts.cex_sub.unwrap_or(self.par.cex_sub),
+                opts.font_sub.unwrap_or(self.par.font_sub),
             );
         }
         if let Some(xlab) = &opts.xlab {
-            let y = self.plt.y0 - (self.par.mgp[0] + (1.0 - Y_LINE_BIAS)) * lh;
+            let l = line.unwrap_or(mgp[0]) + self.line_bias(Side::Bottom, true);
             self.draw_label(
-                Clip::Figure,
-                Point::new(x_mid, y),
+                clip,
+                Point::new(x_at, region.y0 - l * lh),
                 xlab,
-                0.5,
+                adj,
                 Some(0.0),
                 0.0,
-                ColorSpec::Color(self.par.col_lab),
-                self.par.cex_lab,
-                self.par.font_lab,
+                opts.col_lab.unwrap_or(ColorSpec::Color(self.par.col_lab)),
+                opts.cex_lab.unwrap_or(self.par.cex_lab),
+                opts.font_lab.unwrap_or(self.par.font_lab),
             );
         }
         if let Some(ylab) = &opts.ylab {
-            let x = self.plt.x0 - (self.par.mgp[0] + Y_LINE_BIAS) * lh;
+            let l = line.unwrap_or(mgp[0]) + self.line_bias(Side::Left, true);
             self.draw_label(
-                Clip::Figure,
-                Point::new(x, y_mid),
+                clip,
+                Point::new(region.x0 - l * lh, y_at),
                 ylab,
-                0.5,
+                adj,
                 Some(0.0),
                 90.0,
-                ColorSpec::Color(self.par.col_lab),
-                self.par.cex_lab,
-                self.par.font_lab,
+                opts.col_lab.unwrap_or(ColorSpec::Color(self.par.col_lab)),
+                opts.cex_lab.unwrap_or(self.par.cex_lab),
+                opts.font_lab.unwrap_or(self.par.font_lab),
             );
         }
-        self.par.xpd = saved_xpd;
-    }
-
-    /// Direct access to the backend. Drawing through it isn't clipped,
-    /// doesn't follow `par()`, and doesn't reset `par(new)`.
-    pub fn backend_mut(&mut self) -> &mut B {
-        &mut self.backend
     }
 }
 
@@ -1221,12 +1471,149 @@ pub(crate) fn format_axis_labels(vals: &[f64]) -> Vec<String> {
         .collect()
 }
 
+/// A temporary change to a device's `par`, as R's `op <- par(...);
+/// on.exit(par(op))`: `restore` copies the changed fields back from the
+/// saved `par` when the scope ends, also after an early return or a panic.
+/// Derefs to the device.
+pub(crate) struct ParScope<'a, B: Backend> {
+    dev: &'a mut Device<B>,
+    saved: Par,
+    restore: fn(&mut Par, &Par),
+}
+
+impl<B: Backend> Device<B> {
+    /// Starts a [`ParScope`]; `restore` copies back what the caller is
+    /// about to change.
+    pub(crate) fn par_scope(&mut self, restore: fn(&mut Par, &Par)) -> ParScope<'_, B> {
+        let saved = self.par.clone();
+        ParScope {
+            dev: self,
+            saved,
+            restore,
+        }
+    }
+}
+
+impl<B: Backend> Device<B> {
+    /// R's inline `lend`/`ljoin`/`lmitre` for one call (`ProcessInlinePars`,
+    /// undone by `GRestorePars`): every line drawn in the scope uses them.
+    /// `par.font` is restored too, so callers may set an inline `font` in
+    /// the scope (as `points()` does for character symbols).
+    ///
+    /// # Panics
+    /// If `lmitre` is below 1 (R's "invalid value specified for graphical
+    /// parameter \"lmitre\"").
+    pub(crate) fn line_pars(
+        &mut self,
+        lend: Option<LineEnd>,
+        ljoin: Option<LineJoin>,
+        lmitre: Option<f64>,
+    ) -> ParScope<'_, B> {
+        if let Some(m) = lmitre {
+            assert!(
+                m >= 1.0,
+                "invalid value specified for graphical parameter \"lmitre\""
+            );
+        }
+        let mut dev = self.par_scope(|now, saved| {
+            now.lend = saved.lend;
+            now.ljoin = saved.ljoin;
+            now.lmitre = saved.lmitre;
+            now.font = saved.font;
+        });
+        if let Some(l) = lend {
+            dev.par.lend = l;
+        }
+        if let Some(j) = ljoin {
+            dev.par.ljoin = j;
+        }
+        if let Some(m) = lmitre {
+            dev.par.lmitre = m;
+        }
+        dev
+    }
+}
+
+impl<B: Backend> Deref for ParScope<'_, B> {
+    type Target = Device<B>;
+    fn deref(&self) -> &Device<B> {
+        self.dev
+    }
+}
+
+impl<B: Backend> DerefMut for ParScope<'_, B> {
+    fn deref_mut(&mut self) -> &mut Device<B> {
+        self.dev
+    }
+}
+
+impl<B: Backend> Drop for ParScope<'_, B> {
+    fn drop(&mut self) {
+        (self.restore)(&mut self.dev.par, &self.saved);
+    }
+}
+
+/// `GNewPlot()`'s checks (`graphics.c`), in its order: R's error message
+/// when the figure region `fig` (fractions of the inner region) or the plot
+/// region `plt` (fractions of the figure) is invalid. Region sizes are
+/// absolute, as R's unit conversions take them, so outer margins wider
+/// than the device leave a small figure whose margins don't fit ("figure
+/// margins too large").
+fn region_error(fig: [f64; 4], plt: [f64; 4]) -> Option<&'static str> {
+    let eps = f64::from(f32::EPSILON);
+    let within = |r: [f64; 4]| r[0] > -eps && r[1] < 1.0 + eps && r[2] > -eps && r[3] < 1.0 + eps;
+    let ordered = |r: [f64; 4]| r[0] < r[1] && r[2] < r[3];
+    if !ordered(fig) {
+        Some("outer margins too large (figure region too small)")
+    } else if !within(fig) {
+        Some("figure region too large")
+    } else if !ordered(plt) {
+        Some("figure margins too large")
+    } else if !within(plt) {
+        Some("plot region too large")
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::format_axis_labels;
 
     fn f(v: &[f64]) -> Vec<String> {
         format_axis_labels(v)
+    }
+
+    #[test]
+    fn region_errors_follow_r_order() {
+        use super::region_error;
+        let ok = [0.0, 1.0, 0.0, 1.0];
+        let plt = [0.2, 0.8, 0.2, 0.8];
+        assert_eq!(region_error(ok, plt), None);
+        // `GNewPlot()` checks the figure before the plot region, and order
+        // before extent; R's absolute unit sizes make the first one hard to
+        // reach from `par()`, so it's checked here.
+        assert_eq!(
+            region_error([0.6, 0.4, -1.0, 2.0], [0.8, 0.2, 0.0, 2.0]),
+            Some("outer margins too large (figure region too small)")
+        );
+        assert_eq!(
+            region_error([-1.0, 2.0, 0.0, 1.0], [0.8, 0.2, 0.0, 2.0]),
+            Some("figure region too large")
+        );
+        assert_eq!(
+            region_error(ok, [0.8, 0.2, 0.0, 2.0]),
+            Some("figure margins too large")
+        );
+        assert_eq!(
+            region_error(ok, [0.0, 2.0, 0.0, 1.0]),
+            Some("plot region too large")
+        );
+        // R's FLT_EPSILON tolerance at the edges.
+        assert_eq!(
+            region_error([-1e-9, 1.0 + 1e-9, 0.0, 1.0], [-1e-9, 1.0, 0.0, 1.0]),
+            None
+        );
     }
 
     #[test]

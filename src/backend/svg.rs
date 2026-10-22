@@ -23,7 +23,7 @@
 
 use std::fmt::Write as _;
 
-use super::compress::{gzip_compress, DEFLATE_LEVEL};
+use super::compress::{DEFLATE_LEVEL, gzip_compress};
 use super::numfmt::{push_hex, push_trimmed};
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::Color;
@@ -48,7 +48,8 @@ pub struct SvgBackend {
 }
 
 impl SvgBackend {
-    pub fn new(width_in: f64, height_in: f64) -> Self {
+    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
+        let (width_in, height_in) = (width_in.into(), height_in.into());
         SvgBackend {
             width_in,
             height_in,
@@ -271,6 +272,26 @@ impl Backend for SvgBackend {
         (self.width_in, self.height_in)
     }
 
+    /// Big points, as R's `svg()`.
+    fn device_unit_inches(&self) -> f64 {
+        1.0 / 72.0
+    }
+
+    /// Unrounded, as R's cairo `svg()`.
+    fn effective_font_size(&self, requested_pt: f64) -> f64 {
+        requested_pt
+    }
+
+    /// White, as R's `svg()`.
+    fn default_bg(&self) -> Color {
+        Color::WHITE
+    }
+
+    fn take_page(&mut self) -> Vec<u8> {
+        let fresh = SvgBackend::new(self.width_in, self.height_in);
+        std::mem::replace(self, fresh).finish().into_bytes()
+    }
+
     fn new_page(&mut self) {
         self.body.clear();
         self.pending = None;
@@ -442,7 +463,11 @@ mod tests {
         b.pop_clip();
         b.draw_circle(Point::new(0.5, 0.5), 0.1, Some(Color::rgb(255, 0, 0)), None);
         let svg = b.finish();
-        assert_eq!(svg.matches("<g").count(), svg.matches("</g>").count(), "{svg}");
+        assert_eq!(
+            svg.matches("<g").count(),
+            svg.matches("</g>").count(),
+            "{svg}"
+        );
     }
 
     /// Runs of same-style shapes share a `<g>`; a shape whose style differs

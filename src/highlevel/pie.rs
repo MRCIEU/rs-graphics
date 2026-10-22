@@ -15,9 +15,13 @@ use crate::color::{Color, ColorSpec};
 use crate::device::{
     Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
 };
+use crate::font::FontFace;
+use crate::lty::LineType;
+use crate::par::Xpd;
 use crate::plotmath::Label;
 
-/// R's default pie slice color cycle (used when `col` isn't given).
+/// R's default pie slice color cycle (used when neither `col` nor
+/// `density` is given).
 const DEFAULT_COLORS: [&str; 6] = [
     "white",
     "lightblue",
@@ -35,18 +39,48 @@ pub struct PieOptions {
     /// ...`. An empty text label, or a missing one (fewer labels than
     /// slices, R's `NA`), draws no label or tick for its slice.
     pub labels: Option<Vec<Label>>,
+    /// Rotation of the labels in degrees, counterclockwise (R's `srt`,
+    /// passed to `text()`); `None`: `par(srt)`.
+    pub srt: Option<f64>,
+    /// Size of the labels (R's inline `cex`, passed to `text()`; `main`
+    /// keeps `cex.main`); `None`: 1.
+    pub cex: Option<f64>,
+    /// Font of the labels (R's inline `font`, passed to `text()`); `None`:
+    /// `par(font)`.
+    pub font: Option<FontFace>,
     /// Pie radius in user units, where the plot region's shorter side
     /// spans `[-1, 1]` before the usual 4% axis extension; `None`: 0.8
     /// (R's default).
     pub radius: Option<f64>,
     /// Slice fill colours, recycled over the slices; empty: R's default
-    /// cycle of 6 pastel colours.
+    /// cycle of 6 pastel colours, or `par(fg)` (the shading lines' colour)
+    /// when `density` is given.
     pub col: Vec<ColorSpec>,
-    /// Slice borders; `None`: `par(fg)` (R's default).
-    pub border: Option<ColorSpec>,
+    /// Slice borders, recycled per slice; empty: `polygon()`'s default,
+    /// `par(fg)`, or with shading the slice's `col` (R's `border = NULL`).
+    pub border: Vec<ColorSpec>,
+    /// Slice border line types, recycled per slice; empty: `par(lty)`.
+    /// `None` (R's `NA`): that slice has no border.
+    pub lty: Vec<Option<LineType>>,
+    /// Shading lines per inch in the slices (R's `density`), recycled per
+    /// slice, as for [`PolygonOptions::density`]; the lines take `col`, whose
+    /// default is then `par(fg)`. Empty: no shading.
+    pub density: Vec<Option<f64>>,
+    /// Angle of the shading lines in degrees (R's `angle`), recycled per
+    /// slice; empty: 45.
+    pub angle: Vec<f64>,
     /// Title, as for `plot()` (text or a plotmath expression); `None`:
     /// none. Drawn whatever `par(ann)` is, as in R.
     pub main: Option<Label>,
+    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+    /// to `title()`); `None`: `par(cex.main)`.
+    pub cex_main: Option<f64>,
+    /// Colour of `main` (R's `col.main`, passed to `title()`);
+    /// `None`: `par(col.main)`.
+    pub col_main: Option<ColorSpec>,
+    /// Font of `main` (a [`FontFace`]; R's
+    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
+    pub font_main: Option<FontFace>,
     /// Approximate number of polygon edges for a full circle; `None`: 200
     /// (R's default).
     pub edges: Option<usize>,
@@ -59,10 +93,19 @@ pub struct PieOptions {
 
 crate::setters::setters!(PieOptions => [PieCall] {
     labels: list Label,
+    srt: option f64,
+    cex: option f64,
+    font: option FontFace,
     radius: option f64,
     col: values ColorSpec,
-    border: option ColorSpec,
+    border: values ColorSpec,
+    lty: na_values LineType,
+    density: na_values f64,
+    angle: values f64,
     main: option Label,
+    cex_main: option f64,
+    col_main: option ColorSpec,
+    font_main: option FontFace,
     edges: option usize,
     clockwise: value bool,
     init_angle: option f64,
@@ -72,10 +115,19 @@ impl Default for PieOptions {
     fn default() -> Self {
         PieOptions {
             labels: None,
+            srt: None,
+            cex: None,
+            font: None,
             radius: None,
             col: Vec::new(),
-            border: None,
+            border: Vec::new(),
+            lty: Vec::new(),
+            density: Vec::new(),
+            angle: Vec::new(),
             main: None,
+            cex_main: None,
+            col_main: None,
+            font_main: None,
             edges: None,
             clockwise: false,
             init_angle: None,
@@ -158,15 +210,23 @@ impl<B: Backend> Device<B> {
             xs.push(0.0);
             ys.push(0.0);
 
-            let col = if opts.col.is_empty() {
+            // `col = NULL`: the pastel colours, or `par(fg)` with shading.
+            let col = if !opts.col.is_empty() {
+                opts.col[i % opts.col.len()]
+            } else if opts.density.is_empty() {
                 ColorSpec::Color(Color::parse(DEFAULT_COLORS[i % DEFAULT_COLORS.len()]).unwrap())
             } else {
-                opts.col[i % opts.col.len()]
+                ColorSpec::Color(self.par.fg)
             };
-            // `border = NULL`: polygon()'s default, par(fg).
+            // `polygon(.., density = density[i], angle = angle[i], border =
+            // border[i], col = col[i], lty = lty[i])`; `NULL` ones are
+            // polygon()'s defaults.
             let slice = PolygonOptions {
                 col: vec![col],
-                border: opts.border.into_iter().collect(),
+                border: each(&opts.border, i),
+                lty: each(&opts.lty, i),
+                density: each(&opts.density, i),
+                angle: each(&opts.angle, i),
                 ..PolygonOptions::default()
             };
             self.polygon_impl(&xs, &ys, &slice);
@@ -183,18 +243,34 @@ impl<B: Backend> Device<B> {
                 // ifelse(P$x < 0, 1, 0))`.
                 let at = TextOptions {
                     adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
-                    xpd: Some(true),
+                    xpd: Some(Xpd::Figure),
+                    srt: opts.srt,
+                    cex: opts.cex.into_iter().map(Some).collect(),
+                    font: opts.font.into_iter().map(Some).collect(),
                     ..TextOptions::default()
                 };
-                self.text_impl(&[1.1 * px], &[1.1 * py], std::slice::from_ref(label), &at);
+                self.text_impl(&[1.1 * px], &[1.1 * py], &[Some(label.clone())], &at);
             }
         }
 
         if let Some(main) = &opts.main {
             self.title_impl(&TitleOptions {
                 main: Some(main.clone()),
+                cex_main: opts.cex_main,
+                col_main: opts.col_main,
+                font_main: opts.font_main,
                 ..TitleOptions::default()
             });
         }
+    }
+}
+
+/// `v[i]` (recycled) as a one-element vector; empty stays empty (R's
+/// `NULL`, the default).
+fn each<T: Copy>(v: &[T], i: usize) -> Vec<T> {
+    if v.is_empty() {
+        Vec::new()
+    } else {
+        vec![v[i % v.len()]]
     }
 }

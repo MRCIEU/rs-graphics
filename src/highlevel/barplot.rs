@@ -14,27 +14,37 @@
 //! `beside`, vertical or
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
 //! `gray.colors(nrow)`), `names.arg`, `legend.text` (and `args.legend`),
-//! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH` and `add`.
+//! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH`, `add`,
+//! `axisnames`, `cex.names`, `axis.lty`, shading lines (`density`/
+//! `angle`) and R's inline axis parameters (`las`, `cex.axis`, ...).
 //!
-//! Not supported: hatched fills (`density`/`angle`), `xpd` (always
-//! `TRUE`, R's default), `axisnames`, `cex.axis`/`cex.names`, `axis.lty`,
-//! `plot = FALSE` and `panel.first`/`panel.last`.
+//! Also `xpd` and `plot = FALSE`. Not supported: `panel.first`/
+//! `panel.last`.
 //!
-//! **R bug not copied:** for stacked bars R works out the default value
-//! axis limits with `offset` recycled over every element of the matrix of
-//! stacked sums instead of once per column (so `offset = c(0, 10, 0)` on a
-//! 3-column matrix gives limits that cut off the bars it draws). We use
+//! **R bugs not copied:** with `orderH`, R reorders the colours of each
+//! stack's segments but not `density`/`angle`, so the shading moves to
+//! other rows; here it stays with its row, as the colour does. For the
+//! legend, R reverses `density`/`angle` before recycling them over the
+//! labels; here they are recycled first, as the colours are. And for
+//! stacked bars R works out the default value axis limits with `offset`
+//! recycled over every element of the matrix of stacked sums instead of
+//! once per column (so `offset = c(0, 10, 0)` on a 3-column matrix gives
+//! limits that cut off the bars it draws). We use
 //! each column's own offset, as R does when drawing the bars.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec, gray_colors};
 use crate::device::{
-    AxisOptions, Device, LegendEntry, LegendOptions, LegendPos, PlotWindowOptions, RectOptions,
-    TitleOptions,
+    AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions, TitleOptions,
 };
 use crate::error::{from_r_string, from_str_via_parse};
-use crate::par::AxisStyle;
+use crate::font::FontFace;
+use crate::lty::LineType;
+use crate::numbers::{Num, Numbers};
+use crate::par::{AxisStyle, Xpd};
 use crate::plotmath::Label;
+
+use super::InlineAxis;
 
 /// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
 /// `barplot.default`'s arguments this crate implements. Unset fields are
@@ -53,6 +63,15 @@ pub struct BarplotOptions {
     pub col: Vec<ColorSpec>,
     /// Bar borders; `None`: `par(fg)` (R's default).
     pub border: Option<ColorSpec>,
+    /// Shading lines per inch in the bars (R's `density`), recycled as
+    /// `col` is; the lines take the bar's `col`. `None` (R's `NA`) or
+    /// negative fills the bar instead, 0 leaves it empty; see
+    /// [`RectOptions::density`]. Empty: no shading. The legend's boxes are
+    /// shaded the same way. Not allowed with a log axis.
+    pub density: Vec<Option<f64>>,
+    /// Angle of the shading lines in degrees (R's `angle`), recycled as
+    /// `density` is; empty: 45.
+    pub angle: Vec<f64>,
     /// Bar widths, recycled; empty: 1 (R's default).
     pub width: Vec<f64>,
     /// Space before each bar as a fraction of the mean bar width: one value,
@@ -71,10 +90,10 @@ pub struct BarplotOptions {
     /// corner of the plot region, as R.
     pub legend_pos: Option<LegendPos>,
     /// The rest of R's `args.legend`: every field set here overrides
-    /// barplot's choice for the legend (`xjust = yjust = 1`, otherwise
-    /// `legend()`'s defaults), e.g. `bty`, `inset`, `ncol`, `cex`, `title`.
-    /// The labels and fill colours always come from `legend_text` and
-    /// `col`. Default: no overrides.
+    /// barplot's choice for the legend (`fill` from `col`, `xjust = yjust
+    /// = 1`, otherwise `legend()`'s defaults), e.g. `bty`, `inset`, `ncol`,
+    /// `cex`, `title`, `fill`. The labels always come from `legend_text`.
+    /// Default: no overrides.
     pub args_legend: LegendOptions,
     /// x limits; `None`: from the bars.
     pub xlim: Option<(f64, f64)>,
@@ -112,14 +131,81 @@ pub struct BarplotOptions {
     pub xlab: Option<Label>,
     /// y axis label; `None`: none.
     pub ylab: Option<Label>,
+    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+    /// to `title()`); `None`: `par(cex.main)`.
+    pub cex_main: Option<f64>,
+    /// Colour of `main` (R's `col.main`, passed to `title()`);
+    /// `None`: `par(col.main)`.
+    pub col_main: Option<ColorSpec>,
+    /// Font of `main` (a [`FontFace`]; R's
+    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
+    pub font_main: Option<FontFace>,
+    /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
+    /// to `title()`); `None`: `par(cex.sub)`.
+    pub cex_sub: Option<f64>,
+    /// Colour of `sub` (R's `col.sub`, passed to `title()`);
+    /// `None`: `par(col.sub)`.
+    pub col_sub: Option<ColorSpec>,
+    /// Font of `sub` (a [`FontFace`]; R's
+    /// `font.sub`, passed to `title()`); `None`: `par(font.sub)`.
+    pub font_sub: Option<FontFace>,
+    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
+    /// to `title()`); `None`: `par(cex.lab)`.
+    pub cex_lab: Option<f64>,
+    /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
+    /// `None`: `par(col.lab)`.
+    pub col_lab: Option<ColorSpec>,
+    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
+    /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
+    pub font_lab: Option<FontFace>,
     /// Draw the value axis; default `true`.
     pub axes: bool,
+    /// Draw the names (R's `axisnames`); default `true`.
+    pub axisnames: bool,
+    /// Size of the names (R's `cex.names`); `None`: `par(cex.axis)`.
+    pub cex_names: Option<f64>,
+    /// Line type of the names axis's line and ticks (R's `axis.lty`);
+    /// `None`: R's 0, none drawn.
+    pub axis_lty: Option<LineType>,
+    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+    /// `None`: `par(las)`.
+    pub las: Option<i32>,
+    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+    pub cex_axis: Option<f64>,
+    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+    pub col_axis: Option<ColorSpec>,
+    /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
+    pub font_axis: Option<FontFace>,
+    /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
+    /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
+    /// Tick length as a fraction of the plot region (R's inline `tck`);
+    /// `None`: `par(tck)`.
+    pub tck: Option<f64>,
+    /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
+    pub tcl: Option<f64>,
+    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
+    /// R's default.
+    pub gap_axis: Option<f64>,
+    /// Width of the axes' line and ticks (R's inline `lwd`, which `barplot()`
+    /// passes only to `axis()`, not to the bars); `None`: 1, `axis()`'s
+    /// default.
+    pub lwd: Option<f64>,
+    /// Clipping of the bars, names and legend (R's `xpd`; the setter also
+    /// takes `false`/`true`); `None`: [`Xpd::Figure`] (R's `TRUE`).
+    pub xpd: Option<Xpd>,
+    /// `false` works out the bars' centres and returns them without drawing
+    /// (R's `plot = FALSE`); `None`: `true`.
+    pub plot: Option<bool>,
 }
 
 crate::setters::setters!(BarplotOptions => [BarplotCall] {
     names: list Label,
     col: values ColorSpec,
     border: option ColorSpec,
+    density: na_values f64,
+    angle: values f64,
     width: values f64,
     space: option_values f64,
     beside: value bool,
@@ -139,7 +225,30 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     sub: option Label,
     xlab: option Label,
     ylab: option Label,
+    cex_main: option f64,
+    col_main: option ColorSpec,
+    font_main: option FontFace,
+    cex_sub: option f64,
+    col_sub: option ColorSpec,
+    font_sub: option FontFace,
+    cex_lab: option f64,
+    col_lab: option ColorSpec,
+    font_lab: option FontFace,
     axes: value bool,
+    axisnames: value bool,
+    cex_names: option f64,
+    axis_lty: option LineType,
+    las: option i32,
+    cex_axis: option f64,
+    col_axis: option ColorSpec,
+    font_axis: option FontFace,
+    mgp: array [f64; 3],
+    tck: option f64,
+    tcl: option f64,
+    gap_axis: option f64,
+    lwd: option f64,
+    xpd: option Xpd,
+    plot: option bool,
 });
 
 impl Default for BarplotOptions {
@@ -148,6 +257,8 @@ impl Default for BarplotOptions {
             names: None,
             col: Vec::new(),
             border: None,
+            density: Vec::new(),
+            angle: Vec::new(),
             width: Vec::new(),
             space: None,
             beside: false,
@@ -167,7 +278,30 @@ impl Default for BarplotOptions {
             sub: None,
             xlab: None,
             ylab: None,
+            cex_main: None,
+            col_main: None,
+            font_main: None,
+            cex_sub: None,
+            col_sub: None,
+            font_sub: None,
+            cex_lab: None,
+            col_lab: None,
+            font_lab: None,
             axes: true,
+            axisnames: true,
+            cex_names: None,
+            axis_lty: None,
+            las: None,
+            cex_axis: None,
+            col_axis: None,
+            font_axis: None,
+            mgp: None,
+            tck: None,
+            tcl: None,
+            gap_axis: None,
+            lwd: None,
+            xpd: None,
+            plot: None,
         }
     }
 }
@@ -208,9 +342,10 @@ from_str_via_parse!(OrderH, "orderH");
 from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 
 /// The `height` argument of [`Graphics::barplot`](crate::graphics::Graphics::barplot): R's vector or matrix.
-/// Built with `.into()` from a vector of numbers (slice, array, `Vec`) or
-/// from a matrix given as its columns (`Vec<Vec<f64>>`, a slice or array of
-/// `Vec<f64>`).
+/// Built with `.into()` from a vector of numbers of any type (`f64` or
+/// integers; a slice, array or `Vec`, by reference or by value, or a
+/// range, see [`Numbers`]) or from a matrix given as its columns
+/// (`Vec<Vec<T>>`, a slice or array of `Vec<T>`).
 #[derive(Clone, Debug, PartialEq)]
 pub enum BarHeights {
     /// R's `vectorInput` case: one bar per value.
@@ -221,67 +356,56 @@ pub enum BarHeights {
     Matrix(Vec<Vec<f64>>),
 }
 
-impl From<Vec<f64>> for BarHeights {
-    fn from(v: Vec<f64>) -> Self {
-        BarHeights::Vector(v)
+impl<'a, N: Numbers<'a>> From<N> for BarHeights {
+    /// A vector of any numbers, by reference or by value, or a range (see
+    /// [`Numbers`]).
+    fn from(v: N) -> Self {
+        BarHeights::Vector(v.into_numbers().into_owned())
     }
 }
 
-impl From<&Vec<f64>> for BarHeights {
-    fn from(v: &Vec<f64>) -> Self {
-        BarHeights::Vector(v.clone())
+fn columns<T: Num>(m: &[Vec<T>]) -> Vec<Vec<f64>> {
+    m.iter()
+        .map(|c| c.iter().map(|v| v.to_f64()).collect())
+        .collect()
+}
+
+impl<T: Num> From<Vec<Vec<T>>> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: Vec<Vec<T>>) -> Self {
+        BarHeights::Matrix(columns(&m))
     }
 }
 
-impl From<&[f64]> for BarHeights {
-    fn from(v: &[f64]) -> Self {
-        BarHeights::Vector(v.to_vec())
+impl<T: Num> From<&Vec<Vec<T>>> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: &Vec<Vec<T>>) -> Self {
+        BarHeights::Matrix(columns(m))
     }
 }
 
-impl<const N: usize> From<[f64; N]> for BarHeights {
-    fn from(v: [f64; N]) -> Self {
-        BarHeights::Vector(v.to_vec())
+impl<T: Num> From<&[Vec<T>]> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: &[Vec<T>]) -> Self {
+        BarHeights::Matrix(columns(m))
     }
 }
 
-impl<const N: usize> From<&[f64; N]> for BarHeights {
-    fn from(v: &[f64; N]) -> Self {
-        BarHeights::Vector(v.to_vec())
+impl<T: Num, const N: usize> From<[Vec<T>; N]> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: [Vec<T>; N]) -> Self {
+        BarHeights::Matrix(columns(&m))
     }
 }
 
-impl From<Vec<Vec<f64>>> for BarHeights {
-    fn from(m: Vec<Vec<f64>>) -> Self {
-        BarHeights::Matrix(m)
+impl<T: Num, const N: usize> From<&[Vec<T>; N]> for BarHeights {
+    /// A matrix given as its columns.
+    fn from(m: &[Vec<T>; N]) -> Self {
+        BarHeights::Matrix(columns(m))
     }
 }
 
-impl From<&Vec<Vec<f64>>> for BarHeights {
-    fn from(m: &Vec<Vec<f64>>) -> Self {
-        BarHeights::Matrix(m.clone())
-    }
-}
-
-impl From<&[Vec<f64>]> for BarHeights {
-    fn from(m: &[Vec<f64>]) -> Self {
-        BarHeights::Matrix(m.to_vec())
-    }
-}
-
-impl<const N: usize> From<[Vec<f64>; N]> for BarHeights {
-    fn from(m: [Vec<f64>; N]) -> Self {
-        BarHeights::Matrix(m.to_vec())
-    }
-}
-
-impl<const N: usize> From<&[Vec<f64>; N]> for BarHeights {
-    fn from(m: &[Vec<f64>; N]) -> Self {
-        BarHeights::Matrix(m.to_vec())
-    }
-}
-
-fn recycle(v: &[f64], n: usize) -> Vec<f64> {
+fn recycle<T: Copy>(v: &[T], n: usize) -> Vec<T> {
     (0..n).map(|k| v[k % v.len()]).collect()
 }
 
@@ -381,6 +505,11 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
         let k = if beside { i } else { j };
         offset[k % offset.len()]
     };
+
+    assert!(
+        !((opts.xlog || opts.ylog) && !opts.density.is_empty()),
+        "Cannot use shading lines in bars when log scale is used"
+    );
 
     // --- log scale in the data direction: where bars start ---
     let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
@@ -529,7 +658,17 @@ impl<B: Backend> Device<B> {
         opts: &BarplotOptions,
     ) -> Vec<f64> {
         let layout = bar_layout(&heights.into(), opts);
-        self.draw_barplot(layout, opts)
+        if !opts.plot.unwrap_or(true) {
+            return layout.w_m;
+        }
+        // R's `opar <- par(yaxs = "i")` (`xaxs` when `horiz`), then
+        // `par(xpd = TRUE)`, restored `on.exit`.
+        let mut dev = self.par_scope(|now, saved| {
+            now.xaxs = saved.xaxs;
+            now.yaxs = saved.yaxs;
+            now.xpd = saved.xpd;
+        });
+        dev.draw_barplot(layout, opts)
     }
 
     /// Draws `layout`; returns its bar centres.
@@ -547,15 +686,15 @@ impl<B: Backend> Device<B> {
         } = layout;
         let horiz = opts.horiz;
 
-        // barplot() temporarily sets the *value* axis to `"i"` (exact fit, no
-        // 4% padding), leaving the categorical axis at its regular setting.
+        // barplot() sets the *value* axis to `"i"` (exact fit, no 4%
+        // padding), leaving the categorical axis at its regular setting;
+        // `barplot_impl` restores it.
+        if horiz {
+            self.par.xaxs = AxisStyle::Exact;
+        } else {
+            self.par.yaxs = AxisStyle::Exact;
+        }
         if !opts.add {
-            let (saved_xaxs, saved_yaxs) = (self.par.xaxs, self.par.yaxs);
-            if horiz {
-                self.par.xaxs = AxisStyle::Exact;
-            } else {
-                self.par.yaxs = AxisStyle::Exact;
-            }
             self.plot_new_impl();
             let window = PlotWindowOptions {
                 xlog: opts.xlog,
@@ -563,46 +702,107 @@ impl<B: Backend> Device<B> {
                 ..PlotWindowOptions::default()
             };
             self.plot_window_impl(xlim, ylim, &window);
-            self.par.xaxs = saved_xaxs;
-            self.par.yaxs = saved_yaxs;
         }
 
-        // R draws everything with `par(xpd = TRUE)`.
-        let saved_xpd = self.par.xpd;
-        self.par.xpd = true;
+        // R draws everything with `par(xpd = xpd)`, `TRUE` by default
+        // (restored by `barplot_impl`).
+        self.par.xpd = opts.xpd.unwrap_or(Xpd::Figure);
 
-        for &(k, base, top, ci) in &bars {
+        // One `rect()` call for all bars beside each other, one per stack
+        // otherwise, as R (which matters for the order shading lines and
+        // borders are drawn in); `col`, `density` and `angle` per bar.
+        let border = vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))];
+        let mut start = 0;
+        while start < bars.len() {
+            let end = if beside {
+                bars.len()
+            } else {
+                start
+                    + bars[start..]
+                        .iter()
+                        .take_while(|b| b.0 == bars[start].0)
+                        .count()
+            };
+            let group = &bars[start..end];
+            let (mut x0, mut y0, mut x1, mut y1) = (vec![], vec![], vec![], vec![]);
+            for &(k, base, top, _) in group {
+                let (lo, hi) = (w_l[k], w_r[k]);
+                if horiz {
+                    x0.push(base);
+                    y0.push(lo);
+                    x1.push(top);
+                    y1.push(hi);
+                } else {
+                    x0.push(lo);
+                    y0.push(base);
+                    x1.push(hi);
+                    y1.push(top);
+                }
+            }
             let style = RectOptions {
-                col: vec![colors[ci % colors.len()]],
-                border: vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))],
+                col: group.iter().map(|b| colors[b.3 % colors.len()]).collect(),
+                border: border.clone(),
+                density: per_bar(&opts.density, group),
+                angle: per_bar(&opts.angle, group),
                 ..RectOptions::default()
             };
-            if horiz {
-                self.rect_impl(&[base], &[w_l[k]], &[top], &[w_r[k]], &style);
-            } else {
-                self.rect_impl(&[w_l[k]], &[base], &[w_r[k]], &[top], &style);
-            }
+            self.rect_impl(&x0, &y0, &x1, &y1, &style);
+            start = end;
         }
 
-        if let (Some(names), Some(at)) = (&opts.names, names_at) {
-            // `axis(side, at = at, labels = names.arg, lty = 0)`: names only.
+        // R passes `...` to both axes; the value axis gets `cex.axis`, the
+        // names axis `cex.names` instead.
+        let inline = InlineAxis {
+            las: opts.las,
+            cex_axis: None,
+            col_axis: opts.col_axis,
+            font_axis: opts.font_axis,
+            mgp: opts.mgp,
+            tck: opts.tck,
+            tcl: opts.tcl,
+            gap_axis: opts.gap_axis,
+            lwd: opts.lwd,
+            ..InlineAxis::default()
+        };
+        if let (true, Some(names), Some(at)) = (opts.axisnames, &opts.names, names_at) {
+            // `axis(side, at = at, labels = names.arg, lty = axis.lty,
+            // cex.axis = cex.names, ...)`: with R's default `axis.lty = 0`,
+            // the names only.
+            let lty = opts.axis_lty.filter(|&l| l != LineType::BLANK);
             let names = AxisOptions {
                 at: Some(at),
                 labels: Some(names.iter().cloned().map(Some).collect()),
-                tick: false,
+                tick: lty.is_some(),
+                lty,
+                cex_axis: opts.cex_names,
                 ..AxisOptions::default()
             };
-            self.axis_impl(if horiz { 2 } else { 1 }, &names);
+            self.axis_impl(if horiz { 2 } else { 1 }, &inline.apply(names));
         }
 
         if let Some(labels) = &opts.legend_text {
-            let mut entries: Vec<LegendEntry> = labels
-                .iter()
-                .enumerate()
-                .map(|(i, l)| LegendEntry::filled(l.clone(), colors[i % colors.len()]))
+            let mut labels = labels.clone();
+            let mut fill: Vec<ColorSpec> = (0..labels.len())
+                .map(|i| colors[i % colors.len()])
                 .collect();
+            let mut density: Vec<Option<f64>> = if opts.density.is_empty() {
+                Vec::new()
+            } else {
+                recycle(&opts.density, labels.len())
+            };
+            let mut angle: Vec<f64> = if opts.angle.is_empty() {
+                Vec::new()
+            } else {
+                recycle(&opts.angle, labels.len())
+            };
+            // (R reverses `density` and `angle` before `legend()` recycles
+            // them, so with fewer values than labels they don't follow
+            // the reversed labels; we recycle first, as for `fill`.)
             if (horiz && beside) || (!horiz && !beside) {
-                entries.reverse();
+                labels.reverse();
+                fill.reverse();
+                density.reverse();
+                angle.reverse();
             }
             // By default 0.1 inch in from the top-right corner of the plot
             // region. (On a log axis R passes the log10 `par("usr")` values
@@ -620,7 +820,17 @@ impl<B: Backend> Device<B> {
             let mut lopts = opts.args_legend.clone();
             lopts.xjust.get_or_insert(1.0);
             lopts.yjust.get_or_insert(1.0);
-            self.legend_impl(pos, &entries, &lopts);
+            if lopts.fill.is_empty() {
+                lopts.fill = fill;
+            }
+            if lopts.density.is_empty() {
+                lopts.density = density;
+            }
+            if lopts.angle.is_empty() {
+                lopts.angle = angle;
+            }
+            let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
+            self.legend_impl(pos, &labels, &lopts);
         }
 
         if opts.ann.unwrap_or(!opts.add && self.par.ann) {
@@ -629,15 +839,42 @@ impl<B: Backend> Device<B> {
                 sub: opts.sub.clone(),
                 xlab: opts.xlab.clone(),
                 ylab: opts.ylab.clone(),
+                cex_main: opts.cex_main,
+                col_main: opts.col_main,
+                font_main: opts.font_main,
+                cex_sub: opts.cex_sub,
+                col_sub: opts.col_sub,
+                font_sub: opts.font_sub,
+                cex_lab: opts.cex_lab,
+                col_lab: opts.col_lab,
+                font_lab: opts.font_lab,
+                mgp: opts.mgp,
+                ..TitleOptions::default()
             });
         }
 
         if opts.axes {
-            self.axis_impl(if horiz { 1 } else { 2 }, &AxisOptions::default());
+            let value_axis = InlineAxis {
+                cex_axis: opts.cex_axis,
+                ..inline
+            };
+            self.axis_impl(
+                if horiz { 1 } else { 2 },
+                &value_axis.apply(AxisOptions::default()),
+            );
         }
 
-        self.par.xpd = saved_xpd;
         w_m
+    }
+}
+
+/// `v` per bar of `group`, recycled as `col` is (by each bar's colour
+/// index); empty stays empty.
+fn per_bar<T: Copy>(v: &[T], group: &[(usize, f64, f64, usize)]) -> Vec<T> {
+    if v.is_empty() {
+        Vec::new()
+    } else {
+        group.iter().map(|b| v[b.3 % v.len()]).collect()
     }
 }
 

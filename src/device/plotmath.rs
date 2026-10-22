@@ -7,8 +7,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Drawing plotmath expressions: a port of `r-source/src/main/plotmath.c`
-//! for the constructs [`crate::plotmath`] accepts. Each element is laid
-//! out twice, as in R: once to measure its bounding box, once to draw.
+//! for the constructs [`crate::plotmath`] accepts. Rules (fraction bars,
+//! radicals, `bar`/`widehat`/`widetilde`, `underline`, `abs()` bars) are
+//! drawn as lines, as R does. Each element is laid out twice, as in R:
+//! once to measure its bounding box, once to draw.
 //! Boxes and positions are in inches; text is drawn baseline-left in
 //! pieces (whole strings, or one character at a time for names, as R
 //! does), with sizes from the TeX-like styles (`STYLE_D` ... `STYLE_SS1`).
@@ -20,7 +22,7 @@ use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::plotmath::{Expr, Expression, Label};
 
-use super::{Clip, Device};
+use super::{Device, Xpd};
 
 /// `BBOX`: height above and depth below the baseline, width, italic
 /// correction, and whether the element was a simple atom.
@@ -41,6 +43,29 @@ impl BBox {
             width,
             ..BBox::default()
         }
+    }
+
+    /// `EnlargeBBox`.
+    fn enlarge(mut self, height: f64, depth: f64, width: f64) -> BBox {
+        self.height += height;
+        self.depth += depth;
+        self.width += width;
+        self
+    }
+
+    /// `CenterShift`.
+    fn center_shift(&self) -> f64 {
+        0.5 * (self.height - self.depth)
+    }
+
+    /// `CombineOffsetBBoxes`: `b` placed at an offset over `self`.
+    fn combine_offset(mut self, b: BBox, x: f64, y: f64) -> BBox {
+        self.width = self.width.max(b.width + x);
+        self.height = self.height.max(b.height + y);
+        self.depth = self.depth.max(b.depth - y);
+        self.italic = 0.0;
+        self.simple = false;
+        self
     }
 
     fn shift(mut self, v: f64) -> BBox {
@@ -70,26 +95,36 @@ impl BBox {
     }
 }
 
-/// TeX styles, in R's order (`STYLE_SS1 = 1` ... `STYLE_D = 8`). The
-/// cramped text and display styles (`T1`, `D1`) only arise in fractions,
-/// which aren't supported.
+/// TeX styles, in R's order (`STYLE_SS1 = 1` ... `STYLE_D = 8`); the
+/// `1` styles are the cramped ones (subscripts, denominators, radicals).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Style {
     SS1 = 1,
     SS = 2,
     S1 = 3,
     S = 4,
+    T1 = 5,
     T = 6,
+    D1 = 7,
     D = 8,
 }
 
 const ITALIC_FACTOR: f64 = 0.15;
 const DELIM_SYMBOL_MAG: f64 = 1.25;
-const PLAIN: i32 = 1;
-const BOLD: i32 = 2;
-const ITALIC: i32 = 3;
-const BOLD_ITALIC: i32 = 4;
-const SYMBOL: i32 = 5;
+const OPERATOR_SYMBOL_MAG: f64 = 1.25;
+/// `RuleThickness()` (TeX's `xi8`), in inches.
+const RULE_THICKNESS: f64 = 0.015;
+const ACCENT_GAP: f64 = 0.2;
+const HAT_HEIGHT: f64 = 0.3;
+const NTILDE: usize = 8;
+const TILDE_DELTA: f64 = 0.05;
+const RADICAL_GAP: f64 = 0.4;
+const RADICAL_SPACE: f64 = 0.2;
+const PLAIN: FontFace = FontFace::Plain;
+const BOLD: FontFace = FontFace::Bold;
+const ITALIC: FontFace = FontFace::Italic;
+const BOLD_ITALIC: FontFace = FontFace::BoldItalic;
+const SYMBOL: FontFace = FontFace::Symbol;
 
 /// `mathContext` plus the parts of the graphics context plotmath changes
 /// (`gc->cex`, `gc->fontface`).
@@ -98,21 +133,21 @@ struct Math<'d, B: Backend> {
     base_cex: f64,
     style: Style,
     cex: f64,
-    font: i32,
+    font: FontFace,
     reference: Point,
     current: Point,
     angle: f64,
     cos: f64,
     sin: f64,
     col: Color,
-    clip: Clip,
+    clip: Xpd,
 }
 
 impl<B: Backend> Device<B> {
     /// `GEExpressionMetric`: `(ascent, descent, width)` in inches of `expr`
     /// at total text expansion `cex` (`ps * cex` points).
     pub(super) fn expression_metrics(&mut self, expr: &Expression, cex: f64) -> (f64, f64, f64) {
-        let mut m = Math::new(self, cex, Color::BLACK, Clip::Device);
+        let mut m = Math::new(self, cex, Color::BLACK, Xpd::Device);
         let bbox = m.element(&expr.root, false);
         (bbox.height, bbox.depth, bbox.width)
     }
@@ -120,24 +155,18 @@ impl<B: Backend> Device<B> {
     /// `strwidth(label, "inches", cex = cex, font = font)`, single-line
     /// text or an expression; `cex` is multiplied by `par(cex)`, as in
     /// [`Graphics::text`](crate::graphics::Graphics::text).
-    pub(super) fn label_width(&mut self, label: &Label, font: i32, cex: f64) -> f64 {
+    pub(super) fn label_width(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(t) => {
-                let face = self.par.font_face(font);
-                afm::str_width_inches(t, face, self.font_size_pt(cex), 1.0)
-            }
+            Label::Text(t) => afm::str_width_inches(t, font, self.font_size_pt(cex), 1.0),
             Label::Math(e) => self.expression_metrics(e, self.par.cex * cex).2,
         }
     }
 
     /// `strheight(label, "inches", cex = cex, font = font)`: the height of
     /// "M" for single-line text, height + depth for an expression.
-    pub(super) fn label_height(&mut self, label: &Label, font: i32, cex: f64) -> f64 {
+    pub(super) fn label_height(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(_) => {
-                let face = self.par.font_face(font);
-                afm::m_height_inches(face, self.font_size_pt(cex), 1.0)
-            }
+            Label::Text(_) => afm::m_height_inches(font, self.font_size_pt(cex), 1.0),
             Label::Math(e) => {
                 let (h, d, _) = self.expression_metrics(e, self.par.cex * cex);
                 h + d
@@ -152,7 +181,7 @@ impl<B: Backend> Device<B> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn draw_label(
         &mut self,
-        clip: Clip,
+        clip: Xpd,
         anchor: Point,
         label: &Label,
         xc: f64,
@@ -160,7 +189,7 @@ impl<B: Backend> Device<B> {
         rotation_deg: f64,
         col: ColorSpec,
         cex: f64,
-        font: i32,
+        font: FontFace,
     ) {
         match label {
             Label::Text(t) => {
@@ -191,7 +220,7 @@ impl<B: Backend> Device<B> {
         rotation_deg: f64,
         col: Color,
         cex: f64,
-        clip: Clip,
+        clip: Xpd,
     ) {
         let mut m = Math::new(self, cex, col, clip);
         let bbox = m.element(&expr.root, false);
@@ -314,7 +343,7 @@ const A_TILDE: char = '~';
 impl<'d, B: Backend> Math<'d, B> {
     /// A context in display style and the plain font, as `GEMathText`
     /// starts.
-    fn new(dev: &'d mut Device<B>, cex: f64, col: Color, clip: Clip) -> Self {
+    fn new(dev: &'d mut Device<B>, cex: f64, col: Color, clip: Xpd) -> Self {
         Math {
             dev,
             base_cex: cex,
@@ -334,7 +363,7 @@ impl<'d, B: Backend> Math<'d, B> {
     // --- fonts, sizes and metrics -------------------------------------
 
     fn face(&self) -> FontFace {
-        FontFace::from_r_font_code(self.font)
+        self.font
     }
 
     /// The point size text is set at (rounded on PDF, as R's `pdf()`).
@@ -377,19 +406,43 @@ impl<'d, B: Backend> Math<'d, B> {
         self.quad() * 5.0 / 18.0
     }
 
+    fn mu_space(&self) -> f64 {
+        self.quad() / 18.0
+    }
+
+    /// `FigHeight`: the height of digits.
+    fn fig_height(&self) -> f64 {
+        self.metric('0').0
+    }
+
+    /// `DescDepth`: the depth of descenders.
+    fn desc_depth(&self) -> f64 {
+        self.metric('g').1
+    }
+
     fn set_style(&mut self, style: Style) {
         self.cex = self.base_cex
             * match style {
-                Style::D | Style::T => 1.0,
+                Style::D | Style::T | Style::D1 | Style::T1 => 1.0,
                 Style::S | Style::S1 => 0.7,
                 Style::SS | Style::SS1 => 0.5,
             };
         self.style = style;
     }
 
+    fn set_prime_style(&mut self, style: Style) {
+        self.set_style(match style {
+            Style::D | Style::D1 => Style::D1,
+            Style::T | Style::T1 => Style::T1,
+            Style::S | Style::S1 => Style::S1,
+            Style::SS | Style::SS1 => Style::SS1,
+        });
+    }
+
     fn set_sup_style(&mut self, style: Style) {
         self.set_style(match style {
             Style::D | Style::T => Style::S,
+            Style::D1 | Style::T1 => Style::S1,
             Style::S | Style::SS => Style::SS,
             Style::S1 | Style::SS1 => Style::SS1,
         });
@@ -397,20 +450,36 @@ impl<'d, B: Backend> Math<'d, B> {
 
     fn set_sub_style(&mut self, style: Style) {
         self.set_style(match style {
-            Style::D | Style::T => Style::S1,
+            Style::D | Style::T | Style::D1 | Style::T1 => Style::S1,
             _ => Style::SS1,
         });
     }
 
+    fn set_num_style(&mut self, style: Style) {
+        match style {
+            Style::D => self.set_style(Style::T),
+            Style::D1 => self.set_style(Style::T1),
+            _ => self.set_sup_style(style),
+        }
+    }
+
+    fn set_denom_style(&mut self, style: Style) {
+        if style > Style::T {
+            self.set_style(Style::T1);
+        } else {
+            self.set_sub_style(style);
+        }
+    }
+
     fn is_compact(style: Style) -> bool {
-        matches!(style, Style::S1 | Style::SS1)
+        matches!(style, Style::D1 | Style::T1 | Style::S1 | Style::SS1)
     }
 
     fn using_italics(&self) -> bool {
         self.font == ITALIC || self.font == BOLD_ITALIC
     }
 
-    fn set_font(&mut self, font: i32) -> i32 {
+    fn set_font(&mut self, font: FontFace) -> FontFace {
         std::mem::replace(&mut self.font, font)
     }
 
@@ -422,6 +491,21 @@ impl<'d, B: Backend> Math<'d, B> {
 
     fn move_up(&mut self, dy: f64) {
         self.current.y += dy;
+    }
+
+    fn move_to(&mut self, x: f64, y: f64) {
+        self.current = Point::new(x, y);
+    }
+
+    /// `GEPolyline` with `lty` solid and `lwd` at most 1, as plotmath
+    /// draws its rules (fraction bars, radicals, `bar`/`widehat`/
+    /// `widetilde`, `underline`, `abs()`).
+    fn polyline(&mut self, pts: &[Point]) {
+        let lwd = self.dev.par.lwd.min(1.0);
+        let stroke = self.dev.stroke_of(self.col, lwd, LineType::SOLID);
+        self.dev.push_clip_region(self.clip);
+        self.dev.backend.draw_polyline(pts, &stroke);
+        self.dev.pop_clip();
     }
 
     /// `ConvertedX`/`ConvertedY`: the current point rotated about the
@@ -493,6 +577,16 @@ impl<'d, B: Backend> Math<'d, B> {
             self.move_across(bbox.width);
         }
         self.set_font(prev);
+        bbox
+    }
+
+    /// `RenderChar`: one character in the current font.
+    fn char_(&mut self, c: char, draw: bool) -> BBox {
+        let bbox = self.glyph_bbox(c);
+        if draw {
+            self.text(&c.to_string());
+            self.move_across(bbox.width);
+        }
         bbox
     }
 
@@ -626,13 +720,27 @@ impl<'d, B: Backend> Math<'d, B> {
             (n, 1 | 2) if bin_code(n).is_some() => self.bin(n, args, draw),
             ("^", 2) => self.sup(args, draw),
             ("[", 2) => self.sub(args, draw),
+            ("widetilde", 1) => self.wide_tilde(&args[0], draw),
+            ("widehat", 1) => self.wide_hat(&args[0], draw),
+            ("bar", 1) => self.bar(&args[0], draw),
+            ("hat" | "ring" | "tilde" | "dot", 1) => self.accent(name, &args[0], draw),
+            ("frac" | "over", 2) => self.fraction(args, true, draw),
+            ("underline", 1) => self.underline(&args[0], draw),
+            ("atop", 2) => self.fraction(args, false, draw),
             ("(", 1) => {
                 let bbox = self.delimiter(S_PARENLEFT, draw);
                 let bbox = bbox.combine(self.element(&args[0], draw));
                 let bbox = self.italic_corr(bbox, draw);
                 bbox.combine(self.delimiter(S_PARENRIGHT, draw))
             }
+            ("bgroup", 3) => self.bgroup(args, draw),
             ("group", 3) => self.group(args, draw),
+            ("integral", 1..=3) => self.integral(args, draw),
+            (n, 1..=3) if is_op(n) => self.op(n, args, draw),
+            ("sqrt" | "root", 1 | 2) => self.radical(&args[0], args.get(1), draw),
+            ("abs", 1) => self.abs(&args[0], draw),
+            ("{", 0) => BBox::default(),
+            ("{", 1) => self.element(&args[0], draw),
             (n, 2) if rel_code(n).is_some() => self.rel(n, args, draw),
             ("bold", 1) => self.with_font(BOLD, &args[0], draw),
             ("italic" | "math", 1) => self.with_font(ITALIC, &args[0], draw),
@@ -676,7 +784,7 @@ impl<'d, B: Backend> Math<'d, B> {
         }
     }
 
-    fn with_font(&mut self, font: i32, e: &Expr, draw: bool) -> BBox {
+    fn with_font(&mut self, font: FontFace, e: &Expr, draw: bool) -> BBox {
         let prev = self.set_font(font);
         let bbox = self.element(e, draw);
         self.set_font(prev);
@@ -883,27 +991,7 @@ impl<'d, B: Backend> Math<'d, B> {
     /// `group(left, body, right)` (`RenderGroup`); delimiters are strings
     /// such as `"("`, `"["`, `"|"`, or `""`/`"."` for none.
     fn group(&mut self, args: &[Expr], draw: bool) -> BBox {
-        let code = |e: &Expr| -> char {
-            let s = match e {
-                Expr::Str(s) => s.as_str(),
-                Expr::Name(n) => match n.as_str() {
-                    "lfloor" => return '\u{EB}',
-                    "rfloor" => return '\u{FB}',
-                    "lceil" => return '\u{E9}',
-                    "rceil" => return '\u{F9}',
-                    "langle" => return '\u{E1}',
-                    "rangle" => return '\u{F1}',
-                    _ => panic!("invalid group delimiter `{n}`"),
-                },
-                _ => panic!("invalid group delimiter"),
-            };
-            match s {
-                "|" | "||" => '|',
-                "(" | ")" | "[" | "]" | "{" | "}" => s.chars().next().unwrap(),
-                "" | "." => '.',
-                _ => panic!("invalid group delimiter {s:?}"),
-            }
-        };
+        let code = delim_code;
         let saved = self.cex;
         let mut bbox = BBox::default();
         let left = code(&args[0]);
@@ -921,6 +1009,530 @@ impl<'d, B: Backend> Math<'d, B> {
         }
         self.cex = saved;
         bbox
+    }
+
+    /// `RenderWideTilde`: a wavy line over the body.
+    fn wide_tilde(&mut self, body: &Expr, draw: bool) -> BBox {
+        let saved = self.current;
+        let bbox = self.element(body, draw);
+        let height = bbox.height;
+        let total = bbox.width + bbox.italic;
+        let delta = total * (1.0 - 2.0 * TILDE_DELTA) / NTILDE as f64;
+        let start = TILDE_DELTA * total;
+        let gap = ACCENT_GAP * self.cap_x_height();
+        let hat_height = 0.5 * HAT_HEIGHT * self.cap_x_height();
+        let c = 2.0 * std::f64::consts::PI / NTILDE as f64;
+        if draw {
+            let (base_x, base_y) = (saved.x, saved.y + height + gap);
+            self.move_to(base_x, base_y);
+            let mut pts = vec![self.converted()];
+            for i in 0..=NTILDE {
+                let x = start + i as f64 * delta;
+                let y = 0.5 * hat_height * ((c * i as f64).sin() + 1.0);
+                self.move_to(base_x + x, base_y + y);
+                pts.push(self.converted());
+            }
+            self.move_to(base_x + total, base_y + hat_height);
+            pts.push(self.converted());
+            self.polyline(&pts);
+            self.move_to(saved.x + total, saved.y);
+        }
+        BBox::new(height + gap + hat_height, bbox.depth, total)
+    }
+
+    /// `RenderWideHat`: a wide `^` over the body.
+    fn wide_hat(&mut self, body: &Expr, draw: bool) -> BBox {
+        let saved = self.current;
+        let bbox = self.element(body, draw);
+        let gap = ACCENT_GAP * self.cap_x_height();
+        let hat_height = HAT_HEIGHT * self.cap_x_height();
+        let total = bbox.width + bbox.italic;
+        if draw {
+            self.move_to(saved.x, saved.y + bbox.height + gap);
+            let p0 = self.converted();
+            self.move_across(0.5 * total);
+            self.move_up(hat_height);
+            let p1 = self.converted();
+            self.move_across(0.5 * total);
+            self.move_up(-hat_height);
+            let p2 = self.converted();
+            self.polyline(&[p0, p1, p2]);
+            self.move_to(saved.x + bbox.width, saved.y);
+        }
+        bbox.enlarge(gap + hat_height, 0.0, 0.0)
+    }
+
+    /// `RenderBar`: a line over the body.
+    fn bar(&mut self, body: &Expr, draw: bool) -> BBox {
+        let saved = self.current;
+        let bbox = self.element(body, draw);
+        let gap = ACCENT_GAP * self.cap_x_height();
+        if draw {
+            self.move_to(saved.x + bbox.italic, saved.y + bbox.height + gap);
+            let p0 = self.converted();
+            self.move_across(bbox.width);
+            let p1 = self.converted();
+            self.polyline(&[p0, p1]);
+            self.move_to(saved.x + bbox.width, saved.y);
+        }
+        bbox.enlarge(gap, 0.0, 0.0)
+    }
+
+    /// `RenderAccent`: `hat`, `tilde` (characters of the current font),
+    /// `ring` and `dot` (Symbol characters) centred over the body.
+    fn accent(&mut self, name: &str, body: &Expr, draw: bool) -> BBox {
+        let code = match name {
+            "hat" => A_HAT,
+            "ring" => '\u{B0}',
+            "tilde" => A_TILDE,
+            _ => '\u{D7}', // dot
+        };
+        let symbol = code != A_HAT && code != A_TILDE;
+        let saved = self.current;
+        let body_bbox = self.element(body, false);
+        let italic = body_bbox.italic;
+        let accent_bbox = if symbol {
+            self.symbol_char(code, false)
+        } else {
+            self.char_(code, false)
+        };
+        let width = (body_bbox.width + body_bbox.italic).max(accent_bbox.width);
+        let xoffset = 0.5 * (width - body_bbox.width);
+        let mut bbox = self.gap(xoffset, draw);
+        bbox = bbox.combine(self.element(body, draw));
+        bbox = bbox.combine(self.gap(xoffset, draw));
+        self.current = saved;
+        let xoffset = 0.5 * (width - accent_bbox.width) + 0.9 * italic;
+        let yoffset = bbox.height + accent_bbox.depth + 0.1 * self.cap_x_height();
+        if draw {
+            self.move_to(saved.x + xoffset, saved.y + yoffset);
+            if symbol {
+                self.symbol_char(code, true);
+            } else {
+                self.char_(code, true);
+            }
+        }
+        let bbox = bbox.combine_offset(accent_bbox, xoffset, yoffset);
+        if draw {
+            self.move_to(saved.x + width, saved.y);
+        }
+        bbox
+    }
+
+    /// `RenderFraction`: `frac`/`over` (with a rule) and `atop`.
+    fn fraction(&mut self, args: &[Expr], rule: bool, draw: bool) -> BBox {
+        let (num, denom) = (&args[0], &args[1]);
+        let saved = self.current;
+        let style = self.style;
+        self.set_num_style(style);
+        let num_bbox = self.element(num, false);
+        let num_bbox = self.italic_corr(num_bbox, false);
+        self.set_denom_style(style);
+        let denom_bbox = self.element(denom, false);
+        let denom_bbox = self.italic_corr(denom_bbox, false);
+        self.set_style(style);
+
+        let width = num_bbox.width.max(denom_bbox.width);
+        // `NumDenomHShift`.
+        let (n_h, d_h) = if num_bbox.width > denom_bbox.width {
+            (0.0, (num_bbox.width - denom_bbox.width) / 2.0)
+        } else {
+            ((denom_bbox.width - num_bbox.width) / 2.0, 0.0)
+        };
+        // `NumDenomVShift` (TeX rules 15a-15d).
+        let a = self.axis_height();
+        let theta = RULE_THICKNESS;
+        let x = self.cap_x_height();
+        let (mut u, mut v, phi) = if self.style > Style::T {
+            (
+                a + 3.51 * theta + 0.15 * x + 0.7 * self.desc_depth(), // sigma8
+                -a + 3.51 * theta + 0.7 * self.fig_height() + 0.344444 * x, // sigma11
+                3.0 * theta,
+            )
+        } else {
+            (
+                a + 1.51 * theta + 0.08333333 * x, // sigma9
+                -a + 1.51 * theta + 0.7 * self.fig_height() + 0.08333333 * x, // sigma12
+                theta,
+            )
+        };
+        let delta = (u - num_bbox.depth) - (a + 0.5 * theta);
+        if delta < phi {
+            u += phi - delta;
+        }
+        let delta = (a + 0.5 * theta) - (denom_bbox.height - v);
+        if delta < phi {
+            v += phi - delta;
+        }
+
+        self.current = saved;
+        self.set_num_style(style);
+        let num_bbox = self.offset_element(num, n_h, u, draw);
+        self.current = saved;
+        self.set_denom_style(style);
+        let denom_bbox = self.offset_element(denom, d_h, -v, draw);
+        self.set_style(style);
+        if draw {
+            if rule {
+                self.current = saved;
+                self.move_up(self.axis_height());
+                let p0 = self.converted();
+                self.move_across(width);
+                let p1 = self.converted();
+                self.polyline(&[p0, p1]);
+            }
+            self.move_to(saved.x + width, saved.y);
+        }
+        num_bbox.combine_aligned(denom_bbox)
+    }
+
+    /// `RenderUnderline`.
+    fn underline(&mut self, body: &Expr, draw: bool) -> BBox {
+        let saved = self.current;
+        let bbox = self.element(body, false);
+        let width = self.italic_corr(bbox, false).width;
+        self.current = saved;
+        let bbox = self.element(body, draw);
+        let adepth = 0.1 * self.cap_x_height();
+        let depth = bbox.depth + adepth;
+        if draw {
+            self.current = saved;
+            self.move_up(-depth);
+            let p0 = self.converted();
+            self.move_across(width);
+            let p1 = self.converted();
+            self.polyline(&[p0, p1]);
+            self.move_to(saved.x + width, saved.y);
+        }
+        bbox.enlarge(0.0, adepth, 0.0)
+    }
+
+    /// `bgroup(left, body, right)` (`RenderBGroup`): delimiters grown to
+    /// the body's height.
+    fn bgroup(&mut self, args: &[Expr], draw: bool) -> BBox {
+        let axis = self.axis_height();
+        let extra = 0.2 * self.x_height();
+        let (left, right) = (delim_code(&args[0]), delim_code(&args[2]));
+        let bbox = self.element(&args[1], false);
+        let dist = (bbox.height - axis).max(bbox.depth + axis);
+        let bbox = self.delim(left, dist + extra, draw);
+        let bbox = bbox.combine(self.element(&args[1], draw));
+        let bbox = self.italic_corr(bbox, draw);
+        bbox.combine(self.delim(right, dist + extra, draw))
+    }
+
+    /// `RenderDelim`: a delimiter `dist` above and below the axis, built
+    /// from the Symbol font's top, bottom, extension (and middle) pieces.
+    fn delim(&mut self, which: char, dist: f64, draw: bool) -> BBox {
+        let saved = self.current;
+        let prev = self.set_font(SYMBOL);
+        let axis = self.axis_height();
+        let codes =
+            |t: u32, e: u32, b: u32, m: u32| [t, e, b, m].map(|c| char::from_u32(c).unwrap());
+        let [top, ext, bot, mid] = match which {
+            '.' => {
+                self.set_font(prev);
+                return BBox::default();
+            }
+            '|' => codes(239, 239, 239, 0),
+            '(' => codes(230, 231, 232, 0),
+            ')' => codes(246, 247, 248, 0),
+            '[' => codes(233, 234, 235, 0),
+            ']' => codes(249, 250, 251, 0),
+            '{' => codes(236, 239, 238, 237),
+            '}' => codes(252, 239, 254, 253),
+            _ => panic!("group is incomplete"),
+        };
+        let brace = which == '{' || which == '}';
+        let top_bbox = self.glyph_bbox(top);
+        let ext_bbox = self.glyph_bbox(ext);
+        let bot_bbox = self.glyph_bbox(bot);
+        let mut dist = dist;
+        if brace {
+            if 1.2 * (top_bbox.height + top_bbox.depth) > dist {
+                dist = 1.2 * (top_bbox.height + bot_bbox.depth);
+            }
+        } else if 0.8 * (top_bbox.height + top_bbox.depth) > dist {
+            dist = 0.8 * (top_bbox.height + top_bbox.depth);
+        }
+        let ext_height = ext_bbox.height + ext_bbox.depth;
+        let top_shift = dist - top_bbox.height + axis;
+        let bot_shift = dist - bot_bbox.depth - axis;
+        let ext_shift = 0.5 * (ext_bbox.height - ext_bbox.depth);
+        let top_bbox = top_bbox.shift(top_shift);
+        let bot_bbox = bot_bbox.shift(-bot_shift);
+        let mut ans = top_bbox.combine_aligned(bot_bbox);
+        if brace {
+            let mid_bbox = self.glyph_bbox(mid);
+            let mid_shift = axis - 0.5 * (mid_bbox.height - mid_bbox.depth);
+            ans = ans.combine_aligned(mid_bbox.shift(mid_shift));
+            if draw {
+                self.move_to(saved.x, saved.y + top_shift);
+                self.symbol_char(top, true);
+                self.move_to(saved.x, saved.y + mid_shift);
+                self.symbol_char(mid, true);
+                self.move_to(saved.x, saved.y - bot_shift);
+                self.symbol_char(bot, true);
+                self.move_to(saved.x + ans.width, saved.y);
+            }
+        } else if draw {
+            self.move_to(saved.x, saved.y + top_shift);
+            self.symbol_char(top, true);
+            self.move_to(saved.x, saved.y - bot_shift);
+            self.symbol_char(bot, true);
+            // Extension pieces between them.
+            let ytop = axis + dist - (top_bbox.height + top_bbox.depth);
+            let ybot = axis - dist + (bot_bbox.height + bot_bbox.depth);
+            let n = ((ytop - ybot) / (0.99 * ext_height)).ceil() as i64;
+            if n > 0 {
+                let delta = (ytop - ybot) / n as f64;
+                for i in 0..n {
+                    let y = saved.y + ybot + (i as f64 + 0.5) * delta - ext_shift;
+                    self.move_to(saved.x, y);
+                    self.symbol_char(ext, true);
+                }
+            }
+            self.move_to(saved.x + ans.width, saved.y);
+        }
+        self.set_font(prev);
+        ans
+    }
+
+    /// `RenderIntSymbol`: in display styles two pieces, else one.
+    fn int_symbol(&mut self, draw: bool) -> BBox {
+        let saved = self.current;
+        if self.style > Style::T {
+            let (top, bot) = ('\u{F3}', '\u{F5}');
+            let b1 = self.symbol_char(top, false);
+            let b2 = self.symbol_char(bot, false);
+            let shift = self.axis_height() + 0.99 * b1.depth;
+            self.move_up(shift);
+            let b1 = self.symbol_char(top, draw).shift(shift);
+            self.current = saved;
+            let shift = self.axis_height() - 0.99 * b2.height;
+            self.move_up(shift);
+            let b2 = self.symbol_char(bot, draw).shift(shift);
+            if draw {
+                self.move_to(saved.x + b1.width.max(b2.width), saved.y);
+            } else {
+                self.current = saved;
+            }
+            b1.combine_aligned(b2)
+        } else {
+            self.symbol_char('\u{F2}', draw)
+        }
+    }
+
+    /// `RenderInt`: `integral(body, lower, upper)`.
+    fn integral(&mut self, args: &[Expr], draw: bool) -> BBox {
+        let style = self.style;
+        let saved = self.current;
+        let mut op = self.int_symbol(draw);
+        let width = op.width;
+        self.current = saved;
+        if let Some(lower) = args.get(1) {
+            let hshift = 0.5 * width + self.thin_space();
+            self.set_sub_style(style);
+            let b = self.element(lower, false);
+            let vshift = op.depth + b.center_shift();
+            let b = self.offset_element(lower, hshift, -vshift, draw);
+            op = op.combine_aligned(b);
+            self.set_style(style);
+            self.current = saved;
+        }
+        if let Some(upper) = args.get(2) {
+            let hshift = width + self.thin_space();
+            self.set_sup_style(style);
+            let b = self.element(upper, false);
+            let vshift = op.height - b.center_shift();
+            let b = self.offset_element(upper, hshift, vshift, draw);
+            op = op.combine_aligned(b);
+            self.set_style(style);
+            self.current = saved;
+        }
+        self.move_across(op.width);
+        op.combine(self.element(&args[0], draw))
+    }
+
+    /// `RenderOpSymbol`: a large Symbol character (centred on the axis in
+    /// display styles) for `sum`, `prod`, `union`, `intersect`; the name
+    /// in the plain font for the others.
+    fn op_symbol(&mut self, name: &str, draw: bool) -> BBox {
+        let code = match name {
+            "prod" => '\u{D5}',
+            "sum" => '\u{E5}',
+            "union" => '\u{C8}',
+            "intersect" => '\u{C7}',
+            _ => {
+                let prev = self.set_font(PLAIN);
+                let bbox = self.str(name, draw);
+                self.set_font(prev);
+                return bbox;
+            }
+        };
+        if self.style > Style::T {
+            let saved = self.cex;
+            self.cex *= OPERATOR_SYMBOL_MAG;
+            let mut bbox = self.symbol_char(code, false);
+            let shift = 0.5 * (bbox.height - bbox.depth) - self.axis_height();
+            if draw {
+                self.move_up(-shift);
+                bbox = self.symbol_char(code, true);
+                self.move_up(shift);
+            }
+            self.cex = saved;
+            bbox.shift(-shift)
+        } else {
+            self.symbol_char(code, draw)
+        }
+    }
+
+    /// `RenderOp`: `sum(body, lower, upper)` and the other operators,
+    /// with limits centred below and above.
+    fn op(&mut self, name: &str, args: &[Expr], draw: bool) -> BBox {
+        let saved = self.current;
+        let style = self.style;
+        let op_bbox = self.op_symbol(name, false);
+        let mut width = op_bbox.width;
+        let big_op_spacing = |m: &Self| 0.15 * m.cap_x_height(); // xi9..xi13
+        let (mut lower_bbox, mut upper_bbox) = (BBox::default(), BBox::default());
+        let (mut lvshift, mut uvshift) = (0.0, 0.0);
+        if let Some(lower) = args.get(1) {
+            self.set_sub_style(style);
+            lower_bbox = self.element(lower, false);
+            self.set_style(style);
+            width = width.max(lower_bbox.width);
+            let s = big_op_spacing(self);
+            lvshift = op_bbox.depth + lower_bbox.height + s.max(s - lower_bbox.height);
+        }
+        if let Some(upper) = args.get(2) {
+            self.set_sup_style(style);
+            upper_bbox = self.element(upper, false);
+            self.set_style(style);
+            width = width.max(upper_bbox.width);
+            let s = big_op_spacing(self);
+            uvshift = op_bbox.height + upper_bbox.depth + s.max(s - upper_bbox.depth);
+        }
+        let hshift = 0.5 * (width - op_bbox.width);
+        let mut bbox = self.gap(hshift, draw);
+        bbox = bbox.combine(self.op_symbol(name, draw));
+        self.current = saved;
+        if let Some(lower) = args.get(1) {
+            self.set_sub_style(style);
+            let hshift = 0.5 * (width - lower_bbox.width);
+            let b = self.offset_element(lower, hshift, -lvshift, draw);
+            self.set_style(style);
+            bbox = bbox.combine_aligned(b);
+            self.current = saved;
+        }
+        if let Some(upper) = args.get(2) {
+            self.set_sup_style(style);
+            let hshift = 0.5 * (width - upper_bbox.width);
+            let b = self.offset_element(upper, hshift, uvshift, draw);
+            self.set_style(style);
+            bbox = bbox.combine_aligned(b);
+            self.current = saved;
+        }
+        let s = big_op_spacing(self);
+        bbox = bbox.enlarge(s, s, 0.0);
+        if draw {
+            self.move_across(width);
+        }
+        bbox = bbox.combine(self.gap(self.thin_space(), draw));
+        bbox.combine(self.element(&args[0], draw))
+    }
+
+    /// `RenderRadical`: `sqrt(body)` and `sqrt(body, order)`.
+    fn radical(&mut self, body: &Expr, order: Option<&Expr>, draw: bool) -> BBox {
+        let style = self.style;
+        let saved = self.current;
+        let rad_gap = RADICAL_GAP * self.x_height();
+        let rad_space = RADICAL_SPACE * self.x_height();
+        let rad_trail = self.mu_space();
+        self.set_prime_style(style);
+        let body_bbox = self.element(body, false);
+        let body_bbox = self.italic_corr(body_bbox, false);
+        let rad_width = 0.6 * self.cap_x_height();
+        let rad_height = body_bbox.height + rad_gap;
+        let twiddle = body_bbox.center_shift();
+
+        let mut lead_width = rad_width;
+        let mut order_bbox = BBox::default();
+        if let Some(order) = order {
+            // `RenderScript` goes one script style further.
+            self.set_sup_style(style);
+            let script = |m: &mut Self, draw: bool| {
+                let s = m.style;
+                m.set_sup_style(s);
+                let b = m.element(order, draw);
+                m.set_style(s);
+                b
+            };
+            let b = script(self, false);
+            lead_width = lead_width.max(b.width + 0.4 * rad_width);
+            let hshift = lead_width - b.width - 0.4 * rad_width;
+            let mut vshift = rad_height - b.height;
+            if vshift - b.depth < twiddle + rad_gap {
+                vshift = twiddle + b.depth + rad_gap;
+            }
+            let mut b = b;
+            if draw {
+                self.move_to(saved.x + hshift, saved.y + vshift);
+                b = script(self, true);
+            }
+            order_bbox = b.enlarge(vshift, 0.0, hshift);
+        }
+        if draw {
+            self.move_to(saved.x + lead_width - rad_width, saved.y);
+            self.move_up(0.8 * twiddle);
+            let p0 = self.converted();
+            self.move_up(0.2 * twiddle);
+            self.move_across(0.3 * rad_width);
+            let p1 = self.converted();
+            self.move_up(-(twiddle + body_bbox.depth));
+            self.move_across(0.3 * rad_width);
+            let p2 = self.converted();
+            self.move_up(body_bbox.depth + body_bbox.height + rad_gap);
+            self.move_across(0.4 * rad_width);
+            let p3 = self.converted();
+            self.move_across(rad_space + body_bbox.width + rad_trail);
+            let p4 = self.converted();
+            self.polyline(&[p0, p1, p2, p3, p4]);
+            self.current = saved;
+        }
+        order_bbox = order_bbox.combine_aligned(self.gap(lead_width + rad_space, draw));
+        self.set_prime_style(style);
+        order_bbox = order_bbox.combine(self.element(body, draw));
+        order_bbox = order_bbox.combine(self.gap(2.0 * rad_trail, draw));
+        order_bbox = order_bbox.enlarge(rad_gap, 0.0, 0.0);
+        self.set_style(style);
+        order_bbox
+    }
+
+    /// `RenderAbs`: vertical bars either side of the body.
+    fn abs(&mut self, body: &Expr, draw: bool) -> BBox {
+        let b = self.element(body, false);
+        let (height, depth) = (b.height, b.depth);
+        let bar = |m: &mut Self| {
+            m.move_up(-depth);
+            let p0 = m.converted();
+            m.move_up(depth + height);
+            let p1 = m.converted();
+            m.polyline(&[p0, p1]);
+            m.move_up(-height);
+        };
+        let mut bbox = self.gap(self.mu_space(), draw);
+        if draw {
+            bar(self);
+        }
+        bbox = bbox.combine(self.gap(self.mu_space(), draw));
+        bbox = bbox.combine(self.element(body, draw));
+        bbox = self.italic_corr(bbox, draw);
+        bbox = bbox.combine(self.gap(self.mu_space(), draw));
+        if draw {
+            bar(self);
+        }
+        bbox.combine(self.gap(self.mu_space(), draw))
     }
 
     /// `RenderCommaList`.
@@ -955,5 +1567,47 @@ impl<'d, B: Backend> Math<'d, B> {
         let bbox = bbox.combine(self.comma_list(args, draw));
         let bbox = self.italic_corr(bbox, draw);
         bbox.combine(self.delimiter(S_PARENRIGHT, draw))
+    }
+}
+
+/// `OpTable`: the names `RenderOp` draws as operators with limits.
+fn is_op(name: &str) -> bool {
+    matches!(
+        name,
+        "prod"
+            | "sum"
+            | "union"
+            | "intersect"
+            | "lim"
+            | "liminf"
+            | "limsup"
+            | "inf"
+            | "sup"
+            | "min"
+            | "max"
+    )
+}
+
+/// `DelimCode`: a `group()`/`bgroup()` delimiter, a string such as `"("`,
+/// `"["`, `"|"`, or `""`/`"."` for none, or a name such as `lfloor`.
+fn delim_code(e: &Expr) -> char {
+    let s = match e {
+        Expr::Str(s) => s.as_str(),
+        Expr::Name(n) => match n.as_str() {
+            "lfloor" => return '\u{EB}',
+            "rfloor" => return '\u{FB}',
+            "lceil" => return '\u{E9}',
+            "rceil" => return '\u{F9}',
+            "langle" => return '\u{E1}',
+            "rangle" => return '\u{F1}',
+            _ => panic!("invalid group delimiter `{n}`"),
+        },
+        _ => panic!("invalid group delimiter"),
+    };
+    match s {
+        "|" | "||" => '|',
+        "(" | ")" | "[" | "]" | "{" | "}" => s.chars().next().unwrap(),
+        "" | "." => '.',
+        _ => panic!("invalid group delimiter {s:?}"),
     }
 }

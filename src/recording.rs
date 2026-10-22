@@ -20,12 +20,12 @@
 //!
 //! // Build a figure without a device...
 //! let mut fig = Figure::new();
-//! fig.barplot([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
+//! fig.barplot().height([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
 //! fig.abline().h(4.0).lty("dashed").draw();
 //!
 //! // ...and draw it later, as often as needed.
 //! let mut dev = Device::pdf("plot.pdf").width(8.0).height(4.0).open()?;
-//! dev.mfrow(1, 2);
+//! dev.par().mfrow(1, 2).draw();
 //! dev.add_figure(&fig); // panel 1
 //! dev.add_figure(&fig); // panel 2
 //! dev.close()?;
@@ -69,7 +69,7 @@
 //!
 //! # fn main() -> std::io::Result<()> {
 //! let mut fig = Figure::new();
-//! fig.hist(&[2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8]).draw();
+//! fig.hist().x(&[2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8]).draw();
 //!
 //! for format in ["pdf", "png"] {
 //!     let mut dev = Device::format(format, format!("hist.{format}"))
@@ -89,11 +89,11 @@
 
 use crate::backend::Backend;
 use crate::device::{
-    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendEntry, LegendLayout,
-    LegendOptions, LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions,
-    SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
+    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendLayout, LegendOptions,
+    LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side,
+    TextOptions, TitleOptions, XyOptions,
 };
-use crate::graphics::{Graphics, ParGrid};
+use crate::graphics::{Graphics, ParPage};
 use crate::highlevel::barplot::bar_layout;
 use crate::highlevel::boxplot::boxplot_all_stats;
 use crate::highlevel::hist::hist_bins;
@@ -130,13 +130,19 @@ impl Figure {
 }
 
 /// One recorded call, with copies of its data and options.
+///
+/// A new R function needs a variant here; the compiler then asks for its
+/// replay arm in `add_figure` (an exhaustive `match`) and its `emit_*` on
+/// both `Graphics` impls. Also add it to a scene in `tests/all/figure_replay.rs`,
+/// which checks a recorded figure draws what the device does.
 #[derive(Clone, Debug)]
 enum Call {
     PlotNew,
     Par(ParOptions),
     Plot(Vec<f64>, Vec<f64>, PlotOptions),
     Hist(Vec<f64>, HistOptions),
-    Barplot(BarHeights, BarplotOptions),
+    // Boxed, as `BoxplotOptions`: much larger than the other options.
+    Barplot(BarHeights, Box<BarplotOptions>),
     // Boxed: `BoxplotOptions` is much larger than the other options.
     Boxplot(Vec<Vec<f64>>, Box<BoxplotOptions>),
     Pie(Vec<f64>, PieOptions),
@@ -147,12 +153,12 @@ enum Call {
     Arrows([Vec<f64>; 4], ArrowsOptions),
     Rect([Vec<f64>; 4], RectOptions),
     Polygon(Vec<f64>, Vec<f64>, PolygonOptions),
-    Text(Vec<f64>, Vec<f64>, Vec<Label>, TextOptions),
+    Text(Vec<f64>, Vec<f64>, Vec<Option<Label>>, TextOptions),
     Box(BoxOptions),
     Axis(Side, AxisOptions),
     Abline(AblineOptions),
-    Legend(LegendPos, Vec<LegendEntry>, LegendOptions),
-    Mtext(Label, Side, MtextOptions),
+    Legend(LegendPos, Vec<Option<Label>>, LegendOptions),
+    Mtext(Vec<Option<Label>>, Side, MtextOptions),
     Title(TitleOptions),
 }
 
@@ -162,10 +168,11 @@ fn four(x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64]) -> [Vec<f64>; 4] {
 
 impl crate::graphics::sealed::Sealed for Figure {}
 
-/// Records each call. `legend()`'s `.draw()` returns `()`: its layout
-/// comes from [`Device::add_figure`].
+/// Records each call. `legend()`'s and `axis()`'s `.draw()` return `()`:
+/// their results come from [`Device::add_figure`].
 impl Graphics for Figure {
     type LegendResult = ();
+    type AxisResult = ();
 
     fn plot_new(&mut self) {
         self.calls.push(Call::PlotNew);
@@ -180,7 +187,7 @@ impl Graphics for Figure {
     }
     fn emit_barplot(&mut self, heights: BarHeights, opts: BarplotOptions) -> Vec<f64> {
         let centres = bar_layout(&heights, &opts).w_m;
-        self.calls.push(Call::Barplot(heights, opts));
+        self.calls.push(Call::Barplot(heights, Box::new(opts)));
         centres
     }
     fn emit_boxplot(&mut self, groups: &[Vec<f64>], opts: BoxplotOptions) -> Vec<BoxStats> {
@@ -220,7 +227,7 @@ impl Graphics for Figure {
     fn emit_polygon(&mut self, x: &[f64], y: &[f64], opts: PolygonOptions) {
         self.calls.push(Call::Polygon(x.to_vec(), y.to_vec(), opts));
     }
-    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Label>, opts: TextOptions) {
+    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Option<Label>>, opts: TextOptions) {
         self.calls
             .push(Call::Text(x.to_vec(), y.to_vec(), labels, opts));
     }
@@ -233,18 +240,19 @@ impl Graphics for Figure {
     fn emit_abline(&mut self, opts: AblineOptions) {
         self.calls.push(Call::Abline(opts));
     }
-    fn emit_legend(&mut self, pos: LegendPos, entries: &[LegendEntry], opts: LegendOptions) {
-        self.calls.push(Call::Legend(pos, entries.to_vec(), opts));
+    fn emit_legend(&mut self, pos: LegendPos, labels: Vec<Option<Label>>, opts: LegendOptions) {
+        crate::device::check_legend(&labels, &opts);
+        self.calls.push(Call::Legend(pos, labels, opts));
     }
-    fn emit_mtext(&mut self, text: Label, side: Side, opts: MtextOptions) {
+    fn emit_mtext(&mut self, text: Vec<Option<Label>>, side: Side, opts: MtextOptions) {
         self.calls.push(Call::Mtext(text, side, opts));
     }
     fn emit_title(&mut self, opts: TitleOptions) {
         self.calls.push(Call::Title(opts));
     }
-    fn emit_par(&mut self, opts: ParOptions, grid: Option<ParGrid>) {
-        // Only a device's `par()` call has `mfrow`/`mfcol` setters.
-        debug_assert!(grid.is_none());
+    fn emit_par(&mut self, opts: ParOptions, page: ParPage) {
+        // Only a device's `par()` call has page layout setters.
+        debug_assert!(page.is_empty());
         self.calls.push(Call::Par(opts));
     }
 }
@@ -255,7 +263,10 @@ impl Graphics for Figure {
 pub struct FigureResult {
     /// What each of the figure's `legend()` calls returned on the device, in
     /// order (see [`Graphics::legend`]).
-    pub legends: Vec<Option<LegendLayout>>,
+    pub legends: Vec<LegendLayout>,
+    /// What each of the figure's `axis()` calls returned on the device (its
+    /// tick positions), in order (see [`Graphics::axis`]).
+    pub axes: Vec<Vec<f64>>,
 }
 
 impl<B: Backend> Device<B> {
@@ -266,50 +277,54 @@ impl<B: Backend> Device<B> {
     ///
     /// `par` is restored afterwards (like R's `op <- par(...);
     /// on.exit(par(op))`), so the figure's `par()` calls don't affect what
-    /// is drawn next. The panel position and `par(new)` are device state
-    /// and are not restored.
+    /// is drawn next. The panel position, `par(new)` and the coordinates
+    /// (`plot_window()`, `par(usr/xlog/ylog)`) are device state and are
+    /// not restored.
     ///
     /// # Panics
     /// Where the recorded calls would panic on the device (e.g. `abline()`
-    /// with a non-finite `coef`).
+    /// with a non-finite `a`).
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
-        let saved = self.par.clone();
+        // `par` comes back afterwards, also if a recorded call panics.
+        let mut dev = self.par_scope(|now, saved| *now = saved.clone());
         let mut out = FigureResult::default();
+        // Each call goes through the same `emit_*` as a device's `.draw()`.
         for call in &fig.calls {
+            let d = &mut *dev;
             match call {
-                Call::PlotNew => self.plot_new_impl(),
-                Call::Par(o) => self.emit_par(o.clone(), None),
-                Call::Plot(x, y, o) => self.plot_impl(x, y, o),
+                Call::PlotNew => d.plot_new(),
+                Call::Par(o) => d.emit_par(o.clone(), ParPage::default()),
+                Call::Plot(x, y, o) => d.emit_plot(x, y, o.clone()),
                 Call::Hist(x, o) => {
-                    self.hist_impl(x, o);
+                    d.emit_hist(x, o.clone());
                 }
                 Call::Barplot(h, o) => {
-                    self.barplot_impl(h.clone(), o);
+                    d.emit_barplot(h.clone(), (**o).clone());
                 }
                 Call::Boxplot(g, o) => {
-                    self.boxplot_impl(g, o);
+                    d.emit_boxplot(g, (**o).clone());
                 }
-                Call::Pie(x, o) => self.pie_impl(x, o),
-                Call::PlotWindow(xlim, ylim, o) => self.plot_window_impl(*xlim, *ylim, o),
-                Call::Points(x, y, o) => self.points_impl(x, y, o),
-                Call::Lines(x, y, o) => self.lines_impl(x, y, o),
-                Call::Segments([x0, y0, x1, y1], o) => self.segments_impl(x0, y0, x1, y1, o),
-                Call::Arrows([x0, y0, x1, y1], o) => self.arrows_impl(x0, y0, x1, y1, o),
-                Call::Rect([x0, y0, x1, y1], o) => self.rect_impl(x0, y0, x1, y1, o),
-                Call::Polygon(x, y, o) => self.polygon_impl(x, y, o),
-                Call::Text(x, y, labels, o) => self.text_impl(x, y, labels, o),
-                Call::Box(o) => self.box_impl(o),
-                Call::Axis(side, o) => self.axis_impl(*side, o),
-                Call::Abline(o) => self.abline_impl(o),
-                Call::Legend(pos, entries, o) => {
-                    let layout = self.legend_impl(*pos, entries, o);
-                    out.legends.push(layout);
+                Call::Pie(x, o) => d.emit_pie(x, o.clone()),
+                Call::PlotWindow(xlim, ylim, o) => d.emit_plot_window(*xlim, *ylim, o.clone()),
+                Call::Points(x, y, o) => d.emit_points(x, y, o.clone()),
+                Call::Lines(x, y, o) => d.emit_lines(x, y, o.clone()),
+                Call::Segments([x0, y0, x1, y1], o) => d.emit_segments(x0, y0, x1, y1, o.clone()),
+                Call::Arrows([x0, y0, x1, y1], o) => d.emit_arrows(x0, y0, x1, y1, o.clone()),
+                Call::Rect([x0, y0, x1, y1], o) => d.emit_rect(x0, y0, x1, y1, o.clone()),
+                Call::Polygon(x, y, o) => d.emit_polygon(x, y, o.clone()),
+                Call::Text(x, y, labels, o) => d.emit_text(x, y, labels.clone(), o.clone()),
+                Call::Box(o) => d.emit_box(o.clone()),
+                Call::Axis(side, o) => out.axes.push(d.emit_axis(*side, o.clone())),
+                Call::Abline(o) => d.emit_abline(o.clone()),
+                Call::Legend(pos, labels, o) => {
+                    out.legends
+                        .push(d.emit_legend(*pos, labels.clone(), o.clone()))
                 }
-                Call::Mtext(text, side, o) => self.mtext_impl(text.clone(), *side, o),
-                Call::Title(o) => self.title_impl(o),
+                Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), *side, o.clone()),
+                Call::Title(o) => d.emit_title(o.clone()),
             }
         }
-        self.par = saved;
+        drop(dev);
         out
     }
 
@@ -318,7 +333,7 @@ impl<B: Backend> Device<B> {
     /// c(row, col))` before it), for a figure that starts with a
     /// high-level call or `plot_new()`. On a device with nothing drawn yet
     /// it first starts the page, since R ignores `mfg` until then (the
-    /// same as `plot_new()`, then `mfg(row, col)`).
+    /// same as `plot_new()`, then `par(mfg = c(row, col))`).
     ///
     /// # Panics
     /// If `row` or `col` is outside the arrangement.
@@ -326,7 +341,7 @@ impl<B: Backend> Device<B> {
         if !self.is_used() {
             self.plot_new_impl();
         }
-        self.mfg(row, col);
+        self.par().mfg(row, col).draw();
         self.add_figure(fig)
     }
 }

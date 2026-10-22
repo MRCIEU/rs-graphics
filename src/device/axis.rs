@@ -20,14 +20,15 @@
 //! overlapping (`gap.axis` applies to text labels only).
 
 use crate::afm;
-use crate::backend::Backend;
+use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
+use crate::font::FontFace;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::AxisType;
 use crate::plotmath::Label;
 
-use super::{Clip, Device, Side, Y_LINE_BIAS, format_axis_labels};
+use super::{Device, Side, Xpd, format_axis_labels};
 
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
@@ -65,7 +66,7 @@ pub struct AxisOptions {
     /// than the plot region. Default `false`.
     pub outer: bool,
     /// Label font; `None`: `par(font.axis)`.
-    pub font: Option<i32>,
+    pub font: Option<FontFace>,
     /// Line type of the axis line and ticks; `None`: solid (R's default,
     /// not `par(lty)`).
     pub lty: Option<LineType>,
@@ -101,17 +102,28 @@ pub struct AxisOptions {
     /// inline `xaxp`/`yaxp`); `None`: `par(xaxp)` (sides 1, 3) or
     /// `par(yaxp)` (sides 2, 4).
     pub axp: Option<[f64; 3]>,
+    /// Margin lines for the axis title, labels and line (R's inline `mgp`;
+    /// only the labels and line are used here); `None`: `par(mgp)`.
+    pub mgp: Option<[f64; 3]>,
     /// `AxisType::None` draws nothing (R's inline `xaxt`/`yaxt`); `None`:
     /// `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4).
     pub axt: Option<AxisType>,
     /// Tick length as a fraction of the plot region (of its height for an
     /// x axis if above 0.5, else of its smaller side); positive points
-    /// inwards. Overrides `tcl`. `None` (R's `par(tck)` default `NA`): use
-    /// `tcl`.
+    /// inwards. Overrides `tcl`. `None`: `par(tck)`, which is `NA` by
+    /// default, meaning `tcl` is used.
     pub tck: Option<f64>,
     /// Tick length in margin lines; negative points outwards. `None`:
     /// `par(tcl)`.
     pub tcl: Option<f64>,
+    /// R's inline `xpd`: how far ticks and labels may reach along the
+    /// axis (the plot region, figure region or device, as for
+    /// `par(xpd)`); the axis is always clipped to the device, as R does.
+    /// `None`: `par(xpd)`.
+    pub xpd: Option<Xpd>,
+    /// R's inline `lend`: the ends of the axis line and ticks (`"round"`,
+    /// `"butt"`, `"square"`); `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
 }
 
 crate::setters::setters!(AxisOptions => [AxisCall] {
@@ -122,7 +134,7 @@ crate::setters::setters!(AxisOptions => [AxisCall] {
     line: option f64,
     pos: option f64,
     outer: value bool,
-    font: option i32,
+    font: option FontFace,
     lty: option LineType,
     lwd: option f64,
     lwd_ticks: option f64,
@@ -134,10 +146,13 @@ crate::setters::setters!(AxisOptions => [AxisCall] {
     cex_axis: option f64,
     col_axis: option ColorSpec,
     las: option i32,
-    axp: option [f64; 3],
+    axp: array [f64; 3],
+    mgp: array [f64; 3],
     axt: option AxisType,
     tck: option f64,
     tcl: option f64,
+    xpd: option Xpd,
+    lend: option LineEnd,
 });
 
 impl Default for AxisOptions {
@@ -163,9 +178,12 @@ impl Default for AxisOptions {
             col_axis: None,
             las: None,
             axp: None,
+            mgp: None,
             axt: None,
             tck: None,
             tcl: None,
+            xpd: None,
+            lend: None,
         }
     }
 }
@@ -185,10 +203,15 @@ impl<B: Backend> Device<B> {
     /// Draws R's `axis()`; the public entry is
     /// [`Graphics::axis`](crate::graphics::Graphics::axis), whose docs
     /// describe it.
-    pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) {
-        let side = side.into();
+    pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) -> Vec<f64> {
+        let mut dev = self.line_pars(opts.lend, None, None);
+        dev.axis_draw(side.into(), opts)
+    }
+
+    fn axis_draw(&mut self, side: Side, opts: &AxisOptions) -> Vec<f64> {
         let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);
+        let mgp = opts.mgp.unwrap_or(self.par.mgp);
         let perpendicular = if x_axis {
             las == 2 || las == 3
         } else {
@@ -199,7 +222,7 @@ impl<B: Backend> Device<B> {
         // `mgp[1]` is not taken relative to it.
         let (line, mut lineoff) = match opts.line {
             Some(l) if l.is_finite() => (l, 0.0),
-            _ => (self.par.mgp[2], self.par.mgp[2]),
+            _ => (mgp[2], mgp[2]),
         };
         let pos = opts.pos.filter(|p| p.is_finite());
         if pos.is_some() {
@@ -234,8 +257,11 @@ impl<B: Backend> Device<B> {
         // errors above, as in R).
         let axt = if x_axis { self.par.xaxt } else { self.par.yaxt };
         if opts.axt.unwrap_or(axt) == AxisType::None {
-            return;
+            return Vec::new();
         }
+        // R's return value: `at` sorted, `NA`s last.
+        let mut used = at.clone();
+        used.sort_by(|a, b| a.is_nan().cmp(&b.is_nan()).then(a.total_cmp(b)));
         // Sort by `at`, dropping non-finite positions (which sort last).
         let mut ticks: Vec<(f64, Option<&Label>)> = at
             .iter()
@@ -245,7 +271,7 @@ impl<B: Backend> Device<B> {
         ticks.sort_by(|a, b| a.0.total_cmp(&b.0));
         ticks.retain(|t| t.0.is_finite());
         if ticks.is_empty() {
-            return;
+            return used;
         }
         // From here on, positions are in `usr` units (log10 on a log axis;
         // values <= 0 become -inf or NaN, outside every limit below).
@@ -263,7 +289,7 @@ impl<B: Backend> Device<B> {
         } else {
             (self.usr.2, self.usr.3)
         };
-        let (left, right) = self.xpd_limits(x_axis);
+        let (left, right) = self.xpd_limits(x_axis, opts.xpd.unwrap_or(self.par.xpd));
         let (left, right) = (left.min(right), left.max(right));
         let eps = if right == left {
             0.5 * FLT_EPSILON
@@ -321,7 +347,7 @@ impl<B: Backend> Device<B> {
             let lty = opts.lty.unwrap_or(LineType::SOLID);
             let lwd_ticks = opts.lwd_ticks.unwrap_or(lwd);
             // Signed tick length in inches, positive inwards.
-            let len = match opts.tck.filter(|t| t.is_finite()) {
+            let len = match opts.tck.or(self.par.tck).filter(|t| t.is_finite()) {
                 Some(tck) => {
                     let (w, h) = (self.plt.width(), self.plt.height());
                     if tck > 0.5 {
@@ -334,7 +360,7 @@ impl<B: Backend> Device<B> {
                 None => opts.tcl.unwrap_or(self.par.tcl) * lh,
             };
             let axis_tick = axis_base - outward * len;
-            self.push_clip_region(Clip::Device);
+            self.push_clip_region(Xpd::Device);
             if lwd > 0.0 {
                 if let Some(c) = self.resolve(col) {
                     let stroke = self.stroke_of(c, lwd, lty);
@@ -366,12 +392,12 @@ impl<B: Backend> Device<B> {
         }
 
         if !opts.draw_labels {
-            return;
+            return used;
         }
         let font = opts.font.unwrap_or(self.par.font_axis);
         let cex = opts.cex_axis.unwrap_or(self.par.cex_axis);
         let col_axis = opts.col_axis.unwrap_or(ColorSpec::Color(self.par.col_axis));
-        let face = self.par.font_face(font);
+        let face = font;
         let size_pt = self.font_size_pt(cex);
         let m_h = afm::m_height_inches(face, size_pt, 1.0);
         let gap = opts
@@ -391,15 +417,9 @@ impl<B: Backend> Device<B> {
                 0.5
             });
         // `GMtext()`'s rotation and `yLineBias` nudge.
-        let (angle, bias) = match (side, perpendicular) {
-            (Side::Bottom | Side::Top, true) => (90.0, 0.0),
-            (Side::Left | Side::Right, true) => (0.0, 0.0),
-            (Side::Bottom, false) => (0.0, 1.0 - Y_LINE_BIAS),
-            (Side::Left, false) => (90.0, Y_LINE_BIAS),
-            (Side::Top, false) => (0.0, Y_LINE_BIAS),
-            (Side::Right, false) => (90.0, 1.0 - Y_LINE_BIAS),
-        };
-        let label_perp = axis_base + outward * (self.par.mgp[1] - lineoff + bias) * lh;
+        let angle = if x_axis == perpendicular { 90.0 } else { 0.0 };
+        let bias = self.line_bias(side, !perpendicular);
+        let label_perp = axis_base + outward * (mgp[1] - lineoff + bias) * lh;
 
         // Labels left to right (bottom to top), skipping those within `gap`
         // of the previous one.
@@ -433,7 +453,7 @@ impl<B: Backend> Device<B> {
                     if let Some(col) = self.resolve(col_axis) {
                         let cex = self.par.cex * cex;
                         let anchor = point(label_perp, temp);
-                        self.math_text(anchor, expr, hadj, padj, angle, col, cex, Clip::Device);
+                        self.math_text(anchor, expr, hadj, padj, angle, col, cex, Xpd::Device);
                     }
                     continue;
                 }
@@ -446,7 +466,7 @@ impl<B: Backend> Device<B> {
             let tnew = temp - 0.5 * labw;
             if tnew - tlast >= gap {
                 self.text_at_clipped(
-                    Clip::Device,
+                    Xpd::Device,
                     point(label_perp, temp),
                     label,
                     hadj,
@@ -459,6 +479,7 @@ impl<B: Backend> Device<B> {
                 tlast = temp + 0.5 * labw;
             }
         }
+        used
     }
 }
 

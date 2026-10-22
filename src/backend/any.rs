@@ -61,7 +61,13 @@ pub enum AnyBackend {
 impl AnyBackend {
     /// A `width_in` x `height_in` inch page in `format`. `dpi` is used
     /// only for PNG, which gets a white background (R's `png()` default).
-    pub fn new(format: Format, width_in: f64, height_in: f64, dpi: f64) -> Self {
+    pub fn new(
+        format: Format,
+        width_in: impl Into<f64>,
+        height_in: impl Into<f64>,
+        dpi: impl Into<f64>,
+    ) -> Self {
+        let (width_in, height_in, dpi) = (width_in.into(), height_in.into(), dpi.into());
         match format {
             Format::Pdf => AnyBackend::Pdf(PdfBackend::new(width_in, height_in)),
             Format::Svg => AnyBackend::Svg(SvgBackend::new(width_in, height_in)),
@@ -155,6 +161,9 @@ impl Backend for AnyBackend {
     }
     fn new_page(&mut self) {
         forward!(self, b => b.new_page())
+    }
+    fn take_page(&mut self) -> Vec<u8> {
+        forward!(self, b => b.take_page())
     }
     fn into_bytes(self) -> Vec<u8> {
         forward!(self, b => b.into_bytes())

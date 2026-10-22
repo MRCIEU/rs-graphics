@@ -33,7 +33,7 @@ fn threads_for(len: usize) -> usize {
 /// back-references across piece boundaries, a negligible size difference.
 fn deflate_raw(data: &[u8], level: u8, checksum: impl FnOnce() -> u32) -> (Vec<u8>, u32) {
     use miniz_oxide::deflate::core::{
-        compress, create_comp_flags_from_zip_params, CompressorOxide, TDEFLFlush, TDEFLStatus,
+        CompressorOxide, TDEFLFlush, TDEFLStatus, compress, create_comp_flags_from_zip_params,
     };
     let threads = threads_for(data.len());
     if threads <= 1 {

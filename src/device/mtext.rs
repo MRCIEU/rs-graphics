@@ -14,59 +14,97 @@
 //! side, `at` is a user coordinate (inner margins) or a fraction of the
 //! inner region (outer margins); across it, `line` counts margin lines out
 //! from the plot region (inner) or from the inner region (outer). Text is
-//! clipped to the figure region (inner), or the device (outer), as R
-//! forces `xpd` to 1 or `NA`.
+//! clipped to at least the figure region (to the device with `xpd = NA`,
+//! inline or `par()`), and `outer` text to the device, as `C_mtext`
+//! intends (see [`MtextOptions::xpd`]).
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
+use crate::font::FontFace;
 use crate::geometry::Point;
 
 use crate::plotmath::Label;
 
-use super::{Clip, Device, Side, Y_LINE_BIAS};
+use super::{Device, Side, Xpd};
+use crate::setters::pick_na;
 
 /// The arguments of R's `mtext()` other than `text` and `side`, with
-/// R's defaults.
-/// `None` is R's `NA`.
+/// R's defaults. As in R, the text and the vector arguments are recycled
+/// over the longest: `mtext(["a", "b"], 3).at([1, 2])` writes two labels.
+/// Empty: R's default for every label; a `NaN` entry is R's `NA`, the
+/// default for that label.
 #[derive(Clone, Debug, Default)]
 pub struct MtextOptions {
     /// Margin line, starting at 0 next to the plot region (or the inner
-    /// region for `outer`); may be negative or fractional. `None`: 0 (R's
-    /// default).
-    pub line: Option<f64>,
+    /// region for `outer`); may be negative or fractional. Empty: 0 (R's
+    /// default). A `NaN` entry (R's `NA`) leaves its label out; R writes
+    /// it with a `nan` coordinate, an invalid PDF (an R bug, not copied).
+    pub line: Vec<f64>,
     /// Draw in the outer margins (`par(oma)`) rather than the figure's.
     /// Default `false`.
     pub outer: bool,
     /// Position along the side: a user coordinate for inner margins, or a
-    /// fraction (0 to 1) of the inner region for outer ones. `None`: from
-    /// `adj` (text parallel to the side) or centred (perpendicular).
-    pub at: Option<f64>,
-    /// Justification along the text; `None`: 0.5 for text parallel to the
-    /// side, otherwise justified at the end nearest the plot (1 on sides 1
-    /// and 2, 0 on sides 3 and 4).
-    pub adj: Option<f64>,
-    /// Justification across the text; `None`: depends on `side`/`par(las)`
-    /// (0, i.e. baseline on the line, for `las = 0`).
-    pub padj: Option<f64>,
-    /// `None`: 1. Unlike most text, *not* scaled by `par(cex)` (so neither
-    /// by the multi-panel reduction), as in R.
-    pub cex: Option<f64>,
-    /// `None`: `par(col)`.
-    pub col: Option<ColorSpec>,
-    /// `None`: `par(font)`.
-    pub font: Option<i32>,
+    /// fraction (0 to 1) of the inner region for outer ones. Empty or
+    /// `NaN`: from `adj` (text parallel to the side) or centred
+    /// (perpendicular).
+    pub at: Vec<f64>,
+    /// Justification along the text; empty or `NaN`: 0.5 for text
+    /// parallel to the side, otherwise justified at the end nearest the
+    /// plot (1 on sides 1 and 2, 0 on sides 3 and 4).
+    pub adj: Vec<f64>,
+    /// Justification across the text; empty or `NaN`: depends on `side`
+    /// and `las` (0, i.e. baseline on the line, for `las = 0`).
+    pub padj: Vec<f64>,
+    /// Empty, `None` (R's `NA`) or `NaN`: 1. Unlike most text, *not* scaled by `par(cex)` (so
+    /// neither by the multi-panel reduction), as in R. (For an `NA` after a
+    /// finite value, R keeps the previous label's size, as `C_mtext`
+    /// forgets to reset it; that bug isn't copied.)
+    pub cex: Vec<Option<f64>>,
+    /// Empty: `par(col)`.
+    pub col: Vec<ColorSpec>,
+    /// Empty: `par(font)`.
+    /// `None` (R's `NA`): `par(font)`.
+    pub font: Vec<Option<FontFace>>,
+    /// Text orientation (R's inline `las`, through `mtext()`'s `...`): 0
+    /// parallel to the side, 1 horizontal, 2 perpendicular to the side, 3
+    /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
+    /// `None`: `par(las)`.
+    pub las: Option<i32>,
+    /// R's inline `xpd`: where the text clips, at least the figure region
+    /// (`false` is `true` here; [`Xpd::Device`] for the whole device);
+    /// `None`: `par(xpd)`. `outer` text clips to the device. This is what
+    /// R's `C_mtext` means to do; it tests `outer` as a pointer rather
+    /// than its value, so R always clips `mtext()` to the device (an R
+    /// bug, not copied).
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(MtextOptions => [MtextCall] {
-    line: option f64,
+    line: values f64,
     outer: value bool,
-    at: option f64,
-    adj: option f64,
-    padj: option f64,
-    cex: option f64,
-    col: option ColorSpec,
-    font: option i32,
+    at: values f64,
+    adj: values f64,
+    padj: values f64,
+    cex: na_values f64,
+    col: values ColorSpec,
+    font: na_values FontFace,
+    las: option i32,
+    xpd: option Xpd,
 });
+
+/// One label's arguments, after recycling (`None`: R's default).
+struct One {
+    line: Option<f64>,
+    outer: bool,
+    at: Option<f64>,
+    adj: Option<f64>,
+    padj: Option<f64>,
+    cex: Option<f64>,
+    col: Option<ColorSpec>,
+    font: Option<FontFace>,
+    las: Option<i32>,
+    xpd: Option<Xpd>,
+}
 
 /// `ComputeAdjValue()`.
 fn default_adj(side: Side, las: i32) -> f64 {
@@ -104,15 +142,58 @@ impl<B: Backend> Device<B> {
     /// Draws R's `mtext()`; the public entry is
     /// [`Graphics::mtext`](crate::graphics::Graphics::mtext), whose docs
     /// describe it.
-    pub(crate) fn mtext_impl(
-        &mut self,
-        text: impl Into<Label>,
-        side: impl Into<Side>,
-        opts: &MtextOptions,
-    ) {
-        let text = text.into();
-        let side = side.into();
-        let las = self.par.las;
+    pub(crate) fn mtext_impl(&mut self, texts: &[Option<Label>], side: Side, opts: &MtextOptions) {
+        // `C_mtext`: everything recycled over the longest argument.
+        assert!(!texts.is_empty(), "zero-length 'text' specified");
+        let n = [
+            texts.len(),
+            opts.line.len(),
+            opts.at.len(),
+            opts.adj.len(),
+            opts.padj.len(),
+            opts.cex.len(),
+            opts.col.len(),
+            opts.font.len(),
+        ]
+        .into_iter()
+        .max()
+        .unwrap_or(1);
+        let pick = |v: &[f64], i: usize| {
+            (!v.is_empty())
+                .then(|| v[i % v.len()])
+                .filter(|x| !x.is_nan())
+        };
+        for i in 0..n {
+            // An `NA` line puts the label nowhere: R draws nothing for it.
+            let line = (!opts.line.is_empty()).then(|| opts.line[i % opts.line.len()]);
+            if line.is_some_and(f64::is_nan) {
+                continue;
+            }
+            let one = One {
+                line,
+                outer: opts.outer,
+                at: pick(&opts.at, i),
+                adj: pick(&opts.adj, i),
+                padj: pick(&opts.padj, i),
+                // An `NA` (`None`) `cex` or `font` is the default, as in R.
+                cex: pick_na(&opts.cex, i, f64::NAN).filter(|c| !c.is_nan()),
+                col: (!opts.col.is_empty()).then(|| opts.col[i % opts.col.len()]),
+                font: (!opts.font.is_empty())
+                    .then(|| opts.font[i % opts.font.len()])
+                    .flatten(),
+                las: opts.las,
+                xpd: opts.xpd,
+            };
+            // An `NA` (`None`) text is skipped, as `C_mtext`.
+            if let Some(text) = &texts[i % texts.len()] {
+                self.mtext_one(text.clone(), side, &one);
+            }
+        }
+    }
+
+    /// One label of `mtext()`, as `C_mtext`'s loop body.
+    fn mtext_one(&mut self, text: Label, side: Side, opts: &One) {
+        let las = opts.las.unwrap_or(self.par.las);
         let adj = opts.adj.unwrap_or_else(|| default_adj(side, las));
         let padj = opts.padj.unwrap_or_else(|| default_padj(side, las));
         let horizontal_side = side.is_horizontal();
@@ -162,15 +243,7 @@ impl<B: Backend> Device<B> {
         } else {
             90.0
         };
-        let bias = match side {
-            Side::Bottom | Side::Right => 1.0 - Y_LINE_BIAS,
-            Side::Left | Side::Top => Y_LINE_BIAS,
-        };
-        let line = if parallel_text {
-            opts.line.unwrap_or(0.0) + bias / self.par.mex
-        } else {
-            opts.line.unwrap_or(0.0)
-        };
+        let line = opts.line.unwrap_or(0.0) + self.line_bias(side, parallel_text);
 
         // Position across the side.
         let lh = self.line_height_inches();
@@ -187,11 +260,7 @@ impl<B: Backend> Device<B> {
         } else {
             Point::new(across, along)
         };
-        let clip = if opts.outer {
-            Clip::Device
-        } else {
-            Clip::Figure
-        };
+        let clip = self.margin_clip(opts.xpd, opts.outer);
         let col = opts.col.unwrap_or(ColorSpec::Color(self.par.col));
         let font = opts.font.unwrap_or(self.par.font);
         // R sets the text size from `cex` alone (`C_mtext`: "we ignore any

@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // R: pdf("scatter.pdf"); plot(x, y, ...); abline(h = 6); legend(...); dev.off()
     let mut dev = Device::pdf("scatter.pdf").open()?;
-    dev.plot(&x, &y)
+    dev.plot().x(&x).y(&y)
         .pch(19)
         .col("steelblue")
         .main(Label::math("y == beta[0] + beta[1] * x"))
@@ -37,22 +37,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ylab("y")
         .draw();
     dev.abline().h(6.0).col("grey").lty("dashed").draw();
-    let keys = [
-        LegendEntry::point("observed", "steelblue", 19),
-        LegendEntry::line("threshold", "grey", 1.0, "dashed"),
-    ];
-    dev.legend("topleft", &keys).draw();
+    // R: legend("topleft", legend = c("observed", "threshold"),
+    //           col = c("steelblue", "grey"), pch = c(19, NA), lty = c(NA, 2))
+    dev.legend().pos("topleft").labels(["observed", "threshold"])
+        .col(["steelblue", "grey"])
+        .pch([Some(19), None])
+        .lty([None, Some(2)])
+        .draw();
     dev.close()?;
     Ok(())
 }
 ```
 
-Each R function is a method with R's name. It takes R's data arguments;
-chained setters take the others, and `.draw()` runs the call. Arguments
-you leave out get R's defaults (mostly the current `par()` values), and
-calls without `.draw()` draw nothing (the compiler warns). Every
-setter is documented on its options struct, e.g. `XyOptions` for
-`points()`.
+Each R function is a method with R's name. Chained setters, named as R's
+arguments, take all of them, data included (`.x(&x)`), and `.draw()` runs
+the call. A required argument you leave out panics at `.draw()` with R's
+message. Arguments with defaults that you leave out get R's defaults (mostly the current `par()` values), and
+calls without `.draw()` draw nothing (the compiler warns). The
+argument setters are documented on the call (e.g. `PointsCall::x`), and
+the rest on its options struct, e.g. `XyOptions` for `points()`. As in R, numbers may be integers or floats:
+`dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (`1..=10` is R's `1:10`), and
+data vectors may hold any number type. Vectors can be passed by
+reference or by value (`.x(&x)` or `.x(x)`, `.h([1, 2])`); large `f64`
+data isn't copied either way. R's `NA` in a style vector is
+`None`: R's `pch = c(19, NA)` is `.pch([Some(19), None])`.
 
 ### R side by side
 
@@ -68,30 +76,29 @@ let mut dev = Device::png("points.png").width(6.0).height(4.0).res(300.0).open()
 // R: par(las = 1, mar = c(4, 4, 2, 1))
 dev.par().las(1).mar([4.0, 4.0, 2.0, 1.0]).draw();
 // R: plot(x, y, pch = 19, col = groups, xlab = "Dose", ylab = "Response")
-dev.plot(&x, &y).pch(19).col(groups).xlab("Dose").ylab("Response").draw();
+dev.plot().x(&x).y(&y).pch(19).col(groups).xlab("Dose").ylab("Response").draw();
 // R: text(x, y, labels = c("a", "b", "c", "d", "e"), adj = -0.5)
-dev.text(&x, &y, &["a", "b", "c", "d", "e"]).adj(-0.5).draw();
+dev.text().x(&x).y(&y).labels(&["a", "b", "c", "d", "e"]).adj(-0.5).draw();
 // R: legend("topleft", legend = c("control", "treated"), pch = 19, col = 1:2)
-let keys = [
-    LegendEntry::point("control", 1, 19),
-    LegendEntry::point("treated", 2, 19),
-];
-dev.legend("topleft", &keys).draw();
+dev.legend().pos("topleft").labels(["control", "treated"]).pch(19).col([1, 2]).draw();
 // R: dev.off()
 dev.close()?;
 ```
 
 `Device::pdf(file)` and `Device::svg(file)` work the same way. The
 device's arguments (`width`, `height`, `pointsize`, `bg`, `res` for PNG,
-`compress` for PDF) have R's defaults, so
+`compress` and `onefile` for PDF) have R's defaults, so
 `Device::pdf("plot.pdf").open()?` is R's `pdf("plot.pdf")`, 7 x 7 inches.
 As in R, opening the device creates the file, so a bad path fails
 before anything is drawn, and `dev.close()` (R's `dev.off()`) writes it.
+A page number in a PNG or SVG file name gives one file per page, as R's
+`png("Rplot%03d.png")`; for PDF, a page number plus `.onefile(false)`,
+as R's `pdf("Rplot%03d.pdf", onefile = FALSE)`.
 Sizes are in inches for every format. The format is the function's, not
 the file name's. `Device::format(format, file)` takes the format as a
 value or a name (`"pdf"`, `"svg"`, `"png"`), for choosing it at run
 time, and `dev.finish()` returns the file's bytes instead of writing
-them.
+them (with one file per page, the last page's).
 
 ### Several panels on a page
 
@@ -106,25 +113,27 @@ let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
 dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
 
 let x = [4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7];
-let h = dev.hist(&x).col("lightblue").main("Histogram").draw(); // panel 1
+let h = dev.hist().x(&x).col("lightblue").main("Histogram").draw(); // panel 1
 dev.abline().v(h.mids[2]).lty("dashed").draw();
 
 let centres = dev // panel 2: bar centres, for labelling the bars
-    .barplot([3.0, 5.0, 2.0])
+    .barplot().height([3.0, 5.0, 2.0])
     .names(["A", "B", "C"])
     .ylim(0.0, 6.0)
     .draw();
-dev.text(&centres, &[3.3, 5.3, 2.3], &["3", "5", "2"]).draw();
+dev.text().x(&centres).y(&[3.3, 5.3, 2.3]).labels(&["3", "5", "2"]).draw();
 
 // R: mtext("Two panels", outer = TRUE, line = 0.5, font = 2)
-dev.mtext("Two panels", 3).outer(true).line(0.5).font(2).draw();
+dev.mtext().text("Two panels").side(3).outer(true).line(0.5).font(2).draw();
 dev.close()?;
 ```
 
 `par()` ends in `.draw()` like every other call, although it draws
-nothing: `.draw()` is what runs a call. `dev.mfrow(1, 2)` is a shortcut
-for `dev.par().mfrow(1, 2).draw()`. `dev.layout(..)` gives uneven panels
-(R's `layout()`), and `dev.mfg(row, col)` picks the next one.
+nothing: `.draw()` is what runs a call. It is the one way to change
+graphical parameters, including R's page layout ones (`mfrow`, `mfcol`,
+`mfg`, `fig`, `fin`, `new`); `dev.current_par()` reads them.
+`dev.layout(..)` gives uneven panels (R's `layout()`), and
+`dev.par().mfg(row, col).draw()` picks the next one.
 
 ### Reusing arguments
 
@@ -151,17 +160,17 @@ let response = [1.8, 3.1, 3.9, 5.2, 5.8, 7.1];
 let fitted = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
 
 let mut fig = Figure::new();
-fig.plot(&dose, &response)
+fig.plot().x(&dose).y(&response)
     .xlab("Dose")
     .ylab("Response")
     .main(Label::math("y == alpha + beta * x"))
     .draw();
-fig.lines(&dose, &fitted).col("red").draw();
-let keys = [
-    LegendEntry::point("observed", 1, 1),
-    LegendEntry::line("fitted", "red", 1.0, "solid"),
-];
-fig.legend("bottomright", &keys).draw();
+fig.lines().x(&dose).y(&fitted).col("red").draw();
+fig.legend().pos("bottomright").labels(["observed", "fitted"])
+    .col(["black", "red"])
+    .pch([Some(1), None])
+    .lty([None, Some(1)])
+    .draw();
 
 let mut dev = Device::pdf("fits.pdf").width(8.0).height(8.0).open()?;
 dev.par().mfrow(2, 2).draw();
@@ -205,8 +214,8 @@ trait Diagnostics {
 
 impl<G: Graphics> Diagnostics for G {
     fn obs_vs_exp(&mut self, exp: &[f64], obs: &[f64]) {
-        self.plot(exp, obs).pch(20).xlab("Expected").ylab("Observed").draw();
-        self.abline().coef(0.0, 1.0).col("red").draw();
+        self.plot().x(exp).y(obs).pch(20).xlab("Expected").ylab("Observed").draw();
+        self.abline().a(0).b(1).col("red").draw();
     }
 }
 
@@ -217,12 +226,14 @@ dev.obs_vs_exp(&[1.0, 2.0, 3.0], &[1.2, 1.9, 3.4]);
 
 GPL-3.0-or-later (see [LICENSE](LICENSE)). This crate ports R's own
 algorithms closely enough that it's derived from `r-source`, which is
-GPL-2.0-or-later, so it is licensed under version 3 of the GPL, as R's
+GPL-2.0-or-later (one translated file, `src/main/plot.c`,
+GPL-3.0-or-later), so it is licensed under version 3 of the GPL, as R's
 "or later" terms allow. Programs that use rs-graphics must therefore be
 distributed under GPL-3.0 (or a later version).
 
 The ported parts of R remain copyright The R Core Team, The R Foundation,
-Robert Gentleman and Ross Ihaka, and Paul Murrell and Ross Ihaka.
+Robert Gentleman and Ross Ihaka, Paul Murrell and Ross Ihaka, and Kevin
+Buhr (polygon hatching).
 [NOTICE](NOTICE) lists these notices, the R source files the code was
 translated from, and when. Programs that use rs-graphics should carry the
 same section in their notices.

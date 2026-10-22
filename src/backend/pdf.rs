@@ -20,17 +20,23 @@
 //! coordinate flip - only a inches-to-points scale (`1 in = 72 pt`).
 //!
 //! Like R's `pdf()`, each new page the device starts (each `plot_new()`
-//! on a one-figure page, a multi-figure page wrapping round, `fig()`
-//! without `set_new(true)`) is a new PDF page, sharing the font objects.
+//! on a one-figure page, a multi-figure page wrapping round, `par(fig = )`
+//! without `new = TRUE`) is a new PDF page, sharing the font objects.
 //! Like R's `pdf()` (`compress = TRUE`), each page's content stream is
 //! Flate-compressed by default; see [`PdfBackend::with_compression`].
+//!
+//! Semi-transparent colours work as in R's `pdf()` (PDF 1.4 transparency):
+//! each alpha used gets an `ExtGState` resource, `/ca` for fills and text
+//! or `/CA` for strokes, selected with `gs` when the alpha changes. Output
+//! with only opaque colours has no such resources and is unchanged.
 
+use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
-use super::compress::{zlib_compress, DEFLATE_LEVEL};
+use super::compress::{DEFLATE_LEVEL, zlib_compress};
 use super::numfmt::push_fixed;
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
-use crate::afm::FontFace;
+use crate::afm::{self, FontFace};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
@@ -43,6 +49,15 @@ pub struct PdfBackend {
     last_fill: Option<Color>,
     last_stroke_color: Option<Color>,
     last_line: LineState,
+    /// The fill and stroke alpha in effect (`None`: unknown, after a `Q`
+    /// once some alpha has been set). PDF's default is opaque.
+    last_fill_alpha: Option<u8>,
+    last_stroke_alpha: Option<u8>,
+    /// The fill (`/ca`) and stroke (`/CA`) alphas used anywhere, each an
+    /// `ExtGState` resource (`/Ga<alpha>`, `/GA<alpha>`); empty for opaque
+    /// output, which then has no such resources.
+    fill_alphas: BTreeSet<u8>,
+    stroke_alphas: BTreeSet<u8>,
     compress: bool,
     background: Color,
     /// Finished pages' content streams; `content` is the current page.
@@ -66,7 +81,8 @@ struct LineState {
 }
 
 impl PdfBackend {
-    pub fn new(width_in: f64, height_in: f64) -> Self {
+    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
+        let (width_in, height_in) = (width_in.into(), height_in.into());
         PdfBackend {
             width_in,
             height_in,
@@ -75,6 +91,10 @@ impl PdfBackend {
             last_fill: None,
             last_stroke_color: None,
             last_line: LineState::default(),
+            last_fill_alpha: Some(255),
+            last_stroke_alpha: Some(255),
+            fill_alphas: BTreeSet::new(),
+            stroke_alphas: BTreeSet::new(),
             compress: true,
             background: Color::TRANSPARENT,
             pages: Vec::new(),
@@ -112,19 +132,35 @@ impl PdfBackend {
         self.content.push('\n');
     }
 
+    /// Sets the fill colour, and its alpha through an `ExtGState` (`/ca`),
+    /// as R's `pdf()` does for semi-transparent colours.
     fn set_fill(&mut self, c: Color) {
-        if self.last_fill != Some(c) {
+        if self.last_fill_alpha != Some(c.a) {
+            self.fill_alphas.insert(c.a);
+            let _ = writeln!(self.content, "/Ga{} gs", c.a);
+            self.last_fill_alpha = Some(c.a);
+        }
+        let rgb_only = c.with_alpha(255);
+        if self.last_fill != Some(rgb_only) {
             let rgb = [c.r, c.g, c.b].map(|v| v as f64 / 255.0);
             self.op(&rgb, 4, "rg");
-            self.last_fill = Some(c);
+            self.last_fill = Some(rgb_only);
         }
     }
 
+    /// Sets the stroke colour, and its alpha through an `ExtGState`
+    /// (`/CA`).
     fn set_stroke_color(&mut self, c: Color) {
-        if self.last_stroke_color != Some(c) {
+        if self.last_stroke_alpha != Some(c.a) {
+            self.stroke_alphas.insert(c.a);
+            let _ = writeln!(self.content, "/GA{} gs", c.a);
+            self.last_stroke_alpha = Some(c.a);
+        }
+        let rgb_only = c.with_alpha(255);
+        if self.last_stroke_color != Some(rgb_only) {
             let rgb = [c.r, c.g, c.b].map(|v| v as f64 / 255.0);
             self.op(&rgb, 4, "RG");
-            self.last_stroke_color = Some(c);
+            self.last_stroke_color = Some(rgb_only);
         }
     }
 
@@ -182,6 +218,10 @@ impl PdfBackend {
         self.last_fill = None;
         self.last_stroke_color = None;
         self.last_line = LineState::default();
+        // Opaque unless some alpha has been set (it may be in effect again).
+        let opaque = |used: &BTreeSet<u8>| used.is_empty().then_some(255);
+        self.last_fill_alpha = opaque(&self.fill_alphas);
+        self.last_stroke_alpha = opaque(&self.stroke_alphas);
     }
 
     fn path_moveto_lineto(&mut self, points: &[Point], close: bool) {
@@ -292,18 +332,42 @@ impl PdfBackend {
         objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
         let kids: Vec<String> = (0..n_pages).map(|i| format!("{} 0 R", 3 + 2 * i)).collect();
         objects.push(
-            format!("<< /Type /Pages /Kids [{}] /Count {n_pages} >>", kids.join(" ")).into_bytes(),
+            format!(
+                "<< /Type /Pages /Kids [{}] /Count {n_pages} >>",
+                kids.join(" ")
+            )
+            .into_bytes(),
         );
         let symbol_res = if self.uses_symbol {
             format!(" /F5 {} 0 R", font0 + 4)
         } else {
             String::new()
         };
+        // The alphas' `ExtGState`s come after the fonts, one object each,
+        // listed in every page's resources (none for opaque output).
+        let mut gs_obj = font0 + 4 + usize::from(self.uses_symbol);
+        let mut gs_res = String::new();
+        let mut gs_objects: Vec<Vec<u8>> = Vec::new();
+        for (key, prefix, alphas) in [
+            ("ca", "Ga", &self.fill_alphas),
+            ("CA", "GA", &self.stroke_alphas),
+        ] {
+            for &a in alphas {
+                let _ = write!(gs_res, " /{prefix}{a} {gs_obj} 0 R");
+                gs_objects.push(
+                    format!("<< /Type /ExtGState /{key} {:.3} >>", a as f64 / 255.0).into_bytes(),
+                );
+                gs_obj += 1;
+            }
+        }
+        if !gs_res.is_empty() {
+            gs_res = format!(" /ExtGState <<{gs_res} >>");
+        }
         for (i, content) in pages.into_iter().enumerate() {
             objects.push(
                 format!(
                     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w_pt:.3} {h_pt:.3}] \
-                     /Resources << /Font << /F1 {} 0 R /F2 {} 0 R /F3 {} 0 R /F4 {} 0 R{symbol_res} >> >> \
+                     /Resources << /Font << /F1 {} 0 R /F2 {} 0 R /F3 {} 0 R /F4 {} 0 R{symbol_res} >>{gs_res} >> \
                      /Contents {} 0 R >>",
                     font0,
                     font0 + 1,
@@ -348,6 +412,7 @@ impl PdfBackend {
             // A standard 14 font with its own built-in encoding.
             objects.push(b"<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>".to_vec());
         }
+        objects.extend(gs_objects);
 
         let mut out = Vec::new();
         out.extend_from_slice(b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
@@ -396,6 +461,18 @@ impl Backend for PdfBackend {
         self.background
     }
 
+    /// R's `pdf()` works in big points.
+    fn device_unit_inches(&self) -> f64 {
+        1.0 / 72.0
+    }
+
+    fn take_page(&mut self) -> Vec<u8> {
+        let fresh = PdfBackend::new(self.width_in, self.height_in)
+            .with_background(self.background)
+            .with_compression(self.compress);
+        std::mem::replace(self, fresh).finish()
+    }
+
     fn new_page(&mut self) {
         let page = std::mem::take(&mut self.content);
         if self.started {
@@ -403,6 +480,9 @@ impl Backend for PdfBackend {
         }
         self.started = true;
         self.forget_state();
+        // A new page starts in the default (opaque) graphics state.
+        self.last_fill_alpha = Some(255);
+        self.last_stroke_alpha = Some(255);
     }
 
     fn push_clip(&mut self, rect: Rect) {
@@ -486,7 +566,28 @@ impl Backend for PdfBackend {
             self.content.push(' ');
         }
         self.op(&[x, y], 3, "Tm");
-        let _ = writeln!(self.content, "({}) Tj", Self::escape_pdf_string(text, symbol));
+        // As R's `pdf()`: a string with kerning pairs is a `TJ` array, the
+        // pieces separated by each kern (negated: positive numbers move the
+        // next glyph left); otherwise a plain `Tj`.
+        let kerns = afm::kerning_units(text, style.face);
+        if kerns.iter().any(|&k| k != 0.0) {
+            self.content.push_str("[(");
+            let mut buf = [0u8; 4];
+            for (i, ch) in text.chars().enumerate() {
+                let piece = Self::escape_pdf_string(ch.encode_utf8(&mut buf), symbol);
+                self.content.push_str(&piece);
+                if let Some(&k) = kerns.get(i).filter(|&&k| k != 0.0) {
+                    let _ = write!(self.content, ") {} (", -(k as i64));
+                }
+            }
+            self.content.push_str(")] TJ\n");
+        } else {
+            let _ = writeln!(
+                self.content,
+                "({}) Tj",
+                Self::escape_pdf_string(text, symbol)
+            );
+        }
         self.content.push_str("ET\n");
     }
 }

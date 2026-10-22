@@ -30,47 +30,24 @@
 //! space-exclusion above). Strings containing such a pair (e.g. `F r` in
 //! "Frequency") are therefore a fraction of a point wider or narrower than
 //! in R's `pdf()` output.
+//!
+//! The same kerning table gives the kerns `PdfBackend` writes inside drawn
+//! strings (`kerning_units`, as R's `PDFWriteT1KerningString`), so those
+//! strings also differ from R's inside: R writes them without that pair.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// The font faces R exposes via `par(font=)`/`par(font.axis=)` etc.: `1` =
-/// plain, `2` = bold, `3` = italic, `4` = bold italic, `5` = symbol.
-///
-/// Text in [`FontFace::Symbol`] is in Adobe Symbol encoding, one `char`
-/// per code (e.g. `'a'` is alpha, `'\u{B1}'` plus-minus), as R's
-/// `pdf()` writes it; [`symbol_to_unicode`] maps it for devices that need
-/// Unicode.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum FontFace {
-    Plain,
-    Bold,
-    Italic,
-    BoldItalic,
-    Symbol,
-}
+pub use crate::font::FontFace;
 
-impl FontFace {
-    /// The face for R's font number `code` (1 to 5, as above); any other
-    /// number gives [`FontFace::Plain`].
-    pub fn from_r_font_code(code: i32) -> Self {
-        match code {
-            2 => FontFace::Bold,
-            3 => FontFace::Italic,
-            4 => FontFace::BoldItalic,
-            5 => FontFace::Symbol,
-            _ => FontFace::Plain,
-        }
-    }
-
-    fn afm_source(self) -> &'static str {
-        match self {
-            FontFace::Plain => include_str!("../assets/afm/Helvetica.afm"),
-            FontFace::Bold => include_str!("../assets/afm/Helvetica-Bold.afm"),
-            FontFace::Italic => include_str!("../assets/afm/Helvetica-Oblique.afm"),
-            FontFace::BoldItalic => include_str!("../assets/afm/Helvetica-BoldOblique.afm"),
-            FontFace::Symbol => include_str!("../assets/afm/Symbol.afm"),
-        }
+/// The AFM file for `face`.
+fn afm_source(face: FontFace) -> &'static str {
+    match face {
+        FontFace::Plain => include_str!("../assets/afm/Helvetica.afm"),
+        FontFace::Bold => include_str!("../assets/afm/Helvetica-Bold.afm"),
+        FontFace::Italic => include_str!("../assets/afm/Helvetica-Oblique.afm"),
+        FontFace::BoldItalic => include_str!("../assets/afm/Helvetica-BoldOblique.afm"),
+        FontFace::Symbol => include_str!("../assets/afm/Symbol.afm"),
     }
 }
 
@@ -119,18 +96,102 @@ pub fn symbol_to_unicode(c: char) -> char {
 /// Glyph names of Latin-1 code points 0xA0..=0xFF, from R's
 /// `grDevices/enc/ISOLatin1.enc` (identical to WinAnsiEncoding in this range).
 const LATIN1_UPPER_NAMES: [&str; 96] = [
-    "space", "exclamdown", "cent", "sterling", "currency", "yen", "brokenbar", "section",
-    "dieresis", "copyright", "ordfeminine", "guillemotleft", "logicalnot", "hyphen", "registered", "macron",
-    "degree", "plusminus", "twosuperior", "threesuperior", "acute", "mu", "paragraph", "periodcentered",
-    "cedilla", "onesuperior", "ordmasculine", "guillemotright", "onequarter", "onehalf", "threequarters", "questiondown",
-    "Agrave", "Aacute", "Acircumflex", "Atilde", "Adieresis", "Aring", "AE", "Ccedilla",
-    "Egrave", "Eacute", "Ecircumflex", "Edieresis", "Igrave", "Iacute", "Icircumflex", "Idieresis",
-    "Eth", "Ntilde", "Ograve", "Oacute", "Ocircumflex", "Otilde", "Odieresis", "multiply",
-    "Oslash", "Ugrave", "Uacute", "Ucircumflex", "Udieresis", "Yacute", "Thorn", "germandbls",
-    "agrave", "aacute", "acircumflex", "atilde", "adieresis", "aring", "ae", "ccedilla",
-    "egrave", "eacute", "ecircumflex", "edieresis", "igrave", "iacute", "icircumflex", "idieresis",
-    "eth", "ntilde", "ograve", "oacute", "ocircumflex", "otilde", "odieresis", "divide",
-    "oslash", "ugrave", "uacute", "ucircumflex", "udieresis", "yacute", "thorn", "ydieresis",
+    "space",
+    "exclamdown",
+    "cent",
+    "sterling",
+    "currency",
+    "yen",
+    "brokenbar",
+    "section",
+    "dieresis",
+    "copyright",
+    "ordfeminine",
+    "guillemotleft",
+    "logicalnot",
+    "hyphen",
+    "registered",
+    "macron",
+    "degree",
+    "plusminus",
+    "twosuperior",
+    "threesuperior",
+    "acute",
+    "mu",
+    "paragraph",
+    "periodcentered",
+    "cedilla",
+    "onesuperior",
+    "ordmasculine",
+    "guillemotright",
+    "onequarter",
+    "onehalf",
+    "threequarters",
+    "questiondown",
+    "Agrave",
+    "Aacute",
+    "Acircumflex",
+    "Atilde",
+    "Adieresis",
+    "Aring",
+    "AE",
+    "Ccedilla",
+    "Egrave",
+    "Eacute",
+    "Ecircumflex",
+    "Edieresis",
+    "Igrave",
+    "Iacute",
+    "Icircumflex",
+    "Idieresis",
+    "Eth",
+    "Ntilde",
+    "Ograve",
+    "Oacute",
+    "Ocircumflex",
+    "Otilde",
+    "Odieresis",
+    "multiply",
+    "Oslash",
+    "Ugrave",
+    "Uacute",
+    "Ucircumflex",
+    "Udieresis",
+    "Yacute",
+    "Thorn",
+    "germandbls",
+    "agrave",
+    "aacute",
+    "acircumflex",
+    "atilde",
+    "adieresis",
+    "aring",
+    "ae",
+    "ccedilla",
+    "egrave",
+    "eacute",
+    "ecircumflex",
+    "edieresis",
+    "igrave",
+    "iacute",
+    "icircumflex",
+    "idieresis",
+    "eth",
+    "ntilde",
+    "ograve",
+    "oacute",
+    "ocircumflex",
+    "otilde",
+    "odieresis",
+    "divide",
+    "oslash",
+    "ugrave",
+    "uacute",
+    "ucircumflex",
+    "udieresis",
+    "yacute",
+    "thorn",
+    "ydieresis",
 ];
 
 /// Character widths and kerning pairs (in 1/1000 em units, the AFM
@@ -351,7 +412,7 @@ fn metrics_table(face: FontFace) -> &'static FontMetrics {
         FontFace::BoldItalic => &BOLD_ITALIC,
         FontFace::Symbol => &SYMBOL,
     };
-    cell.get_or_init(|| FontMetrics::parse(face.afm_source(), face == FontFace::Symbol))
+    cell.get_or_init(|| FontMetrics::parse(afm_source(face), face == FontFace::Symbol))
 }
 
 /// Width of `s`, in inches, set in `face` at `pointsize * cex` points -
@@ -360,6 +421,17 @@ fn metrics_table(face: FontFace) -> &'static FontMetrics {
 pub fn str_width_inches(s: &str, face: FontFace, pointsize: f64, cex: f64) -> f64 {
     let pt = pointsize * cex;
     metrics_table(face).str_width_units(s) / 1000.0 * pt / 72.0
+}
+
+/// The kerning between each character of `s` and the next, in 1/1000 em
+/// (AFM units; 0 where the AFM has no pair), in `face`: what R's `pdf()`
+/// writes inside a string's `TJ` array (`PDFWriteT1KerningString`, which
+/// shares the width calculation's kerning table, so the same pairs and
+/// the same space exclusion). `s.chars().count() - 1` values.
+pub(crate) fn kerning_units(s: &str, face: FontFace) -> Vec<f64> {
+    let m = metrics_table(face);
+    let chars: Vec<char> = s.chars().collect();
+    chars.windows(2).map(|w| m.kern_units(w[0], w[1])).collect()
 }
 
 /// Cumulative per-character x-offsets (in inches, from the string's left
@@ -436,7 +508,12 @@ pub fn glyph_metric_inches(c: char, face: FontFace, pointsize: f64) -> (f64, f64
 /// the minimum glyph `lly` (so descent is positive below the baseline).
 /// `GEText()` uses these to centre text vertically when `adj[2]` is `NA`
 /// (e.g. character `pch`).
-pub fn glyph_ascent_descent_inches(s: &str, face: FontFace, pointsize: f64, cex: f64) -> (f64, f64) {
+pub fn glyph_ascent_descent_inches(
+    s: &str,
+    face: FontFace,
+    pointsize: f64,
+    cex: f64,
+) -> (f64, f64) {
     let m = metrics_table(face);
     let scale = pointsize * cex / 72.0 / 1000.0;
     let mut chars = s.chars();
