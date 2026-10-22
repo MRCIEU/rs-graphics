@@ -126,8 +126,8 @@ fn draw_ours(c: &Case) -> String {
     for pch in 0..26 {
         let (x, y) = pch_pos(pch);
         dev.points()
-            .x(&[x])
-            .y(&[y])
+            .x([x])
+            .y([y])
             .with(&XyOptions {
                 pch: vec![Some(pch as i32)],
                 col: vec![col],
@@ -141,8 +141,8 @@ fn draw_ours(c: &Case) -> String {
     for (i, &ch) in CHARS.iter().enumerate() {
         let (x, y) = char_pos(i);
         dev.points()
-            .x(&[x])
-            .y(&[y])
+            .x([x])
+            .y([y])
             .with(&XyOptions {
                 pch: vec![Some(ch as i32)],
                 col: vec![col],

@@ -247,5 +247,5 @@ fn failed_figure_is_retried_like_r() {
 #[should_panic(expected = "figure margins too large")]
 fn high_level_plots_panic_too() {
     let mut dev = device(1.0, 1.0);
-    dev.plot().x(&[1, 2]).y(&[1, 2]).draw();
+    dev.plot().x([1, 2]).y([1, 2]).draw();
 }

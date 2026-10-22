@@ -175,7 +175,7 @@ fn pie_matches_r() {
             radius: Some(c.radius),
             ..PieOptions::default()
         };
-        dev.pie().x(&VALUES).with(&opts).draw();
+        dev.pie().x(VALUES).with(&opts).draw();
         let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
 
         let (r_p, o_p) = (paths(&r_pdf), paths(&ours));

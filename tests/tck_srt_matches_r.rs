@@ -44,7 +44,7 @@ fn cases() -> Vec<Case> {
             r: "par(tck = 0.02); plot(x, y, ann = FALSE)",
             ours: |d| {
                 d.par().tck(0.02).draw();
-                d.plot().x(&X).y(&Y).draw();
+                d.plot().x(X).y(Y).draw();
             },
         },
         Case {
@@ -52,7 +52,7 @@ fn cases() -> Vec<Case> {
             r: "par(tck = 1); plot(x, y, ann = FALSE)",
             ours: |d| {
                 d.par().tck(1).draw();
-                d.plot().x(&X).y(&Y).draw();
+                d.plot().x(X).y(Y).draw();
             },
         },
         Case {
@@ -61,7 +61,7 @@ fn cases() -> Vec<Case> {
                 axis(1); axis(2, tck = 0.03); box()",
             ours: |d| {
                 d.par().tck(-0.05).draw();
-                d.plot().x(&X).y(&Y).axes(false).draw();
+                d.plot().x(X).y(Y).axes(false).draw();
                 d.axis().side(1).draw();
                 d.axis().side(2).tck(0.03).draw();
                 d.box_().draw();
@@ -73,7 +73,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().tck(0.1).draw();
                 d.par().tck(f64::NAN).draw();
-                d.plot().x(&X).y(&Y).draw();
+                d.plot().x(X).y(Y).draw();
             },
         },
         Case {
@@ -83,13 +83,9 @@ fn cases() -> Vec<Case> {
                 text(3, 3, 'f', srt = -30)",
             ours: |d| {
                 d.par().srt(45).draw();
-                d.plot().x(&X).y(&Y).type_("n").draw();
-                d.text()
-                    .x(&X)
-                    .y(&Y)
-                    .labels(["a", "b", "c", "d", "e"])
-                    .draw();
-                d.text().x(&[3]).y(&[3]).labels(["f"]).srt(-30).draw();
+                d.plot().x(X).y(Y).type_("n").draw();
+                d.text().x(X).y(Y).labels(["a", "b", "c", "d", "e"]).draw();
+                d.text().x([3]).y([3]).labels(["f"]).srt(-30).draw();
             },
         },
         Case {
@@ -97,7 +93,7 @@ fn cases() -> Vec<Case> {
             r: "par(srt = 30); pie(c(1, 2, 3), labels = c('a', 'b', 'c'))",
             ours: |d| {
                 d.par().srt(30).draw();
-                d.pie().x(&[1, 2, 3]).labels(["a", "b", "c"]).draw();
+                d.pie().x([1, 2, 3]).labels(["a", "b", "c"]).draw();
             },
         },
         Case {
@@ -105,11 +101,7 @@ fn cases() -> Vec<Case> {
             r: "par(srt = 30); pie(c(1, 2, 3), labels = c('a', 'b', 'c'), srt = -45)",
             ours: |d| {
                 d.par().srt(30).draw();
-                d.pie()
-                    .x(&[1, 2, 3])
-                    .labels(["a", "b", "c"])
-                    .srt(-45)
-                    .draw();
+                d.pie().x([1, 2, 3]).labels(["a", "b", "c"]).srt(-45).draw();
             },
         },
         Case {
@@ -117,7 +109,7 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE); par(srt = 20)\n\
                 legend('topleft', legend = c('abc', 'sum'), pch = 1:2, title = 'title')",
             ours: |d| {
-                d.plot().x(&X).y(&Y).draw();
+                d.plot().x(X).y(Y).draw();
                 d.par().srt(20).draw();
                 d.legend()
                     .pos("topleft")

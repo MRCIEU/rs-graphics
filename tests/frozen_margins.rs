@@ -26,7 +26,7 @@ fn draw(change_margins: bool) -> Vec<u8> {
         d.par().mar(Sides::from([2.0, 2.0, 8.0, 1.0])).draw();
         d.par().oma(Sides::from([3.0, 0.0, 0.0, 2.0])).draw();
     }
-    d.points().x(&[5.0]).y(&[5.0]).draw();
+    d.points().x([5.0]).y([5.0]).draw();
     d.title().main("Main").xlab("x").draw();
     d.mtext().text("outer").side(3).outer(true).draw();
     d.mtext().text("inner").side(4).line(1.0).draw();

@@ -34,53 +34,53 @@ fn ours(d: &mut Device<PdfBackend>) {
     d.plot_new();
     d.plot_window().xlim(0, 10).ylim(0, 10).draw();
     d.lines()
-        .x(&[1, 2, 3])
-        .y(&[1, 5, 2])
+        .x([1, 2, 3])
+        .y([1, 5, 2])
         .lwd(8)
         .lend("butt")
         .ljoin("mitre")
         .lmitre(3)
         .draw();
     d.points()
-        .x(&[5])
-        .y(&[5])
+        .x([5])
+        .y([5])
         .pch(0)
         .cex(3)
         .lwd(4)
         .ljoin("bevel")
         .draw();
     d.segments()
-        .x0(&[1])
-        .y0(&[8])
-        .x1(&[4])
-        .y1(&[9])
+        .x0([1])
+        .y0([8])
+        .x1([4])
+        .y1([9])
         .lwd(6)
         .ljoin("mitre")
         .lend("square")
         .draw();
     d.arrows()
-        .x0(&[6])
-        .y0(&[1])
-        .x1(&[9])
-        .y1(&[3])
+        .x0([6])
+        .y0([1])
+        .x1([9])
+        .y1([3])
         .lwd(3)
         .ljoin("mitre")
         .lmitre(2)
         .lend("butt")
         .draw();
     d.rect()
-        .xleft(&[6])
-        .ybottom(&[6])
-        .xright(&[8])
-        .ytop(&[8])
+        .xleft([6])
+        .ybottom([6])
+        .xright([8])
+        .ytop([8])
         .lwd(5)
         .ljoin("bevel")
         .lty("dashed")
         .lend("square")
         .draw();
     d.polygon()
-        .x(&[1, 2, 3])
-        .y(&[6, 7, 6])
+        .x([1, 2, 3])
+        .y([6, 7, 6])
         .lwd(5)
         .ljoin("mitre")
         .lmitre(1.5)
@@ -88,7 +88,7 @@ fn ours(d: &mut Device<PdfBackend>) {
     d.box_().lwd(4).ljoin("bevel").lend("butt").draw();
     d.abline().h(4).lwd(5).lend("butt").draw();
     // Back to `par()`'s values.
-    d.lines().x(&[7, 8, 9]).y(&[9, 5, 9]).lwd(6).draw();
+    d.lines().x([7, 8, 9]).y([9, 5, 9]).lwd(6).draw();
 }
 
 /// `(cap, join, mitre, width)` in effect at each stroking operator.
@@ -170,5 +170,5 @@ fn inline_line_pars_match_r() {
 fn lmitre_below_one_panics_like_r() {
     let mut dev = Device::new(PdfBackend::new(6, 6), Par::default());
     dev.plot_new();
-    dev.lines().x(&[1, 2]).y(&[1, 2]).lmitre(0.5).draw();
+    dev.lines().x([1, 2]).y([1, 2]).lmitre(0.5).draw();
 }

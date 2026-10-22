@@ -21,8 +21,8 @@ use rs_graphics::prelude::*;
 /// (`startps` matters) and the page background.
 fn draw<B: Backend>(dev: &mut Device<B>) {
     dev.plot()
-        .x(&[1.0, 2.0, 3.0])
-        .y(&[3.0, 1.0, 2.0])
+        .x([1.0, 2.0, 3.0])
+        .y([3.0, 1.0, 2.0])
         .pch(19)
         .main("title")
         .draw();

@@ -73,7 +73,7 @@ fn cases() -> Vec<Case> {
             r: "boxplot(G, at = c(1, 2.5, 6), width = c(1, 2, 0.5), names = c('a', 'b', 'c'))",
             ours: |d| {
                 d.boxplot()
-                    .x(&groups(&G))
+                    .x(groups(&G))
                     .at([1.0, 2.5, 6.0])
                     .width([1.0, 2.0, 0.5])
                     .names(["a", "b", "c"])
@@ -84,7 +84,7 @@ fn cases() -> Vec<Case> {
             name: "outline_false",
             r: "boxplot(G, outline = FALSE, axes = FALSE)",
             ours: |d| {
-                d.boxplot().x(&groups(&G)).outline(false).axes(false).draw();
+                d.boxplot().x(groups(&G)).outline(false).axes(false).draw();
             },
         },
         Case {
@@ -97,7 +97,7 @@ fn cases() -> Vec<Case> {
                 col = c('pink', 'lightblue'), axes = FALSE)",
             ours: |d| {
                 d.boxplot()
-                    .x(&groups(&G))
+                    .x(groups(&G))
                     .boxwex(0.4)
                     .staplewex(1.0)
                     .lwd(2.0)
@@ -143,12 +143,12 @@ fn cases() -> Vec<Case> {
                 boxplot(G, add = TRUE, at = c(2, 5, 8), col = 'white', main = 'hidden')",
             ours: |d| {
                 d.plot()
-                    .x(&[0.0, 10.0])
-                    .y(&[0.0, 16.0])
+                    .x([0.0, 10.0])
+                    .y([0.0, 16.0])
                     .type_(PlotType::None)
                     .draw();
                 d.boxplot()
-                    .x(&groups(&G))
+                    .x(groups(&G))
                     .add(true)
                     .at([2.0, 5.0, 8.0])
                     .col("white")
@@ -160,7 +160,7 @@ fn cases() -> Vec<Case> {
             name: "log_values",
             r: "boxplot(P, log = 'y', main = 'log')",
             ours: |d| {
-                d.boxplot().x(&groups(&P)).ylog(true).main("log").draw();
+                d.boxplot().x(groups(&P)).ylog(true).main("log").draw();
             },
         },
         Case {
@@ -168,7 +168,7 @@ fn cases() -> Vec<Case> {
             r: "boxplot(P, horizontal = TRUE, log = 'y', at = c(1, 3, 10))",
             ours: |d| {
                 d.boxplot()
-                    .x(&groups(&P))
+                    .x(groups(&P))
                     .horizontal(true)
                     .ylog(true)
                     .at([1.0, 3.0, 10.0])
@@ -180,7 +180,7 @@ fn cases() -> Vec<Case> {
             r: "boxplot(P, horizontal = TRUE, ylim = c(0, 100), xlim = c(0, 5), notch = TRUE)",
             ours: |d| {
                 d.boxplot()
-                    .x(&groups(&P))
+                    .x(groups(&P))
                     .horizontal(true)
                     .ylim(0.0, 100.0)
                     .xlim(0.0, 5.0)

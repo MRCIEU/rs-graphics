@@ -88,26 +88,26 @@ fn cases() -> Vec<Case> {
                     lty: Some(LineType::DASHED),
                     ..XyOptions::default()
                 };
-                d.lines().x(&x).y(&Y).with(&b).draw();
+                d.lines().x(&x).y(Y).with(&b).draw();
                 let o = XyOptions {
                     type_: Some(PlotType::Overplotted),
                     pch: vec![Some(0)],
                     col: cols(&["blue", "green"]),
                     ..XyOptions::default()
                 };
-                d.lines().x(&x).y(&shift(0.5)).with(&o).draw();
+                d.lines().x(&x).y(shift(0.5)).with(&o).draw();
                 let c = XyOptions {
                     type_: Some(PlotType::BrokenLines),
                     lty: Some(LineType::DOTTED),
                     ..XyOptions::default()
                 };
-                d.points().x(&x).y(&shift(-0.5)).with(&c).draw();
+                d.points().x(&x).y(shift(-0.5)).with(&c).draw();
                 let p = XyOptions {
                     type_: Some(PlotType::Points),
                     pch: vec![Some(4)],
                     ..XyOptions::default()
                 };
-                d.lines().x(&x).y(&shift(-1.0)).with(&p).draw();
+                d.lines().x(&x).y(shift(-1.0)).with(&p).draw();
             },
         },
         Case {
@@ -126,10 +126,10 @@ fn cases() -> Vec<Case> {
                     ..SegmentsOptions::default()
                 };
                 d.segments()
-                    .x0(&[1.0])
-                    .y0(&[1.0, 2.0, 3.0, 4.0])
-                    .x1(&[9.0])
-                    .y1(&[1.0, 2.0, 3.0, 4.0])
+                    .x0([1.0])
+                    .y0([1.0, 2.0, 3.0, 4.0])
+                    .x1([9.0])
+                    .y1([1.0, 2.0, 3.0, 4.0])
                     .with(&solid_dashed)
                     .draw();
                 let red = SegmentsOptions {
@@ -137,10 +137,10 @@ fn cases() -> Vec<Case> {
                     ..SegmentsOptions::default()
                 };
                 d.segments()
-                    .x0(&[1.0, 2.0])
-                    .y0(&[5.0])
-                    .x1(&[3.0, f64::NAN])
-                    .y1(&[6.0])
+                    .x0([1.0, 2.0])
+                    .y0([5.0])
+                    .x1([3.0, f64::NAN])
+                    .y1([6.0])
                     .with(&red)
                     .draw();
                 let bars = ArrowsOptions {
@@ -151,18 +151,13 @@ fn cases() -> Vec<Case> {
                     ..ArrowsOptions::default()
                 };
                 d.arrows()
-                    .x0(&[2.0, 5.0, 7.0])
-                    .y0(&[6.0])
-                    .x1(&[3.0, 8.0, 9.0])
-                    .y1(&[9.0])
+                    .x0([2.0, 5.0, 7.0])
+                    .y0([6.0])
+                    .x1([3.0, 8.0, 9.0])
+                    .y1([9.0])
                     .with(&bars)
                     .draw();
-                d.arrows()
-                    .x0(&[1.0])
-                    .y0(&[9.0])
-                    .x1(&[1.0])
-                    .y1(&[7.0])
-                    .draw();
+                d.arrows().x0([1.0]).y0([9.0]).x1([1.0]).y1([7.0]).draw();
             },
         },
         Case {
@@ -182,10 +177,10 @@ fn cases() -> Vec<Case> {
                     ..RectOptions::default()
                 };
                 d.rect()
-                    .xleft(&[1.0, 3.0, 5.0])
-                    .ybottom(&[1.0])
-                    .xright(&[2.0, 4.0, 6.0])
-                    .ytop(&[2.0, 3.0, 4.0])
+                    .xleft([1.0, 3.0, 5.0])
+                    .ybottom([1.0])
+                    .xright([2.0, 4.0, 6.0])
+                    .ytop([2.0, 3.0, 4.0])
                     .with(&three)
                     .draw();
                 let dashed = RectOptions {
@@ -193,10 +188,10 @@ fn cases() -> Vec<Case> {
                     ..RectOptions::default()
                 };
                 d.rect()
-                    .xleft(&[7.0])
-                    .ybottom(&[1.0])
-                    .xright(&[9.0])
-                    .ytop(&[3.0])
+                    .xleft([7.0])
+                    .ybottom([1.0])
+                    .xright([9.0])
+                    .ytop([3.0])
                     .with(&dashed)
                     .draw();
                 let na = f64::NAN;
@@ -211,8 +206,8 @@ fn cases() -> Vec<Case> {
                     ..PolygonOptions::default()
                 };
                 d.polygon()
-                    .x(&[1.0, 2.0, 3.0, na, 5.0, 6.0, 7.0, na, 8.0, 9.0, 9.0])
-                    .y(&[5.0, 8.0, 5.0, na, 5.0, 8.0, 5.0, na, 6.0, 6.0, 9.0])
+                    .x([1.0, 2.0, 3.0, na, 5.0, 6.0, 7.0, na, 8.0, 9.0, 9.0])
+                    .y([5.0, 8.0, 5.0, na, 5.0, 8.0, 5.0, na, 6.0, 6.0, 9.0])
                     .with(&polys)
                     .draw();
             },
@@ -233,21 +228,21 @@ fn cases() -> Vec<Case> {
                     ..TextOptions::default()
                 };
                 d.text()
-                    .x(&[2.0, 5.0, 8.0])
-                    .y(&[2.0, 5.0, 8.0])
+                    .x([2.0, 5.0, 8.0])
+                    .y([2.0, 5.0, 8.0])
                     .labels(["a", "bb"])
                     .with(&vec_text)
                     .draw();
                 let numbers: [&str; 0] = [];
-                d.text().x(&[2.0, 4.0]).y(&[9.0]).labels(numbers).draw();
+                d.text().x([2.0, 4.0]).y([9.0]).labels(numbers).draw();
                 let edge = TextOptions {
                     adj: Some(0.0),
                     xpd: Some(Xpd::Figure),
                     ..TextOptions::default()
                 };
                 d.text()
-                    .x(&[9.5])
-                    .y(&[1.0])
+                    .x([9.5])
+                    .y([1.0])
                     .labels(["edge"])
                     .with(&edge)
                     .draw();
@@ -257,14 +252,9 @@ fn cases() -> Vec<Case> {
                     srt: Some(45.0),
                     ..TextOptions::default()
                 };
-                d.text()
-                    .x(&[3.0])
-                    .y(&[3.0])
-                    .labels(["rot"])
-                    .with(&rot)
-                    .draw();
+                d.text().x([3.0]).y([3.0]).labels(["rot"]).with(&rot).draw();
                 d.par().adj(1.0).draw();
-                d.text().x(&[5.0]).y(&[7.0]).labels(["right"]).draw();
+                d.text().x([5.0]).y([7.0]).labels(["right"]).draw();
             },
         },
         Case {
@@ -318,7 +308,7 @@ fn cases() -> Vec<Case> {
                 d.par().font_axis(2).draw();
                 d.par().las(1).draw();
                 d.par().ann(false).draw();
-                d.plot().x(&[1.0, 3.0]).y(&[2.0, 5.0]).pch(19).draw();
+                d.plot().x([1.0, 3.0]).y([2.0, 5.0]).pch(19).draw();
             },
         },
         Case {
@@ -342,7 +332,7 @@ fn cases() -> Vec<Case> {
                 d.par().lty(LineType::DOTTED).draw();
                 d.par().lwd(2.0).draw();
                 d.hist()
-                    .x(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 7.0])
+                    .x([1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 7.0])
                     .breaks([0.0, 2.0, 3.0, 8.0])
                     .main("H")
                     .draw();
@@ -351,7 +341,7 @@ fn cases() -> Vec<Case> {
                     .x(&[vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![2.0, 4.0, 6.0]])
                     .main("X")
                     .draw();
-                d.pie().x(&[1.0, 2.0, 3.0]).labels(["a", "b"]).draw();
+                d.pie().x([1.0, 2.0, 3.0]).labels(["a", "b"]).draw();
             },
         },
         Case {
@@ -380,10 +370,10 @@ fn cases() -> Vec<Case> {
                     .xlog(true)
                     .draw();
                 d.arrows()
-                    .x0(&[0.0, 10.0, -5.0])
-                    .y0(&[2.0])
-                    .x1(&[50.0, 20.0, 30.0])
-                    .y1(&[5.0, 8.0, 9.0])
+                    .x0([0.0, 10.0, -5.0])
+                    .y0([2.0])
+                    .x1([50.0, 20.0, 30.0])
+                    .y1([5.0, 8.0, 9.0])
                     .draw();
             },
         },
@@ -398,8 +388,8 @@ fn cases() -> Vec<Case> {
                 // Runs of 1, 3, 1, 2 and 1 points: only the 3- and 2-point
                 // ones are drawn, in the first and second colours.
                 d.polygon()
-                    .x(&[1.0, na, 2.0, 3.0, 4.0, na, 6.0, na, 7.0, 8.0, na, 9.0])
-                    .y(&[1.0, na, 2.0, 4.0, 2.0, na, 6.0, na, 7.0, 9.0, na, 9.0])
+                    .x([1.0, na, 2.0, 3.0, 4.0, na, 6.0, na, 7.0, 8.0, na, 9.0])
+                    .y([1.0, na, 2.0, 4.0, 2.0, na, 6.0, na, 7.0, 9.0, na, 9.0])
                     .col(["red", "blue", "green"])
                     .border(["black", "purple"])
                     .draw();
@@ -416,14 +406,14 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 window(d);
                 d.text()
-                    .x(&[2, 4, 6, 8])
-                    .y(&[5])
+                    .x([2, 4, 6, 8])
+                    .y([5])
                     .labels(["a", "b", "c", "d"])
                     .pos([1, 2, 3, 4])
                     .draw();
                 d.text()
-                    .x(&[5])
-                    .y(&[8])
+                    .x([5])
+                    .y([8])
                     .labels(["e"])
                     .pos(3)
                     .offset(1.5)
@@ -431,15 +421,15 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.par().cex(0.8).draw();
                 d.text()
-                    .x(&[3, 7])
-                    .y(&[2])
+                    .x([3, 7])
+                    .y([2])
                     .labels(["f", "g"])
                     .pos([2, 4])
                     .srt(30)
                     .draw();
                 d.text()
-                    .x(&[5])
-                    .y(&[3])
+                    .x([5])
+                    .y([3])
                     .labels(&[Label::math("x^2")])
                     .pos(4)
                     .draw();
@@ -454,8 +444,8 @@ fn cases() -> Vec<Case> {
                 d.plot_new();
                 d.plot_window().xlim(1, 100).ylim(0, 10).xlog(true).draw();
                 d.text()
-                    .x(&[f64::NAN, 10.0, 0.0, 50.0, -1.0, 20.0])
-                    .y(&[2.0, 3.0, 4.0, 5.0, 6.0, f64::NAN])
+                    .x([f64::NAN, 10.0, 0.0, 50.0, -1.0, 20.0])
+                    .y([2.0, 3.0, 4.0, 5.0, 6.0, f64::NAN])
                     .labels(["a", "b", "c", "d", "e", "f"])
                     .col(["red", "blue", "green", "orange", "purple", "black"])
                     .draw();
@@ -477,10 +467,10 @@ fn cases() -> Vec<Case> {
                     .with(&asp)
                     .draw();
                 d.rect()
-                    .xleft(&[0.0])
-                    .ybottom(&[0.0])
-                    .xright(&[10.0])
-                    .ytop(&[2.0])
+                    .xleft([0.0])
+                    .ybottom([0.0])
+                    .xright([10.0])
+                    .ytop([2.0])
                     .draw();
                 // Ignored on a log axis, as in R.
                 let log = PlotWindowOptions { xlog: true, ..asp };
@@ -494,10 +484,10 @@ fn cases() -> Vec<Case> {
                     ..RectOptions::default()
                 };
                 d.rect()
-                    .xleft(&[1.0])
-                    .ybottom(&[0.0])
-                    .xright(&[100.0])
-                    .ytop(&[2.0])
+                    .xleft([1.0])
+                    .ybottom([0.0])
+                    .xright([100.0])
+                    .ytop([2.0])
                     .with(&red)
                     .draw();
             },
@@ -791,5 +781,5 @@ fn primitives_match_r() {
 fn text_pos_outside_1_to_4_panics_like_r() {
     let mut d = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
     window(&mut d);
-    d.text().x(&[5]).y(&[5]).labels(["a"]).pos(5).draw();
+    d.text().x([5]).y([5]).labels(["a"]).pos(5).draw();
 }

@@ -53,7 +53,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().mfrow(2, 4).draw();
                 for b in ["o", "l", "7", "c", "u", "]", "n", "["] {
-                    d.plot().x(&X).y(&Y).bty(b).draw();
+                    d.plot().x(X).y(Y).bty(b).draw();
                 }
             },
         },
@@ -62,7 +62,7 @@ fn cases() -> Vec<Case> {
             r: "par(bty = 'L'); plot(x, y, ann = FALSE)",
             ours: |d| {
                 d.par().bty("L").draw();
-                d.plot().x(&X).y(&Y).draw();
+                d.plot().x(X).y(Y).draw();
             },
         },
         Case {
@@ -71,7 +71,7 @@ fn cases() -> Vec<Case> {
                 box(bty = 'u', lwd = 2, col = 'red')\n\
                 box(which = 'figure', bty = 'l', col = 'blue')",
             ours: |d| {
-                d.plot().x(&X).y(&Y).axes(false).draw();
+                d.plot().x(X).y(Y).axes(false).draw();
                 d.box_().bty("u").lwd(2).col("red").draw();
                 d.box_().which(BoxWhich::Figure).bty("l").col("blue").draw();
             },
@@ -81,7 +81,7 @@ fn cases() -> Vec<Case> {
             r: "par(bty = '7'); boxplot(list(c(1, 2, 3, 4, 9), c(2, 3, 5, 6)))",
             ours: |d| {
                 d.par().bty("7").draw();
-                d.boxplot().x(&groups()).draw();
+                d.boxplot().x(groups()).draw();
             },
         },
         Case {
@@ -92,8 +92,8 @@ fn cases() -> Vec<Case> {
                 cex.lab = 1.5, col.lab = 'darkgreen', font.lab = 4)",
             ours: |d| {
                 d.plot()
-                    .x(&X)
-                    .y(&Y)
+                    .x(X)
+                    .y(Y)
                     .main("title")
                     .sub("sub")
                     .xlab("xlab")
@@ -118,7 +118,7 @@ fn cases() -> Vec<Case> {
                 font.main = 1, font.lab = 3)",
             ours: |d| {
                 d.par().cex_main(1.5).col_lab("orange").draw();
-                d.plot().x(&X).y(&Y).draw();
+                d.plot().x(X).y(Y).draw();
                 d.title()
                     .main("title")
                     .xlab("xlab")
@@ -139,7 +139,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
                 d.hist()
-                    .x(&H)
+                    .x(H)
                     .main("title")
                     .xlab("xlab")
                     .ylab("n")
@@ -170,7 +170,7 @@ fn cases() -> Vec<Case> {
                 cex.sub = 0.7, col.sub = 'blue', col.lab = 'darkgreen', cex.lab = 1.4)",
             ours: |d| {
                 d.boxplot()
-                    .x(&groups())
+                    .x(groups())
                     .main("title")
                     .sub("sub")
                     .xlab("xlab")
@@ -190,7 +190,7 @@ fn cases() -> Vec<Case> {
                 col.main = 'red', font.main = 4)",
             ours: |d| {
                 d.pie()
-                    .x(&[1, 2, 3])
+                    .x([1, 2, 3])
                     .labels(["a", "b", "c"])
                     .main("title")
                     .cex_main(0.8)
@@ -260,10 +260,10 @@ fn cases() -> Vec<Case> {
                 plot.window(c(0, 10), c(0, 10)); axis(3)",
             ours: |d| {
                 d.par().mfrow(2, 2).draw();
-                d.plot().x(&X).y(&Y).asp(1).draw();
+                d.plot().x(X).y(Y).asp(1).draw();
                 d.plot()
-                    .x(&X)
-                    .y(&Y)
+                    .x(X)
+                    .y(Y)
                     .xaxs("i")
                     .yaxs("i")
                     .lab([10, 3, 7])
@@ -271,13 +271,8 @@ fn cases() -> Vec<Case> {
                 let mut grid = Figure::new();
                 grid.abline().h([1, 2, 3, 4, 5]).col("grey").draw();
                 let mut mark = Figure::new();
-                mark.points().x(&[3]).y(&[3]).pch(19).col("red").draw();
-                d.plot()
-                    .x(&X)
-                    .y(&Y)
-                    .panel_first(grid)
-                    .panel_last(mark)
-                    .draw();
+                mark.points().x([3]).y([3]).pch(19).col("red").draw();
+                d.plot().x(X).y(Y).panel_first(grid).panel_last(mark).draw();
                 d.plot_new();
                 d.plot_window()
                     .xlim(0, 10)
@@ -326,7 +321,7 @@ fn cases() -> Vec<Case> {
             r: "pie(c(1, 2, 3), labels = c('a', 'b', 'c'), main = 'M', cex = 1.8, font = 3)",
             ours: |d| {
                 d.pie()
-                    .x(&[1, 2, 3])
+                    .x([1, 2, 3])
                     .labels(["a", "b", "c"])
                     .main("M")
                     .cex(1.8)
@@ -344,7 +339,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().mfrow(1, 3).draw();
                 d.hist()
-                    .x(&H)
+                    .x(H)
                     .labels(true)
                     .col(["red", "blue"])
                     .border(["black", "green"])
@@ -352,13 +347,13 @@ fn cases() -> Vec<Case> {
                     .ann(false)
                     .draw();
                 d.hist()
-                    .x(&H)
+                    .x(H)
                     .breaks([0, 3, 7])
                     .labels(true)
                     .ann(false)
                     .draw();
                 d.hist()
-                    .x(&H)
+                    .x(H)
                     .breaks([0, 4, 7])
                     .labels(["p", "q"])
                     .ann(false)
@@ -376,8 +371,8 @@ fn cases() -> Vec<Case> {
                 invisible(hist(h, plot = FALSE)); invisible(barplot(c(1, 2), plot = FALSE))",
             ours: |d| {
                 d.par().mfrow(2, 3).draw();
-                d.plot().x(&X).y(&Y).frame_plot(false).draw();
-                d.plot().x(&X).y(&Y).axes(false).frame_plot(true).draw();
+                d.plot().x(X).y(Y).frame_plot(false).draw();
+                d.plot().x(X).y(Y).axes(false).frame_plot(true).draw();
                 d.boxplot()
                     .x(&[vec![1, 2, 3, 9]])
                     .names(["a"])
@@ -390,7 +385,7 @@ fn cases() -> Vec<Case> {
                     .frame_plot(false)
                     .draw();
                 d.barplot().height([3, 5, 2]).ylim(0, 4).xpd(false).draw();
-                d.hist().x(&H).plot(false).draw();
+                d.hist().x(H).plot(false).draw();
                 d.barplot().height([1, 2]).plot(false).draw();
             },
         },
@@ -401,9 +396,9 @@ fn cases() -> Vec<Case> {
                 plot(c(3, 1, 4, 1, 5, 9, 2), type = 'b', xlab = 'i', ylab = '')",
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
-                d.plot().x(&Y).draw();
+                d.plot().x(Y).draw();
                 d.plot()
-                    .x(&[3, 1, 4, 1, 5, 9, 2])
+                    .x([3, 1, 4, 1, 5, 9, 2])
                     .type_("b")
                     .xlab("i")
                     .draw();
@@ -425,19 +420,19 @@ fn cases() -> Vec<Case> {
                 mtext('top')",
             ours: |d| {
                 d.plot()
-                    .x(&[0, 8])
-                    .y(&[0, 6])
+                    .x([0, 8])
+                    .y([0, 6])
                     .type_("n")
                     .xlab("")
                     .ylab("")
                     .draw();
-                d.points().x(&[1, 3, 2, 5]).draw();
-                d.lines().x(&[2, 4, 3, 5, 1]).draw();
-                d.text().x(&[5, 4, 3]).labels(["a", "b", "c"]).draw();
-                d.polygon().x(&[1.0, 2.0, 1.5]).col("grey").draw();
-                d.segments().x0(&[1, 2]).y0(&[5.0, 5.5]).x1(&[6]).draw();
-                d.arrows().x0(&[1]).y0(&[0.5]).x1(&[3]).draw();
-                d.arrows().x0(&[7]).y0(&[0.5]).y1(&[2]).draw();
+                d.points().x([1, 3, 2, 5]).draw();
+                d.lines().x([2, 4, 3, 5, 1]).draw();
+                d.text().x([5, 4, 3]).labels(["a", "b", "c"]).draw();
+                d.polygon().x([1.0, 2.0, 1.5]).col("grey").draw();
+                d.segments().x0([1, 2]).y0([5.0, 5.5]).x1([6]).draw();
+                d.arrows().x0([1]).y0([0.5]).x1([3]).draw();
+                d.arrows().x0([7]).y0([0.5]).y1([2]).draw();
                 d.mtext().text("top").draw();
             },
         },
@@ -450,8 +445,8 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
                 d.plot()
-                    .x(&X)
-                    .y(&Y)
+                    .x(X)
+                    .y(Y)
                     .las(1)
                     .cex_axis(0.8)
                     .col_axis("blue")
@@ -461,7 +456,7 @@ fn cases() -> Vec<Case> {
                     .xlab("X")
                     .ylab("Y")
                     .draw();
-                d.plot().x(&X).y(&Y).tcl(-0.2).las(2).draw();
+                d.plot().x(X).y(Y).tcl(-0.2).las(2).draw();
             },
         },
         Case {
@@ -474,7 +469,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().mfrow(1, 2).draw();
                 d.hist()
-                    .x(&H)
+                    .x(H)
                     .las(1)
                     .cex_axis(1.2)
                     .mgp([2.5, 0.8, 0.0])
@@ -940,8 +935,8 @@ fn plot_false_returns_the_result_without_drawing() {
         a.barplot().height([3, 5, 2]).plot(false).draw(),
         b.barplot().height([3, 5, 2]).draw()
     );
-    let h = a.hist().x(&H).plot(false).draw();
-    let drawn = b.hist().x(&H).draw();
+    let h = a.hist().x(H).plot(false).draw();
+    let drawn = b.hist().x(H).draw();
     assert_eq!((h.breaks, h.counts), (drawn.breaks, drawn.counts));
     let (paths, texts) = interpret(&String::from_utf8_lossy(&a.into_backend().finish()));
     assert!(paths.is_empty() && texts.is_empty());

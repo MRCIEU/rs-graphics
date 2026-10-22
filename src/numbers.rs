@@ -7,11 +7,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Numeric arguments that take integers as well as `f64`, as R's numbers
-//! do: data vectors ([`Numbers`]: `dev.plot().x(&[1, 2, 3]).y(&y)` or
+//! do: data vectors ([`Numbers`]: `dev.plot().x([1, 2, 3]).y(&y)` or
 //! `dev.plot().x(1..=10).y(&y)`, R's `plot(1:10, y)`), groups of them
 //! ([`Groups`], for `boxplot()`) and pairs ([`Pair`]: `(5, 20)`).
 //!
-//! `f64` data is borrowed as it is; other numbers are converted to `f64`
+//! Data may be passed by reference or by value (`&x` or `x`, `&[1, 2]` or
+//! `[1, 2]`), as may the recycled option vectors (`.h([1, 2])`,
+//! `.col(&cols)`). `f64` data is borrowed as it is, or taken over when a
+//! `Vec<f64>` is moved in; other numbers are converted to `f64`
 //! once (`i64`/`u64`/`usize` values beyond 2^53 lose precision, as in R,
 //! whose numbers are doubles).
 
@@ -43,10 +46,12 @@ macro_rules! num {
 }
 num!(f64, f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 
-/// A data vector (R's numeric vector `x`, `y`, ...): a reference to a
-/// slice, array or `Vec` of any [`Num`] type (`&x`, `&[1, 2, 3]`), or an
-/// integer range (`1..=10` is R's `1:10`). `f64` data is borrowed without
-/// copying.
+/// A data vector (R's numeric vector `x`, `y`, ...): a slice, array or
+/// `Vec` of any [`Num`] type, by reference or by value (`&x`, `x`,
+/// `&[1, 2, 3]`, `[1, 2, 3]`), or an integer range (`1..=10` is R's
+/// `1:10`). `f64` data passed by reference is borrowed, and a `Vec<f64>`
+/// passed by value is taken over, both without copying; other number
+/// types are converted once.
 pub trait Numbers<'a> {
     /// The values as `f64`s.
     fn into_numbers(self) -> Cow<'a, [f64]>;
@@ -83,6 +88,18 @@ impl<'a, const N: usize> Numbers<'a> for &'a [f64; N] {
     }
 }
 
+impl<'a> Numbers<'a> for Vec<f64> {
+    fn into_numbers(self) -> Cow<'a, [f64]> {
+        Cow::Owned(self)
+    }
+}
+
+impl<'a, const N: usize> Numbers<'a> for [f64; N] {
+    fn into_numbers(self) -> Cow<'a, [f64]> {
+        Cow::Owned(self.to_vec())
+    }
+}
+
 /// Converting impls for the number types other than `f64`.
 macro_rules! converted_numbers {
     ($($t:ty),*) => {
@@ -110,6 +127,18 @@ macro_rules! converted_numbers {
                     self.as_slice().into_numbers()
                 }
             }
+
+            impl<'a> Numbers<'a> for Vec<$t> {
+                fn into_numbers(self) -> Cow<'a, [f64]> {
+                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
+                }
+            }
+
+            impl<'a, const N: usize> Numbers<'a> for [$t; N] {
+                fn into_numbers(self) -> Cow<'a, [f64]> {
+                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
+                }
+            }
         )*
     };
 }
@@ -135,9 +164,10 @@ macro_rules! range_numbers {
 }
 range_numbers!(i32, i64, u32, u64, usize);
 
-/// Groups of data vectors (`boxplot()`'s R list of groups): a reference
-/// to a slice, array or `Vec` of `Vec`s of any [`Num`] type. `f64` groups
-/// are borrowed without copying.
+/// Groups of data vectors (`boxplot()`'s R list of groups): a slice,
+/// array or `Vec` of `Vec`s of any [`Num`] type, by reference or by value.
+/// `f64` groups are borrowed (by reference) or taken over (a `Vec` by
+/// value) without copying.
 pub trait Groups<'a> {
     /// The groups as `f64` vectors.
     fn into_groups(self) -> Cow<'a, [Vec<f64>]>;
@@ -158,6 +188,18 @@ impl<'a> Groups<'a> for &'a Vec<Vec<f64>> {
 impl<'a, const N: usize> Groups<'a> for &'a [Vec<f64>; N] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
         Cow::Borrowed(self)
+    }
+}
+
+impl<'a> Groups<'a> for Vec<Vec<f64>> {
+    fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
+        Cow::Owned(self)
+    }
+}
+
+impl<'a, const N: usize> Groups<'a> for [Vec<f64>; N] {
+    fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
+        Cow::Owned(self.into())
     }
 }
 
@@ -188,6 +230,18 @@ macro_rules! converted_groups {
                     Cow::Owned(convert_groups(self))
                 }
             }
+
+            impl<'a> Groups<'a> for Vec<Vec<$t>> {
+                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
+                    Cow::Owned(convert_groups(&self))
+                }
+            }
+
+            impl<'a, const N: usize> Groups<'a> for [Vec<$t>; N] {
+                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
+                    Cow::Owned(convert_groups(&self))
+                }
+            }
         )*
     };
 }
@@ -214,6 +268,8 @@ macro_rules! pair {
 pair!((f64, f64), (f64, i32), (i32, f64), (i32, i32));
 
 #[cfg(test)]
+// The tests use the reference forms on purpose; clippy would drop the `&`.
+#[allow(clippy::needless_borrows_for_generic_args)]
 mod tests {
     use super::*;
 
@@ -245,5 +301,26 @@ mod tests {
         );
         assert_eq!((5, 20).into_pair(), (5.0, 20.0));
         assert_eq!((0.5, 2).into_pair(), (0.5, 2.0));
+    }
+
+    #[test]
+    fn data_by_value_equals_by_reference_without_copying() {
+        let x = vec![1.5, 2.5];
+        assert_eq!(n(&x), n(x.clone()));
+        assert_eq!(n(&[1.0, 2.0]), n([1.0, 2.0]));
+        assert_eq!(n(&[1, 2]), n([1, 2]));
+        assert_eq!(n(&vec![3u8]), n(vec![3u8]));
+        // A `Vec<f64>` passed by value is taken over, not copied.
+        let ptr = x.as_ptr();
+        match n(x) {
+            Cow::Owned(v) => assert_eq!(v.as_ptr(), ptr),
+            Cow::Borrowed(_) => panic!("expected the Vec itself"),
+        }
+        let g = vec![vec![1.0], vec![2.0, 3.0]];
+        assert_eq!(g.as_slice().into_groups(), g.clone().into_groups());
+        assert_eq!(
+            [vec![1, 2], vec![3]].into_groups(),
+            (&[vec![1, 2], vec![3]]).into_groups()
+        );
     }
 }

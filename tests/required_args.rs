@@ -34,7 +34,7 @@ type Call<G> = fn(&mut G);
 /// Each call with one required argument left out, and that argument.
 fn calls<G: Graphics>() -> Vec<(&'static str, Call<G>)> {
     vec![
-        ("x", |g| g.plot().y(&[1.0, 2.0]).draw()),
+        ("x", |g| g.plot().y([1.0, 2.0]).draw()),
         ("x", |g| {
             g.hist().draw();
         }),
@@ -47,14 +47,14 @@ fn calls<G: Graphics>() -> Vec<(&'static str, Call<G>)> {
         ("x", |g| g.pie().draw()),
         ("xlim", |g| g.plot_window().ylim(0, 1).draw()),
         ("ylim", |g| g.plot_window().xlim(0, 1).draw()),
-        ("x", |g| g.points().y(&[1.0]).draw()),
+        ("x", |g| g.points().y([1.0]).draw()),
         ("x", |g| g.lines().draw()),
         ("x", |g| g.polygon().draw()),
-        ("x0", |g| g.segments().y0(&[1.0]).draw()),
-        ("y0", |g| g.segments().x0(&[1.0]).draw()),
-        ("x0", |g| g.arrows().y0(&[1.0]).draw()),
+        ("x0", |g| g.segments().y0([1.0]).draw()),
+        ("y0", |g| g.segments().x0([1.0]).draw()),
+        ("x0", |g| g.arrows().y0([1.0]).draw()),
         ("ytop", |g| {
-            g.rect().xleft(&[0.0]).ybottom(&[0.0]).xright(&[1.0]).draw()
+            g.rect().xleft([0.0]).ybottom([0.0]).xright([1.0]).draw()
         }),
         ("x", |g| g.text().labels("a").draw()),
         ("side", |g| {
@@ -95,10 +95,10 @@ fn arguments_with_r_defaults_can_be_left_out() {
     // `y` (one-vector form), `x1`/`y1`, `labels` and `mtext`'s `side`.
     let mut dev = device();
     dev.plot_window().xlim(0, 5).ylim(0, 5).draw();
-    dev.points().x(&[1.0, 2.0]).draw();
-    dev.segments().x0(&[1.0]).y0(&[1.0]).draw();
-    dev.arrows().x0(&[1.0]).y0(&[1.0]).y1(&[3.0]).draw();
-    dev.text().x(&[1.0, 2.0]).y(&[1.0, 2.0]).draw();
+    dev.points().x([1.0, 2.0]).draw();
+    dev.segments().x0([1.0]).y0([1.0]).draw();
+    dev.arrows().x0([1.0]).y0([1.0]).y1([3.0]).draw();
+    dev.text().x([1.0, 2.0]).y([1.0, 2.0]).draw();
     dev.mtext().text("top").draw();
     dev.box_().draw();
     dev.abline().h(&[1.0][..]).draw();

@@ -92,7 +92,7 @@ fn draw_ours(c: &Case) -> String {
         axes: false,
         ..PlotOptions::default()
     };
-    dev.plot().x(&X).y(&Y).with(&opts).draw();
+    dev.plot().x(X).y(Y).with(&opts).draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }
 

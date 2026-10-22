@@ -347,8 +347,8 @@ fn legend_return_value_on_log_axes_matches_r() {
         ..PlotOptions::default()
     };
     dev.plot()
-        .x(&[1.0, 1000.0])
-        .y(&[2.0, 500.0])
+        .x([1.0, 1000.0])
+        .y([2.0, 500.0])
         .with(&opts)
         .draw();
     let layout = dev

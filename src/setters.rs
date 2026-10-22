@@ -55,6 +55,12 @@ impl<T, U: Into<T> + Clone> Values<T> for &[U] {
     }
 }
 
+impl<T, U: Into<T> + Clone, const N: usize> Values<T> for &[U; N] {
+    fn into_values(self) -> Vec<T> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
 impl<T, U: Into<T> + Clone> Values<T> for &Vec<U> {
     fn into_values(self) -> Vec<T> {
         self.iter().cloned().map(Into::into).collect()
@@ -134,6 +140,11 @@ macro_rules! na_values {
                 self.iter().cloned().map(|v| Some($conv(v))).collect()
             }
         }
+        impl<const N: usize> NaValues<$t> for &[$e; N] {
+            fn into_na_values(self) -> Vec<Option<$t>> {
+                self.iter().cloned().map(|v| Some($conv(v))).collect()
+            }
+        }
         impl NaValues<$t> for &Vec<$e> {
             fn into_na_values(self) -> Vec<Option<$t>> {
                 self.iter().cloned().map(|v| Some($conv(v))).collect()
@@ -152,6 +163,11 @@ macro_rules! na_values {
             }
         }
         impl NaValues<$t> for &[Option<$e>] {
+            fn into_na_values(self) -> Vec<Option<$t>> {
+                self.iter().cloned().map(|v| v.map($conv)).collect()
+            }
+        }
+        impl<const N: usize> NaValues<$t> for &[Option<$e>; N] {
             fn into_na_values(self) -> Vec<Option<$t>> {
                 self.iter().cloned().map(|v| v.map($conv)).collect()
             }
@@ -377,6 +393,21 @@ mod tests {
         assert_eq!(values::<f64>(&[1.0, 2.0][..]), vec![1.0, 2.0]);
         assert_eq!(values::<i32>('.'), vec![46]);
         assert_eq!(values::<LineType>([LineType::SOLID, 2.into()]).len(), 2);
+    }
+
+    #[test]
+    #[allow(clippy::needless_borrows_for_generic_args)] // the `&` forms on purpose
+    fn option_vectors_take_array_references() {
+        use crate::device::{AblineOptions, XyOptions};
+        let ab = AblineOptions::default().h(&[1, 2]).col(&["red", "blue"]);
+        assert_eq!(ab.h, vec![1.0, 2.0]);
+        assert_eq!(
+            ab.col,
+            vec![ColorSpec::from("red"), ColorSpec::from("blue")]
+        );
+        let xy = XyOptions::default().pch(&[1, 2]).lwd(&[Some(1.0), None]);
+        assert_eq!(xy.pch, vec![Some(1), Some(2)]);
+        assert_eq!(xy.lwd, vec![Some(1.0), None]);
     }
 
     #[test]

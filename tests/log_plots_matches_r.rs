@@ -76,10 +76,10 @@ fn cases() -> Vec<Case> {
                     .draw();
                 let nan = f64::NAN;
                 d.segments()
-                    .x0(&[1.0, 0.0, 10.0, -5.0, 2.0, nan, 3.0])
-                    .y0(&[1.0, 10.0, 50.0, 5.0, 3.0, 5.0, 2.0])
-                    .x1(&[10.0, 50.0, 100.0, 20.0, 0.0, 9.0, 80.0])
-                    .y1(&[5.0, 20.0, 0.5, 30.0, 30.0, 9.0, 0.0])
+                    .x0([1.0, 0.0, 10.0, -5.0, 2.0, nan, 3.0])
+                    .y0([1.0, 10.0, 50.0, 5.0, 3.0, 5.0, 2.0])
+                    .x1([10.0, 50.0, 100.0, 20.0, 0.0, 9.0, 80.0])
+                    .y1([5.0, 20.0, 0.5, 30.0, 30.0, 9.0, 0.0])
                     .with(&SegmentsOptions {
                         col: vec![red()],
                         lty: vec![Some(solid())],
@@ -103,7 +103,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
-                d.plot().x(&[1.0, 1000.0]).y(&[1.0, 1e4]).with(&opts).draw();
+                d.plot().x([1.0, 1000.0]).y([1.0, 1e4]).with(&opts).draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
                     .with(&AblineOptions {
@@ -178,11 +178,7 @@ fn cases() -> Vec<Case> {
                     ylab: Some("y".into()),
                     ..PlotOptions::default()
                 };
-                d.plot()
-                    .x(&[1.0, 1000.0])
-                    .y(&[0.0, 10.0])
-                    .with(&opts)
-                    .draw();
+                d.plot().x([1.0, 1000.0]).y([0.0, 10.0]).with(&opts).draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
                     .with(&AblineOptions {
@@ -223,7 +219,7 @@ fn cases() -> Vec<Case> {
             r: "hist(hx, log = 'x', ylab = 'n')",
             draw: |d| {
                 let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                d.hist().x(&hist_data()).with(&o).draw();
+                d.hist().x(hist_data()).with(&o).draw();
             },
         },
         Case {
@@ -231,7 +227,7 @@ fn cases() -> Vec<Case> {
             r: "suppressWarnings(hist(hx, log = 'y', ylab = 'n'))",
             draw: |d| {
                 let o = HistOptions { ylog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                d.hist().x(&hist_data()).with(&o).draw();
+                d.hist().x(hist_data()).with(&o).draw();
             },
         },
         Case {
@@ -240,7 +236,7 @@ fn cases() -> Vec<Case> {
                 hist(hx * 1.05, add = TRUE, col = 'pink', border = 'red')",
             draw: |d| {
                 let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
-                d.hist().x(&hist_data()).with(&o).draw();
+                d.hist().x(hist_data()).with(&o).draw();
                 let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
                 let o = HistOptions {
                     add: true,
@@ -361,11 +357,11 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.par().lab([10, 3, 7]).draw();
                 let o = PlotOptions { xlab: Some("x".into()), ylab: Some("y".into()), ..Default::default() };
-                d.plot().x(&[0.0, 1.0]).y(&[0.0, 1.0]).with(&o).draw();
+                d.plot().x([0.0, 1.0]).y([0.0, 1.0]).with(&o).draw();
                 d.par().new(true).draw();
                 d.par().lab([2, 12, 7]).draw();
                 let o = PlotOptions { xlog: true, ylog: true, axes: false, ..Default::default() };
-                d.plot().x(&[1.0, 1e6]).y(&[1.0, 50.0]).with(&o).draw();
+                d.plot().x([1.0, 1e6]).y([1.0, 50.0]).with(&o).draw();
                 let fg = ColorSpec::Index(1);
                 d.axis()
                     .side(3)

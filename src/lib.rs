@@ -41,8 +41,8 @@
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
 //! [`prelude`] imports it all, including the trait. As in R, numbers may
 //! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (data
-//! vectors are any [`Numbers`](numbers::Numbers); `f64` data is borrowed
-//! without copying). R's `NA` in a style vector is `None`:
+//! vectors are any [`Numbers`](numbers::Numbers), by reference or by
+//! value; `f64` data isn't copied either way). R's `NA` in a style vector is `None`:
 //! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`.
 //!
 //! # Devices and files

@@ -133,8 +133,8 @@ fn latin1_text_matches_r() {
         for (j, adj) in [0.0, 0.5, 1.0].iter().enumerate() {
             let y = (3 * i + j + 1) as f64;
             dev.text()
-                .x(&[5.0])
-                .y(&[y])
+                .x([5.0])
+                .y([y])
                 .labels([label])
                 .with(&TextOptions {
                     adj: Some(*adj),

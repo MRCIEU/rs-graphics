@@ -51,7 +51,7 @@ fn pl(dev: &mut Dev, y: &[f64], main: Option<&str>, axes: bool) {
         ylab: axes.then(|| "y".into()),
         ..PlotOptions::default()
     };
-    dev.plot().x(&xs()).y(y).with(&opts).draw();
+    dev.plot().x(xs()).y(y).with(&opts).draw();
 }
 
 fn squares() -> Vec<f64> {
@@ -90,7 +90,7 @@ fn cases() -> Vec<Case> {
                     col: vec![ColorSpec::Color(Color::parse("red").unwrap())],
                     ..PlotOptions::default()
                 };
-                d.plot().x(&xs()).y(&roots()).with(&opts).draw();
+                d.plot().x(xs()).y(roots()).with(&opts).draw();
                 d.axis().side(4).draw();
                 let o = MtextOptions {
                     line: vec![3.0],
@@ -145,8 +145,8 @@ fn cases() -> Vec<Case> {
                 d.par().new(true).draw();
                 let black = ColorSpec::Index(1);
                 d.points()
-                    .x(&[5.0])
-                    .y(&[50.0])
+                    .x([5.0])
+                    .y([50.0])
                     .with(&XyOptions {
                         pch: vec![Some(19)],
                         col: vec![black],

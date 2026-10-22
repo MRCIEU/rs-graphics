@@ -333,23 +333,10 @@ pub enum BarHeights {
 }
 
 impl<'a, N: Numbers<'a>> From<N> for BarHeights {
-    /// A vector of any numbers, by reference, or a range (see [`Numbers`]).
+    /// A vector of any numbers, by reference or by value, or a range (see
+    /// [`Numbers`]).
     fn from(v: N) -> Self {
         BarHeights::Vector(v.into_numbers().into_owned())
-    }
-}
-
-impl<T: Num> From<Vec<T>> for BarHeights {
-    /// A vector of any numbers, by value.
-    fn from(v: Vec<T>) -> Self {
-        BarHeights::Vector(v.into_iter().map(|h| h.to_f64()).collect())
-    }
-}
-
-impl<T: Num, const N: usize> From<[T; N]> for BarHeights {
-    /// A vector of any numbers, by value (`[3, 5, 2]`).
-    fn from(v: [T; N]) -> Self {
-        BarHeights::Vector(v.into_iter().map(|h| h.to_f64()).collect())
     }
 }
 

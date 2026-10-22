@@ -61,13 +61,13 @@ fn keys() -> LegendOptions {
 fn fit_figure(pos: LegendPos, opts: &LegendOptions) -> Figure {
     let mut fig = Figure::new();
     fig.plot()
-        .x(&DOSE)
-        .y(&RESPONSE)
+        .x(DOSE)
+        .y(RESPONSE)
         .xlab("x")
         .ylab("y")
         .main("Fit")
         .draw();
-    fig.lines().x(&DOSE).y(&FITTED).col("red").draw();
+    fig.lines().x(DOSE).y(FITTED).col("red").draw();
     fig.legend().pos(pos).labels(LABELS).with(opts).draw();
     fig
 }
@@ -112,13 +112,13 @@ par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
                 let mut b = Figure::new();
                 b.par().las(1).draw();
                 b.plot()
-                    .x(&DOSE)
-                    .y(&RESPONSE)
+                    .x(DOSE)
+                    .y(RESPONSE)
                     .xlab("x")
                     .ylab("y")
                     .main("Fit")
                     .draw();
-                b.lines().x(&DOSE).y(&FITTED).col("red").draw();
+                b.lines().x(DOSE).y(FITTED).col("red").draw();
                 b.legend()
                     .pos(LegendPos::Xy(1.5, 6.8))
                     .labels(LABELS)
@@ -127,8 +127,8 @@ par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
                 out.extend(layouts(d.add_figure_at(2, 1, &b), d.usr()));
                 d.par().mfg(2, 2).draw();
                 d.plot()
-                    .x(&DOSE)
-                    .y(&FITTED)
+                    .x(DOSE)
+                    .y(FITTED)
                     .type_(PlotType::Lines)
                     .xlab("dose")
                     .ylab("fitted")
@@ -153,16 +153,16 @@ key("layout_key.0", "center")"#,
                 ]));
                 let mut a = Figure::new();
                 a.plot()
-                    .x(&DOSE)
-                    .y(&RESPONSE)
+                    .x(DOSE)
+                    .y(RESPONSE)
                     .xlab("x")
                     .ylab("y")
                     .main("A")
                     .draw();
                 let mut b = Figure::new();
                 b.plot()
-                    .x(&DOSE)
-                    .y(&FITTED)
+                    .x(DOSE)
+                    .y(FITTED)
                     .type_(PlotType::Lines)
                     .xlab("x")
                     .ylab("y")

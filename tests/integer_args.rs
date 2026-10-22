@@ -19,8 +19,8 @@ use rs_graphics::prelude::*;
 fn with_integers<G: Graphics>(g: &mut G) {
     g.par().mar([5, 4, 4, 2]).mgp([3, 1, 0]).draw();
     g.plot()
-        .x(&[1, 2, 3, 4])
-        .y(&vec![2u32, 4, 3, 5])
+        .x([1, 2, 3, 4])
+        .y(vec![2u32, 4, 3, 5])
         .pch(21)
         .cex(2)
         .lwd(2)
@@ -29,33 +29,27 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .ylim(0, 6)
         .xaxp([0, 5, 5])
         .draw();
-    g.lines().x(1..=4).y(&[1i64, 2, 2, 3]).lwd(3).draw();
-    g.points().x(&[2, 3]).y(&[5, 1]).cex([1, 2]).draw();
-    g.segments()
-        .x0(&[0])
-        .y0(&[0])
-        .x1(&[5])
-        .y1(&[6])
-        .lwd(2)
-        .draw();
+    g.lines().x(1..=4).y([1i64, 2, 2, 3]).lwd(3).draw();
+    g.points().x([2, 3]).y([5, 1]).cex([1, 2]).draw();
+    g.segments().x0([0]).y0([0]).x1([5]).y1([6]).lwd(2).draw();
     g.arrows()
-        .x0(&[1])
-        .y0(&[1])
-        .x1(&[2])
-        .y1(&[2])
+        .x0([1])
+        .y0([1])
+        .x1([2])
+        .y1([2])
         .length(0.1)
         .draw();
     g.rect()
-        .xleft(&[1])
-        .ybottom(&[1])
-        .xright(&[2])
-        .ytop(&[2])
+        .xleft([1])
+        .ybottom([1])
+        .xright([2])
+        .ytop([2])
         .lwd(2)
         .draw();
-    g.polygon().x(&[3, 4, 4]).y(&[3, 3, 4]).col("grey").draw();
+    g.polygon().x([3, 4, 4]).y([3, 3, 4]).col("grey").draw();
     g.text()
-        .x(&[1, 2])
-        .y(&[5, 5])
+        .x([1, 2])
+        .y([5, 5])
         .labels(["a", "b"])
         .cex(2)
         .draw();
@@ -80,7 +74,7 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .with(&keys)
         .draw();
     g.plot_window().xlim(0, 10).ylim(0, 5).draw();
-    g.hist().x(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).draw();
+    g.hist().x([1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).draw();
     g.barplot()
         .height([3, 5, 2])
         .width([1, 2, 1])
@@ -91,7 +85,7 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .x(&[vec![1, 2, 3, 9], vec![4, 5, 6]])
         .at([1, 3])
         .draw();
-    g.pie().x(&[1, 2, 3]).radius(1).draw();
+    g.pie().x([1, 2, 3]).radius(1).draw();
 }
 
 /// The same with `f64`s.
@@ -101,8 +95,8 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .mgp([3.0, 1.0, 0.0])
         .draw();
     g.plot()
-        .x(&[1.0, 2.0, 3.0, 4.0])
-        .y(&[2.0, 4.0, 3.0, 5.0])
+        .x([1.0, 2.0, 3.0, 4.0])
+        .y([2.0, 4.0, 3.0, 5.0])
         .pch(21)
         .cex(2.0)
         .lwd(2.0)
@@ -112,44 +106,44 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .xaxp([0.0, 5.0, 5.0])
         .draw();
     g.lines()
-        .x(&[1.0, 2.0, 3.0, 4.0])
-        .y(&[1.0, 2.0, 2.0, 3.0])
+        .x([1.0, 2.0, 3.0, 4.0])
+        .y([1.0, 2.0, 2.0, 3.0])
         .lwd(3.0)
         .draw();
     g.points()
-        .x(&[2.0, 3.0])
-        .y(&[5.0, 1.0])
+        .x([2.0, 3.0])
+        .y([5.0, 1.0])
         .cex([1.0, 2.0])
         .draw();
     g.segments()
-        .x0(&[0.0])
-        .y0(&[0.0])
-        .x1(&[5.0])
-        .y1(&[6.0])
+        .x0([0.0])
+        .y0([0.0])
+        .x1([5.0])
+        .y1([6.0])
         .lwd(2.0)
         .draw();
     g.arrows()
-        .x0(&[1.0])
-        .y0(&[1.0])
-        .x1(&[2.0])
-        .y1(&[2.0])
+        .x0([1.0])
+        .y0([1.0])
+        .x1([2.0])
+        .y1([2.0])
         .length(0.1)
         .draw();
     g.rect()
-        .xleft(&[1.0])
-        .ybottom(&[1.0])
-        .xright(&[2.0])
-        .ytop(&[2.0])
+        .xleft([1.0])
+        .ybottom([1.0])
+        .xright([2.0])
+        .ytop([2.0])
         .lwd(2.0)
         .draw();
     g.polygon()
-        .x(&[3.0, 4.0, 4.0])
-        .y(&[3.0, 3.0, 4.0])
+        .x([3.0, 4.0, 4.0])
+        .y([3.0, 3.0, 4.0])
         .col("grey")
         .draw();
     g.text()
-        .x(&[1.0, 2.0])
-        .y(&[5.0, 5.0])
+        .x([1.0, 2.0])
+        .y([5.0, 5.0])
         .labels(["a", "b"])
         .cex(2.0)
         .draw();
@@ -181,7 +175,7 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .draw();
     g.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
     g.hist()
-        .x(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0])
+        .x([1.0, 2.0, 2.0, 3.0, 3.0, 3.0])
         .breaks([0.0, 1.0, 2.0, 3.0])
         .draw();
     g.barplot()
@@ -196,7 +190,7 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .x(&[vec![1.0, 2.0, 3.0, 9.0], vec![4.0, 5.0, 6.0]])
         .at([1.0, 3.0])
         .draw();
-    g.pie().x(&[1.0, 2.0, 3.0]).radius(1.0).draw();
+    g.pie().x([1.0, 2.0, 3.0]).radius(1.0).draw();
 }
 
 fn device(w: f64, h: f64) -> Device<PdfBackend> {
@@ -239,14 +233,14 @@ fn layout_fig_and_backends_take_integers() {
             layout.widths(&[LayoutSize::Relative(2.0), LayoutSize::Relative(1.0)])
         };
         dev.layout(layout);
-        dev.plot().x(&[1.0, 2.0]).y(&[1.0, 2.0]).draw();
+        dev.plot().x([1.0, 2.0]).y([1.0, 2.0]).draw();
         if ints {
             dev.par().fig([0, 1, 0, 1]).draw();
         } else {
             dev.par().fig([0.0, 1.0, 0.0, 1.0]).draw();
         }
         dev.par().new(true).draw();
-        dev.plot().x(&[1.0, 2.0]).y(&[2.0, 1.0]).draw();
+        dev.plot().x([1.0, 2.0]).y([2.0, 1.0]).draw();
         dev.finish()
     };
     assert!(render(true) == render(false));
@@ -261,11 +255,11 @@ fn layout_fig_and_backends_take_integers() {
 fn boxplot_stats_takes_integers() {
     let s = |b: BoxStats| format!("{b:?}");
     assert_eq!(
-        s(boxplot_stats(&[1, 2, 3, 4, 100], 1.5)),
-        s(boxplot_stats(&[1.0, 2.0, 3.0, 4.0, 100.0], 1.5))
+        s(boxplot_stats([1, 2, 3, 4, 100], 1.5)),
+        s(boxplot_stats([1.0, 2.0, 3.0, 4.0, 100.0], 1.5))
     );
     assert_eq!(
-        s(boxplot_stats(&[1, 2, 3, 4, 100], 1)),
-        s(boxplot_stats(&[1.0, 2.0, 3.0, 4.0, 100.0], 1.0))
+        s(boxplot_stats([1, 2, 3, 4, 100], 1)),
+        s(boxplot_stats([1.0, 2.0, 3.0, 4.0, 100.0], 1.0))
     );
 }

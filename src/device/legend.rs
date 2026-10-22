@@ -291,6 +291,11 @@ macro_rules! legend_pch_impls {
                     string_pch(&self.iter().map(Some).collect::<Vec<_>>())
                 }
             }
+            impl<const N: usize> LegendPch for &[$s; N] {
+                fn into_pch(self) -> Vec<Option<i32>> {
+                    string_pch(&self.iter().map(Some).collect::<Vec<_>>())
+                }
+            }
             impl LegendPch for Vec<$s> {
                 fn into_pch(self) -> Vec<Option<i32>> {
                     string_pch(&self.into_iter().map(Some).collect::<Vec<_>>())
@@ -325,6 +330,11 @@ macro_rules! legend_pch_impls {
             }
         }
         impl LegendPch for &[$e] {
+            fn into_pch(self) -> Vec<Option<i32>> {
+                self.iter().copied().map($one).collect()
+            }
+        }
+        impl<const N: usize> LegendPch for &[$e; N] {
             fn into_pch(self) -> Vec<Option<i32>> {
                 self.iter().copied().map($one).collect()
             }

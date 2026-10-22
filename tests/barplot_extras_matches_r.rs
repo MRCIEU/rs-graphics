@@ -128,8 +128,8 @@ fn cases() -> Vec<Case> {
                 names.arg = c('x', 'y', 'z'))",
             ours: |d| {
                 d.plot()
-                    .x(&[0.0, 6.0])
-                    .y(&[0.0, 12.0])
+                    .x([0.0, 6.0])
+                    .y([0.0, 12.0])
                     .type_(PlotType::None)
                     .draw();
                 d.barplot()
@@ -149,8 +149,8 @@ fn cases() -> Vec<Case> {
                 xlab = 'x label')",
             ours: |d| {
                 d.plot()
-                    .x(&[0.0, 6.0])
-                    .y(&[0.0, 12.0])
+                    .x([0.0, 6.0])
+                    .y([0.0, 12.0])
                     .type_(PlotType::None)
                     .draw();
                 d.barplot()

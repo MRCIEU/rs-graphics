@@ -47,8 +47,8 @@ fn cases() -> Vec<Case> {
                 d.plot_new();
                 let v = [0.0, 0.5, 1.0];
                 d.points()
-                    .x(&v)
-                    .y(&v)
+                    .x(v)
+                    .y(v)
                     .with(&XyOptions {
                         pch: vec![Some(1)],
                         col: vec![ColorSpec::Index(1)],
@@ -87,8 +87,8 @@ fn cases() -> Vec<Case> {
                 d.par().yaxs(AxisStyle::Exact).draw();
                 d.plot_new();
                 d.points()
-                    .x(&[0.25])
-                    .y(&[0.75])
+                    .x([0.25])
+                    .y([0.75])
                     .with(&XyOptions {
                         pch: vec![Some(1)],
                         col: vec![ColorSpec::Index(1)],

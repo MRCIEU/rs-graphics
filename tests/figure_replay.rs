@@ -25,47 +25,47 @@ fn scatter<G: Graphics>(g: &mut G) {
     let x = [1.0, 2.0, 3.0, 4.0, 5.0];
     let y = [2.0, 4.5, 3.0, 6.0, 5.5];
     g.plot()
-        .x(&x)
-        .y(&y)
+        .x(x)
+        .y(y)
         .pch(19)
         .col(["red", "blue"])
         .main(Label::math("y == alpha^2"))
         .xlab("x")
         .draw();
-    g.lines().x(&x).y(&y).lty(LineType::DASHED).draw();
-    g.points().x(&[2.5]).y(&[5.0]).pch(4).cex(2.0).draw();
+    g.lines().x(x).y(y).lty(LineType::DASHED).draw();
+    g.points().x([2.5]).y([5.0]).pch(4).cex(2.0).draw();
     g.segments()
-        .x0(&[1.0])
-        .y0(&[2.0])
-        .x1(&[5.0])
-        .y1(&[6.0])
+        .x0([1.0])
+        .y0([2.0])
+        .x1([5.0])
+        .y1([6.0])
         .col("grey")
         .draw();
     g.arrows()
-        .x0(&[1.5, 4.5])
-        .y0(&[5.5, 5.5])
-        .x1(&[1.5, 4.5])
-        .y1(&[3.0, 3.0])
+        .x0([1.5, 4.5])
+        .y0([5.5, 5.5])
+        .x1([1.5, 4.5])
+        .y1([3.0, 3.0])
         .angle(90.0)
         .code(3)
         .length(0.05)
         .draw();
     g.rect()
-        .xleft(&[3.2])
-        .ybottom(&[2.2])
-        .xright(&[3.8])
-        .ytop(&[2.8])
+        .xleft([3.2])
+        .ybottom([2.2])
+        .xright([3.8])
+        .ytop([2.8])
         .col("lightblue")
         .draw();
     g.polygon()
-        .x(&[1.2, 1.8, 1.5, f64::NAN, 4.2, 4.8, 4.5])
-        .y(&[3.0, 3.0, 3.6, f64::NAN, 2.0, 2.0, 2.6])
+        .x([1.2, 1.8, 1.5, f64::NAN, 4.2, 4.8, 4.5])
+        .y([3.0, 3.0, 3.6, f64::NAN, 2.0, 2.0, 2.6])
         .col(["pink", "yellow"])
         .draw();
-    g.text().x(&[2.0, 4.0]).y(&[2.5, 4.5]).draw();
+    g.text().x([2.0, 4.0]).y([2.5, 4.5]).draw();
     g.text()
-        .x(&[3.0])
-        .y(&[5.8])
+        .x([3.0])
+        .y([5.8])
         .labels(&[Label::math("beta[i]")])
         .cex(1.3)
         .draw();
@@ -90,9 +90,9 @@ fn scatter<G: Graphics>(g: &mut G) {
 /// `hist()`, and a second histogram added to it.
 fn histograms<G: Graphics>(g: &mut G) {
     let x = [1.2, 2.5, 2.7, 3.1, 3.3, 3.9, 4.4, 5.0, 5.2, 7.5];
-    g.hist().x(&x).col("lightgrey").draw();
+    g.hist().x(x).col("lightgrey").draw();
     g.hist()
-        .x(&[2.1, 3.2, 3.4, 4.1])
+        .x([2.1, 3.2, 3.4, 4.1])
         .add(true)
         .col("steelblue")
         .draw();
@@ -131,7 +131,7 @@ fn boxes<G: Graphics>(g: &mut G) {
 /// `pie()`.
 fn pie<G: Graphics>(g: &mut G) {
     g.pie()
-        .x(&[1.0, 2.0, 3.0])
+        .x([1.0, 2.0, 3.0])
         .labels(["one", "two", "three"])
         .main("Pie")
         .draw();
@@ -148,15 +148,15 @@ fn layered<G: Graphics>(g: &mut G) {
         .xlog(true)
         .draw();
     g.points()
-        .x(&[1.0, 10.0, 100.0, 1000.0])
-        .y(&[0.2, 0.4, 0.6, 0.8])
+        .x([1.0, 10.0, 100.0, 1000.0])
+        .y([0.2, 0.4, 0.6, 0.8])
         .draw();
     g.axis().side(1).draw();
     g.mtext().text("outer title").side(3).outer(true).draw();
     g.par().new(true).draw();
     g.plot()
-        .x(&[0.0, 1.0])
-        .y(&[1.0, 0.0])
+        .x([0.0, 1.0])
+        .y([1.0, 0.0])
         .type_(PlotType::Lines)
         .axes(false)
         .draw();
@@ -273,7 +273,7 @@ fn recorded_results_match_the_device() {
     let mut fig = Figure::new();
     let mut dev = device(Format::Svg);
 
-    let (h_fig, h_dev) = (fig.hist().x(&x).draw(), dev.hist().x(&x).draw());
+    let (h_fig, h_dev) = (fig.hist().x(x).draw(), dev.hist().x(x).draw());
     assert_eq!(
         (h_fig.breaks, h_fig.counts, h_fig.density, h_fig.mids),
         (h_dev.breaks, h_dev.counts, h_dev.density, h_dev.mids)
@@ -291,7 +291,7 @@ fn recorded_results_match_the_device() {
     // Legend layouts come back from add_figure, one per legend() call.
     let key = LegendOptions::default().col("red").pch(1);
     let mut legends = Figure::new();
-    legends.plot().x(&x).y(&x).draw();
+    legends.plot().x(x).y(x).draw();
     legends
         .legend()
         .pos(LegendPos::Keyword(LegendKeyword::TopLeft))
@@ -308,7 +308,7 @@ fn recorded_results_match_the_device() {
     let mut d1 = device(Format::Pdf);
     let replayed = d1.add_figure(&legends);
     let mut d2 = device(Format::Pdf);
-    d2.plot().x(&x).y(&x).draw();
+    d2.plot().x(x).y(x).draw();
     let direct = vec![
         d2.legend()
             .pos(LegendPos::Keyword(LegendKeyword::TopLeft))
@@ -364,7 +364,7 @@ fn legend_errors_panic_when_recorded() {
 /// The legends drawn with R-style positions or with `LegendPos` variants.
 fn legends<G: Graphics>(g: &mut G, short: bool) {
     let x = [1.0, 10.0];
-    g.plot().x(&x).y(&x).draw();
+    g.plot().x(x).y(x).draw();
     if short {
         g.legend().pos("bottomr").labels("a").pch(19).draw();
         g.legend().pos((5.0, 3.0)).labels("a").pch(19).draw();
@@ -416,7 +416,7 @@ fn legend_shorthand_draws_the_same() {
 fn add_figure_restores_par_after_a_panic() {
     let mut fig = Figure::new();
     fig.par().cex(2).las(1).draw();
-    fig.plot().x(&[1, 2]).y(&[1, 2]).draw();
+    fig.plot().x([1, 2]).y([1, 2]).draw();
     fig.abline().a(f64::NAN).b(1).draw();
     let mut dev = device(Format::Pdf);
     let before = format!("{:?}", dev.current_par());

@@ -96,7 +96,7 @@ fn draw_types_h_s<B: Backend>(dev: &mut Device<B>) {
     let counts = [2.0, 5.0, 9.0, 14.0, 11.0, 7.0, 4.0, 2.0, 1.0];
     dev.plot()
         .x(&k)
-        .y(&counts)
+        .y(counts)
         .type_(PlotType::Histogram)
         .lwd(4.0)
         .col(4)
@@ -247,7 +247,7 @@ fn draw_boxplot<B: Backend>(dev: &mut Device<B>) {
         .names(["Ctrl", "Treat A", "Treat B"])
         .main("boxplot()")
         .ylab("value");
-    dev.boxplot().x(&boxplot_sample_groups()).with(&opts).draw();
+    dev.boxplot().x(boxplot_sample_groups()).with(&opts).draw();
 }
 
 fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
@@ -256,7 +256,7 @@ fn draw_boxplot_horizontal<B: Backend>(dev: &mut Device<B>) {
         .horizontal(true)
         .main("boxplot(horizontal = TRUE)")
         .xlab("value");
-    dev.boxplot().x(&boxplot_sample_groups()).with(&opts).draw();
+    dev.boxplot().x(boxplot_sample_groups()).with(&opts).draw();
 }
 
 fn draw_pie<B: Backend>(dev: &mut Device<B>) {
@@ -277,24 +277,20 @@ fn draw_pch<B: Backend>(dev: &mut Device<B>) {
     let label = TextOptions::default().col(Color::BLACK).cex(0.8);
     for pch in 0..26 {
         let (x, y) = ((pch % 7) as f64 + 1.0, 5.0 - (pch / 7) as f64);
-        dev.points().x(&[x]).y(&[y]).with(&symbol(pch)).draw();
+        dev.points().x([x]).y([y]).with(&symbol(pch)).draw();
         dev.text()
-            .x(&[x])
-            .y(&[y - 0.45])
+            .x([x])
+            .y([y - 0.45])
             .labels(&[pch.to_string()])
             .with(&label)
             .draw();
     }
     for (i, ch) in ['.', 'a', 'M', '+', '*', '#', 'o'].into_iter().enumerate() {
         let x = i as f64 + 1.0;
-        dev.points()
-            .x(&[x])
-            .y(&[0.6])
-            .with(&symbol(ch as i32))
-            .draw();
+        dev.points().x([x]).y([0.6]).with(&symbol(ch as i32)).draw();
         dev.text()
-            .x(&[x])
-            .y(&[0.15])
+            .x([x])
+            .y([0.15])
             .labels(&[format!("\"{ch}\"")])
             .with(&label)
             .draw();

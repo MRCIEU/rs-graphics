@@ -33,14 +33,14 @@ fn outcome(f: impl FnOnce()) -> String {
 /// same code.
 fn call<G: Graphics>(g: &mut G, i: usize) {
     match i {
-        0 => g.plot().x(&[1, 2, 3]).y(&[1, 2]).draw(),
-        1 => g.points().x(&[1, 2, 3]).y(&[1, 2]).draw(),
-        2 => g.points().x(&[1]).y(&[1, 2, 3]).draw(),
-        3 => g.lines().x(&[1, 2, 3, 4]).y(&[1, 2]).draw(),
-        4 => g.polygon().x(&[1, 2, 3]).y(&[1, 2]).draw(),
-        5 => g.text().x(&[1, 2, 3]).y(&[1, 2]).labels(["a"]).draw(),
-        6 => g.points().x(&[0.0; 0]).y(&[0.0; 0]).draw(),
-        7 => g.lines().x(&[1, 2, 3]).y(&[3, 1, 2]).draw(),
+        0 => g.plot().x([1, 2, 3]).y([1, 2]).draw(),
+        1 => g.points().x([1, 2, 3]).y([1, 2]).draw(),
+        2 => g.points().x([1]).y([1, 2, 3]).draw(),
+        3 => g.lines().x([1, 2, 3, 4]).y([1, 2]).draw(),
+        4 => g.polygon().x([1, 2, 3]).y([1, 2]).draw(),
+        5 => g.text().x([1, 2, 3]).y([1, 2]).labels(["a"]).draw(),
+        6 => g.points().x([0.0; 0]).y([0.0; 0]).draw(),
+        7 => g.lines().x([1, 2, 3]).y([3, 1, 2]).draw(),
         _ => unreachable!(),
     }
 }

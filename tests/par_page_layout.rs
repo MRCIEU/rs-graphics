@@ -19,7 +19,7 @@ use rs_graphics::prelude::*;
 fn panels(dev: &mut Device<PdfBackend>) {
     for i in 0..3 {
         let y = [1.0, 3.0 + i as f64, 2.0];
-        dev.plot().x(&[1.0, 2.0, 3.0]).y(&y).main("Panel").draw();
+        dev.plot().x([1.0, 2.0, 3.0]).y(y).main("Panel").draw();
     }
     dev.mtext().text("Page").side(3).outer(true).draw();
 }
@@ -90,9 +90,9 @@ fn page_layout_is_applied_in_order() {
             PdfBackend::new(8.0, 6.0).with_compression(false),
             Par::default(),
         );
-        dev.plot().x(&[1, 2]).y(&[1, 2]).draw();
+        dev.plot().x([1, 2]).y([1, 2]).draw();
         setup(&mut dev);
-        dev.plot().x(&[1, 2]).y(&[2, 1]).draw();
+        dev.plot().x([1, 2]).y([2, 1]).draw();
         dev.finish()
     };
     let separate = draw(&|dev| {

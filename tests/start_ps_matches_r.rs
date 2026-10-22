@@ -54,8 +54,8 @@ fn draw_ours(start: f64, ps: f64) -> String {
         ..PlotOptions::default()
     };
     dev.plot()
-        .x(&[1.0, 2.0, 3.0, 4.0])
-        .y(&[1.0, 3.0, 2.0, 4.0])
+        .x([1.0, 2.0, 3.0, 4.0])
+        .y([1.0, 3.0, 2.0, 4.0])
         .with(&opts)
         .draw();
     let black = ColorSpec::Index(1);

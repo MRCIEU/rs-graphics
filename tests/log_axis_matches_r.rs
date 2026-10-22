@@ -126,8 +126,8 @@ fn draw_ours(c: &Case) -> String {
         ..PlotOptions::default()
     };
     dev.plot()
-        .x(&values(c.x, c.xlog))
-        .y(&values(c.y, c.ylog))
+        .x(values(c.x, c.xlog))
+        .y(values(c.y, c.ylog))
         .with(&opts)
         .draw();
     if let Some(at) = c.at3 {

@@ -57,7 +57,9 @@ calls without `.draw()` draw nothing (the compiler warns). The
 argument setters are documented on the call (e.g. `PointsCall::x`), and
 the rest on its options struct, e.g. `XyOptions` for `points()`. As in R, numbers may be integers or floats:
 `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (`1..=10` is R's `1:10`), and
-data vectors may hold any number type. R's `NA` in a style vector is
+data vectors may hold any number type. Vectors can be passed by
+reference or by value (`.x(&x)` or `.x(x)`, `.h([1, 2])`); large `f64`
+data isn't copied either way. R's `NA` in a style vector is
 `None`: R's `pch = c(19, NA)` is `.pch([Some(19), None])`.
 
 ### R side by side

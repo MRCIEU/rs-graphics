@@ -472,8 +472,8 @@ fn plotmath_title_mtext_text_legend_match_r() {
     d.par().las(0).draw();
     let black = ColorSpec::Index(1);
     d.text()
-        .x(&[2.0])
-        .y(&[8.0])
+        .x([2.0])
+        .y([8.0])
         .labels(&[Label::math("x^2 + y^2 == r^2")])
         .with(&TextOptions {
             adj: Some(0.5),
@@ -484,8 +484,8 @@ fn plotmath_title_mtext_text_legend_match_r() {
         })
         .draw();
     d.text()
-        .x(&[7.0])
-        .y(&[3.0])
+        .x([7.0])
+        .y([3.0])
         .labels(&[Label::math("alpha %+-% beta")])
         .with(&TextOptions {
             adj: Some(0.0),
@@ -499,8 +499,8 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .draw();
     let red = ColorSpec::Color(Color::parse("red").unwrap());
     d.text()
-        .x(&[5.0])
-        .y(&[2.0])
+        .x([5.0])
+        .y([2.0])
         .labels(&[Label::math("paste(\"P = \", 0.05)")])
         .with(&TextOptions {
             adj: Some(0.5),
@@ -636,7 +636,7 @@ fn plotmath_high_level_titles_match_r() {
         })
         .draw();
     d.hist()
-        .x(&[1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0])
+        .x([1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0])
         .with(&HistOptions {
             main: math("Histogram ~ of ~ X[1]"),
             ylab: math("count[i]"),
@@ -661,7 +661,7 @@ fn plotmath_high_level_titles_match_r() {
         })
         .draw();
     d.pie()
-        .x(&[1.0, 2.0, 3.0])
+        .x([1.0, 2.0, 3.0])
         .with(&PieOptions {
             labels: abc(),
             main: math("pi * r^2"),

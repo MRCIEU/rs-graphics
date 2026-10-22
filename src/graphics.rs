@@ -15,8 +15,9 @@
 //! and `.draw()` runs it. An argument R requires (one without a default)
 //! that is left out panics at `.draw()` with R's message (`argument "x" is
 //! missing, with no default`), also when a `Figure` records the call. As in R, numbers may be integers or floats: data
-//! vectors are any [`Numbers`] (`&x`, `&[1, 2, 3]`, `1..=10` for R's
-//! `1:10`; `f64` data is borrowed without copying), and numeric setters
+//! vectors are any [`Numbers`], by reference or by value (`&x`, `x`,
+//! `[1, 2, 3]`, `1..=10` for R's `1:10`; `f64` data isn't copied, whether
+//! borrowed or a `Vec` moved in), and numeric setters
 //! take integers too (`.cex(2)`, `.xlim(0, 10)`):
 //!
 //! ```no_run

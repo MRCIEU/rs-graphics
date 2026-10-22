@@ -99,8 +99,8 @@ fn text_placement_matches_r() {
     let black = ColorSpec::Color(Color::BLACK);
     for (i, &(label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
         dev.text()
-            .x(&[5.0])
-            .y(&[(i + 1) as f64])
+            .x([5.0])
+            .y([(i + 1) as f64])
             .labels([label])
             .with(&TextOptions {
                 adj: Some(h),
