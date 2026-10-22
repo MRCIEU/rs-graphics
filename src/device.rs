@@ -104,9 +104,6 @@ impl From<i32> for Side {
     }
 }
 
-/// `dev->yLineBias` for R's pdf/png/svg devices (see `GMtext()`).
-const Y_LINE_BIAS: f64 = 0.2;
-
 /// A graphics device: a page (or several, for PDF) drawn onto a
 /// [`Backend`], plus R's `par()` state and the page layout. Open one for
 /// a file with [`Device::pdf`], [`Device::svg`], [`Device::png`] or
@@ -359,13 +356,15 @@ impl<B: Backend> Device<B> {
     /// the plot region. As in R, a log axis's limits are log10 values
     /// (`par("usr")` of `plot(1:100, log = "x")` starts at about 0, not
     /// 1); everything that takes coordinates (`points()`, `axis(at = )`,
-    /// [`Device::user_to_inches`], ...) takes data units instead.
+    /// [`Device::user_to_inches`], ...) takes data units instead. Set by
+    /// `plot_window()` or `par(usr = )`.
     pub fn usr(&self) -> (f64, f64, f64, f64) {
         self.usr
     }
 
     /// Whether the x axis is logarithmic (R's `par("xlog")`), as set by
-    /// the last `plot_window()` (`plot_new()` resets it).
+    /// the last `plot_window()` or `par(xlog = )` (`plot_new()` resets
+    /// it).
     pub fn xlog(&self) -> bool {
         self.xlog
     }
@@ -649,6 +648,26 @@ impl<B: Backend> Device<B> {
     /// The user coordinates for limits `xlim`/`ylim` (data units) on
     /// linear or log axes, through `GScale()`, and `par.xaxp`/`yaxp`; see
     /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window).
+    /// R's `par(xlog = , ylog = )` (`None`: unchanged): only the flags, as
+    /// in R; `usr` and the mapping stay.
+    pub(crate) fn set_log(&mut self, xlog: Option<bool>, ylog: Option<bool>) {
+        if let Some(x) = xlog {
+            self.xlog = x;
+        }
+        if let Some(y) = ylog {
+            self.ylog = y;
+        }
+    }
+
+    /// R's `par(usr = )`: the plot region's user coordinates (log10 units
+    /// on a log axis), and the axis tick settings from them
+    /// (`GSetupAxis()`). Checked by `ParOptions::check`.
+    pub(crate) fn set_usr(&mut self, [x0, x1, y0, y1]: [f64; 4]) {
+        self.usr = (x0, x1, y0, y1);
+        self.par.xaxp = axis_pars(x0, x1, self.par.lab[0], self.xlog);
+        self.par.yaxp = axis_pars(y0, y1, self.par.lab[1], self.ylog);
+    }
+
     fn set_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), xlog: bool, ylog: bool) {
         self.xlog = xlog;
         self.ylog = ylog;
@@ -1280,8 +1299,9 @@ impl<B: Backend> Device<B> {
     // title()
     // ---------------------------------------------------------------
 
-    /// `GMtext()`'s `yLineBias` nudge (`graphics.c`), in margin lines, for
-    /// text on `side`: `1 - bias` on sides 1 and 4, `bias` on 2 and 3, divided
+    /// `GMtext()`'s `yLineBias` nudge (`graphics.c`; `par(ylbias)`), in
+    /// margin lines, for text on `side`: `1 - bias` on sides 1 and 4, `bias`
+    /// on 2 and 3, divided
     /// by `par(mex)` as R does (so the nudge stays the same size in inches);
     /// 0 for text perpendicular to the side. Shared by `title()`, `axis()`
     /// and `mtext()`.
@@ -1290,8 +1310,8 @@ impl<B: Backend> Device<B> {
             return 0.0;
         }
         let bias = match side {
-            Side::Bottom | Side::Right => 1.0 - Y_LINE_BIAS,
-            Side::Left | Side::Top => Y_LINE_BIAS,
+            Side::Bottom | Side::Right => 1.0 - self.par.ylbias,
+            Side::Left | Side::Top => self.par.ylbias,
         };
         bias / self.par.mex
     }

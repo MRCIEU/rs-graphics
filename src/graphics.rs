@@ -684,6 +684,10 @@ impl<B: Backend> Graphics for Device<B> {
         if let Some(new) = opts.new {
             self.set_new(new);
         }
+        self.set_log(opts.xlog, opts.ylog);
+        if let Some(usr) = opts.usr {
+            self.set_usr(usr);
+        }
     }
 }
 
@@ -1042,7 +1046,10 @@ call!(
     ParCall, ParOptions => (),
     args {},
     state { page: ParPage },
-    |t, o| { t.emit_par(o, page) }
+    |t, o| {
+        o.check();
+        t.emit_par(o, page)
+    }
 );
 
 /// `segments()`/`arrows()`'s ends: `x0` and `y0` required, `x1` and `y1`

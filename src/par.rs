@@ -359,6 +359,11 @@ pub struct Par {
     /// [`Device::text_metrics`](crate::device::Device::text_metrics). (Text
     /// is drawn one line at a time, so this doesn't affect drawing.)
     pub lheight: f64,
+    /// `par(ylbias)`: how far text sits from its margin line, as a fraction
+    /// of a line (R's device `yLineBias`): text on sides 1 and 4 has its
+    /// baseline `1 - ylbias` lines out, on sides 2 and 3 `ylbias` lines.
+    /// 0.2 by default (R's pdf, png and svg devices).
+    pub ylbias: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
     /// `par(xpd)`: where drawing is clipped to: [`Xpd::Plot`] (R's
@@ -431,6 +436,7 @@ impl Default for Par {
             xaxp: [0.0, 1.0, 5.0],
             yaxp: [0.0, 1.0, 5.0],
             lheight: 1.0,
+            ylbias: 0.2,
             adj: 0.5,
             xpd: Xpd::Plot,
             ann: true,
@@ -529,11 +535,30 @@ macro_rules! par_options {
             /// `false`, `plot_new()` itself does not, and it is ignored (R
             /// warns) before anything is plotted.
             pub new: Option<bool>,
+            /// `par(usr = c(x0, x1, y0, y1))`: the user coordinates of the
+            /// plot region, in log10 units on a log axis (as `par("usr")`
+            /// reads); the axis tick settings (`xaxp`/`yaxp`) are worked
+            /// out again from them, as R's `GSetupAxis()`. Applied after
+            /// `xlog`/`ylog` in the same call, so a `usr` given with them
+            /// is in their units.
+            ///
+            /// # Panics
+            /// At `.draw()`, if a value is `NaN` or `x0 == x1` or `y0 ==
+            /// y1` (R's "invalid value specified for graphical parameter
+            /// \"usr\"").
+            pub usr: Option<[f64; 4]>,
+            /// `par(xlog = )`: whether the x axis is logarithmic. As in R,
+            /// this only changes how data are mapped from now on (taking
+            /// `log10` of x values first); `usr` stays as it is, so set it
+            /// too. The next `plot_new()` resets it.
+            pub xlog: Option<bool>,
+            /// `par(ylog = )`: as [`xlog`](ParOptions::xlog) for y.
+            pub ylog: Option<bool>,
         }
 
         impl ParOptions {
-            /// Sets the given fields of `par` (all but `new`, which is
-            /// device state).
+            /// Sets the given fields of `par` (all but `new`, `usr`, `xlog`
+            /// and `ylog`, which are device state).
             pub(crate) fn apply(&self, par: &mut Par) {
                 $(
                     if let Some(v) = &self.$field {
@@ -553,7 +578,23 @@ macro_rules! par_options {
             $($field: $kind $t,)*
             $($ofield: $okind $ot,)*
             new: option bool,
+            usr: array [f64; 4],
+            xlog: option bool,
+            ylog: option bool,
         });
+
+        impl ParOptions {
+            /// R's checks of `usr`, made when the call is drawn or recorded.
+            pub(crate) fn check(&self) {
+                if let Some([x0, x1, y0, y1]) = self.usr {
+                    let ok = ![x0, x1, y0, y1].iter().any(|v| v.is_nan()) && x0 != x1 && y0 != y1;
+                    assert!(
+                        ok,
+                        "invalid value specified for graphical parameter \"usr\""
+                    );
+                }
+            }
+        }
     };
 }
 
@@ -602,6 +643,7 @@ par_options!(
     xaxp: array [f64; 3],
     yaxp: array [f64; 3],
     lheight: option f64,
+    ylbias: option f64,
     adj: option f64,
     xpd: option Xpd,
     ann: option bool,

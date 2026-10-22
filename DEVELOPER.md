@@ -506,7 +506,9 @@ against a real R installation by shelling out to `Rscript`:
   `mtext()` to the device, a bug not copied), inline `xpd`/`lend` on
   `axis()`, `lwd` on `hist()`/`barplot()` axes with shaded bars,
   `pie()`'s `border`/`lty`/`density`/`angle`, character-`pch` `font`, and
-  `plot()`'s inline `fg`/`adj`/`lend`/`xpd`/`font`: every painted path and
+  `plot()`'s inline `fg`/`adj`/`lend`/`xpd`/`font`, `par(usr = )` (also
+  on a log axis, whose tick settings R's `GSetupAxis()` gets wrong, a bug
+  not copied), `par(xlog = )` and `par(ylbias = )`: every painted path and
   text item with its clip rectangle.
 - `tests/all/required_args.rs` (no R needed) - every required argument left
   out panics with R's message (`argument "x" is missing, with no

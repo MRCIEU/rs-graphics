@@ -13,7 +13,9 @@
 //! `xpd`/`lend` on `axis()`, `lwd` on `hist()`/`barplot()` axes with
 //! shaded bars, `pie()`'s `border`/`lty`/`density`/`angle`, the `font` of
 //! character symbols (and `par(font)` restored after), and `plot()`'s
-//! inline `fg`/`adj`/`lend`/`xpd`/`font`. Compares every painted path and
+//! inline `fg`/`adj`/`lend`/`xpd`/`font`; and `par(usr = )` (also on a log
+//! axis), `par(xlog = )` (alone and with `usr`) and `par(ylbias = )`.
+//! Compares every painted path and
 //! text item, with the clip rectangle in effect for each. Skipped if
 //! `Rscript` isn't available.
 
@@ -240,6 +242,82 @@ fn cases() -> Vec<Case> {
                     .xlab("xxx")
                     .ylab("yyy")
                     .draw();
+            },
+        },
+        Case {
+            // New coordinates, and the axis ticks worked out from them.
+            name: "par_usr",
+            r: "plot.new(); plot.window(c(0, 10), c(0, 10)); points(5, 5)\n\
+                par(usr = c(0, 20, -5, 5)); points(5, 0); axis(1)\n\
+                axis(2, labels = FALSE); abline(h = 0)",
+            ours: |d| {
+                d.plot_new();
+                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.points().x([5]).y([5]).draw();
+                d.par().usr([0, 20, -5, 5]).draw();
+                d.points().x([5]).y([0]).draw();
+                d.axis().side(1).draw();
+                d.axis().side(2).draw_labels(false).draw();
+                d.abline().h([0]).draw();
+            },
+        },
+        Case {
+            // On a log axis `usr` is in log10 units. (No axis: R works out
+            // linear tick settings there, which its `axis()` rejects; see
+            // `par_usr_on_a_log_axis_sets_log_ticks`.)
+            name: "par_usr_log",
+            r: "plot.new(); plot.window(c(1, 100), c(0, 1), log = 'x')\n\
+                par(usr = c(0, 3, 0, 1)); points(c(10, 100), c(0.5, 0.5))",
+            ours: |d| {
+                d.plot_new();
+                d.plot_window().xlim(1, 100).ylim(0, 1).xlog(true).draw();
+                d.par().usr([0, 3, 0, 1]).draw();
+                d.points().x([10, 100]).y([0.5, 0.5]).draw();
+            },
+        },
+        Case {
+            // `xlog` alone changes only the mapping; with `usr` in the same
+            // call, `usr` is in log units.
+            name: "par_xlog",
+            r: "par(mfrow = c(1, 2))\n\
+                plot.new(); plot.window(c(0, 3), c(0, 1)); par(xlog = TRUE)\n\
+                points(c(1, 10, 100), c(0.5, 0.5, 0.5)); axis(2)\n\
+                plot.new(); plot.window(c(0, 1), c(0, 1)); par(xlog = TRUE, usr = c(0, 2, 0, 1))\n\
+                points(c(1, 10, 100), c(0.2, 0.4, 0.6))",
+            ours: |d| {
+                d.par().mfrow(1, 2).draw();
+                d.plot_new();
+                d.plot_window().xlim(0, 3).ylim(0, 1).draw();
+                d.par().xlog(true).draw();
+                d.points().x([1, 10, 100]).y([0.5, 0.5, 0.5]).draw();
+                d.axis().side(2).draw();
+                d.plot_new();
+                d.plot_window().xlim(0, 1).ylim(0, 1).draw();
+                d.par().xlog(true).usr([0, 2, 0, 1]).draw();
+                d.points().x([1, 10, 100]).y([0.2, 0.4, 0.6]).draw();
+            },
+        },
+        Case {
+            name: "par_ylbias",
+            r: "par(mfrow = c(1, 2), ylbias = 0.5)\n\
+                plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                title(xlab = 'xx', ylab = 'yy'); axis(1); axis(4); axis(3)\n\
+                par(ylbias = -0.1); plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                title(xlab = 'xx', ylab = 'yy'); axis(1); axis(3)",
+            ours: |d| {
+                d.par().mfrow(1, 2).ylbias(0.5).draw();
+                d.plot_new();
+                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.title().xlab("xx").ylab("yy").draw();
+                d.axis().side(1).draw();
+                d.axis().side(4).draw();
+                d.axis().side(3).draw();
+                d.par().ylbias(-0.1).draw();
+                d.plot_new();
+                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.title().xlab("xx").ylab("yy").draw();
+                d.axis().side(1).draw();
+                d.axis().side(3).draw();
             },
         },
     ]
@@ -657,4 +735,61 @@ fn mtext_clips_to_the_figure_unless_xpd_is_na() {
     for (k, (draw, want)) in cases.into_iter().enumerate() {
         assert!(close(&clip_of(draw), &want, 0.01), "case {k}");
     }
+}
+
+/// `par(usr = )` with an empty range or `NA` fails with R's message, on a
+/// device and when a `Figure` records the call.
+#[test]
+fn par_usr_is_checked() {
+    for usr in [
+        [1.0, 1.0, 0.0, 1.0],
+        [0.0, 1.0, 2.0, 2.0],
+        [f64::NAN, 1.0, 0.0, 1.0],
+    ] {
+        for figure in [false, true] {
+            let r = std::panic::catch_unwind(|| {
+                if figure {
+                    Figure::new().par().usr(usr).draw();
+                } else {
+                    let mut dev = Device::new(PdfBackend::new(5, 5), Par::default());
+                    dev.par().usr(usr).draw();
+                }
+            });
+            let e = r.unwrap_err();
+            let msg = e
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_default();
+            assert!(
+                msg.contains("graphical parameter \"usr\""),
+                "{usr:?}: {msg}"
+            );
+        }
+    }
+}
+
+/// `par(usr = )` on a log axis sets the tick settings a log axis gets from
+/// `plot.window()` over the same range. (R's `GSetupAxis()` works out
+/// linear ones there, which its own `axis()` then rejects: an R bug, not
+/// copied.)
+#[test]
+fn par_usr_on_a_log_axis_sets_log_ticks() {
+    let mut dev = Device::new(PdfBackend::new(5, 5), Par::default());
+    dev.plot_new();
+    dev.plot_window().xlim(1, 100).ylim(0, 1).xlog(true).draw();
+    dev.par().usr([0, 3, 0, 1]).draw();
+    let got = dev.current_par().xaxp;
+    let mut want = Device::new(PdfBackend::new(5, 5), Par::default());
+    want.par().xaxs("i").draw();
+    want.plot_new();
+    want.plot_window()
+        .xlim(1, 1000)
+        .ylim(0, 1)
+        .xlog(true)
+        .draw();
+    assert_eq!(got, want.current_par().xaxp);
+    assert_eq!(dev.usr(), (0.0, 3.0, 0.0, 1.0));
+    // And so the same ticks.
+    assert_eq!(dev.axis().side(1).draw(), want.axis().side(1).draw());
 }
