@@ -364,12 +364,14 @@ legend_pch_impls!(@each char, |c: char| Some(char_pch(c)), |c: Option<char>| c.m
 /// Empty `Vec`s and `None` are R's defaults, given for each field.
 ///
 /// The per-key arguments (`col`, `pch`, `lty`, `lwd`, `fill`, `border`,
-/// `pt_bg`, `pt_cex`, `pt_lwd`, `cex`, `x_intersp`, `seg_len`,
-/// `text_col`, `text_font`) are recycled over the keys, as in R. A `None`
+/// `density`, `angle`, `pt_bg`, `pt_cex`, `pt_lwd`, `cex`, `x_intersp`,
+/// `seg_len`, `text_col`, `text_font`) are recycled over the keys, as in
+/// R. A `None`
 /// element is R's `NA` for that key (`.pch([Some(19), None])`): the
 /// field says what it does. Which parts a key has follows R's rules:
-/// - a box, if `fill` or `density` is given (every key gets one; a `None`
-///   fill is an empty box), shaded with lines if `density` is;
+/// - a box, if `fill` or `density` is given (every key gets one; without
+///   `density` a `None` fill is an empty box, with it `None` is `par(fg)`),
+///   shaded with lines if `density` is;
 /// - a line, if `lty` has a line type other than blank, or `lwd` is given
 ///   (R: "one of these two must be specified for line drawing"; `lty` is
 ///   then solid); keys whose `lty` or `lwd` is `None`, or whose `lty` is
@@ -393,7 +395,9 @@ pub struct LegendOptions {
     /// `par("lwd")`.
     /// `None` (R's `NA`): no line on that key (its point, if any, uses `par(lwd)`).
     pub lwd: Vec<Option<f64>>,
-    /// Fill colours of box keys (giving any draws boxes); empty: no boxes.
+    /// Fill colours of box keys (giving any draws boxes); empty: no fill,
+    /// and no boxes unless `density` is given. With shading, the colour of
+    /// the lines (empty or `None`: `par(fg)`).
     pub fill: Vec<ColorSpec>,
     /// Border colours of box keys; empty: black (R's default).
     pub border: Vec<ColorSpec>,

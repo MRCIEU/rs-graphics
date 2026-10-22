@@ -250,7 +250,7 @@ A few fidelity-relevant decisions worth calling out:
   WinAnsi bytes. Characters outside Latin-1 are drawn as `?` in PDF
   output (SVG/PNG draw them as-is). Kerning is applied to string widths
   and, as R's `pdf()` does, inside drawn PDF strings (a string with
-  kerning pairs is a `TJ` array, `[(T) 74 (oyota)] TJ`; PNG places each
+  kerning pairs is a `TJ` array, `[(A) 70 (V)] TJ`; PNG places each
   glyph at its kerned position; SVG leaves it to the viewer's font). R
   never applies the last kerning pair of each first character (a bug in
   `devPS.c`'s lookup); we apply every pair, so such strings (`F r` in
@@ -511,6 +511,19 @@ against a real R installation by shelling out to `Rscript`:
   not copied), `par(xlog = )`, `par(ylbias = )`, and `NA` labels in
   `text()`, `mtext()` and `legend()`: every painted path and text item
   with its clip rectangle.
+- `tests/all/kerning_matches_r.rs` - kerning inside PDF strings: `TJ`
+  arrays (pieces and kerns) vs R's for strings in all four Helvetica faces,
+  Latin-1, escaped characters, scaled and rotated text; R's skipped last
+  pair of a character (`F r`) checked on our side only.
+- `tests/all/page_files.rs` - one file per page: `%03d` names for PNG and
+  SVG (each page's file as that page drawn alone), page breaks with
+  `mfrow`, the last page without a number (also on a transparent
+  background), PDF `onefile` (file names and page counts vs R), refused
+  `%` conversions, and page numbers vs R's `sprintf()`.
+- `tests/all/na_values_matches_r.rs` - `None` (R's `NA`) in the recycled
+  style vectors of points, lines, segments, arrows, rect, polygon, text,
+  mtext, abline, boxplot and legend: where R defines `NA`, R's drawing;
+  otherwise R drawing the skipped element or the default.
 - `tests/all/required_args.rs` (no R needed) - every required argument left
   out panics with R's message (`argument "x" is missing, with no
   default`), on a device and in a `Figure`; arguments with R defaults can

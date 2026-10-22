@@ -10,8 +10,9 @@
 //! real R `pdf()` device's uncompressed output: every painted path in
 //! drawing order (operator and vertices, `re` expanded; circles by
 //! operator only) and every text item in order (origin and string).
-//! Skipped if `Rscript` isn't available. Also, without R: `fig()` without
-//! `set_new(true)` starts a new page, and invalid `fig` values panic.
+//! Skipped if `Rscript` isn't available. Also, without R: `par(fig = )`
+//! without `par(new = TRUE)` starts a new page, and invalid `fig` values
+//! panic.
 
 use crate::common;
 

@@ -302,14 +302,18 @@ impl<B: Backend> Device<B> {
     }
 
     /// The backend, to finish it with its own `finish()` or set options.
-    /// On a device opened for a file this doesn't write the file (it stays
-    /// empty); use [`close`](Device::close) for that.
+    /// On a device opened for a file this doesn't write the file (the
+    /// current page's file stays empty; with one file per page, earlier
+    /// pages' files are already written and the backend holds only the
+    /// last page); use [`close`](Device::close) for that.
     pub fn into_backend(self) -> B {
         self.backend
     }
 
     /// The finished output's bytes (PDF, PNG, or SVG as UTF-8). On a device
-    /// opened for a file this doesn't write the file (it stays empty); use
+    /// opened for a file this doesn't write the file (the current page's
+    /// file stays empty; with one file per page, earlier pages' files are
+    /// already written and these are the last page's bytes); use
     /// [`close`](Device::close) for that.
     pub fn finish(self) -> Vec<u8> {
         self.backend.into_bytes()
@@ -318,7 +322,9 @@ impl<B: Backend> Device<B> {
     /// Closes the device (R's `dev.off()`): finishes the output and writes
     /// it to the file created when the device was opened
     /// ([`DeviceBuilder::open`]); with one file per page (a PNG or SVG
-    /// file name with `%d`), the last page's file. A device dropped
+    /// file name with a page number such as `%03d`, or a PDF with
+    /// [`onefile(false)`](DeviceBuilder::onefile)), the last page's file.
+    /// A device dropped
     /// without `close()` leaves that file empty. Also returns the first
     /// error from writing an earlier page's file.
     ///

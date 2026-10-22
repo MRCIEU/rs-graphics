@@ -14,8 +14,9 @@
 //! side, `at` is a user coordinate (inner margins) or a fraction of the
 //! inner region (outer margins); across it, `line` counts margin lines out
 //! from the plot region (inner) or from the inner region (outer). Text is
-//! clipped to the figure region (inner), or the device (outer), as R
-//! forces `xpd` to 1 or `NA`.
+//! clipped to at least the figure region (to the device with `xpd = NA`,
+//! inline or `par()`), and `outer` text to the device, as `C_mtext`
+//! intends (see [`MtextOptions::xpd`]).
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;

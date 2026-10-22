@@ -11,8 +11,8 @@
 //! (edges, a number of classes, the `"Sturges"`/`"Scott"`/`"FD"` rules, a
 //! function; see [`HistBreaks`]), `xlim`/`ylim`, R's binning with
 //! `right`/`include.lowest`/`fuzz`, `labels` and per-bar `col`/`border`/
-//! `lty`, and `plot = FALSE`. Not supported: hatched bars
-//! (`density`/`angle`) and `panel.first`.
+//! `lty`, shading lines (`density`/`angle`), and `plot = FALSE`. Not
+//! supported: `panel.first`.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};

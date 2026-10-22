@@ -128,9 +128,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   next call, also on margin text (`title()`, `mtext()`,
     ///   `axis(outer = )`), which R would place with the new `mar`/`oma`.
     /// - **New page:** what happens depends on the backend. PDF starts
-    ///   a new page in the file; SVG and PNG start an empty page, after
-    ///   writing the finished one to its own file if the file name has a
-    ///   page number (`"plot%03d.png"`; see
+    ///   a new page in the file, or with
+    ///   [`onefile(false)`](crate::device::DeviceBuilder::onefile) writes
+    ///   the finished page to its own file as SVG and PNG do; SVG and PNG
+    ///   start an empty page, after writing the finished one to its own
+    ///   file if the file name has a page number (`"plot%03d.png"`; see
     ///   [`DeviceBuilder::open`](crate::device::DeviceBuilder::open)), or
     ///   else discarding it. The page is then filled with `par.bg`, unless
     ///   that is fully transparent, which it is by default on PDF (as R's
@@ -332,9 +334,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `rect(xleft, ybottom, xright, ytop, ...)` in data units: the four
     /// coordinates are setters named as R's (all required); other arguments
     /// in [`RectOptions`]. Coordinates and styles are recycled to the
-    /// longest. Rectangles with a non-finite corner (e.g. at 0 on a log
-    /// axis) are skipped, as in R. With `density`, the rectangles are
-    /// shaded with lines (R's hatching), drawn as polygons as R does.
+    /// longest. Without `density`, rectangles with a non-finite corner
+    /// (e.g. at 0 on a log axis) are skipped, as in R. With `density`, the
+    /// rectangles are shaded with lines (R's hatching) and drawn as
+    /// polygons, as R does (so a non-finite corner splits the outline).
     ///
     /// # Panics
     /// At `.draw()`, if a coordinate is missing (R's message).
@@ -349,8 +352,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `NA`, separate them), with `col`, `border` and `lty` recycled over
     /// the polygons drawn, as `C_polygon` (a shorter run is skipped and
     /// uses up no colour). With `density`, each polygon is shaded with
-    /// lines instead of filled (R's hatching; see
-    /// [`PolygonOptions::density`]), then all borders are drawn.
+    /// lines (R's hatching; see [`PolygonOptions::density`]), or filled
+    /// where its density is `None` or negative, with `col`, `lty`,
+    /// `density` and `angle` recycled over every run of at least one point,
+    /// as `polygon.R`; then all borders are drawn.
     ///
     /// # Panics
     /// At `.draw()`, if `x` is missing (R's message) or `x` and `y` have
@@ -460,8 +465,9 @@ pub trait Graphics: sealed::Sealed + Sized {
         LegendCall::start(self)
     }
 
-    /// `mtext(text, side, line, outer, at, adj, padj, cex, col, font)`,
-    /// with rotation from `par(las)`. R's `text` and `side` are
+    /// `mtext(text, side, line, outer, at, adj, padj, cex, col, font, las,
+    /// xpd)`, with rotation from `las` (inline, else `par(las)`); a `None`
+    /// text (R's `NA`) is skipped. R's `text` and `side` are
     /// [`text`](MtextCall::text) (required) and [`side`](MtextCall::side)
     /// (default 3, the top); the others are in [`MtextOptions`]. `text` is
     /// text (placed by `GMtext()`) or a plotmath expression
@@ -480,7 +486,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// (main, sub, xlab, ylab) with `cex.main`/`col.main`/`font.main` and
     /// the `sub` and `lab` ones: inline (`.cex_main(2)`), else `par()`'s.
     /// Text `sub`, `xlab` and `ylab` are placed by `GMtext()`
-    /// (baseline on the line, nudged by `yLineBias`); text `main` is
+    /// (baseline on the line, nudged by `par(ylbias)`); text `main` is
     /// centred on line `0.5 * mar[3]` (its baseline half the height of "M"
     /// below it, no `yLineBias`). Expressions are placed by `GMathText()`
     /// (`main`: box centred on its line) and `GMMathText()` (the others:
@@ -490,8 +496,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     }
 
     /// `par(...)`: changes graphical parameters; options in
-    /// [`ParOptions`] (each a [`Par`](crate::par::Par) field, plus `new`
-    /// for R's `par(new = TRUE)`). It is the one way to change them, on a
+    /// [`ParOptions`] (each a [`Par`](crate::par::Par) field, plus `new`,
+    /// `usr`, `xlog` and `ylog`, which are device state). It is the one way
+    /// to change them, on a
     /// [`Device`] and in a recorded [`Figure`](crate::recording::Figure);
     /// read the current values with [`Device::current_par`]. As in R,
     /// setting one unit of a region clears the others (`mar` clears `mai`,
@@ -521,6 +528,13 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// let mut fig = Figure::new();
     /// fig.par().mfrow(1, 2).draw(); // error: no method `mfrow`
     /// ```
+    ///
+    /// # Panics
+    /// At `.draw()` (also when a `Figure` records the call), if `usr` has
+    /// a `NaN` or `x0 == x1` or `y0 == y1` (R's "invalid value specified
+    /// for graphical parameter \"usr\""). Some page layout values are
+    /// checked on a device only (see [`mfrow`](ParCall::mfrow) and the
+    /// other layout setters).
     fn par(&mut self) -> ParCall<'_, Self> {
         ParCall::start(self)
     }

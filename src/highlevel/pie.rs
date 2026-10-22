@@ -20,7 +20,8 @@ use crate::lty::LineType;
 use crate::par::Xpd;
 use crate::plotmath::Label;
 
-/// R's default pie slice color cycle (used when `col` isn't given).
+/// R's default pie slice color cycle (used when neither `col` nor
+/// `density` is given).
 const DEFAULT_COLORS: [&str; 6] = [
     "white",
     "lightblue",
@@ -52,7 +53,8 @@ pub struct PieOptions {
     /// (R's default).
     pub radius: Option<f64>,
     /// Slice fill colours, recycled over the slices; empty: R's default
-    /// cycle of 6 pastel colours.
+    /// cycle of 6 pastel colours, or `par(fg)` (the shading lines' colour)
+    /// when `density` is given.
     pub col: Vec<ColorSpec>,
     /// Slice borders, recycled per slice; empty: `polygon()`'s default,
     /// `par(fg)`, or with shading the slice's `col` (R's `border = NULL`).

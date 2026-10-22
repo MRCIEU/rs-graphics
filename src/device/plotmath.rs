@@ -8,8 +8,9 @@
 
 //! Drawing plotmath expressions: a port of `r-source/src/main/plotmath.c`
 //! for the constructs [`crate::plotmath`] accepts. Rules (fraction bars,
-//! radicals, accents, `abs()` bars) are drawn as lines, as R does. Each element is laid
-//! out twice, as in R: once to measure its bounding box, once to draw.
+//! radicals, `bar`/`widehat`/`widetilde`, `underline`, `abs()` bars) are
+//! drawn as lines, as R does. Each element is laid out twice, as in R:
+//! once to measure its bounding box, once to draw.
 //! Boxes and positions are in inches; text is drawn baseline-left in
 //! pieces (whole strings, or one character at a time for names, as R
 //! does), with sizes from the TeX-like styles (`STYLE_D` ... `STYLE_SS1`).
@@ -95,7 +96,7 @@ impl BBox {
 }
 
 /// TeX styles, in R's order (`STYLE_SS1 = 1` ... `STYLE_D = 8`); the
-/// `1` styles are the cramped ones (denominators, radicals).
+/// `1` styles are the cramped ones (subscripts, denominators, radicals).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Style {
     SS1 = 1,
@@ -497,7 +498,8 @@ impl<'d, B: Backend> Math<'d, B> {
     }
 
     /// `GEPolyline` with `lty` solid and `lwd` at most 1, as plotmath
-    /// draws its rules (accents, fraction bars, radicals, `abs()`).
+    /// draws its rules (fraction bars, radicals, `bar`/`widehat`/
+    /// `widetilde`, `underline`, `abs()`).
     fn polyline(&mut self, pts: &[Point]) {
         let lwd = self.dev.par.lwd.min(1.0);
         let stroke = self.dev.stroke_of(self.col, lwd, LineType::SOLID);

@@ -30,6 +30,10 @@
 //! space-exclusion above). Strings containing such a pair (e.g. `F r` in
 //! "Frequency") are therefore a fraction of a point wider or narrower than
 //! in R's `pdf()` output.
+//!
+//! The same kerning table gives the kerns `PdfBackend` writes inside drawn
+//! strings (`kerning_units`, as R's `PDFWriteT1KerningString`), so those
+//! strings also differ from R's inside: R writes them without that pair.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;

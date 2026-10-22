@@ -348,9 +348,9 @@ pub struct Par {
     pub lab: [i32; 3],
     /// `par(xaxp)` / `par(yaxp)`: the first and last default tick and the
     /// number of intervals between them (on a log axis, a tick-rule code
-    /// instead: see [`crate::pretty::axis_pars`]). `plot_new()` and
-    /// `plot_window()` set
-    /// them from the axis range and `par(lab)`; change them afterwards to
+    /// instead: see [`crate::pretty::axis_pars`]). `plot_new()`,
+    /// `plot_window()` and `par(usr = )` set them from the axis range and
+    /// `par(lab)`; change them afterwards to
     /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
     pub xaxp: [f64; 3],
     /// `par(yaxp)`: see `xaxp`.
@@ -359,10 +359,11 @@ pub struct Par {
     /// [`Device::text_metrics`](crate::device::Device::text_metrics). (Text
     /// is drawn one line at a time, so this doesn't affect drawing.)
     pub lheight: f64,
-    /// `par(ylbias)`: how far text sits from its margin line, as a fraction
-    /// of a line (R's device `yLineBias`): text on sides 1 and 4 has its
-    /// baseline `1 - ylbias` lines out, on sides 2 and 3 `ylbias` lines.
-    /// 0.2 by default (R's pdf, png and svg devices).
+    /// `par(ylbias)`: how far text parallel to its side is moved out from
+    /// its margin line (`GMtext()`'s `yLineBias`): `1 - ylbias` lines on
+    /// sides 1 and 4, `ylbias` on sides 2 and 3 (divided by `mex`). Used by
+    /// axis labels, `mtext()` and `title()`'s `sub`/`xlab`/`ylab`. 0.2 by
+    /// default (R's pdf, png and svg devices).
     pub ylbias: f64,
     /// Default text justification (`par(adj)`).
     pub adj: f64,
@@ -512,7 +513,8 @@ macro_rules! par_options {
             let Par { $($field: _,)* $($ofield: _,)* } = p;
         };
         /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
-        /// plus `new` (R's `par(new = TRUE)`). R's `mfrow`/`mfcol`/`mfg`/
+        /// plus `new`, `usr`, `xlog` and `ylog` (device state rather than
+        /// `Par` fields). R's `mfrow`/`mfcol`/`mfg`/
         /// `fig`/`fin` aren't here: they change the device's page layout,
         /// not `Par`, so only a device's `par()` call takes them
         /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow) and
@@ -539,8 +541,9 @@ macro_rules! par_options {
             /// plot region, in log10 units on a log axis (as `par("usr")`
             /// reads); the axis tick settings (`xaxp`/`yaxp`) are worked
             /// out again from them, as R's `GSetupAxis()`. Applied after
-            /// `xlog`/`ylog` in the same call, so a `usr` given with them
-            /// is in their units.
+            /// the other fields and `xlog`/`ylog` in the same call, so a
+            /// `usr` given with them is in their units, uses a new `lab`,
+            /// and replaces an `xaxp`/`yaxp` given there.
             ///
             /// # Panics
             /// At `.draw()`, if a value is `NaN` or `x0 == x1` or `y0 ==

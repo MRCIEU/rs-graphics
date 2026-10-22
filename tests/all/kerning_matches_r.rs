@@ -8,7 +8,7 @@
 
 //! Cross-checks kerning inside PDF strings against a real R `pdf()`
 //! device's uncompressed output: a string with kerning pairs is a `TJ`
-//! array (`[(T) 74 (oyota)] TJ`), one without a plain `Tj`, in all four
+//! array (`[(A) 70 (V)] TJ`), one without a plain `Tj`, in all four
 //! Helvetica faces, with Latin-1 characters, scaled and rotated. Compares
 //! every text item's font, size, origin and its pieces and kerns.
 //!

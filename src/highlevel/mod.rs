@@ -54,8 +54,8 @@ pub(crate) fn data_range(xs: &[f64]) -> (f64, f64) {
 }
 
 /// R's inline axis parameters that a high-level plot passes through its
-/// `...` to `axis()` (`las = 1`, `cex.axis = 0.8`, ...); `None` is the
-/// `par()` value. Each plot copies its own fields in, and only those R
+/// `...` to `axis()` (`las = 1`, `cex.axis = 0.8`, ...); `None` is
+/// `axis()`'s default (the `par()` value, except `lwd`: 1). Each plot copies its own fields in, and only those R
 /// lets through (e.g. `bxp()` drops `mgp`).
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct InlineAxis {
@@ -74,7 +74,9 @@ pub(crate) struct InlineAxis {
     /// `fg`: the axis line and ticks' colour (`axis()` takes `fg` as
     /// `col`).
     pub col: Option<crate::color::ColorSpec>,
+    /// `lend`: the axis line and ticks' ends (`axis(lend = )`).
     pub lend: Option<crate::backend::LineEnd>,
+    /// `xpd`: how far ticks and labels may reach (`axis(xpd = )`).
     pub xpd: Option<crate::par::Xpd>,
 }
 

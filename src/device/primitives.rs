@@ -8,13 +8,14 @@
 
 //! The low-level drawing functions `points()`, `lines()`, `segments()`,
 //! `arrows()`, `rect()`, `polygon()`, `text()`, `box()` and
-//! `plot.window()`, each taking its data and an options struct, as in R.
+//! `plot.window()`: the options structs of their builder calls (see
+//! [`Graphics`](crate::graphics::Graphics)), with R's arguments.
 //!
 //! An empty `Vec` (or `None`) field means R's default for that argument,
 //! usually the `par()` value; a field R recycles per element (`col` in
 //! `points(x, y, col = groups)`) is a `Vec` used in turn and repeated as
-//! needed. `xpd` is R's inline `xpd = ` (clip to the figure region rather
-//! than the plot region); `None` uses `par(xpd)`.
+//! needed. `xpd` is R's inline `xpd = ` (clip to the plot region, the
+//! figure region or the device: [`Xpd`]); `None` uses `par(xpd)`.
 
 use super::hatch::{ShapeStyle, shading};
 use super::{Device, Xpd};
@@ -192,15 +193,16 @@ crate::setters::setters!(ArrowsOptions => [ArrowsCall] {
 #[derive(Clone, Debug, Default)]
 pub struct RectOptions {
     /// Fill colours, recycled per rectangle; empty: no fill (R's `NA`).
+    /// With `density`, see there.
     pub col: Vec<ColorSpec>,
-    /// Border colours, recycled; empty: `par(fg)`. `ColorSpec::None`
-    /// draws no border.
+    /// Border colours, recycled; empty: `par(fg)` (with `density`: `col`).
+    /// `ColorSpec::None` draws no border.
     pub border: Vec<ColorSpec>,
     /// Recycled per rectangle; empty: `par(lty)`.
-    /// `None` (R's `NA`): no border (the fill is drawn).
+    /// `None` (R's `NA`): no border and no shading lines (a fill is drawn).
     pub lty: Vec<Option<LineType>>,
     /// Recycled per rectangle; empty: `par(lwd)`.
-    /// `None` (R's `NA`): no border (the fill is drawn).
+    /// `None` (R's `NA`): no border and no shading lines (a fill is drawn).
     pub lwd: Vec<Option<f64>>,
     /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
     /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
@@ -220,7 +222,7 @@ pub struct RectOptions {
     /// lines nor fill. Empty (or all `None`/negative): no shading. With
     /// shading, `col` is the colour of the lines (empty or `None`:
     /// `par(fg)`) and `border` defaults to `col`; the lines are skipped on
-    /// log axes, as R does (with a warning).
+    /// log axes, as in R (where they also give a warning).
     pub density: Vec<Option<f64>>,
     /// Angle of the shading lines in degrees, anticlockwise (R's
     /// `angle`), recycled per rectangle; empty: 45.
@@ -241,17 +243,17 @@ crate::setters::setters!(RectOptions => [RectCall] {
 });
 
 /// Arguments of `polygon()`. A non-finite coordinate (R's `NA`) ends one
-/// polygon and starts the next; `col`, `border` and `lty` are recycled
-/// over those polygons.
+/// polygon and starts the next; `col`, `border`, `lty`, `density` and
+/// `angle` are recycled over those polygons.
 #[derive(Clone, Debug, Default)]
 pub struct PolygonOptions {
-    /// Fill colours; empty: no fill (R's `NA`).
+    /// Fill colours; empty: no fill (R's `NA`). With `density`, see there.
     pub col: Vec<ColorSpec>,
-    /// Border colours; empty: `par(fg)`. `ColorSpec::None` draws no
-    /// border.
+    /// Border colours; empty: `par(fg)` (with `density`: `col`).
+    /// `ColorSpec::None` draws no border.
     pub border: Vec<ColorSpec>,
     /// Empty: `par(lty)`.
-    /// `None` (R's `NA`): no border (the fill is drawn).
+    /// `None` (R's `NA`): no border and no shading lines (a fill is drawn).
     pub lty: Vec<Option<LineType>>,
     /// One width for all; `None`: `par(lwd)`.
     pub lwd: Option<f64>,
@@ -273,7 +275,7 @@ pub struct PolygonOptions {
     /// lines nor fill. Empty (or all `None`/negative): no shading. With
     /// shading, `col` is the colour of the lines (empty or `None`:
     /// `par(fg)`) and `border` defaults to `col`; the lines are skipped on
-    /// log axes, as R does (with a warning).
+    /// log axes, as in R (where they also give a warning).
     pub density: Vec<Option<f64>>,
     /// Angle of the shading lines in degrees, anticlockwise (R's
     /// `angle`), recycled per polygon; empty: 45.

@@ -22,7 +22,7 @@
 //! relations, ...), spacing with `~`, juxtaposition with `*` and
 //! `paste()`, `list()`, parentheses, `group()` and `bgroup()`, braces
 //! `{}` (`{}^14*C`), fractions (`frac`, `over`, `atop`), `sqrt(x)` and
-//! `sqrt(x, n)`, accents (`hat`, `tilde`, `dot`, `ring`, `bar`,
+//! `sqrt(x, n)` (also `root`), accents (`hat`, `tilde`, `dot`, `ring`, `bar`,
 //! `widehat`, `widetilde`), `abs()`, `underline()`, big operators with
 //! limits (`sum(x[i], i == 1, n)`, `prod`, `integral`, `union`,
 //! `intersect`, `lim`, `liminf`, `limsup`, `min`, `max`, `inf`, `sup`),
@@ -108,8 +108,8 @@ impl std::str::FromStr for Expression {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParseError {
     pub message: String,
-    /// Byte offset in the source; 0 when not known (e.g. for unsupported
-    /// constructs).
+    /// Byte offset in the source; 0 when not known (for a construct with
+    /// the wrong number of arguments).
     pub offset: usize,
 }
 

@@ -54,13 +54,14 @@
 //! [`Device::format`](device::Device::format), for a format chosen at run
 //! time) take the file and return a [`DeviceBuilder`](device::DeviceBuilder)
 //! for R's other arguments (`width` and `height` in inches, `pointsize`,
-//! `bg`, PNG's `res`, PDF's `compress`), with R's defaults; `.open()`
-//! opens the device and creates the file (so a bad path fails before any
-//! drawing), and [`close`](device::Device::close) (R's `dev.off()`)
+//! `bg`, PNG's `res`, PDF's `compress` and `onefile`), with R's defaults;
+//! `.open()` opens the device and creates the file (so a bad path fails
+//! before any drawing), and [`close`](device::Device::close) (R's `dev.off()`)
 //! writes it. The format is always the constructor's, never the
 //! file name's (`Device::pdf("x.png")` writes a PDF, as R's `pdf()`). A
 //! page number in a PNG or SVG file name (`"Rplot%03d.png"`) gives one
-//! file per page, as in R; for PDF, with `onefile(false)`.
+//! file per page, as in R; for PDF, a page number plus `onefile(false)`
+//! (R's `pdf("Rplot%03d.pdf", onefile = FALSE)`).
 //! [`Device::new`](device::Device::new) takes a backend directly instead:
 //! for output kept in memory ([`finish`](device::Device::finish)) and
 //! backend options the builder doesn't cover.

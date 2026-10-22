@@ -23,8 +23,9 @@ use crate::setters::pick_na;
 /// Whether R shades: some `density` is given and not `NA` or negative
 /// (`polygon()`/`rect()` treat a `density` that is all `NA` or negative
 /// as not given). R tests this with `is.numeric(density)`, so a logical
-/// `density = NA` shades anyway (an R bug, not copied: `None`s are
-/// R's `NA_real_`).
+/// `density = NA` takes the shading path anyway, filling with `col`
+/// (`par(fg)` by default) and outlining in it (an R bug, not copied:
+/// `None`s are R's `NA_real_`).
 pub(crate) fn shading(density: &[Option<f64>]) -> bool {
     density.iter().any(|d| d.is_some_and(|d| d >= 0.0))
 }

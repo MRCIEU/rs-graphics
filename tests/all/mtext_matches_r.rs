@@ -7,7 +7,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks `mtext()` placement (every side, inner and outer margins,
-//! `line`, `at`, `adj`, `padj`, `cex`, `font`, and `par(las)` 0..=3) against
+//! `line`, `at`, `adj`, `padj`, `cex`, `font`, and inline `las` 0..=3, plus
+//! `par(las)` without it) against
 //! a real R `pdf()` device's uncompressed output, inside a 2x2 `mfrow` page
 //! with outer margins (so the 0.83 multi-panel `cex` applies). Skipped if
 //! `Rscript` isn't available.

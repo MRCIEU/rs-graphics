@@ -12,7 +12,7 @@
 //! stroke colour, width, cap, dash) and every text item's string, origin,
 //! font, size and fill colour. Covers both of `polygon.fullhatch()`'s
 //! branches and their boundaries, winding inside a self-intersecting
-//! polygon, `NA`/0/negative densities, reversed axes and a log axis
+//! polygon (and `fillOddEven`), `NA`/0/negative densities, reversed axes and a log axis
 //! (no shading, as R).
 //!
 //! An all-`NA` `density` is no shading. R checks this with
@@ -21,7 +21,7 @@
 //! uses `NA_real_`, which R treats as intended.
 //!
 //! Not compared: R's `rect()` with a vector `lwd` and shading (R recycles
-//! it over the lines of each shading line instead of per rectangle), and
+//! it over each rectangle's shading lines instead of per rectangle), and
 //! `barplot()` legends with fewer `density` values than labels (R
 //! reverses them before recycling). With `orderH`, R keeps `density` and
 //! `angle` in segment order while the colours follow the rows; ours

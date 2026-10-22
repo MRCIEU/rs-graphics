@@ -133,7 +133,7 @@ impl Figure {
 ///
 /// A new R function needs a variant here; the compiler then asks for its
 /// replay arm in `add_figure` (an exhaustive `match`) and its `emit_*` on
-/// both `Graphics` impls. Also add it to a scene in `tests/figure_replay.rs`,
+/// both `Graphics` impls. Also add it to a scene in `tests/all/figure_replay.rs`,
 /// which checks a recorded figure draws what the device does.
 #[derive(Clone, Debug)]
 enum Call {
@@ -277,8 +277,9 @@ impl<B: Backend> Device<B> {
     ///
     /// `par` is restored afterwards (like R's `op <- par(...);
     /// on.exit(par(op))`), so the figure's `par()` calls don't affect what
-    /// is drawn next. The panel position and `par(new)` are device state
-    /// and are not restored.
+    /// is drawn next. The panel position, `par(new)` and the coordinates
+    /// (`plot_window()`, `par(usr/xlog/ylog)`) are device state and are
+    /// not restored.
     ///
     /// # Panics
     /// Where the recorded calls would panic on the device (e.g. `abline()`

@@ -166,8 +166,10 @@ fn create(path: &Path) -> std::io::Result<File> {
 
 /// A device's file name, which may hold a C integer format for the page
 /// number (`"Rplot%03d.png"`), as R's devices take: at most one
-/// `%[#0 ,+-]*[0-9.]*[diouxX]`, and `%%` for a `%` (R's
-/// `checkIntFormat()`).
+/// `%[#0 ,+-]*` conversion with a width and an optional `.precision`, of
+/// `d`, `i`, `o`, `u`, `x` or `X`, and `%%` for a `%`. This is R's
+/// `checkIntFormat()`, a little stricter: R's pattern `[0-9.]*` also lets
+/// malformed widths such as `%1.2.3d` through.
 #[derive(Debug)]
 pub(crate) struct FileName {
     /// A name that isn't UTF-8, used as it is (it has no `%` to read).

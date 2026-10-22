@@ -591,7 +591,10 @@ impl Stamps {
     /// done in parallel, each with its own table of shapes; then, in
     /// order, each chunk's shapes are looked up in (or added to) the
     /// final table and each command gets its sprite. Shapes are added in
-    /// order of first use either way, as when done in one pass.
+    /// order of first use, as when done in one pass, except for commands
+    /// whose chunk table was full (`UNRESOLVED`, resolved after that
+    /// chunk's shapes); either way the plan doesn't depend on the number of
+    /// threads, since `PLAN_CHUNK` is fixed.
     fn plan(commands: &[Command], strokes: &[SkStroke], threads: usize) -> Self {
         // Per chunk: its shapes, and each command's shape in them (or
         // `NO_SPRITE`, or `UNRESOLVED`).

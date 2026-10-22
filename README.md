@@ -87,18 +87,18 @@ dev.close()?;
 
 `Device::pdf(file)` and `Device::svg(file)` work the same way. The
 device's arguments (`width`, `height`, `pointsize`, `bg`, `res` for PNG,
-`compress` for PDF) have R's defaults, so
+`compress` and `onefile` for PDF) have R's defaults, so
 `Device::pdf("plot.pdf").open()?` is R's `pdf("plot.pdf")`, 7 x 7 inches.
 As in R, opening the device creates the file, so a bad path fails
 before anything is drawn, and `dev.close()` (R's `dev.off()`) writes it.
 A page number in a PNG or SVG file name gives one file per page, as R's
-`png("Rplot%03d.png")`; for PDF, add `.onefile(false)`, as R's
-`pdf(onefile = FALSE)`.
+`png("Rplot%03d.png")`; for PDF, a page number plus `.onefile(false)`,
+as R's `pdf("Rplot%03d.pdf", onefile = FALSE)`.
 Sizes are in inches for every format. The format is the function's, not
 the file name's. `Device::format(format, file)` takes the format as a
 value or a name (`"pdf"`, `"svg"`, `"png"`), for choosing it at run
 time, and `dev.finish()` returns the file's bytes instead of writing
-them.
+them (with one file per page, the last page's).
 
 ### Several panels on a page
 

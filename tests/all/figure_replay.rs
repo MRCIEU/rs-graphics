@@ -11,7 +11,8 @@
 //! backends, alone and mixed with direct calls in multi-panel pages, plus
 //! `add_figure_at`, `par` being restored, and the results recorded figures
 //! return. Also that `legend()`'s R-style positions (`"topright"`,
-//! `(x, y)`, corners) draw the same as the `LegendPos` variants. (Not an R
+//! `(x, y)`, corners) draw the same as the `LegendPos` variants, and that
+//! `barplot()` shading on a log axis panics on both. (Not an R
 //! cross-check: the direct calls are checked against R elsewhere.)
 
 use rs_graphics::prelude::*;
