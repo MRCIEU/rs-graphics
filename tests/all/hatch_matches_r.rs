@@ -145,6 +145,33 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            // With `fillOddEven`, the pentagram's centre (encircled twice)
+            // isn't shaded.
+            name: "star_odd_even",
+            r: concat!(
+                window!(),
+                "a <- pi / 2 + (0:4) * 4 * pi / 5\n",
+                "polygon(5 + 4 * cos(a), 5 + 4 * sin(a), density = 12, angle = 20, fillOddEven = TRUE)"
+            ),
+            ours: |d| {
+                window(d, (0.0, 10.0), (0.0, 10.0));
+                let a: Vec<f64> = (0..5)
+                    .map(|k| {
+                        std::f64::consts::PI / 2.0 + k as f64 * 4.0 * std::f64::consts::PI / 5.0
+                    })
+                    .collect();
+                let x: Vec<f64> = a.iter().map(|a| 5.0 + 4.0 * a.cos()).collect();
+                let y: Vec<f64> = a.iter().map(|a| 5.0 + 4.0 * a.sin()).collect();
+                d.polygon()
+                    .x(&x)
+                    .y(&y)
+                    .density(12)
+                    .angle(20)
+                    .fill_odd_even(true)
+                    .draw();
+            },
+        },
+        Case {
             // `NA` and negative densities fill, 0 draws only the border.
             name: "density_mix",
             r: concat!(

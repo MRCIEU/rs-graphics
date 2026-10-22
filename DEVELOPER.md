@@ -354,9 +354,9 @@ against a real R installation by shelling out to `Rscript`:
   item and every stroke (fraction bars, radicals, accents).
 - `tests/all/hatch_matches_r.rs` - shading lines (`density`/`angle`) in
   `polygon()`, `rect()`, `barplot()` (beside, stacked, `orderH`,
-  horizontal, legend) and `legend()`: both hatching branches, winding,
-  `NA`/0/negative densities, reversed and log axes; every painted path
-  and text item.
+  horizontal, legend) and `legend()`: both hatching branches, winding
+  (and `fillOddEven`), `NA`/0/negative densities, reversed and log axes;
+  every painted path and text item.
 - `tests/all/start_ps_matches_r.rs` - margins, symbols, `type = "b"` gaps and
   `legend()` spacing come from the device's starting point size, not a
   later `par(ps)`, as R's `cra`.
@@ -508,8 +508,9 @@ against a real R installation by shelling out to `Rscript`:
   `pie()`'s `border`/`lty`/`density`/`angle`, character-`pch` `font`, and
   `plot()`'s inline `fg`/`adj`/`lend`/`xpd`/`font`, `par(usr = )` (also
   on a log axis, whose tick settings R's `GSetupAxis()` gets wrong, a bug
-  not copied), `par(xlog = )` and `par(ylbias = )`: every painted path and
-  text item with its clip rectangle.
+  not copied), `par(xlog = )`, `par(ylbias = )`, and `NA` labels in
+  `text()`, `mtext()` and `legend()`: every painted path and text item
+  with its clip rectangle.
 - `tests/all/required_args.rs` (no R needed) - every required argument left
   out panics with R's message (`argument "x" is missing, with no
   default`), on a device and in a `Figure`; arguments with R defaults can

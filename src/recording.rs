@@ -153,12 +153,12 @@ enum Call {
     Arrows([Vec<f64>; 4], ArrowsOptions),
     Rect([Vec<f64>; 4], RectOptions),
     Polygon(Vec<f64>, Vec<f64>, PolygonOptions),
-    Text(Vec<f64>, Vec<f64>, Vec<Label>, TextOptions),
+    Text(Vec<f64>, Vec<f64>, Vec<Option<Label>>, TextOptions),
     Box(BoxOptions),
     Axis(Side, AxisOptions),
     Abline(AblineOptions),
-    Legend(LegendPos, Vec<Label>, LegendOptions),
-    Mtext(Vec<Label>, Side, MtextOptions),
+    Legend(LegendPos, Vec<Option<Label>>, LegendOptions),
+    Mtext(Vec<Option<Label>>, Side, MtextOptions),
     Title(TitleOptions),
 }
 
@@ -227,7 +227,7 @@ impl Graphics for Figure {
     fn emit_polygon(&mut self, x: &[f64], y: &[f64], opts: PolygonOptions) {
         self.calls.push(Call::Polygon(x.to_vec(), y.to_vec(), opts));
     }
-    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Label>, opts: TextOptions) {
+    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Option<Label>>, opts: TextOptions) {
         self.calls
             .push(Call::Text(x.to_vec(), y.to_vec(), labels, opts));
     }
@@ -240,11 +240,11 @@ impl Graphics for Figure {
     fn emit_abline(&mut self, opts: AblineOptions) {
         self.calls.push(Call::Abline(opts));
     }
-    fn emit_legend(&mut self, pos: LegendPos, labels: Vec<Label>, opts: LegendOptions) {
+    fn emit_legend(&mut self, pos: LegendPos, labels: Vec<Option<Label>>, opts: LegendOptions) {
         crate::device::check_legend(&labels, &opts);
         self.calls.push(Call::Legend(pos, labels, opts));
     }
-    fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions) {
+    fn emit_mtext(&mut self, text: Vec<Option<Label>>, side: Side, opts: MtextOptions) {
         self.calls.push(Call::Mtext(text, side, opts));
     }
     fn emit_title(&mut self, opts: TitleOptions) {

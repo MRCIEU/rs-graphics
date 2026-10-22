@@ -535,7 +535,7 @@ crate::setters::setters!(LegendOptions => [LegendCall] {
 
 /// R's argument checks for `legend()`, so a [`Figure`](crate::recording::Figure)
 /// panics when recording, as the device does.
-pub(crate) fn check_legend(labels: &[Label], opts: &LegendOptions) {
+pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) {
     assert!(!labels.is_empty(), "'legend' is of length 0");
     let tw = &opts.text_width;
     let any_na = tw.iter().any(|v| v.is_nan());
@@ -567,7 +567,7 @@ impl<B: Backend> Device<B> {
     pub(crate) fn legend_impl(
         &mut self,
         pos: LegendPos,
-        labels: &[Label],
+        labels: &[Option<Label>],
         opts: &LegendOptions,
     ) -> LegendLayout {
         check_legend(labels, opts);
@@ -583,7 +583,7 @@ impl<B: Backend> Device<B> {
     fn draw_legend(
         &mut self,
         pos: LegendPos,
-        labels: &[Label],
+        labels: &[Option<Label>],
         opts: &LegendOptions,
     ) -> LegendLayout {
         let n = labels.len();
@@ -640,7 +640,11 @@ impl<B: Backend> Device<B> {
         let fonts = rep_or(&opts.text_font, n, self.par.font);
         let title_font = opts.title_font.unwrap_or(fonts[0]);
         let label_w: Vec<f64> = (0..n)
-            .map(|i| self.label_width(&labels[i], fonts[i], cex[i]))
+            // An `NA` label takes no room (R's `strwidth(NA)` is 0).
+            .map(|i| match &labels[i] {
+                Some(l) => self.label_width(l, fonts[i], cex[i]),
+                None => 0.0,
+            })
             .collect();
 
         // `text.width`: the widest label for every column (`NULL`), each
@@ -686,7 +690,10 @@ impl<B: Backend> Device<B> {
             .map(|r| row_yc[r] * (y_intersp[r] - 1.0))
             .collect();
         let tallest = (0..n)
-            .map(|i| self.label_height(&labels[i], fonts[i], cex[i]) / yc[i])
+            .map(|i| match &labels[i] {
+                Some(l) => self.label_height(l, fonts[i], cex[i]) / yc[i],
+                None => 0.0,
+            })
             .fold(1.0, f64::max);
         let ymax = yc.iter().copied().fold(0.0, f64::max) * tallest;
         let ychar: Vec<f64> = yextra.iter().map(|e| e + ymax).collect();
@@ -870,6 +877,7 @@ impl<B: Backend> Device<B> {
                     lwd: &[],
                     density: &opts.density,
                     angle: &opts.angle,
+                    odd_even: false,
                 };
                 self.rects(&x0, &y0, &x1, &y1, &style);
             }
@@ -970,13 +978,13 @@ impl<B: Backend> Device<B> {
             let (tx, ty) = self.inches_to_usr(anchor);
             text_x.push(tx);
             text_y.push(ty);
-            if !plot {
+            let (true, Some(label)) = (plot, &labels[i]) else {
                 continue;
-            }
+            };
             self.draw_label(
                 clip,
                 anchor,
-                &labels[i],
+                label,
                 adj,
                 vadj,
                 self.par.srt,
@@ -1068,7 +1076,7 @@ mod tests {
 
     #[test]
     fn text_width_is_checked_like_r() {
-        let labels = [Label::from("a")];
+        let labels = [Some(Label::from("a"))];
         let check = |tw: Vec<f64>| {
             let opts = LegendOptions {
                 text_width: tw,

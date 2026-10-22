@@ -278,6 +278,12 @@ pub struct PolygonOptions {
     /// Angle of the shading lines in degrees, anticlockwise (R's
     /// `angle`), recycled per polygon; empty: 45.
     pub angle: Vec<f64>,
+    /// R's `fillOddEven`: shading lines go where the border encircles a
+    /// point an odd number of times, rather than a non-zero number (so a
+    /// pentagram's centre isn't shaded). Default `false`. Only the shading:
+    /// solid fills use the non-zero rule, as R's `pdf()` and the other
+    /// devices here do.
+    pub fill_odd_even: bool,
 }
 
 crate::setters::setters!(PolygonOptions => [PolygonCall] {
@@ -291,6 +297,7 @@ crate::setters::setters!(PolygonOptions => [PolygonCall] {
     lmitre: option f64,
     density: na_values f64,
     angle: values f64,
+    fill_odd_even: value bool,
 });
 
 /// Arguments of `text()`.
@@ -757,6 +764,7 @@ impl<B: Backend> Device<B> {
             lwd: &opts.lwd,
             density: &opts.density,
             angle: &opts.angle,
+            odd_even: false,
         };
         self.rects(x0, y0, x1, y1, &style);
         self.pop_clip();
@@ -824,6 +832,7 @@ impl<B: Backend> Device<B> {
             lwd: &lwd,
             density: &opts.density,
             angle: &opts.angle,
+            odd_even: opts.fill_odd_even,
         };
         self.polygons(x, y, &style);
         self.pop_clip();
@@ -832,11 +841,11 @@ impl<B: Backend> Device<B> {
     /// Draws R's `text()`; the public entry is
     /// [`Graphics::text`](crate::graphics::Graphics::text), whose docs
     /// describe it.
-    pub(crate) fn text_impl<L: Clone + Into<Label>>(
+    pub(crate) fn text_impl(
         &mut self,
         x: &[f64],
         y: &[f64],
-        labels: &[L],
+        labels: &[Option<Label>],
         opts: &TextOptions,
     ) {
         let n = recycled_len(&[x.len(), y.len()]);
@@ -853,10 +862,14 @@ impl<B: Backend> Device<B> {
         let offset = opts.offset.unwrap_or(0.5) * self.layout_cex * 1.2 * self.start_ps / 72.0;
         let (col, font) = (ColorSpec::Color(self.par.col), self.par.font);
         for i in 0..n {
+            // An `NA` (`None`) label is skipped, as `C_text`.
             let label: Label = if labels.is_empty() {
                 Label::Text((i + 1).to_string())
             } else {
-                labels[i % labels.len()].clone().into()
+                match &labels[i % labels.len()] {
+                    Some(l) => l.clone(),
+                    None => continue,
+                }
             };
             let p = self.user_to_inches(x[i % x.len()], y[i % y.len()]);
             // As `C_text`: a label at a non-finite position (`NA`, or <= 0

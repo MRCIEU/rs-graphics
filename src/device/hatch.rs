@@ -41,6 +41,9 @@ pub(crate) struct ShapeStyle<'a> {
     pub lwd: &'a [Option<f64>],
     pub density: &'a [Option<f64>],
     pub angle: &'a [f64],
+    /// R's `fillOddEven`: shade where the border goes round an odd number
+    /// of times, rather than a non-zero number.
+    pub odd_even: bool,
 }
 
 impl<B: Backend> Device<B> {
@@ -107,7 +110,7 @@ impl<B: Backend> Device<B> {
                         };
                         let stroke = self.stroke_of(c, lwd, lty);
                         let angle = pick(s.angle, i, 45.0);
-                        self.hatch(pts, d, angle, &stroke);
+                        self.hatch(pts, d, angle, s.odd_even, &stroke);
                     }
                     Some(0.0) => {}
                     _ => {
@@ -138,7 +141,14 @@ impl<B: Backend> Device<B> {
     /// `polygon.fullhatch()`: shading lines `density` per inch at `angle`
     /// degrees across the polygon `pts` (`usr` units, linear axes), placed
     /// so that, extended, they would pass through the `usr` origin.
-    fn hatch(&mut self, pts: &[(f64, f64)], density: f64, angle: f64, stroke: &Stroke) {
+    fn hatch(
+        &mut self,
+        pts: &[(f64, f64)],
+        density: f64,
+        angle: f64,
+        odd_even: bool,
+        stroke: &Stroke,
+    ) {
         let mut x: Vec<f64> = pts.iter().map(|p| p.0).collect();
         let mut y: Vec<f64> = pts.iter().map(|p| p.1).collect();
         x.push(x[0]);
@@ -178,7 +188,7 @@ impl<B: Backend> Device<B> {
             let mut y0 = ((min(&y) - first_x * yd / xd) / y_shift).floor() * y_shift;
             let y_end = max(&y) - last_x * yd / xd;
             while y0 < y_end {
-                self.hatch_line(&x, &y, 0.0, y0, xd, yd, stroke);
+                self.hatch_line(&x, &y, (0.0, y0), (xd, yd), odd_even, stroke);
                 y0 += y_shift;
             }
         } else {
@@ -194,23 +204,22 @@ impl<B: Backend> Device<B> {
             let mut x0 = ((min(&x) - first_y * xd / yd) / x_shift).floor() * x_shift;
             let x_end = max(&x) - last_y * xd / yd;
             while x0 < x_end {
-                self.hatch_line(&x, &y, x0, 0.0, xd, yd, stroke);
+                self.hatch_line(&x, &y, (x0, 0.0), (xd, yd), odd_even, stroke);
                 x0 += x_shift;
             }
         }
     }
 
     /// `polygon.onehatch()`: the parts of the line `(x0, y0) + t (xd, yd)`
-    /// inside the closed polygon `x`/`y` (non-zero winding).
-    #[allow(clippy::too_many_arguments)]
+    /// inside the closed polygon `x`/`y` (non-zero winding, or with
+    /// `odd_even` an odd number of crossings).
     fn hatch_line(
         &mut self,
         x: &[f64],
         y: &[f64],
-        x0: f64,
-        y0: f64,
-        xd: f64,
-        yd: f64,
+        (x0, y0): (f64, f64),
+        (xd, yd): (f64, f64),
+        odd_even: bool,
         stroke: &Stroke,
     ) {
         // Which side of the line each point is on, and where (and which
@@ -240,7 +249,13 @@ impl<B: Backend> Device<B> {
         let mut crossings = 0;
         for k in 0..o.len() - 1 {
             crossings += cross[o[k]];
-            if crossings == 0 {
+            // `if (fillOddEven) crossings <- crossings %% 2`.
+            let inside = if odd_even {
+                crossings.rem_euclid(2)
+            } else {
+                crossings
+            };
+            if inside == 0 {
                 continue;
             }
             let (ta, tb) = (t[o[k]], t[o[k + 1]]);

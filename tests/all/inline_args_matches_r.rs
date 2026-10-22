@@ -14,7 +14,8 @@
 //! shaded bars, `pie()`'s `border`/`lty`/`density`/`angle`, the `font` of
 //! character symbols (and `par(font)` restored after), and `plot()`'s
 //! inline `fg`/`adj`/`lend`/`xpd`/`font`; and `par(usr = )` (also on a log
-//! axis), `par(xlog = )` (alone and with `usr`) and `par(ylbias = )`.
+//! axis), `par(xlog = )` (alone and with `usr`), `par(ylbias = )`, and
+//! `NA` labels in `text()`, `mtext()` and `legend()`.
 //! Compares every painted path and
 //! text item, with the clip rectangle in effect for each. Skipped if
 //! `Rscript` isn't available.
@@ -318,6 +319,38 @@ fn cases() -> Vec<Case> {
                 d.title().xlab("xx").ylab("yy").draw();
                 d.axis().side(1).draw();
                 d.axis().side(3).draw();
+            },
+        },
+        Case {
+            // `NA` labels: skipped by `text()` (the others keep their index
+            // for recycled styles) and `mtext()`; in `legend()` the key is
+            // drawn and the label takes no room.
+            name: "na_labels",
+            r: "plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                text(c(2, 4, 6, 8), 8, c('a', NA, 'c', NA), col = 1:4)\n\
+                mtext(c('m', NA, 'o'), side = 1, outer = TRUE, line = -1, at = c(0.2, 0.5, 0.8))\n\
+                legend('bottomleft', legend = c('a', NA, 'c'), pch = 1:3)",
+            ours: |d| {
+                d.plot_new();
+                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.text()
+                    .x([2, 4, 6, 8])
+                    .y([8])
+                    .labels([Some("a"), None, Some("c"), None])
+                    .col([1, 2, 3, 4])
+                    .draw();
+                d.mtext()
+                    .text([Some("m"), None, Some("o")])
+                    .side(1)
+                    .outer(true)
+                    .line(-1)
+                    .at([0.2, 0.5, 0.8])
+                    .draw();
+                d.legend()
+                    .pos("bottomleft")
+                    .labels([Some("a"), None, Some("c")])
+                    .pch([1, 2, 3])
+                    .draw();
             },
         },
     ]

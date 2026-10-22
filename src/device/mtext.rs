@@ -141,7 +141,7 @@ impl<B: Backend> Device<B> {
     /// Draws R's `mtext()`; the public entry is
     /// [`Graphics::mtext`](crate::graphics::Graphics::mtext), whose docs
     /// describe it.
-    pub(crate) fn mtext_impl(&mut self, texts: &[Label], side: Side, opts: &MtextOptions) {
+    pub(crate) fn mtext_impl(&mut self, texts: &[Option<Label>], side: Side, opts: &MtextOptions) {
         // `C_mtext`: everything recycled over the longest argument.
         assert!(!texts.is_empty(), "zero-length 'text' specified");
         let n = [
@@ -183,7 +183,10 @@ impl<B: Backend> Device<B> {
                 las: opts.las,
                 xpd: opts.xpd,
             };
-            self.mtext_one(texts[i % texts.len()].clone(), side, &one);
+            // An `NA` (`None`) text is skipped, as `C_mtext`.
+            if let Some(text) = &texts[i % texts.len()] {
+                self.mtext_one(text.clone(), side, &one);
+            }
         }
     }
 

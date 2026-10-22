@@ -814,6 +814,7 @@ impl<B: Backend> Device<B> {
                 vadj: Some(-0.5),
                 ..TextOptions::default()
             };
+            let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
             self.text_impl(&mids, &heights, &labels, &at);
         }
 

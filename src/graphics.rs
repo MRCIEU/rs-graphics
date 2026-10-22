@@ -559,7 +559,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     #[doc(hidden)]
     fn emit_polygon(&mut self, x: &[f64], y: &[f64], opts: PolygonOptions);
     #[doc(hidden)]
-    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Label>, opts: TextOptions);
+    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Option<Label>>, opts: TextOptions);
     #[doc(hidden)]
     fn emit_box(&mut self, opts: BoxOptions);
     #[doc(hidden)]
@@ -570,11 +570,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     fn emit_legend(
         &mut self,
         pos: LegendPos,
-        labels: Vec<Label>,
+        labels: Vec<Option<Label>>,
         opts: LegendOptions,
     ) -> Self::LegendResult;
     #[doc(hidden)]
-    fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions);
+    fn emit_mtext(&mut self, text: Vec<Option<Label>>, side: Side, opts: MtextOptions);
     #[doc(hidden)]
     fn emit_title(&mut self, opts: TitleOptions);
     #[doc(hidden)]
@@ -631,7 +631,7 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_polygon(&mut self, x: &[f64], y: &[f64], opts: PolygonOptions) {
         self.polygon_impl(x, y, &opts)
     }
-    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Label>, opts: TextOptions) {
+    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Option<Label>>, opts: TextOptions) {
         self.text_impl(x, y, &labels, &opts)
     }
     fn emit_box(&mut self, opts: BoxOptions) {
@@ -646,12 +646,12 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_legend(
         &mut self,
         pos: LegendPos,
-        labels: Vec<Label>,
+        labels: Vec<Option<Label>>,
         opts: LegendOptions,
     ) -> LegendLayout {
         self.legend_impl(pos, &labels, &opts)
     }
-    fn emit_mtext(&mut self, text: Vec<Label>, side: Side, opts: MtextOptions) {
+    fn emit_mtext(&mut self, text: Vec<Option<Label>>, side: Side, opts: MtextOptions) {
         self.mtext_impl(&text, side, &opts)
     }
     fn emit_title(&mut self, opts: TitleOptions) {
@@ -969,8 +969,9 @@ call!(
         /// longer.
         y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
         /// R's `labels`: text or plotmath expressions, one or several (see
-        /// [`Labels`]); default `"1"`, `"2"`, ....
-        labels: Vec<Label> = (impl Labels => Labels::into_labels),
+        /// [`Labels`]; a `None` element, R's `NA`, is skipped); default
+        /// `"1"`, `"2"`, ....
+        labels: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
     },
     |t, o| {
         let (x, y, _) = xy_coords(x, y, true);
@@ -1014,8 +1015,9 @@ call!(
         /// of one).
         pos: LegendPos = (impl Into<LegendPos> => Into::into),
         /// The keys' labels (required; R's `legend`): text or plotmath
-        /// expressions, one or several (see [`Labels`]).
-        labels: Vec<Label> = (impl Labels => Labels::into_labels),
+        /// expressions, one or several (see [`Labels`]; a `None` element,
+        /// R's `NA`, has its key but no text, and takes no room).
+        labels: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
     },
     |t, o| { t.emit_legend(required(pos, "pos"), required(labels, "labels"), o) }
 );
@@ -1024,8 +1026,9 @@ call!(
     MtextCall, MtextOptions => (),
     args {
         /// R's `text` (required): text or plotmath expressions, one or
-        /// several (see [`Labels`]), recycled with the other arguments.
-        text: Vec<Label> = (impl Labels => Labels::into_labels),
+        /// several (see [`Labels`]; a `None` element, R's `NA`, is
+        /// skipped), recycled with the other arguments.
+        text: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
         /// R's `side`: a [`Side`] or R's number for it (1 to 4); default 3
         /// (top).
         ///

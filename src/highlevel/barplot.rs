@@ -829,6 +829,7 @@ impl<B: Backend> Device<B> {
             if lopts.angle.is_empty() {
                 lopts.angle = angle;
             }
+            let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
             self.legend_impl(pos, &labels, &lopts);
         }
 

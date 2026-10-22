@@ -247,7 +247,7 @@ impl<B: Backend> Device<B> {
                     font: opts.font.into_iter().map(Some).collect(),
                     ..TextOptions::default()
                 };
-                self.text_impl(&[1.1 * px], &[1.1 * py], std::slice::from_ref(label), &at);
+                self.text_impl(&[1.1 * px], &[1.1 * py], &[Some(label.clone())], &at);
             }
         }
 
