@@ -501,6 +501,13 @@ against a real R installation by shelling out to `Rscript`:
   `x.intersp`/`seg.len` with per-row `y.intersp`, `text.width = NA` and
   per column, and `adj`: every painted path and text item, and the
   return value.
+- `tests/all/inline_args_matches_r.rs` - `box(fg = , col = NA)`, inline
+  `xpd` on `title()` (and `mtext()`'s, on its own: R always clips
+  `mtext()` to the device, a bug not copied), inline `xpd`/`lend` on
+  `axis()`, `lwd` on `hist()`/`barplot()` axes with shaded bars,
+  `pie()`'s `border`/`lty`/`density`/`angle`, character-`pch` `font`, and
+  `plot()`'s inline `fg`/`adj`/`lend`/`xpd`/`font`: every painted path and
+  text item with its clip rectangle.
 - `tests/all/required_args.rs` (no R needed) - every required argument left
   out panics with R's message (`argument "x" is missing, with no
   default`), on a device and in a `Figure`; arguments with R defaults can

@@ -167,6 +167,7 @@ fn mtext_placement_matches_r() {
                     .map(|f| Some(FontFace::from(f)))
                     .collect(),
                 las: Some(c.las),
+                xpd: None,
             })
             .draw();
     }

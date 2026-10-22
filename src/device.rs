@@ -231,6 +231,10 @@ pub struct TitleOptions {
     /// inner region (R's `outer = TRUE`); `main` defaults to half the top
     /// outer margin. Default `false`.
     pub outer: bool,
+    /// R's inline `xpd`: where the titles clip, at least the figure region
+    /// (`false` is `true` here, as in R; [`Xpd::Device`] for the whole
+    /// device); `None`: `par(xpd)`. `outer` titles clip to the device.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(TitleOptions => [TitleCall] {
@@ -251,6 +255,7 @@ crate::setters::setters!(TitleOptions => [TitleCall] {
     mgp: array [f64; 3],
     line: option f64,
     outer: value bool,
+    xpd: option Xpd,
 });
 
 impl<B: Backend> Device<B> {
@@ -889,6 +894,16 @@ impl<B: Backend> Device<B> {
     // always use the device, as R).
     // ---------------------------------------------------------------
 
+    /// Where margin text (`title()`, `mtext()`) clips: R raises `xpd` (the
+    /// inline one, else `par(xpd)`) to at least `TRUE`, the figure region
+    /// (`NA`, the device, stays), and `outer` text clips to the device.
+    fn margin_clip(&self, xpd: Option<Xpd>, outer: bool) -> Xpd {
+        match (outer, xpd.unwrap_or(self.par.xpd)) {
+            (true, _) | (_, Xpd::Device) => Xpd::Device,
+            _ => Xpd::Figure,
+        }
+    }
+
     fn push_clip_for(&mut self, xpd: Xpd) {
         self.push_clip_region(xpd);
     }
@@ -1292,16 +1307,8 @@ impl<B: Backend> Device<B> {
         let adj = opts.adj.unwrap_or(self.par.adj);
         let mgp = opts.mgp.unwrap_or(self.par.mgp);
         let line = opts.line.filter(|l| l.is_finite());
-        let (region, clip) = if opts.outer {
-            (self.inner, Xpd::Device)
-        } else {
-            // R raises `xpd` to at least `TRUE` (`NA` stays `NA`).
-            let clip = match self.par.xpd {
-                Xpd::Device => Xpd::Device,
-                _ => Xpd::Figure,
-            };
-            (self.plt, clip)
-        };
+        let region = if opts.outer { self.inner } else { self.plt };
+        let clip = self.margin_clip(opts.xpd, opts.outer);
         let x_at = region.x0 + adj * region.width();
         let y_at = region.y0 + adj * region.height();
         if let Some(main) = &opts.main {
@@ -1464,6 +1471,8 @@ impl<B: Backend> Device<B> {
 impl<B: Backend> Device<B> {
     /// R's inline `lend`/`ljoin`/`lmitre` for one call (`ProcessInlinePars`,
     /// undone by `GRestorePars`): every line drawn in the scope uses them.
+    /// `par.font` is restored too, so callers may set an inline `font` in
+    /// the scope (as `points()` does for character symbols).
     ///
     /// # Panics
     /// If `lmitre` is below 1 (R's "invalid value specified for graphical
@@ -1484,6 +1493,7 @@ impl<B: Backend> Device<B> {
             now.lend = saved.lend;
             now.ljoin = saved.ljoin;
             now.lmitre = saved.lmitre;
+            now.font = saved.font;
         });
         if let Some(l) = lend {
             dev.par.lend = l;

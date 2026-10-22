@@ -20,7 +20,7 @@
 //! overlapping (`gap.axis` applies to text labels only).
 
 use crate::afm;
-use crate::backend::Backend;
+use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
 use crate::font::FontFace;
 use crate::geometry::Point;
@@ -116,6 +116,14 @@ pub struct AxisOptions {
     /// Tick length in margin lines; negative points outwards. `None`:
     /// `par(tcl)`.
     pub tcl: Option<f64>,
+    /// R's inline `xpd`: how far ticks and labels may reach along the
+    /// axis (the plot region, figure region or device, as for
+    /// `par(xpd)`); the axis is always clipped to the device, as R does.
+    /// `None`: `par(xpd)`.
+    pub xpd: Option<Xpd>,
+    /// R's inline `lend`: the ends of the axis line and ticks (`"round"`,
+    /// `"butt"`, `"square"`); `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
 }
 
 crate::setters::setters!(AxisOptions => [AxisCall] {
@@ -143,6 +151,8 @@ crate::setters::setters!(AxisOptions => [AxisCall] {
     axt: option AxisType,
     tck: option f64,
     tcl: option f64,
+    xpd: option Xpd,
+    lend: option LineEnd,
 });
 
 impl Default for AxisOptions {
@@ -172,6 +182,8 @@ impl Default for AxisOptions {
             axt: None,
             tck: None,
             tcl: None,
+            xpd: None,
+            lend: None,
         }
     }
 }
@@ -192,7 +204,11 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::axis`](crate::graphics::Graphics::axis), whose docs
     /// describe it.
     pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) -> Vec<f64> {
-        let side = side.into();
+        let mut dev = self.line_pars(opts.lend, None, None);
+        dev.axis_draw(side.into(), opts)
+    }
+
+    fn axis_draw(&mut self, side: Side, opts: &AxisOptions) -> Vec<f64> {
         let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);
         let mgp = opts.mgp.unwrap_or(self.par.mgp);
@@ -273,7 +289,7 @@ impl<B: Backend> Device<B> {
         } else {
             (self.usr.2, self.usr.3)
         };
-        let (left, right) = self.xpd_limits(x_axis, self.par.xpd);
+        let (left, right) = self.xpd_limits(x_axis, opts.xpd.unwrap_or(self.par.xpd));
         let (left, right) = (left.min(right), left.max(right));
         let eps = if right == left {
             0.5 * FLT_EPSILON

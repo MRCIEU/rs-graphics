@@ -12,12 +12,12 @@
 //! logic and argument munging for other input types, which is out of
 //! scope here).
 
-use crate::backend::Backend;
+use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
 use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions};
 use crate::font::FontFace;
 use crate::lty::LineType;
-use crate::par::{AxisStyle, AxisType, Bty};
+use crate::par::{AxisStyle, AxisType, Bty, Xpd};
 use crate::plotmath::Label;
 use crate::recording::Figure;
 
@@ -215,6 +215,23 @@ pub struct PlotOptions {
     /// Draw the box around the plot region (R's `frame.plot`, shaped by
     /// `bty`); `None`: `axes`.
     pub frame_plot: Option<bool>,
+    /// R's inline `font`: the font of character symbols (`pch = "a"`) and of
+    /// the axis labels (over `font_axis`); `None`: `par(font)` for symbols,
+    /// `font_axis` for the axes.
+    pub font: Option<FontFace>,
+    /// R's inline `fg`: the colour of the axes' line and ticks and of the
+    /// frame; `None`: `par(fg)` for the axes, `par(col)` for the frame.
+    pub fg: Option<ColorSpec>,
+    /// R's inline `adj`: where the titles sit along their sides (0 left, 1
+    /// right); `None`: `par(adj)`.
+    pub adj: Option<f64>,
+    /// R's inline `lend`: the line ends of the lines and symbols, the axes
+    /// and the frame; `None`: `par(lend)`.
+    pub lend: Option<LineEnd>,
+    /// R's inline `xpd`: where the points and lines clip, how far the axes'
+    /// ticks may reach, and the titles' clip (at least the figure region);
+    /// `None`: `par(xpd)`.
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(PlotOptions => [PlotCall] {
@@ -262,6 +279,11 @@ crate::setters::setters!(PlotOptions => [PlotCall] {
     panel_first: option Figure,
     panel_last: option Figure,
     frame_plot: option bool,
+    font: option FontFace,
+    fg: option ColorSpec,
+    adj: option f64,
+    lend: option LineEnd,
+    xpd: option Xpd,
 });
 
 impl Default for PlotOptions {
@@ -311,6 +333,11 @@ impl Default for PlotOptions {
             panel_first: None,
             panel_last: None,
             frame_plot: None,
+            font: None,
+            fg: None,
+            adj: None,
+            lend: None,
+            xpd: None,
         }
     }
 }
@@ -357,6 +384,9 @@ impl<B: Backend> Device<B> {
             cex: opts.cex.clone(),
             lwd: opts.lwd.clone(),
             lty: opts.lty,
+            font: opts.font,
+            lend: opts.lend,
+            xpd: opts.xpd,
             ..XyOptions::default()
         };
         self.points_impl(x, y, &xy);
@@ -366,7 +396,8 @@ impl<B: Backend> Device<B> {
 
         if opts.axes {
             // `localAxis()`: `axis(side, ...)` with the inline axis pars
-            // (`col`, `lwd`, ... are the points', so they don't reach it).
+            // (`col`, `lwd`, ... are the points', so they don't reach it;
+            // `fg` is `axis()`'s `col`).
             let inline = InlineAxis {
                 las: opts.las,
                 cex_axis: opts.cex_axis,
@@ -375,7 +406,11 @@ impl<B: Backend> Device<B> {
                 mgp: opts.mgp,
                 tck: opts.tck,
                 tcl: opts.tcl,
-                gap_axis: None,
+                font: opts.font,
+                col: opts.fg,
+                lend: opts.lend,
+                xpd: opts.xpd,
+                ..InlineAxis::default()
             };
             for (side, axt, axp) in [(1, opts.xaxt, opts.xaxp), (2, opts.yaxt, opts.yaxp)] {
                 let o = AxisOptions {
@@ -390,6 +425,8 @@ impl<B: Backend> Device<B> {
         if opts.frame_plot.unwrap_or(opts.axes) {
             self.box_impl(&BoxOptions {
                 bty: opts.bty,
+                fg: opts.fg,
+                lend: opts.lend,
                 ..BoxOptions::default()
             });
         }
@@ -410,6 +447,8 @@ impl<B: Backend> Device<B> {
                 col_lab: opts.col_lab,
                 font_lab: opts.font_lab,
                 mgp: opts.mgp,
+                adj: opts.adj,
+                xpd: opts.xpd,
                 ..TitleOptions::default()
             });
         }

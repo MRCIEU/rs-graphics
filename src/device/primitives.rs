@@ -85,6 +85,9 @@ pub struct XyOptions {
     /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
     /// `par(lmitre)`.
     pub lmitre: Option<f64>,
+    /// R's inline `font`: the font of character symbols (`pch = "a"`, or
+    /// `'é'`); `None`: `par(font)`.
+    pub font: Option<FontFace>,
 }
 
 crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
@@ -99,6 +102,7 @@ crate::setters::setters!(XyOptions => [PointsCall, LinesCall] {
     lend: option LineEnd,
     ljoin: option LineJoin,
     lmitre: option f64,
+    font: option FontFace,
 });
 
 /// Arguments of `segments()`.
@@ -362,9 +366,13 @@ pub enum BoxWhich {
 pub struct BoxOptions {
     /// Which region to outline; `None`: the plot region (R's default).
     pub which: Option<BoxWhich>,
-    /// `None`: `par(col)` (R's `C_box`; R's `par(fg = )` sets `col` too,
+    /// The colour; `None` or `ColorSpec::None` (R's `NA`): `fg` if given,
+    /// else `par(col)`, as R's `C_box` (R's `par(fg = )` sets `col` too,
     /// so set both `par.fg` and `par.col` to follow it).
     pub col: Option<ColorSpec>,
+    /// R's inline `fg`: the colour when `col` isn't given (or is `NA`);
+    /// `None` or `ColorSpec::None`: `par(col)`.
+    pub fg: Option<ColorSpec>,
     /// `None`: solid (R's `box(lty = "solid")`, not `par(lty)`).
     pub lty: Option<LineType>,
     /// `None`: `par(lwd)`.
@@ -387,6 +395,7 @@ pub struct BoxOptions {
 crate::setters::setters!(BoxOptions => [BoxCall] {
     which: option BoxWhich,
     col: option ColorSpec,
+    fg: option ColorSpec,
     lty: option LineType,
     lwd: option f64,
     bty: option Bty,
@@ -495,15 +504,24 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::points`](crate::graphics::Graphics::points), whose docs
     /// describe it.
     pub(crate) fn points_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        let mut dev = self.xy_pars(opts);
         dev.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Points), opts);
+    }
+
+    /// `points()`/`lines()`'s inline `lend`/`ljoin`/`lmitre` and `font`.
+    fn xy_pars(&mut self, opts: &XyOptions) -> super::ParScope<'_, B> {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        if let Some(f) = opts.font {
+            dev.par.font = f;
+        }
+        dev
     }
 
     /// Draws R's `lines()`; the public entry is
     /// [`Graphics::lines`](crate::graphics::Graphics::lines), whose docs
     /// describe it.
     pub(crate) fn lines_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+        let mut dev = self.xy_pars(opts);
         dev.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Lines), opts);
     }
 
@@ -881,7 +899,13 @@ impl<B: Backend> Device<B> {
     }
 
     fn box_draw(&mut self, opts: &BoxOptions) {
-        let Some(color) = self.resolve(opts.col.unwrap_or(ColorSpec::Color(self.par.col))) else {
+        // `C_box`: a non-`NA` `col`, else a non-`NA` inline `fg`, else
+        // `par(col)`.
+        let given = |c: Option<ColorSpec>| c.filter(|c| *c != ColorSpec::None);
+        let col = given(opts.col)
+            .or(given(opts.fg))
+            .unwrap_or(ColorSpec::Color(self.par.col));
+        let Some(color) = self.resolve(col) else {
             return;
         };
         let stroke = self.stroke_of(

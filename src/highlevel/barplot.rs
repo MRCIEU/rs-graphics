@@ -188,6 +188,10 @@ pub struct BarplotOptions {
     /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
     /// R's default.
     pub gap_axis: Option<f64>,
+    /// Width of the axes' line and ticks (R's inline `lwd`, which `barplot()`
+    /// passes only to `axis()`, not to the bars); `None`: 1, `axis()`'s
+    /// default.
+    pub lwd: Option<f64>,
     /// Clipping of the bars, names and legend (R's `xpd`; the setter also
     /// takes `false`/`true`); `None`: [`Xpd::Figure`] (R's `TRUE`).
     pub xpd: Option<Xpd>,
@@ -242,6 +246,7 @@ crate::setters::setters!(BarplotOptions => [BarplotCall] {
     tck: option f64,
     tcl: option f64,
     gap_axis: option f64,
+    lwd: option f64,
     xpd: option Xpd,
     plot: option bool,
 });
@@ -294,6 +299,7 @@ impl Default for BarplotOptions {
             tck: None,
             tcl: None,
             gap_axis: None,
+            lwd: None,
             xpd: None,
             plot: None,
         }
@@ -755,6 +761,8 @@ impl<B: Backend> Device<B> {
             tck: opts.tck,
             tcl: opts.tcl,
             gap_axis: opts.gap_axis,
+            lwd: opts.lwd,
+            ..InlineAxis::default()
         };
         if let (true, Some(names), Some(at)) = (opts.axisnames, &opts.names, names_at) {
             // `axis(side, at = at, labels = names.arg, lty = axis.lty,

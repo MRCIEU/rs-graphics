@@ -392,11 +392,19 @@ pub struct HistOptions {
     /// Bar fills, recycled over the bars; empty: `"lightgray"` (R's
     /// default).
     pub col: Vec<ColorSpec>,
-    /// Bar borders, recycled; empty: `par(fg)` (R's default).
+    /// Bar borders, recycled; empty: `par(fg)`, or with shading the bar's
+    /// `col` (R's `border = NULL`).
     pub border: Vec<ColorSpec>,
     /// Bar border line types, recycled; empty: `par(lty)`.
     /// `None` (R's `NA`): that bar has no border.
     pub lty: Vec<Option<LineType>>,
+    /// Shading lines per inch in the bars (R's `density`), recycled per bar;
+    /// the lines take the bar's `col`; see [`RectOptions::density`]. Empty:
+    /// no shading.
+    pub density: Vec<Option<f64>>,
+    /// Angle of the shading lines in degrees (R's `angle`), recycled as
+    /// `density`; empty: 45.
+    pub angle: Vec<f64>,
     /// R's `labels`: [`HistLabels::Values`] writes each bar's count (or,
     /// with densities, its density to 3 decimals) above it, `Text` the
     /// given labels; default none.
@@ -472,6 +480,9 @@ pub struct HistOptions {
     /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
     /// R's default.
     pub gap_axis: Option<f64>,
+    /// Width of the axes' line and ticks (R's inline `lwd`, which `hist()` passes
+    /// only to `axis()`); `None`: 1, `axis()`'s default.
+    pub lwd: Option<f64>,
     /// `false` returns the bins without drawing (R's `plot = FALSE`);
     /// `None`: `true`.
     pub plot: Option<bool>,
@@ -485,6 +496,8 @@ crate::setters::setters!(HistOptions => [HistCall] {
     col: values ColorSpec,
     border: values ColorSpec,
     lty: na_values LineType,
+    density: na_values f64,
+    angle: values f64,
     labels: value HistLabels,
     right: option bool,
     include_lowest: option bool,
@@ -511,6 +524,7 @@ crate::setters::setters!(HistOptions => [HistCall] {
     tck: option f64,
     tcl: option f64,
     gap_axis: option f64,
+    lwd: option f64,
     plot: option bool,
 });
 
@@ -524,6 +538,8 @@ impl Default for HistOptions {
             col: Vec::new(),
             border: Vec::new(),
             lty: Vec::new(),
+            density: Vec::new(),
+            angle: Vec::new(),
             labels: HistLabels::None,
             right: None,
             include_lowest: None,
@@ -550,6 +566,7 @@ impl Default for HistOptions {
             tck: None,
             tcl: None,
             gap_axis: None,
+            lwd: None,
             plot: None,
         }
     }
@@ -730,6 +747,8 @@ impl<B: Backend> Device<B> {
                     tck: opts.tck,
                     tcl: opts.tcl,
                     gap_axis: opts.gap_axis,
+                    lwd: opts.lwd,
+                    ..InlineAxis::default()
                 };
                 self.axis_impl(1, &inline.apply(AxisOptions::default()));
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
@@ -749,7 +768,8 @@ impl<B: Backend> Device<B> {
             }
         }
 
-        // `rect(breaks[-nB], 0, breaks[-1L], y, col = col, border = border)`.
+        // `rect(breaks[-nB], 0, breaks[-1L], y, col = col, border = border,
+        // angle = angle, density = density, lty = lty)`.
         let or = |v: &[ColorSpec], default: ColorSpec| {
             if v.is_empty() {
                 vec![default]
@@ -762,8 +782,12 @@ impl<B: Backend> Device<B> {
                 &opts.col,
                 ColorSpec::Color(Color::parse("lightgray").unwrap()),
             ),
-            border: or(&opts.border, ColorSpec::Color(self.par.fg)),
+            // `border = NULL`: `rect()`'s default (`par(fg)`, or with
+            // shading the bar's `col`).
+            border: opts.border.clone(),
             lty: opts.lty.clone(),
+            density: opts.density.clone(),
+            angle: opts.angle.clone(),
             ..RectOptions::default()
         };
         self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);

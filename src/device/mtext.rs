@@ -69,6 +69,13 @@ pub struct MtextOptions {
     /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
     /// `None`: `par(las)`.
     pub las: Option<i32>,
+    /// R's inline `xpd`: where the text clips, at least the figure region
+    /// (`false` is `true` here; [`Xpd::Device`] for the whole device);
+    /// `None`: `par(xpd)`. `outer` text clips to the device. This is what
+    /// R's `C_mtext` means to do; it tests `outer` as a pointer rather
+    /// than its value, so R always clips `mtext()` to the device (an R
+    /// bug, not copied).
+    pub xpd: Option<Xpd>,
 }
 
 crate::setters::setters!(MtextOptions => [MtextCall] {
@@ -81,6 +88,7 @@ crate::setters::setters!(MtextOptions => [MtextCall] {
     col: values ColorSpec,
     font: na_values FontFace,
     las: option i32,
+    xpd: option Xpd,
 });
 
 /// One label's arguments, after recycling (`None`: R's default).
@@ -94,6 +102,7 @@ struct One {
     col: Option<ColorSpec>,
     font: Option<FontFace>,
     las: Option<i32>,
+    xpd: Option<Xpd>,
 }
 
 /// `ComputeAdjValue()`.
@@ -172,6 +181,7 @@ impl<B: Backend> Device<B> {
                     .then(|| opts.font[i % opts.font.len()])
                     .flatten(),
                 las: opts.las,
+                xpd: opts.xpd,
             };
             self.mtext_one(texts[i % texts.len()].clone(), side, &one);
         }
@@ -246,7 +256,7 @@ impl<B: Backend> Device<B> {
         } else {
             Point::new(across, along)
         };
-        let clip = if opts.outer { Xpd::Device } else { Xpd::Figure };
+        let clip = self.margin_clip(opts.xpd, opts.outer);
         let col = opts.col.unwrap_or(ColorSpec::Color(self.par.col));
         let font = opts.font.unwrap_or(self.par.font);
         // R sets the text size from `cex` alone (`C_mtext`: "we ignore any

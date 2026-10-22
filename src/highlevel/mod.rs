@@ -67,6 +67,15 @@ pub(crate) struct InlineAxis {
     pub tck: Option<f64>,
     pub tcl: Option<f64>,
     pub gap_axis: Option<f64>,
+    /// `lwd`: the axis line and ticks (`axis(lwd = )`).
+    pub lwd: Option<f64>,
+    /// `font`: the label font, over `font_axis` (`axis(font = )`).
+    pub font: Option<FontFace>,
+    /// `fg`: the axis line and ticks' colour (`axis()` takes `fg` as
+    /// `col`).
+    pub col: Option<crate::color::ColorSpec>,
+    pub lend: Option<crate::backend::LineEnd>,
+    pub xpd: Option<crate::par::Xpd>,
 }
 
 impl InlineAxis {
@@ -76,7 +85,11 @@ impl InlineAxis {
             las: opts.las.or(self.las),
             cex_axis: opts.cex_axis.or(self.cex_axis),
             col_axis: opts.col_axis.or(self.col_axis),
-            font: opts.font.or(self.font_axis),
+            font: opts.font.or(self.font).or(self.font_axis),
+            lwd: opts.lwd.or(self.lwd),
+            col: opts.col.or(self.col),
+            lend: opts.lend.or(self.lend),
+            xpd: opts.xpd.or(self.xpd),
             mgp: opts.mgp.or(self.mgp),
             tck: opts.tck.or(self.tck),
             tcl: opts.tcl.or(self.tcl),
