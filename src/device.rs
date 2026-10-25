@@ -55,7 +55,7 @@ pub use axis::AxisOptions;
 pub(crate) use legend::check_legend;
 pub use legend::{LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos};
 pub use mtext::MtextOptions;
-pub use open::DeviceBuilder;
+pub use open::{DeviceBuilder, Units};
 pub use primitives::{
     ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
     SegmentsOptions, TextOptions, XyOptions,

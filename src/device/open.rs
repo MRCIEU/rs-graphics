@@ -36,10 +36,19 @@ use crate::par::Par;
 pub struct DeviceBuilder {
     format: Format,
     file: PathBuf,
-    /// Page width in inches; `None`: 7 for PDF and SVG, 480/72 for PNG.
+    /// Page width in [`units`](DeviceBuilder::units); `None`: 7 inches for
+    /// PDF and SVG, 480/72 inches for PNG, whatever the units.
     pub width: Option<f64>,
-    /// Page height in inches; `None`: as `width`.
+    /// Page height in [`units`](DeviceBuilder::units); `None`: as `width`.
     pub height: Option<f64>,
+    /// The units of `width` and `height` (R's `units`, which only R's
+    /// bitmap devices such as `png()` take); `None`: inches (R's `png()`
+    /// defaults to pixels). Here inches, centimetres and millimetres work
+    /// for every format; pixels only for PNG, where they are divided by
+    /// `res` (so `.width(1200).units("px").res(300)` is 4 inches, as R's
+    /// `png(width = 1200, res = 300)`). Pixels for a PDF or SVG device make
+    /// [`open`](DeviceBuilder::open) fail.
+    pub units: Option<Units>,
     /// R's `pointsize`: the starting `par(ps)`, which also fixes the size
     /// of plotting symbols and margin lines from the start (R's
     /// `startps`); `None`: 12.
@@ -65,6 +74,7 @@ pub struct DeviceBuilder {
 crate::setters::setters!(DeviceBuilder {
     width: option f64,
     height: option f64,
+    units: option Units,
     pointsize: option f64,
     bg: option ColorSpec,
     res: option f64,
@@ -90,10 +100,21 @@ impl DeviceBuilder {
     /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid
     /// 'file' argument"), as R's `checkIntFormat()`.
     ///
+    /// [`units`](DeviceBuilder::units) of pixels for a PDF or SVG device
+    /// are an [`InvalidInput`](std::io::ErrorKind::InvalidInput) error,
+    /// checked before the file is created.
+    ///
     /// The contents are written by
     /// [`close`](Device::close) (R's `dev.off()`); a device dropped
     /// without it leaves the file empty.
     pub fn open(self) -> std::io::Result<Device<AnyBackend>> {
+        let units = self.units.unwrap_or(Units::In);
+        if units == Units::Px && self.format != Format::Png {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "units = \"px\" needs a PNG device",
+            ));
+        }
         let name = FileName::parse(&self.file)?;
         let first = name.for_page(1);
         let file = create(&first)?;
@@ -101,8 +122,15 @@ impl DeviceBuilder {
             Format::Png => 480.0 / 72.0,
             Format::Pdf | Format::Svg => 7.0,
         };
-        let width = self.width.unwrap_or(default_size);
-        let height = self.height.unwrap_or(default_size);
+        let res = self.res.unwrap_or(72.0);
+        let inches = |size: f64| match units {
+            Units::In => size,
+            Units::Cm => size / 2.54,
+            Units::Mm => size / 25.4,
+            Units::Px => size / res,
+        };
+        let width = self.width.map_or(default_size, inches);
+        let height = self.height.map_or(default_size, inches);
         let mut par = Par::default();
         let bg = self
             .bg
@@ -117,13 +145,9 @@ impl DeviceBuilder {
                 }
             }
             Format::Svg => SvgBackend::new(width, height).into(),
-            Format::Png => RasterBackend::new(
-                width,
-                height,
-                self.res.unwrap_or(72.0),
-                bg.unwrap_or(Color::WHITE),
-            )
-            .into(),
+            Format::Png => {
+                RasterBackend::new(width, height, res, bg.unwrap_or(Color::WHITE)).into()
+            }
         };
         if let Some(ps) = self.pointsize {
             par.ps = ps;
@@ -153,6 +177,44 @@ impl DeviceBuilder {
         Ok(dev)
     }
 }
+
+/// The units of a device's `width` and `height`
+/// ([`DeviceBuilder::units`]): R's `units` of `png()`.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum Units {
+    /// `"in"`: inches (the default here; R's `png()` defaults to pixels).
+    #[default]
+    In,
+    /// `"cm"`: centimetres.
+    Cm,
+    /// `"mm"`: millimetres.
+    Mm,
+    /// `"px"`: pixels, at the device's `res` (PNG only).
+    Px,
+}
+
+impl Units {
+    /// `"px"`, `"in"`, `"cm"` or `"mm"`, or a unique prefix of one (R's
+    /// `match.arg()`); `None` for anything else.
+    pub fn parse(s: &str) -> Option<Units> {
+        let all = [
+            ("px", Units::Px),
+            ("in", Units::In),
+            ("cm", Units::Cm),
+            ("mm", Units::Mm),
+        ];
+        let mut hits = all
+            .iter()
+            .filter(|(name, _)| !s.is_empty() && name.starts_with(s));
+        match (hits.next(), hits.next()) {
+            (Some(&(_, u)), None) => Some(u),
+            _ => None,
+        }
+    }
+}
+
+crate::error::from_str_via_parse!(Units, "units");
+crate::error::from_r_string!(Units, "units", "\"px\", \"in\", \"cm\" or \"mm\"");
 
 /// Creates (or empties) `path`, with R's message on failure.
 fn create(path: &Path) -> std::io::Result<File> {
@@ -402,6 +464,7 @@ impl Device<AnyBackend> {
             file: file.as_ref().to_path_buf(),
             width: None,
             height: None,
+            units: None,
             pointsize: None,
             bg: None,
             res: None,
@@ -438,8 +501,9 @@ impl Device<AnyBackend> {
     }
 
     /// R's `png(filename, ...)`: [`Device::format`] with PNG. Sizes are in
-    /// inches (R's `units = "in"`), with [`res`](DeviceBuilder::res) pixels
-    /// per inch (default 72); the default 6.67 x 6.67 inches at 72 ppi is
+    /// inches (R's `units = "in"`) unless [`units`](DeviceBuilder::units)
+    /// says otherwise (`"px"` for R's default), with
+    /// [`res`](DeviceBuilder::res) pixels per inch (default 72); the default 6.67 x 6.67 inches at 72 ppi is
     /// R's default 480 x 480 pixel image. White background. One file per
     /// page with a page number in `file`, as R's default
     /// `"Rplot%03d.png"` (see [`open`](DeviceBuilder::open)).

@@ -26,7 +26,7 @@ pub use crate::device::{
     AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, DeviceBuilder,
     LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos, MtextOptions,
     PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
-    TitleOptions, XyOptions,
+    TitleOptions, Units, XyOptions,
 };
 pub use crate::font::FontFace;
 pub use crate::geometry::{Point, Rect};

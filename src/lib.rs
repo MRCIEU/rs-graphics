@@ -53,7 +53,8 @@
 //! and [`Device::png`](device::Device::png) (or
 //! [`Device::format`](device::Device::format), for a format chosen at run
 //! time) take the file and return a [`DeviceBuilder`](device::DeviceBuilder)
-//! for R's other arguments (`width` and `height` in inches, `pointsize`,
+//! for R's other arguments (`width` and `height`, in inches unless `units`
+//! is `"cm"`, `"mm"` or, for PNG, `"px"`; `pointsize`,
 //! `bg`, PNG's `res`, PDF's `compress` and `onefile`), with R's defaults;
 //! `.open()` opens the device and creates the file (so a bad path fails
 //! before any drawing), and [`close`](device::Device::close) (R's `dev.off()`)

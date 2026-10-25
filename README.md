@@ -86,9 +86,13 @@ dev.close()?;
 ```
 
 `Device::pdf(file)` and `Device::svg(file)` work the same way. The
-device's arguments (`width`, `height`, `pointsize`, `bg`, `res` for PNG,
+device's arguments (`width`, `height`, `units`, `pointsize`, `bg`, `res` for PNG,
 `compress` and `onefile` for PDF) have R's defaults, so
 `Device::pdf("plot.pdf").open()?` is R's `pdf("plot.pdf")`, 7 x 7 inches.
+Sizes are in inches unless `units` is set: `"cm"` and `"mm"` work for
+every format, `"px"` for PNG (divided by `res`, so
+`.width(1200).height(900).units("px").res(150)` is R's
+`png(width = 1200, height = 900, res = 150)`).
 As in R, opening the device creates the file, so a bad path fails
 before anything is drawn, and `dev.close()` (R's `dev.off()`) writes it.
 A page number in a PNG or SVG file name gives one file per page, as R's

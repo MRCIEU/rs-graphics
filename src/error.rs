@@ -19,7 +19,8 @@ use std::fmt;
 /// [`LegendBty`](crate::device::LegendBty),
 /// [`OrderH`](crate::highlevel::OrderH), [`Bty`](crate::par::Bty),
 /// [`FontFace`](crate::font::FontFace),
-/// [`Format`](crate::backend::Format) and the `par()` enums.
+/// [`Format`](crate::backend::Format), [`Units`](crate::device::Units)
+/// and the `par()` enums.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {
     /// What was being parsed, e.g. `"colour"` or `"axis style"`.

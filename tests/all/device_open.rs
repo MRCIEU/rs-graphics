@@ -274,3 +274,107 @@ fn open_fails_on_a_bad_path_and_names_it() {
     assert!(err.to_string().contains("no_such_directory"), "{err}");
     assert!(!path.exists());
 }
+
+#[test]
+fn units_convert_sizes_to_inches() {
+    // 12.7 cm = 101.6 mm = 5 in; 4 in the other way.
+    assert_eq!(
+        opened(
+            Device::pdf(temp("a.pdf"))
+                .width(12.7)
+                .height(10.16)
+                .units("cm")
+        ),
+        direct(PdfBackend::new(5.0, 4.0), Par::default())
+    );
+    assert_eq!(
+        opened(
+            Device::svg(temp("a.svg"))
+                .width(127)
+                .height(101.6)
+                .units("mm")
+        ),
+        direct(SvgBackend::new(5.0, 4.0), Par::default())
+    );
+    assert_eq!(
+        opened(
+            Device::png(temp("a.png"))
+                .width(5)
+                .height(4)
+                .units(Units::In)
+        ),
+        opened(Device::png(temp("a.png")).width(5).height(4))
+    );
+    // Pixels are divided by `res`: R's png(width = 750, height = 600, res = 150).
+    assert_eq!(
+        opened(
+            Device::png(temp("a.png"))
+                .width(750)
+                .height(600)
+                .units("px")
+                .res(150)
+        ),
+        direct(
+            RasterBackend::new(5.0, 4.0, 150.0, Color::WHITE),
+            Par::default()
+        )
+    );
+    // ... at 72 ppi by default, so 480 px is R's default page.
+    assert_eq!(
+        opened(
+            Device::png(temp("a.png"))
+                .width(480)
+                .height(480)
+                .units("px")
+        ),
+        opened(Device::png(temp("a.png")))
+    );
+}
+
+#[test]
+fn units_leave_the_default_size_alone() {
+    for units in ["in", "cm", "mm"] {
+        assert_eq!(
+            opened(Device::pdf(temp("a.pdf")).units(units)),
+            opened(Device::pdf(temp("a.pdf")))
+        );
+    }
+    assert_eq!(
+        opened(Device::png(temp("a.png")).units("px").res(150)),
+        opened(Device::png(temp("a.png")).res(150))
+    );
+}
+
+#[test]
+fn pixels_need_a_png_device() {
+    for format in ["pdf", "svg"] {
+        let path = temp(&format!("px.{format}"));
+        let _ = std::fs::remove_file(&path);
+        let err = Device::format(format, &path)
+            .width(480)
+            .units("px")
+            .open()
+            .err()
+            .expect("open should fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(err.to_string().contains("px"), "{err}");
+        assert!(!path.exists());
+    }
+}
+
+#[test]
+fn units_parse_like_match_arg() {
+    assert_eq!(Units::parse("px"), Some(Units::Px));
+    assert_eq!(Units::parse("i"), Some(Units::In));
+    assert_eq!(Units::parse("c"), Some(Units::Cm));
+    assert_eq!(Units::parse("m"), Some(Units::Mm));
+    assert_eq!(Units::parse(""), None);
+    assert_eq!(Units::parse("pt"), None);
+    assert_eq!("mm".parse::<Units>(), Ok(Units::Mm));
+}
+
+#[test]
+#[should_panic(expected = "\"pt\" is not a valid units")]
+fn unknown_units_panic() {
+    let _ = Device::pdf(temp("a.pdf")).units("pt");
+}
