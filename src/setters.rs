@@ -228,9 +228,10 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// Setter kinds: `value` (plain field), `option` (`Option<T>`, set to
 /// `Some`), `values` (`Vec<T>` recycled by R), `na_values`
 /// (`Vec<Option<T>>` recycled by R, `None` = `NA`), `option_values`
-/// (`Option<Vec<T>>`), `list` (`Option<Vec<T>>` from any iterator of
-/// `Into<T>`, e.g. strings for `Label`s), `labels`
-/// (`Option<Vec<Option<Label>>>`), `pair` (`Option<(f64, f64)>` from two
+/// (`Option<Vec<T>>`), `list` (`Option<Vec<Label>>` from one label or
+/// several, [`LabelValues`](crate::plotmath::LabelValues)), `labels`
+/// (`Option<Vec<Option<Label>>>` from [`Labels`](crate::plotmath::Labels),
+/// `None` = `NA`), `pair` (`Option<(f64, f64)>` from two
 /// numbers), `option_pair` (`Option<(f64, f64)>` from one
 /// [`Pair`](crate::numbers::Pair) tuple), `array` (`Option<[f64; N]>`
 /// from an array of any numbers), `na` (`Option<Option<f64>>`, R's
@@ -365,24 +366,22 @@ macro_rules! options {
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident list $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
+        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
+            "`] to one label or several (see [`LabelValues`](crate::plotmath::LabelValues)).")]
         #[doc = ""]
         $($a)*
-        pub fn $field<S: Into<$t>>(mut self, values: impl IntoIterator<Item = S>) -> Self {
-            self$(.$p)?.$field = Some(values.into_iter().map(Into::into).collect());
+        pub fn $field(mut self, values: impl $crate::plotmath::LabelValues) -> Self {
+            self$(.$p)?.$field = Some(values.into_label_values());
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident labels $t:ty) => {
         #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`], all present (set the field directly for `NA` labels).")]
+            "`] to one label or several; `None` is R's `NA` (see [`Labels`](crate::plotmath::Labels)).")]
         #[doc = ""]
         $($a)*
-        pub fn $field<L: Into<$crate::plotmath::Label>>(
-            mut self,
-            values: impl IntoIterator<Item = L>,
-        ) -> Self {
-            self$(.$p)?.$field = Some(values.into_iter().map(|l| Some(l.into())).collect());
+        pub fn $field(mut self, values: impl $crate::plotmath::Labels) -> Self {
+            self$(.$p)?.$field = Some(values.into_labels());
             self
         }
     };
@@ -493,6 +492,30 @@ mod tests {
             vec![Some(1.0), None, Some(1.0), None]
         );
         assert_eq!(pick_na(&[], 3, 9.0), Some(9.0));
+    }
+
+    #[test]
+    fn label_setters_take_one_label_or_several() {
+        use crate::device::AxisOptions;
+        use crate::highlevel::{BarplotOptions, BoxplotOptions, PieOptions};
+        use crate::plotmath::Label;
+
+        let a = Label::from("A");
+        let bars = BarplotOptions::default()
+            .names("A")
+            .legend_text(String::from("A"));
+        assert_eq!(bars.names, Some(vec![a.clone()]));
+        assert_eq!(bars.legend_text, Some(vec![a.clone()]));
+        let names = vec!["A".to_string(), "B".to_string()];
+        let boxes = BoxplotOptions::default().names(&names);
+        assert_eq!(boxes.names, Some(vec![a.clone(), Label::from("B")]));
+        let pie = PieOptions::default().labels(Label::math("x^2"));
+        assert_eq!(pie.labels, Some(vec![Label::math("x^2")]));
+        // Axis labels may hold R's `NA`.
+        let axis = AxisOptions::default().labels("A");
+        assert_eq!(axis.labels, Some(vec![Some(a.clone())]));
+        let axis = AxisOptions::default().labels([Some("A"), None]);
+        assert_eq!(axis.labels, Some(vec![Some(a), None]));
     }
 
     #[test]

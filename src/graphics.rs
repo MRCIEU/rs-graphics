@@ -16,7 +16,8 @@
 //! that is left out panics at `.draw()` with R's message (`argument "x" is
 //! missing, with no default`), also when a `Figure` records the call. As in R, numbers may be integers or floats: data
 //! vectors are any [`Numbers`], by reference or by value (`&x`, `x`,
-//! `[1, 2, 3]`, `1..=10` for R's `1:10`; `f64` data isn't copied, whether
+//! `[1, 2, 3]`, `1..=10` for R's `1:10`, or one number, `1`, as R's
+//! length-one vector; `f64` data isn't copied, whether
 //! borrowed or a `Vec` moved in), and numeric setters
 //! take integers too (`.cex(2)`, `.xlim(0, 10)`):
 //!
@@ -211,7 +212,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `boxplot(x, ...)`: R's `x` is [`x`](BoxplotCall::x) (required), the
     /// groups (R's `list`/formula input reduced to its common case): any
     /// [`Groups`], e.g. `&[a, b]` or `&groups` for `Vec`s of numbers, `f64`
-    /// or integer; a single group is `.x(&[v])`. Other arguments in
+    /// or integer; one vector is one group, as R's `boxplot(x)` (`.x(&v)`). Other arguments in
     /// [`BoxplotOptions`]. A high-level plot:
     /// it starts a new plot with [`plot_new`](Graphics::plot_new), so on a
     /// multi-panel page it moves to the next panel, unless `add` (R's
@@ -832,7 +833,7 @@ call!(
     BoxplotCall, BoxplotOptions => Vec<BoxStats>,
     args {
         /// R's `x` (required): the groups, any [`Groups`] (e.g. `&[a, b]`
-        /// or `&groups`; a single group is `&[x]`).
+        /// or `&groups`; one vector, `&x`, is one group).
         x: Cow<'a, [Vec<f64>]> = (impl Groups<'a> => Groups::into_groups),
     },
     |t, o| { t.emit_boxplot(&required(x, "x"), o) }

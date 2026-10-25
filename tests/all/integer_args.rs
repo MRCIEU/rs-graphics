@@ -263,3 +263,71 @@ fn boxplot_stats_takes_integers() {
         s(boxplot_stats([1.0, 2.0, 3.0, 4.0, 100.0], 1.0))
     );
 }
+
+/// Every data argument given single numbers (R's length-one vectors),
+/// integers and floats, by value and by reference.
+#[allow(clippy::needless_borrows_for_generic_args)] // `&one` on purpose
+fn with_single_numbers<G: Graphics>(g: &mut G) {
+    let one = 1.0;
+    g.plot().x(1).y(&one).xlim(0, 4).ylim(0, 4).draw();
+    g.points().x(2.0).y(2).draw();
+    g.lines().x(1).y(1).draw();
+    g.text().x(3).y(3.0).labels("a").draw();
+    g.segments().x0(0).y0(0).x1(4).y1(4).draw();
+    g.arrows().x0(1).y0(3).x1(2).y1(3.5).draw();
+    g.rect().xleft(1).ybottom(1).xright(2).ytop(2).draw();
+    g.polygon().x(3).y(1).draw();
+    g.hist().x(2).draw();
+    g.barplot().height(5).draw();
+    g.boxplot().x(3).draw();
+    g.pie().x(1).draw();
+}
+
+/// The same, as one-element vectors.
+fn with_one_element_vectors<G: Graphics>(g: &mut G) {
+    g.plot().x([1.0]).y([1.0]).xlim(0, 4).ylim(0, 4).draw();
+    g.points().x([2.0]).y([2.0]).draw();
+    g.lines().x([1.0]).y([1.0]).draw();
+    g.text().x([3.0]).y([3.0]).labels(["a"]).draw();
+    g.segments().x0([0.0]).y0([0.0]).x1([4.0]).y1([4.0]).draw();
+    g.arrows().x0([1.0]).y0([3.0]).x1([2.0]).y1([3.5]).draw();
+    g.rect()
+        .xleft([1.0])
+        .ybottom([1.0])
+        .xright([2.0])
+        .ytop([2.0])
+        .draw();
+    g.polygon().x([3.0]).y([1.0]).draw();
+    g.hist().x([2.0]).draw();
+    g.barplot().height([5.0]).draw();
+    g.boxplot().x([vec![3.0]]).draw();
+    g.pie().x([1.0]).draw();
+}
+
+#[test]
+fn single_numbers_are_vectors_of_one() {
+    let mut a = device(7.0, 6.0);
+    with_single_numbers(&mut a);
+    let mut b = device(7.0, 6.0);
+    with_one_element_vectors(&mut b);
+    assert!(a.finish() == b.finish(), "device output differs");
+
+    let (mut fa, mut fb) = (Figure::new(), Figure::new());
+    with_single_numbers(&mut fa);
+    with_one_element_vectors(&mut fb);
+    let (mut a, mut b) = (device(7.0, 6.0), device(7.0, 6.0));
+    a.add_figure(&fa);
+    b.add_figure(&fb);
+    assert!(a.finish() == b.finish(), "figure output differs");
+
+    // One vector is one box, as R's `boxplot(x)`.
+    let mut a = device(7.0, 6.0);
+    a.boxplot().x([1, 2, 3, 4, 100]).draw();
+    let mut b = device(7.0, 6.0);
+    b.boxplot().x([vec![1.0, 2.0, 3.0, 4.0, 100.0]]).draw();
+    assert!(a.finish() == b.finish(), "boxplot of one vector differs");
+    assert_eq!(
+        format!("{:?}", boxplot_stats(5, 1.5)),
+        format!("{:?}", boxplot_stats([5.0], 1.5))
+    );
+}

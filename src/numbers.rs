@@ -8,8 +8,10 @@
 
 //! Numeric arguments that take integers as well as `f64`, as R's numbers
 //! do: data vectors ([`Numbers`]: `dev.plot().x([1, 2, 3]).y(&y)` or
-//! `dev.plot().x(1..=10).y(&y)`, R's `plot(1:10, y)`), groups of them
-//! ([`Groups`], for `boxplot()`) and pairs ([`Pair`]: `(5, 20)`).
+//! `dev.plot().x(1..=10).y(&y)`, R's `plot(1:10, y)`; one number is a
+//! vector of one, `dev.plot().x(1).y(1)` for R's `plot(1, 1)`), groups of
+//! them ([`Groups`], for `boxplot()`; one vector is one group) and pairs
+//! ([`Pair`]: `(5, 20)`).
 //!
 //! Data may be passed by reference or by value (`&x` or `x`, `&[1, 2]` or
 //! `[1, 2]`), as may the recycled option vectors (`.h([1, 2])`,
@@ -48,8 +50,8 @@ num!(f64, f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 
 /// A data vector (R's numeric vector `x`, `y`, ...): a slice, array or
 /// `Vec` of any [`Num`] type, by reference or by value (`&x`, `x`,
-/// `&[1, 2, 3]`, `[1, 2, 3]`), or an integer range (`1..=10` is R's
-/// `1:10`). `f64` data passed by reference is borrowed, and a `Vec<f64>`
+/// `&[1, 2, 3]`, `[1, 2, 3]`), an integer range (`1..=10` is R's
+/// `1:10`), or one number (`1`, `2.5`, `&v`), R's length-one vector. `f64` data passed by reference is borrowed, and a `Vec<f64>`
 /// passed by value is taken over, both without copying; other number
 /// types are converted once.
 pub trait Numbers<'a> {
@@ -144,6 +146,27 @@ macro_rules! converted_numbers {
 }
 converted_numbers!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 
+/// One number, as R's length-one vector (`plot(1, 1)` is
+/// `.x(1).y(1)`), by value or by reference.
+macro_rules! one_number {
+    ($($t:ty),*) => {
+        $(
+            impl<'a> Numbers<'a> for $t {
+                fn into_numbers(self) -> Cow<'a, [f64]> {
+                    Cow::Owned(vec![self.to_f64()])
+                }
+            }
+
+            impl<'a> Numbers<'a> for &'a $t {
+                fn into_numbers(self) -> Cow<'a, [f64]> {
+                    (*self).into_numbers()
+                }
+            }
+        )*
+    };
+}
+one_number!(f64, f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
+
 /// Integer ranges (`1..=10` is R's `1:10`).
 macro_rules! range_numbers {
     ($($t:ty),*) => {
@@ -165,7 +188,9 @@ macro_rules! range_numbers {
 range_numbers!(i32, i64, u32, u64, usize);
 
 /// Groups of data vectors (`boxplot()`'s R list of groups): a slice,
-/// array or `Vec` of `Vec`s of any [`Num`] type, by reference or by value.
+/// array or `Vec` of `Vec`s of any [`Num`] type, by reference or by value,
+/// or one data vector ([`Numbers`], one number included), which is one
+/// group, as R's `boxplot(x)`.
 /// `f64` groups are borrowed (by reference) or taken over (a `Vec` by
 /// value) without copying.
 pub trait Groups<'a> {
@@ -200,6 +225,13 @@ impl<'a> Groups<'a> for Vec<Vec<f64>> {
 impl<'a, const N: usize> Groups<'a> for [Vec<f64>; N] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
         Cow::Owned(self.into())
+    }
+}
+
+/// One data vector (or number) is one group, as R's `boxplot(x)`.
+impl<'a, N: Numbers<'a>> Groups<'a> for N {
+    fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
+        Cow::Owned(vec![self.into_numbers().into_owned()])
     }
 }
 

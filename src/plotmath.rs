@@ -176,9 +176,11 @@ impl From<Expression> for Label {
 /// of [`text()`](crate::graphics::Graphics::text), the text of
 /// [`mtext()`](crate::graphics::Graphics::mtext), recycled with its other
 /// arguments, and the labels of
-/// [`legend()`](crate::graphics::Graphics::legend), one per key. A `None`
+/// [`legend()`](crate::graphics::Graphics::legend), one per key, and
+/// [`axis()`](crate::graphics::Graphics::axis)'s `labels`. A `None`
 /// element is R's `NA`: no text there (`text()` and `mtext()` skip it; in
-/// `legend()` the key is drawn and the label takes no room), as in R.
+/// `legend()` the key is drawn and the label takes no room; in `axis()`
+/// the tick is drawn without a label), as in R.
 pub trait Labels {
     /// The labels, in order (`None`: R's `NA`).
     fn into_labels(self) -> Vec<Option<Label>>;
@@ -241,6 +243,59 @@ impl<L: Clone + LabelElement> Labels for Vec<L> {
 impl<L: Clone + LabelElement> Labels for &Vec<L> {
     fn into_labels(self) -> Vec<Option<Label>> {
         self.iter().cloned().map(LabelElement::into_label).collect()
+    }
+}
+
+/// One label (`&str`, `String`, [`Label`], an [`Expression`]) or several
+/// (a slice, array or `Vec` of them), for the label lists that have no
+/// `NA`: `barplot()`'s `names` and `legend_text`, `boxplot()`'s `names`
+/// and `pie()`'s `labels`. As in R, one label is a list of one
+/// (`.names("A")`).
+pub trait LabelValues {
+    /// The labels, in order.
+    fn into_label_values(self) -> Vec<Label>;
+}
+
+macro_rules! one_label_value {
+    ($($t:ty),*) => {
+        $(
+            impl LabelValues for $t {
+                fn into_label_values(self) -> Vec<Label> {
+                    vec![self.into()]
+                }
+            }
+        )*
+    };
+}
+one_label_value!(&str, &&str, String, &String, Label, Expression);
+
+impl<L: Clone + Into<Label>> LabelValues for &[L] {
+    fn into_label_values(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Into<Label>, const N: usize> LabelValues for [L; N] {
+    fn into_label_values(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>, const N: usize> LabelValues for &[L; N] {
+    fn into_label_values(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Into<Label>> LabelValues for Vec<L> {
+    fn into_label_values(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>> LabelValues for &Vec<L> {
+    fn into_label_values(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
     }
 }
 

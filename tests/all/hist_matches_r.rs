@@ -8,8 +8,8 @@
 
 //! Cross-checks the bin edges and counts `hist()` returns against R's own
 //! `hist(x, plot = FALSE)` for a handful of fixed datasets, with the
-//! default Sturges breaks, a number of classes (`breaks = 20`) and unsorted
-//! edges.
+//! default Sturges breaks (also for one value and for all values equal),
+//! a number of classes (`breaks = 20`) and unsorted edges.
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.
 
@@ -78,6 +78,13 @@ fn breaks_and_counts_match_r_sturges() {
         &[
             0.1, 0.2, 0.15, 0.3, 0.25, 0.4, 0.35, 0.5, 0.45, 0.6, 0.55, 0.7, 0.65,
         ],
+        // One value, or all values equal: `pretty()` of a zero-width range.
+        &[2.0],
+        &[7.0, 7.0, 7.0],
+        &[0.0],
+        &[-5.0],
+        &[-0.3],
+        &[1e6],
     ];
 
     for data in datasets {

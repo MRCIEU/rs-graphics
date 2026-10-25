@@ -577,7 +577,7 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
             let nclass = k.min(1e6) as i32;
             let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
             let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
                 (lo, hi)
             } else {
                 (0.0, 1.0)
@@ -588,7 +588,7 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
         _ => {
             let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
             let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
                 (lo, hi)
             } else {
                 (0.0, 1.0)
