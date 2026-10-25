@@ -24,65 +24,52 @@ use crate::setters::pick_na;
 
 use super::Device;
 
-/// The arguments of R's `abline()`, with R's defaults. Empty
-/// `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/`par("lwd")`;
-/// otherwise they are recycled over the lines in drawing order: each
-/// `a`/`b` line, then each `h`, then each `v`.
-///
-/// Unlike R, `a` and `b` take several values (one line per pair), so every
-/// kind of line can be given several times. R's `coef = c(a, b)` (and
-/// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
-#[derive(Clone, Debug, Default)]
-pub struct AblineOptions {
-    /// Intercepts of the `a`/`b` lines `y = a + b * x`, paired with `b`
-    /// (one of them may have a single value, used for every line); empty
-    /// (with `b`): no such lines.
-    pub a: Vec<f64>,
-    /// Slopes of the `a`/`b` lines, paired with `a`.
-    pub b: Vec<f64>,
-    /// `untf = TRUE`: on log axes, draw each `y = a + b * x` in data units
-    /// (a curve) rather than a straight line in log units. Default `false`.
-    pub untf: bool,
-    /// Horizontal lines at these y values; empty: none.
-    pub h: Vec<f64>,
-    /// Vertical lines at these x values; empty: none.
-    pub v: Vec<f64>,
-    /// Colours, recycled over the lines; empty: `par(col)`.
-    pub col: Vec<ColorSpec>,
-    /// Line types, recycled over the lines; empty: `par(lty)`.
-    pub lty: Vec<Option<LineType>>,
-    /// Line widths, recycled over the lines; empty: `par(lwd)`.
-    pub lwd: Vec<Option<f64>>,
-    /// R's inline `xpd`: how far the lines run and where they are clipped
-    /// (the plot region for [`Xpd::Plot`], the figure region for
-    /// [`Xpd::Figure`], the whole device for [`Xpd::Device`]; the setter
-    /// also takes `false`/`true`); `None`: `par(xpd)`.
-    pub xpd: Option<Xpd>,
-    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
-    /// `None`: `par(lend)`.
-    pub lend: Option<LineEnd>,
-    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-    /// `None`: `par(ljoin)`.
-    pub ljoin: Option<LineJoin>,
-    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-    /// `par(lmitre)`.
-    pub lmitre: Option<f64>,
+crate::setters::options! {
+    /// The arguments of R's `abline()`, with R's defaults. Empty
+    /// `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/`par("lwd")`;
+    /// otherwise they are recycled over the lines in drawing order: each
+    /// `a`/`b` line, then each `h`, then each `v`.
+    ///
+    /// Unlike R, `a` and `b` take several values (one line per pair), so every
+    /// kind of line can be given several times. R's `coef = c(a, b)` (and
+    /// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
+    #[derive(Clone, Debug, Default)]
+    pub struct AblineOptions => [AblineCall] {
+        /// Intercepts of the `a`/`b` lines `y = a + b * x`, paired with `b`
+        /// (one of them may have a single value, used for every line); empty
+        /// (with `b`): no such lines.
+        pub a: Vec<f64> => values f64,
+        /// Slopes of the `a`/`b` lines, paired with `a`.
+        pub b: Vec<f64> => values f64,
+        /// `untf = TRUE`: on log axes, draw each `y = a + b * x` in data units
+        /// (a curve) rather than a straight line in log units. Default `false`.
+        pub untf: bool => value bool,
+        /// Horizontal lines at these y values; empty: none.
+        pub h: Vec<f64> => values f64,
+        /// Vertical lines at these x values; empty: none.
+        pub v: Vec<f64> => values f64,
+        /// Colours, recycled over the lines; empty: `par(col)`.
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Line types, recycled over the lines; empty: `par(lty)`.
+        pub lty: Vec<Option<LineType>> => na_values LineType,
+        /// Line widths, recycled over the lines; empty: `par(lwd)`.
+        pub lwd: Vec<Option<f64>> => na_values f64,
+        /// R's inline `xpd`: how far the lines run and where they are clipped
+        /// (the plot region for [`Xpd::Plot`], the figure region for
+        /// [`Xpd::Figure`], the whole device for [`Xpd::Device`]; the setter
+        /// also takes `false`/`true`); `None`: `par(xpd)`.
+        pub xpd: Option<Xpd> => option Xpd,
+        /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
+        /// `None`: `par(lend)`.
+        pub lend: Option<LineEnd> => option LineEnd,
+        /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
+        /// `None`: `par(ljoin)`.
+        pub ljoin: Option<LineJoin> => option LineJoin,
+        /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
+        /// `par(lmitre)`.
+        pub lmitre: Option<f64> => option f64,
+    }
 }
-
-crate::setters::setters!(AblineOptions => [AblineCall] {
-    a: values f64,
-    b: values f64,
-    untf: value bool,
-    h: values f64,
-    v: values f64,
-    col: values ColorSpec,
-    lty: na_values LineType,
-    lwd: na_values f64,
-    xpd: option Xpd,
-    lend: option LineEnd,
-    ljoin: option LineJoin,
-    lmitre: option f64,
-});
 
 impl AblineOptions {
     /// The `a`/`b` lines' intercepts and slopes, `a` and `b` paired (a

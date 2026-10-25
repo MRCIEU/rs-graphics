@@ -46,210 +46,161 @@ use crate::plotmath::Label;
 
 use super::InlineAxis;
 
-/// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
-/// `barplot.default`'s arguments this crate implements. Unset fields are
-/// R's defaults, given for each.
-#[derive(Clone, Debug)]
-pub struct BarplotOptions {
-    /// Labels drawn under each bar, or beside it if `horiz` (R's
-    /// `names.arg`). For a `beside` matrix either one name per bar or one
-    /// per column (centred under each group of bars). `None`: no names
-    /// (R takes them from `names(height)`/`colnames(height)`, which Rust
-    /// data doesn't have).
-    pub names: Option<Vec<Label>>,
-    /// Fill colours, recycled over the bars of a vector / the rows of a
-    /// matrix. Empty: R's default, `"grey"` for a vector,
-    /// `gray.colors(nrow)` for a matrix.
-    pub col: Vec<ColorSpec>,
-    /// Bar borders; `None`: `par(fg)` (R's default).
-    pub border: Option<ColorSpec>,
-    /// Shading lines per inch in the bars (R's `density`), recycled as
-    /// `col` is; the lines take the bar's `col`. `None` (R's `NA`) or
-    /// negative fills the bar instead, 0 leaves it empty; see
-    /// [`RectOptions::density`]. Empty: no shading. The legend's boxes are
-    /// shaded the same way. Not allowed with a log axis.
-    pub density: Vec<Option<f64>>,
-    /// Angle of the shading lines in degrees (R's `angle`), recycled as
-    /// `density` is; empty: 45.
-    pub angle: Vec<f64>,
-    /// Bar widths, recycled; empty: 1 (R's default).
-    pub width: Vec<f64>,
-    /// Space before each bar as a fraction of the mean bar width: one value,
-    /// or `[within group, between groups]` for a `beside` matrix. `None`
-    /// (or empty): R's default, `0.2`, or `[0, 1]` for a `beside` matrix.
-    pub space: Option<Vec<f64>>,
-    /// Matrix only: bars side by side instead of stacked. Default `false`.
-    pub beside: bool,
-    /// Horizontal bars. Default `false`.
-    pub horiz: bool,
-    /// Legend labels (R's `legend.text`): one per row of a matrix, or per
-    /// bar of a vector, filled with `col`; `None`: no legend.
-    pub legend_text: Option<Vec<Label>>,
-    /// Where the legend goes (R's `args.legend = list(x = .., y = ..)`),
-    /// e.g. `"topleft"` or `(x, y)`; `None`: 0.1 inch in from the top-right
-    /// corner of the plot region, as R.
-    pub legend_pos: Option<LegendPos>,
-    /// The rest of R's `args.legend`: every field set here overrides
-    /// barplot's choice for the legend (`fill` from `col`, `xjust = yjust
-    /// = 1`, otherwise `legend()`'s defaults), e.g. `bty`, `inset`, `ncol`,
-    /// `cex`, `title`, `fill`. The labels always come from `legend_text`.
-    /// Default: no overrides.
-    pub args_legend: LegendOptions,
-    /// x limits; `None`: from the bars.
-    pub xlim: Option<(f64, f64)>,
-    /// y limits; `None`: from the bars.
-    pub ylim: Option<(f64, f64)>,
-    /// Log x axis (R's `log = "x"`); default `false`. On a log value
-    /// axis bars start at the first value of `ylim` (or `xlim` if
-    /// `horiz`) when given, else at 0.9 times the smallest height, as in
-    /// R.
-    pub xlog: bool,
-    /// Log y axis (R's `log = "y"`); default `false`. See `xlog`.
-    pub ylog: bool,
-    /// Shifts each bar along the value axis (R's `offset`): recycled over
-    /// the bars of a vector, the rows of a `beside` matrix, or the columns
-    /// (stacks) of a stacked one. Empty: 0 (R's default).
-    pub offset: Vec<f64>,
-    /// Stacked bars only: the order of the segments within each stack (R's
-    /// `orderH`); each segment keeps its row's colour. Default
-    /// [`OrderH::None`] (row order).
-    pub order_h: OrderH,
-    /// Draw on the current plot instead of starting a new one (R's
-    /// `add = TRUE`): no new plot or panel, no new coordinates; the names,
-    /// legend and axis are still drawn. Default `false`.
-    pub add: bool,
-    /// Draw the titles (R's `ann`); `None`: `par(ann)`, unless `add` (R's
-    /// default `ann = !add && par("ann")`).
-    pub ann: Option<bool>,
-    /// Main title, as for `plot()` (text or a plotmath expression);
-    /// `None`: none. Titles are drawn when `ann` is (by default
-    /// `par(ann)`, and not with `add`).
-    pub main: Option<Label>,
-    /// Subtitle; `None`: none.
-    pub sub: Option<Label>,
-    /// x axis label; `None`: none.
-    pub xlab: Option<Label>,
-    /// y axis label; `None`: none.
-    pub ylab: Option<Label>,
-    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
-    /// to `title()`); `None`: `par(cex.main)`.
-    pub cex_main: Option<f64>,
-    /// Colour of `main` (R's `col.main`, passed to `title()`);
-    /// `None`: `par(col.main)`.
-    pub col_main: Option<ColorSpec>,
-    /// Font of `main` (a [`FontFace`]; R's
-    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
-    pub font_main: Option<FontFace>,
-    /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
-    /// to `title()`); `None`: `par(cex.sub)`.
-    pub cex_sub: Option<f64>,
-    /// Colour of `sub` (R's `col.sub`, passed to `title()`);
-    /// `None`: `par(col.sub)`.
-    pub col_sub: Option<ColorSpec>,
-    /// Font of `sub` (a [`FontFace`]; R's
-    /// `font.sub`, passed to `title()`); `None`: `par(font.sub)`.
-    pub font_sub: Option<FontFace>,
-    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
-    /// to `title()`); `None`: `par(cex.lab)`.
-    pub cex_lab: Option<f64>,
-    /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
-    /// `None`: `par(col.lab)`.
-    pub col_lab: Option<ColorSpec>,
-    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
-    /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
-    pub font_lab: Option<FontFace>,
-    /// Draw the value axis; default `true`.
-    pub axes: bool,
-    /// Draw the names (R's `axisnames`); default `true`.
-    pub axisnames: bool,
-    /// Size of the names (R's `cex.names`); `None`: `par(cex.axis)`.
-    pub cex_names: Option<f64>,
-    /// Line type of the names axis's line and ticks (R's `axis.lty`);
-    /// `None`: R's 0, none drawn.
-    pub axis_lty: Option<LineType>,
-    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
-    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
-    /// `None`: `par(las)`.
-    pub las: Option<i32>,
-    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
-    pub cex_axis: Option<f64>,
-    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
-    pub col_axis: Option<ColorSpec>,
-    /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
-    pub font_axis: Option<FontFace>,
-    /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
-    /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
-    pub mgp: Option<[f64; 3]>,
-    /// Tick length as a fraction of the plot region (R's inline `tck`);
-    /// `None`: `par(tck)`.
-    pub tck: Option<f64>,
-    /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
-    pub tcl: Option<f64>,
-    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
-    /// R's default.
-    pub gap_axis: Option<f64>,
-    /// Width of the axes' line and ticks (R's inline `lwd`, which `barplot()`
-    /// passes only to `axis()`, not to the bars); `None`: 1, `axis()`'s
-    /// default.
-    pub lwd: Option<f64>,
-    /// Clipping of the bars, names and legend (R's `xpd`; the setter also
-    /// takes `false`/`true`); `None`: [`Xpd::Figure`] (R's `TRUE`).
-    pub xpd: Option<Xpd>,
-    /// `false` works out the bars' centres and returns them without drawing
-    /// (R's `plot = FALSE`); `None`: `true`.
-    pub plot: Option<bool>,
+crate::setters::options! {
+    /// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
+    /// `barplot.default`'s arguments this crate implements. Unset fields are
+    /// R's defaults, given for each.
+    #[derive(Clone, Debug)]
+    pub struct BarplotOptions => [BarplotCall] {
+        /// Labels drawn under each bar, or beside it if `horiz` (R's
+        /// `names.arg`). For a `beside` matrix either one name per bar or one
+        /// per column (centred under each group of bars). `None`: no names
+        /// (R takes them from `names(height)`/`colnames(height)`, which Rust
+        /// data doesn't have).
+        pub names: Option<Vec<Label>> => list Label,
+        /// Fill colours, recycled over the bars of a vector / the rows of a
+        /// matrix. Empty: R's default, `"grey"` for a vector,
+        /// `gray.colors(nrow)` for a matrix.
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Bar borders; `None`: `par(fg)` (R's default).
+        pub border: Option<ColorSpec> => option ColorSpec,
+        /// Shading lines per inch in the bars (R's `density`), recycled as
+        /// `col` is; the lines take the bar's `col`. `None` (R's `NA`) or
+        /// negative fills the bar instead, 0 leaves it empty; see
+        /// [`RectOptions::density`]. Empty: no shading. The legend's boxes are
+        /// shaded the same way. Not allowed with a log axis.
+        pub density: Vec<Option<f64>> => na_values f64,
+        /// Angle of the shading lines in degrees (R's `angle`), recycled as
+        /// `density` is; empty: 45.
+        pub angle: Vec<f64> => values f64,
+        /// Bar widths, recycled; empty: 1 (R's default).
+        pub width: Vec<f64> => values f64,
+        /// Space before each bar as a fraction of the mean bar width: one value,
+        /// or `[within group, between groups]` for a `beside` matrix. `None`
+        /// (or empty): R's default, `0.2`, or `[0, 1]` for a `beside` matrix.
+        pub space: Option<Vec<f64>> => option_values f64,
+        /// Matrix only: bars side by side instead of stacked. Default `false`.
+        pub beside: bool => value bool,
+        /// Horizontal bars. Default `false`.
+        pub horiz: bool => value bool,
+        /// Legend labels (R's `legend.text`): one per row of a matrix, or per
+        /// bar of a vector, filled with `col`; `None`: no legend.
+        pub legend_text: Option<Vec<Label>> => list Label,
+        /// Where the legend goes (R's `args.legend = list(x = .., y = ..)`),
+        /// e.g. `"topleft"` or `(x, y)`; `None`: 0.1 inch in from the top-right
+        /// corner of the plot region, as R.
+        pub legend_pos: Option<LegendPos> => option LegendPos,
+        /// The rest of R's `args.legend`: every field set here overrides
+        /// barplot's choice for the legend (`fill` from `col`, `xjust = yjust
+        /// = 1`, otherwise `legend()`'s defaults), e.g. `bty`, `inset`, `ncol`,
+        /// `cex`, `title`, `fill`. The labels always come from `legend_text`.
+        /// Default: no overrides.
+        pub args_legend: LegendOptions => value LegendOptions,
+        /// x limits; `None`: from the bars.
+        pub xlim: Option<(f64, f64)> => pair f64,
+        /// y limits; `None`: from the bars.
+        pub ylim: Option<(f64, f64)> => pair f64,
+        /// Log x axis (R's `log = "x"`); default `false`. On a log value
+        /// axis bars start at the first value of `ylim` (or `xlim` if
+        /// `horiz`) when given, else at 0.9 times the smallest height, as in
+        /// R.
+        pub xlog: bool => value bool,
+        /// Log y axis (R's `log = "y"`); default `false`. See `xlog`.
+        pub ylog: bool => value bool,
+        /// Shifts each bar along the value axis (R's `offset`): recycled over
+        /// the bars of a vector, the rows of a `beside` matrix, or the columns
+        /// (stacks) of a stacked one. Empty: 0 (R's default).
+        pub offset: Vec<f64> => values f64,
+        /// Stacked bars only: the order of the segments within each stack (R's
+        /// `orderH`); each segment keeps its row's colour. Default
+        /// [`OrderH::None`] (row order).
+        pub order_h: OrderH => value OrderH,
+        /// Draw on the current plot instead of starting a new one (R's
+        /// `add = TRUE`): no new plot or panel, no new coordinates; the names,
+        /// legend and axis are still drawn. Default `false`.
+        pub add: bool => value bool,
+        /// Draw the titles (R's `ann`); `None`: `par(ann)`, unless `add` (R's
+        /// default `ann = !add && par("ann")`).
+        pub ann: Option<bool> => option bool,
+        /// Main title, as for `plot()` (text or a plotmath expression);
+        /// `None`: none. Titles are drawn when `ann` is (by default
+        /// `par(ann)`, and not with `add`).
+        pub main: Option<Label> => option Label,
+        /// Subtitle; `None`: none.
+        pub sub: Option<Label> => option Label,
+        /// x axis label; `None`: none.
+        pub xlab: Option<Label> => option Label,
+        /// y axis label; `None`: none.
+        pub ylab: Option<Label> => option Label,
+        /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+        /// to `title()`); `None`: `par(cex.main)`.
+        pub cex_main: Option<f64> => option f64,
+        /// Colour of `main` (R's `col.main`, passed to `title()`);
+        /// `None`: `par(col.main)`.
+        pub col_main: Option<ColorSpec> => option ColorSpec,
+        /// Font of `main` (a [`FontFace`]; R's
+        /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
+        pub font_main: Option<FontFace> => option FontFace,
+        /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
+        /// to `title()`); `None`: `par(cex.sub)`.
+        pub cex_sub: Option<f64> => option f64,
+        /// Colour of `sub` (R's `col.sub`, passed to `title()`);
+        /// `None`: `par(col.sub)`.
+        pub col_sub: Option<ColorSpec> => option ColorSpec,
+        /// Font of `sub` (a [`FontFace`]; R's
+        /// `font.sub`, passed to `title()`); `None`: `par(font.sub)`.
+        pub font_sub: Option<FontFace> => option FontFace,
+        /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
+        /// to `title()`); `None`: `par(cex.lab)`.
+        pub cex_lab: Option<f64> => option f64,
+        /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
+        /// `None`: `par(col.lab)`.
+        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
+        /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
+        pub font_lab: Option<FontFace> => option FontFace,
+        /// Draw the value axis; default `true`.
+        pub axes: bool => value bool,
+        /// Draw the names (R's `axisnames`); default `true`.
+        pub axisnames: bool => value bool,
+        /// Size of the names (R's `cex.names`); `None`: `par(cex.axis)`.
+        pub cex_names: Option<f64> => option f64,
+        /// Line type of the names axis's line and ticks (R's `axis.lty`);
+        /// `None`: R's 0, none drawn.
+        pub axis_lty: Option<LineType> => option LineType,
+        /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+        /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+        /// `None`: `par(las)`.
+        pub las: Option<i32> => option i32,
+        /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+        pub cex_axis: Option<f64> => option f64,
+        /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
+        pub font_axis: Option<FontFace> => option FontFace,
+        /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
+        /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
+        pub mgp: Option<[f64; 3]> => array [f64; 3],
+        /// Tick length as a fraction of the plot region (R's inline `tck`);
+        /// `None`: `par(tck)`.
+        pub tck: Option<f64> => option f64,
+        /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
+        pub tcl: Option<f64> => option f64,
+        /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
+        /// R's default.
+        pub gap_axis: Option<f64> => option f64,
+        /// Width of the axes' line and ticks (R's inline `lwd`, which `barplot()`
+        /// passes only to `axis()`, not to the bars); `None`: 1, `axis()`'s
+        /// default.
+        pub lwd: Option<f64> => option f64,
+        /// Clipping of the bars, names and legend (R's `xpd`; the setter also
+        /// takes `false`/`true`); `None`: [`Xpd::Figure`] (R's `TRUE`).
+        pub xpd: Option<Xpd> => option Xpd,
+        /// `false` works out the bars' centres and returns them without drawing
+        /// (R's `plot = FALSE`); `None`: `true`.
+        pub plot: Option<bool> => option bool,
+    }
 }
-
-crate::setters::setters!(BarplotOptions => [BarplotCall] {
-    names: list Label,
-    col: values ColorSpec,
-    border: option ColorSpec,
-    density: na_values f64,
-    angle: values f64,
-    width: values f64,
-    space: option_values f64,
-    beside: value bool,
-    horiz: value bool,
-    legend_text: list Label,
-    legend_pos: option LegendPos,
-    args_legend: value LegendOptions,
-    xlim: pair f64,
-    ylim: pair f64,
-    xlog: value bool,
-    ylog: value bool,
-    offset: values f64,
-    order_h: value OrderH,
-    add: value bool,
-    ann: option bool,
-    main: option Label,
-    sub: option Label,
-    xlab: option Label,
-    ylab: option Label,
-    cex_main: option f64,
-    col_main: option ColorSpec,
-    font_main: option FontFace,
-    cex_sub: option f64,
-    col_sub: option ColorSpec,
-    font_sub: option FontFace,
-    cex_lab: option f64,
-    col_lab: option ColorSpec,
-    font_lab: option FontFace,
-    axes: value bool,
-    axisnames: value bool,
-    cex_names: option f64,
-    axis_lty: option LineType,
-    las: option i32,
-    cex_axis: option f64,
-    col_axis: option ColorSpec,
-    font_axis: option FontFace,
-    mgp: array [f64; 3],
-    tck: option f64,
-    tcl: option f64,
-    gap_axis: option f64,
-    lwd: option f64,
-    xpd: option Xpd,
-    plot: option bool,
-});
 
 impl Default for BarplotOptions {
     fn default() -> Self {

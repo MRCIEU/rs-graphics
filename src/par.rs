@@ -200,183 +200,285 @@ impl AxisType {
 crate::error::from_str_via_parse!(AxisType, "axis type");
 crate::error::from_r_string!(AxisType, "axis type", "\"s\" or \"n\"");
 
-/// The graphics parameter set (`par()`), restricted to what this crate
-/// implements. Field names match R's own where practical.
-#[derive(Clone, Debug)]
-pub struct Par {
-    /// Margins in lines: bottom, left, top, right. Default `c(5.1, 4.1,
-    /// 4.1, 2.1)`. Used unless `mai` is set. Applied at the next
-    /// `plot_new()`.
-    pub mar: Sides<f64>,
-    /// `par(mai)`: the margins in inches instead of lines; `None` (the
-    /// default) uses `mar`. Unlike `mar`, they don't change with `cex` or
-    /// `mex`. Applied at the next `plot_new()`.
-    pub mai: Option<Sides<f64>>,
-    /// Outer margins in lines. Default `c(0, 0, 0, 0)`. Used unless `omi`
-    /// or `omd` is set. Applied at the next `plot_new()`.
-    pub oma: Sides<f64>,
-    /// `par(omi)`: the outer margins in inches; `None` (the default) uses
-    /// `oma`. Applied at the next `plot_new()`.
-    pub omi: Option<Sides<f64>>,
-    /// `par(omd = c(x0, x1, y0, y1))`: the inner region (the device less
-    /// the outer margins) as fractions of the device; `None` (the default)
-    /// uses `omi` or `oma`. Takes precedence over both. Applied at the
-    /// next `plot_new()`.
-    pub omd: Option<[f64; 4]>,
-    /// `par(plt = c(x0, x1, y0, y1))`: the plot region as fractions of the
-    /// figure region, instead of the figure less `mar`. `None` (the default)
-    /// uses `mar` and `pty`. A `par()` call setting `mar`, `mai` or `pty`
-    /// resets it to `None`, as in R. Applied at the next `plot_new()`.
-    pub plt: Option<[f64; 4]>,
-    /// `par(pin = c(width, height))`: the plot region's size in inches,
-    /// centred in the figure, instead of the figure less `mar`. `None`
-    /// (the default) uses `plt`, or `mar` and `pty`; takes precedence over
-    /// `plt`. A `par()` call setting `mar`, `mai`, `pty` or `plt` resets it
-    /// to `None`, as in R. Applied at the next `plot_new()`.
-    pub pin: Option<[f64; 2]>,
-    /// `par(pty)`: [`Pty::Square`] makes the `mar`-based plot region
-    /// square. Applied at the next `plot_new()`.
-    pub pty: Pty,
-    /// `par(bty)`: which sides of the plot region `box()` and `plot()`'s
-    /// frame draw. Default [`Bty::O`] (all four).
-    pub bty: Bty,
-    /// `par(xaxs)`: x axis range style; [`AxisStyle::Regular`] (`"r"`,
-    /// the default) extends the range by 4% on each side,
-    /// [`AxisStyle::Exact`] (`"i"`) uses it as given.
-    pub xaxs: AxisStyle,
-    /// `par(yaxs)`: as `xaxs`, for the y axis.
-    pub yaxs: AxisStyle,
+// `Par` and `ParOptions` from one list of `Par`'s fields: `ParOptions`
+// holds every field as an `Option` (`None`: unchanged), with its `apply`
+// and setters (on `ParOptions` and `ParCall`), each documented with the
+// `Par` field's doc. Each field gives its setter kind and type after `=>`;
+// `@Some` marks a `Par` field of type `Option<T>` that a `par()` call can
+// only set to `Some` (as R, which resets them by setting the alternative,
+// e.g. `mar` for `mai`).
+macro_rules! par_options {
+    (@wrap [] $e:expr) => { $e };
+    (@wrap [Some] $e:expr) => { Some($e) };
+    (
+        $(#[$sattr:meta])*
+        pub struct Par {
+            $(
+                $(#[$fattr:meta])*
+                pub $field:ident : $fty:ty => $(@ $some:ident)? $kind:ident $t:ty
+            ),* $(,)?
+        }
+    ) => {
+        $(#[$sattr])*
+        pub struct Par {
+            $( $(#[$fattr])* pub $field: $fty, )*
+        }
 
-    /// `par(col)`: default colour of points, lines, `abline()` and `box()`.
-    pub col: Color,
-    /// `par(bg)`: background colour (new pages, default `legend()` box
-    /// fill, colour 0).
-    pub bg: Color,
-    /// `par(fg)`: default colour of axes, segments, arrows and
-    /// rectangle/polygon borders. R's `par(fg = )` sets `col` too; here set
-    /// both fields to do the same.
-    pub fg: Color,
-    /// `par(col.axis)`: colour of axis tick labels.
-    pub col_axis: Color,
-    /// `par(col.lab)`: colour of `xlab`/`ylab`.
-    pub col_lab: Color,
-    /// `par(col.main)`: colour of `main`.
-    pub col_main: Color,
-    /// `par(col.sub)`: colour of `sub`.
-    pub col_sub: Color,
+        $crate::setters::options! {
+            /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
+            /// plus `new`, `usr`, `xlog` and `ylog` (device state rather than
+            /// `Par` fields). R's `mfrow`/`mfcol`/`mfg`/
+            /// `fig`/`fin` aren't here: they change the device's page layout,
+            /// not `Par`, so only a device's `par()` call takes them
+            /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow) and
+            /// co.).
+            #[derive(Clone, Debug, Default, PartialEq)]
+            pub struct ParOptions => [ParCall] {
+                $(
+                    $(#[$fattr])*
+                    #[doc = ""]
+                    #[doc = concat!("New value of [`Par::", stringify!($field), "`]",
+                        $(" (set to `", stringify!($some), "`)",)? "; `None`: unchanged.")]
+                    pub $field: Option<$t> => $kind $t,
+                )*
+                /// `par(new = )`: with `true`, the next `plot_new()` draws into
+                /// the current figure without advancing or clearing it, so a
+                /// second plot can be overlaid on the first (e.g. with its own
+                /// `plot_window()` and an axis on side 4). As in R, drawing
+                /// anything (other than `mtext(outer = TRUE)`) resets it to
+                /// `false`, `plot_new()` itself does not, and it is ignored (R
+                /// warns) before anything is plotted.
+                pub new: Option<bool> => option bool,
+                /// `par(usr = c(x0, x1, y0, y1))`: the user coordinates of the
+                /// plot region, in log10 units on a log axis (as `par("usr")`
+                /// reads); the axis tick settings (`xaxp`/`yaxp`) are worked
+                /// out again from them, as R's `GSetupAxis()`. Applied after
+                /// the other fields and `xlog`/`ylog` in the same call, so a
+                /// `usr` given with them is in their units, uses a new `lab`,
+                /// and replaces an `xaxp`/`yaxp` given there.
+                ///
+                /// # Panics
+                /// At `.draw()`, if a value is `NaN` or `x0 == x1` or `y0 ==
+                /// y1` (R's "invalid value specified for graphical parameter
+                /// \"usr\"").
+                pub usr: Option<[f64; 4]> => array [f64; 4],
+                /// `par(xlog = )`: whether the x axis is logarithmic. As in R,
+                /// this only changes how data are mapped from now on (taking
+                /// `log10` of x values first); `usr` stays as it is, so set it
+                /// too. The next `plot_new()` resets it.
+                pub xlog: Option<bool> => option bool,
+                /// `par(ylog = )`: as [`xlog`](ParOptions::xlog) for y.
+                pub ylog: Option<bool> => option bool,
+            }
+        }
 
-    /// R's `palette()`: the colours that numbers (`col = 2`) index,
-    /// from 1. Default [`DEFAULT_PALETTE`].
-    pub palette: Vec<Color>,
+        impl ParOptions {
+            /// Sets the given fields of `par` (all but `new`, `usr`, `xlog`
+            /// and `ylog`, which are device state).
+            pub(crate) fn apply(&self, par: &mut Par) {
+                $(
+                    if let Some(v) = &self.$field {
+                        par.$field = par_options!(@wrap [$($some)?] v.clone());
+                    }
+                )*
+                self.apply_units(par);
+            }
+        }
 
-    /// `par(lwd)`: line width (1 = 1/96 inch, as in R). Default 1.
-    pub lwd: f64,
-    /// `par(lty)`: line type. Default solid.
-    pub lty: LineType,
-    /// `par(lend)`: line end style. Default round.
-    pub lend: LineEnd,
-    /// `par(ljoin)`: line join style. Default round.
-    pub ljoin: LineJoin,
-    /// `par(lmitre)`: mitre limit for mitred joins. Default 10.
-    pub lmitre: f64,
+        impl ParOptions {
+            /// R's checks of `usr`, made when the call is drawn or recorded.
+            pub(crate) fn check(&self) {
+                if let Some([x0, x1, y0, y1]) = self.usr {
+                    let ok = ![x0, x1, y0, y1].iter().any(|v| v.is_nan()) && x0 != x1 && y0 != y1;
+                    assert!(
+                        ok,
+                        "invalid value specified for graphical parameter \"usr\""
+                    );
+                }
+            }
+        }
+    };
+}
 
-    /// `par(pch)`: default plotting symbol. Default 1 (open circle).
-    pub pch: i32,
+par_options! {
+    /// The graphics parameter set (`par()`), restricted to what this crate
+    /// implements. Field names match R's own where practical.
+    #[derive(Clone, Debug)]
+    pub struct Par {
+        /// Margins in lines: bottom, left, top, right. Default `c(5.1, 4.1,
+        /// 4.1, 2.1)`. Used unless `mai` is set. Applied at the next
+        /// `plot_new()`.
+        pub mar: Sides<f64> => option Sides<f64>,
+        /// `par(mai)`: the margins in inches instead of lines; `None` (the
+        /// default) uses `mar`. Unlike `mar`, they don't change with `cex` or
+        /// `mex`. Applied at the next `plot_new()`.
+        pub mai: Option<Sides<f64>> => @Some option Sides<f64>,
+        /// Outer margins in lines. Default `c(0, 0, 0, 0)`. Used unless `omi`
+        /// or `omd` is set. Applied at the next `plot_new()`.
+        pub oma: Sides<f64> => option Sides<f64>,
+        /// `par(omi)`: the outer margins in inches; `None` (the default) uses
+        /// `oma`. Applied at the next `plot_new()`.
+        pub omi: Option<Sides<f64>> => @Some option Sides<f64>,
+        /// `par(omd = c(x0, x1, y0, y1))`: the inner region (the device less
+        /// the outer margins) as fractions of the device; `None` (the default)
+        /// uses `omi` or `oma`. Takes precedence over both. Applied at the
+        /// next `plot_new()`.
+        pub omd: Option<[f64; 4]> => @Some array [f64; 4],
+        /// `par(plt = c(x0, x1, y0, y1))`: the plot region as fractions of the
+        /// figure region, instead of the figure less `mar`. `None` (the default)
+        /// uses `mar` and `pty`. A `par()` call setting `mar`, `mai` or `pty`
+        /// resets it to `None`, as in R. Applied at the next `plot_new()`.
+        pub plt: Option<[f64; 4]> => option Option<[f64; 4]>,
+        /// `par(pin = c(width, height))`: the plot region's size in inches,
+        /// centred in the figure, instead of the figure less `mar`. `None`
+        /// (the default) uses `plt`, or `mar` and `pty`; takes precedence over
+        /// `plt`. A `par()` call setting `mar`, `mai`, `pty` or `plt` resets it
+        /// to `None`, as in R. Applied at the next `plot_new()`.
+        pub pin: Option<[f64; 2]> => @Some array [f64; 2],
+        /// `par(pty)`: [`Pty::Square`] makes the `mar`-based plot region
+        /// square. Applied at the next `plot_new()`.
+        pub pty: Pty => option Pty,
+        /// `par(bty)`: which sides of the plot region `box()` and `plot()`'s
+        /// frame draw. Default [`Bty::O`] (all four).
+        pub bty: Bty => option Bty,
+        /// `par(xaxs)`: x axis range style; [`AxisStyle::Regular`] (`"r"`,
+        /// the default) extends the range by 4% on each side,
+        /// [`AxisStyle::Exact`] (`"i"`) uses it as given.
+        pub xaxs: AxisStyle => option AxisStyle,
+        /// `par(yaxs)`: as `xaxs`, for the y axis.
+        pub yaxs: AxisStyle => option AxisStyle,
 
-    /// Base point size, in big points (`par(ps)`). Default `12`. Its value
-    /// when the device is created is the device's starting size (R's
-    /// `pdf(pointsize = )`, here [`DeviceBuilder::pointsize`](crate::device::DeviceBuilder::pointsize)
-    /// or `ps` passed to `Device::new`), from which margin lines and
-    /// symbols are sized; changing it later only changes text size, as in R.
-    pub ps: f64,
-    /// `par(cex)`, i.e. R's `cexbase`. Also scales the margin "line"
-    /// unit (see [`Device::line_height_inches`](crate::device::Device::line_height_inches)).
-    pub cex: f64,
-    /// `par(mex)`: margin-line expansion factor (a multiple of `cex`).
-    pub mex: f64,
-    /// `par(cex.axis)`: size of axis tick labels, relative to `cex`.
-    /// Default 1.
-    pub cex_axis: f64,
-    /// `par(cex.lab)`: size of `xlab`/`ylab`, relative to `cex`. Default
-    /// 1.
-    pub cex_lab: f64,
-    /// `par(cex.main)`: size of `main`, relative to `cex`. Default 1.2.
-    pub cex_main: f64,
-    /// `par(cex.sub)`: size of `sub`, relative to `cex`. Default 1.
-    pub cex_sub: f64,
+        /// `par(col)`: default colour of points, lines, `abline()` and `box()`.
+        pub col: Color => option Color,
+        /// `par(bg)`: background colour (new pages, default `legend()` box
+        /// fill, colour 0).
+        pub bg: Color => option Color,
+        /// `par(fg)`: default colour of axes, segments, arrows and
+        /// rectangle/polygon borders. R's `par(fg = )` sets `col` too; here set
+        /// both fields to do the same.
+        pub fg: Color => option Color,
+        /// `par(col.axis)`: colour of axis tick labels.
+        pub col_axis: Color => option Color,
+        /// `par(col.lab)`: colour of `xlab`/`ylab`.
+        pub col_lab: Color => option Color,
+        /// `par(col.main)`: colour of `main`.
+        pub col_main: Color => option Color,
+        /// `par(col.sub)`: colour of `sub`.
+        pub col_sub: Color => option Color,
 
-    /// `par(font)`: font of text ([`FontFace`]; the setter takes R's
-    /// numbers 1 to 5, the names or the enum). Default plain.
-    pub font: FontFace,
-    /// `par(font.axis)`: font of axis tick labels, as `font`. Default
-    /// plain.
-    pub font_axis: FontFace,
-    /// `par(font.lab)`: font of `xlab`/`ylab`, as `font`. Default plain.
-    pub font_lab: FontFace,
-    /// `par(font.main)`: font of `main`, as `font`. Default bold.
-    pub font_main: FontFace,
-    /// `par(font.sub)`: font of `sub`, as `font`. Default plain.
-    pub font_sub: FontFace,
+        /// R's `palette()`: the colours that numbers (`col = 2`) index,
+        /// from 1. Default [`DEFAULT_PALETTE`].
+        pub palette: Vec<Color> => option Vec<Color>,
 
-    /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
-    /// horizontal, 2 = perpendicular to axis, 3 = vertical.
-    pub las: i32,
-    /// `par(xaxt)` / `par(yaxt)`: [`AxisType::None`] stops `axis()`
-    /// drawing on the x (sides 1, 3) / y (sides 2, 4) axis.
-    pub xaxt: AxisType,
-    /// `par(yaxt)`: see `xaxt`.
-    pub yaxt: AxisType,
-    /// Tick mark length in margin lines (negative = outward; R's default
-    /// is -0.5). Used when `tck` is `None`.
-    pub tcl: f64,
-    /// `par(tck)`: tick length as a fraction of the plot region (of its
-    /// height for an x axis if above 0.5, so `1` draws grid lines, else of
-    /// its smaller side); positive points inwards. Overrides `tcl`.
-    /// `None` (R's default `NA`): use `tcl`. The `par()` setter takes a
-    /// number; `f64::NAN` sets it back to `NA`.
-    pub tck: Option<f64>,
-    /// `par(srt)`: default string rotation of `text()` (and so of
-    /// `legend()` and `pie()` labels, which R draws with `text()`), in
-    /// degrees counterclockwise. Default 0.
-    pub srt: f64,
-    /// Margin line positions for axis title/labels/line, `c(3, 1, 0)` by
-    /// default.
-    pub mgp: [f64; 3],
-    /// `par(lab)`: the approximate number of tick intervals on the x and y
-    /// axes for default ticks (the third value, label length, is unused,
-    /// as in R). `c(5, 5, 7)` by default.
-    pub lab: [i32; 3],
-    /// `par(xaxp)` / `par(yaxp)`: the first and last default tick and the
-    /// number of intervals between them (on a log axis, a tick-rule code
-    /// instead: see [`crate::pretty::axis_pars`]). `plot_new()`,
-    /// `plot_window()` and `par(usr = )` set them from the axis range and
-    /// `par(lab)`; change them afterwards to
-    /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
-    pub xaxp: [f64; 3],
-    /// `par(yaxp)`: see `xaxp`.
-    pub yaxp: [f64; 3],
-    /// `par(lheight)`: multiplies the height of each extra line of text in
-    /// [`Device::text_metrics`](crate::device::Device::text_metrics). (Text
-    /// is drawn one line at a time, so this doesn't affect drawing.)
-    pub lheight: f64,
-    /// `par(ylbias)`: how far text parallel to its side is moved out from
-    /// its margin line (`GMtext()`'s `yLineBias`): `1 - ylbias` lines on
-    /// sides 1 and 4, `ylbias` on sides 2 and 3 (divided by `mex`). Used by
-    /// axis labels, `mtext()` and `title()`'s `sub`/`xlab`/`ylab`. 0.2 by
-    /// default (R's pdf, png and svg devices).
-    pub ylbias: f64,
-    /// Default text justification (`par(adj)`).
-    pub adj: f64,
-    /// `par(xpd)`: where drawing is clipped to: [`Xpd::Plot`] (R's
-    /// `FALSE`, the default), [`Xpd::Figure`] (`TRUE`) or [`Xpd::Device`]
-    /// (`NA`). Also sets the extent of `abline()` lines and of `axis()`
-    /// ticks outside the plot range, as R's `getxlimits()`.
-    pub xpd: Xpd,
-    /// `par(ann)`: whether `plot()` draws its titles and axis labels, and
-    /// the default of `barplot()`'s `ann` (with `!add`). Default `true`. As
-    /// in R, `hist()` and `boxplot()` have their own `ann` options that
-    /// don't depend on it, and `pie()` always draws `main`.
-    pub ann: bool,
+        /// `par(lwd)`: line width (1 = 1/96 inch, as in R). Default 1.
+        pub lwd: f64 => option f64,
+        /// `par(lty)`: line type. Default solid.
+        pub lty: LineType => option LineType,
+        /// `par(lend)`: line end style. Default round.
+        pub lend: LineEnd => option LineEnd,
+        /// `par(ljoin)`: line join style. Default round.
+        pub ljoin: LineJoin => option LineJoin,
+        /// `par(lmitre)`: mitre limit for mitred joins. Default 10.
+        pub lmitre: f64 => option f64,
+
+        /// `par(pch)`: default plotting symbol. Default 1 (open circle).
+        pub pch: i32 => option i32,
+
+        /// Base point size, in big points (`par(ps)`). Default `12`. Its value
+        /// when the device is created is the device's starting size (R's
+        /// `pdf(pointsize = )`, here [`DeviceBuilder::pointsize`](crate::device::DeviceBuilder::pointsize)
+        /// or `ps` passed to `Device::new`), from which margin lines and
+        /// symbols are sized; changing it later only changes text size, as in R.
+        pub ps: f64 => option f64,
+        /// `par(cex)`, i.e. R's `cexbase`. Also scales the margin "line"
+        /// unit (see [`Device::line_height_inches`](crate::device::Device::line_height_inches)).
+        pub cex: f64 => option f64,
+        /// `par(mex)`: margin-line expansion factor (a multiple of `cex`).
+        pub mex: f64 => option f64,
+        /// `par(cex.axis)`: size of axis tick labels, relative to `cex`.
+        /// Default 1.
+        pub cex_axis: f64 => option f64,
+        /// `par(cex.lab)`: size of `xlab`/`ylab`, relative to `cex`. Default
+        /// 1.
+        pub cex_lab: f64 => option f64,
+        /// `par(cex.main)`: size of `main`, relative to `cex`. Default 1.2.
+        pub cex_main: f64 => option f64,
+        /// `par(cex.sub)`: size of `sub`, relative to `cex`. Default 1.
+        pub cex_sub: f64 => option f64,
+
+        /// `par(font)`: font of text ([`FontFace`]; the setter takes R's
+        /// numbers 1 to 5, the names or the enum). Default plain.
+        pub font: FontFace => option FontFace,
+        /// `par(font.axis)`: font of axis tick labels, as `font`. Default
+        /// plain.
+        pub font_axis: FontFace => option FontFace,
+        /// `par(font.lab)`: font of `xlab`/`ylab`, as `font`. Default plain.
+        pub font_lab: FontFace => option FontFace,
+        /// `par(font.main)`: font of `main`, as `font`. Default bold.
+        pub font_main: FontFace => option FontFace,
+        /// `par(font.sub)`: font of `sub`, as `font`. Default plain.
+        pub font_sub: FontFace => option FontFace,
+
+        /// Label orientation (`par(las)`): 0 = parallel to axis, 1 =
+        /// horizontal, 2 = perpendicular to axis, 3 = vertical.
+        pub las: i32 => option i32,
+        /// `par(xaxt)` / `par(yaxt)`: [`AxisType::None`] stops `axis()`
+        /// drawing on the x (sides 1, 3) / y (sides 2, 4) axis.
+        pub xaxt: AxisType => option AxisType,
+        /// `par(yaxt)`: see `xaxt`.
+        pub yaxt: AxisType => option AxisType,
+        /// Tick mark length in margin lines (negative = outward; R's default
+        /// is -0.5). Used when `tck` is `None`.
+        pub tcl: f64 => option f64,
+        /// `par(tck)`: tick length as a fraction of the plot region (of its
+        /// height for an x axis if above 0.5, so `1` draws grid lines, else of
+        /// its smaller side); positive points inwards. Overrides `tcl`.
+        /// `None` (R's default `NA`): use `tcl`. The `par()` setter takes a
+        /// number; `f64::NAN` sets it back to `NA`.
+        pub tck: Option<f64> => na Option<f64>,
+        /// `par(srt)`: default string rotation of `text()` (and so of
+        /// `legend()` and `pie()` labels, which R draws with `text()`), in
+        /// degrees counterclockwise. Default 0.
+        pub srt: f64 => option f64,
+        /// Margin line positions for axis title/labels/line, `c(3, 1, 0)` by
+        /// default.
+        pub mgp: [f64; 3] => array [f64; 3],
+        /// `par(lab)`: the approximate number of tick intervals on the x and y
+        /// axes for default ticks (the third value, label length, is unused,
+        /// as in R). `c(5, 5, 7)` by default.
+        pub lab: [i32; 3] => option [i32; 3],
+        /// `par(xaxp)` / `par(yaxp)`: the first and last default tick and the
+        /// number of intervals between them (on a log axis, a tick-rule code
+        /// instead: see [`crate::pretty::axis_pars`]). `plot_new()`,
+        /// `plot_window()` and `par(usr = )` set them from the axis range and
+        /// `par(lab)`; change them afterwards to
+        /// change the ticks `axis()` draws by default. `c(0, 1, 5)` initially.
+        pub xaxp: [f64; 3] => array [f64; 3],
+        /// `par(yaxp)`: see `xaxp`.
+        pub yaxp: [f64; 3] => array [f64; 3],
+        /// `par(lheight)`: multiplies the height of each extra line of text in
+        /// [`Device::text_metrics`](crate::device::Device::text_metrics). (Text
+        /// is drawn one line at a time, so this doesn't affect drawing.)
+        pub lheight: f64 => option f64,
+        /// `par(ylbias)`: how far text parallel to its side is moved out from
+        /// its margin line (`GMtext()`'s `yLineBias`): `1 - ylbias` lines on
+        /// sides 1 and 4, `ylbias` on sides 2 and 3 (divided by `mex`). Used by
+        /// axis labels, `mtext()` and `title()`'s `sub`/`xlab`/`ylab`. 0.2 by
+        /// default (R's pdf, png and svg devices).
+        pub ylbias: f64 => option f64,
+        /// Default text justification (`par(adj)`).
+        pub adj: f64 => option f64,
+        /// `par(xpd)`: where drawing is clipped to: [`Xpd::Plot`] (R's
+        /// `FALSE`, the default), [`Xpd::Figure`] (`TRUE`) or [`Xpd::Device`]
+        /// (`NA`). Also sets the extent of `abline()` lines and of `axis()`
+        /// ticks outside the plot range, as R's `getxlimits()`.
+        pub xpd: Xpd => option Xpd,
+        /// `par(ann)`: whether `plot()` draws its titles and axis labels, and
+        /// the default of `barplot()`'s `ann` (with `!add`). Default `true`. As
+        /// in R, `hist()` and `boxplot()` have their own `ann` options that
+        /// don't depend on it, and `pie()` always draws `main`.
+        pub ann: bool => option bool,
+    }
 }
 
 impl Default for Par {
@@ -495,167 +597,6 @@ impl ParOptions {
         self.oma.is_some() || self.omi.is_some() || self.omd.is_some()
     }
 }
-
-// `ParOptions`: every `Par` field as an `Option`, its `apply`, and its
-// setters (on `ParOptions` and `ParCall`), from the field lists: `Par`
-// fields of type `T` first, then (`optional:`) `Par` fields of type
-// `Option<T>` that a `par()` call can only set to `Some` (as R, which
-// resets them by setting the alternative, e.g. `mar` for `mai`).
-macro_rules! par_options {
-    (
-        $($field:ident : $kind:ident $t:ty),* $(,)?
-        ; optional: $($ofield:ident : $okind:ident $ot:ty),* $(,)?
-    ) => {
-        // Every `Par` field is in one of the lists: this pattern names them
-        // all, with no `..`, so a `Par` field added without a line here is a
-        // compile error.
-        const _: fn(&Par) = |p| {
-            let Par { $($field: _,)* $($ofield: _,)* } = p;
-        };
-        /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
-        /// plus `new`, `usr`, `xlog` and `ylog` (device state rather than
-        /// `Par` fields). R's `mfrow`/`mfcol`/`mfg`/
-        /// `fig`/`fin` aren't here: they change the device's page layout,
-        /// not `Par`, so only a device's `par()` call takes them
-        /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow) and
-        /// co.).
-        #[derive(Clone, Debug, Default, PartialEq)]
-        pub struct ParOptions {
-            $(
-                #[doc = concat!("New value of [`Par::", stringify!($field), "`].")]
-                pub $field: Option<$t>,
-            )*
-            $(
-                #[doc = concat!("New value of [`Par::", stringify!($ofield), "`] (set to `Some`).")]
-                pub $ofield: Option<$ot>,
-            )*
-            /// `par(new = )`: with `true`, the next `plot_new()` draws into
-            /// the current figure without advancing or clearing it, so a
-            /// second plot can be overlaid on the first (e.g. with its own
-            /// `plot_window()` and an axis on side 4). As in R, drawing
-            /// anything (other than `mtext(outer = TRUE)`) resets it to
-            /// `false`, `plot_new()` itself does not, and it is ignored (R
-            /// warns) before anything is plotted.
-            pub new: Option<bool>,
-            /// `par(usr = c(x0, x1, y0, y1))`: the user coordinates of the
-            /// plot region, in log10 units on a log axis (as `par("usr")`
-            /// reads); the axis tick settings (`xaxp`/`yaxp`) are worked
-            /// out again from them, as R's `GSetupAxis()`. Applied after
-            /// the other fields and `xlog`/`ylog` in the same call, so a
-            /// `usr` given with them is in their units, uses a new `lab`,
-            /// and replaces an `xaxp`/`yaxp` given there.
-            ///
-            /// # Panics
-            /// At `.draw()`, if a value is `NaN` or `x0 == x1` or `y0 ==
-            /// y1` (R's "invalid value specified for graphical parameter
-            /// \"usr\"").
-            pub usr: Option<[f64; 4]>,
-            /// `par(xlog = )`: whether the x axis is logarithmic. As in R,
-            /// this only changes how data are mapped from now on (taking
-            /// `log10` of x values first); `usr` stays as it is, so set it
-            /// too. The next `plot_new()` resets it.
-            pub xlog: Option<bool>,
-            /// `par(ylog = )`: as [`xlog`](ParOptions::xlog) for y.
-            pub ylog: Option<bool>,
-        }
-
-        impl ParOptions {
-            /// Sets the given fields of `par` (all but `new`, `usr`, `xlog`
-            /// and `ylog`, which are device state).
-            pub(crate) fn apply(&self, par: &mut Par) {
-                $(
-                    if let Some(v) = &self.$field {
-                        par.$field = v.clone();
-                    }
-                )*
-                $(
-                    if let Some(v) = &self.$ofield {
-                        par.$ofield = Some(v.clone());
-                    }
-                )*
-                self.apply_units(par);
-            }
-        }
-
-        $crate::setters::setters!(ParOptions => [ParCall] {
-            $($field: $kind $t,)*
-            $($ofield: $okind $ot,)*
-            new: option bool,
-            usr: array [f64; 4],
-            xlog: option bool,
-            ylog: option bool,
-        });
-
-        impl ParOptions {
-            /// R's checks of `usr`, made when the call is drawn or recorded.
-            pub(crate) fn check(&self) {
-                if let Some([x0, x1, y0, y1]) = self.usr {
-                    let ok = ![x0, x1, y0, y1].iter().any(|v| v.is_nan()) && x0 != x1 && y0 != y1;
-                    assert!(
-                        ok,
-                        "invalid value specified for graphical parameter \"usr\""
-                    );
-                }
-            }
-        }
-    };
-}
-
-par_options!(
-    mar: option Sides<f64>,
-    oma: option Sides<f64>,
-    plt: option Option<[f64; 4]>,
-    pty: option Pty,
-    bty: option Bty,
-    xaxs: option AxisStyle,
-    yaxs: option AxisStyle,
-    col: option Color,
-    bg: option Color,
-    fg: option Color,
-    col_axis: option Color,
-    col_lab: option Color,
-    col_main: option Color,
-    col_sub: option Color,
-    palette: option Vec<Color>,
-    lwd: option f64,
-    lty: option LineType,
-    lend: option LineEnd,
-    ljoin: option LineJoin,
-    lmitre: option f64,
-    pch: option i32,
-    ps: option f64,
-    cex: option f64,
-    mex: option f64,
-    cex_axis: option f64,
-    cex_lab: option f64,
-    cex_main: option f64,
-    cex_sub: option f64,
-    font: option FontFace,
-    font_axis: option FontFace,
-    font_lab: option FontFace,
-    font_main: option FontFace,
-    font_sub: option FontFace,
-    las: option i32,
-    xaxt: option AxisType,
-    yaxt: option AxisType,
-    tcl: option f64,
-    tck: na Option<f64>,
-    srt: option f64,
-    mgp: array [f64; 3],
-    lab: option [i32; 3],
-    xaxp: array [f64; 3],
-    yaxp: array [f64; 3],
-    lheight: option f64,
-    ylbias: option f64,
-    adj: option f64,
-    xpd: option Xpd,
-    ann: option bool,
-    ; optional:
-    mai: option Sides<f64>,
-    omi: option Sides<f64>,
-    omd: array [f64; 4],
-    pin: array [f64; 2],
-);
 
 #[cfg(test)]
 mod tests {

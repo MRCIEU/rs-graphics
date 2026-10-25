@@ -28,69 +28,58 @@ use crate::plotmath::Label;
 use super::{Device, Side, Xpd};
 use crate::setters::pick_na;
 
-/// The arguments of R's `mtext()` other than `text` and `side`, with
-/// R's defaults. As in R, the text and the vector arguments are recycled
-/// over the longest: `mtext(["a", "b"], 3).at([1, 2])` writes two labels.
-/// Empty: R's default for every label; a `NaN` entry is R's `NA`, the
-/// default for that label.
-#[derive(Clone, Debug, Default)]
-pub struct MtextOptions {
-    /// Margin line, starting at 0 next to the plot region (or the inner
-    /// region for `outer`); may be negative or fractional. Empty: 0 (R's
-    /// default). A `NaN` entry (R's `NA`) leaves its label out; R writes
-    /// it with a `nan` coordinate, an invalid PDF (an R bug, not copied).
-    pub line: Vec<f64>,
-    /// Draw in the outer margins (`par(oma)`) rather than the figure's.
-    /// Default `false`.
-    pub outer: bool,
-    /// Position along the side: a user coordinate for inner margins, or a
-    /// fraction (0 to 1) of the inner region for outer ones. Empty or
-    /// `NaN`: from `adj` (text parallel to the side) or centred
-    /// (perpendicular).
-    pub at: Vec<f64>,
-    /// Justification along the text; empty or `NaN`: 0.5 for text
-    /// parallel to the side, otherwise justified at the end nearest the
-    /// plot (1 on sides 1 and 2, 0 on sides 3 and 4).
-    pub adj: Vec<f64>,
-    /// Justification across the text; empty or `NaN`: depends on `side`
-    /// and `las` (0, i.e. baseline on the line, for `las = 0`).
-    pub padj: Vec<f64>,
-    /// Empty, `None` (R's `NA`) or `NaN`: 1. Unlike most text, *not* scaled by `par(cex)` (so
-    /// neither by the multi-panel reduction), as in R. (For an `NA` after a
-    /// finite value, R keeps the previous label's size, as `C_mtext`
-    /// forgets to reset it; that bug isn't copied.)
-    pub cex: Vec<Option<f64>>,
-    /// Empty: `par(col)`.
-    pub col: Vec<ColorSpec>,
-    /// Empty: `par(font)`.
-    /// `None` (R's `NA`): `par(font)`.
-    pub font: Vec<Option<FontFace>>,
-    /// Text orientation (R's inline `las`, through `mtext()`'s `...`): 0
-    /// parallel to the side, 1 horizontal, 2 perpendicular to the side, 3
-    /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
-    /// `None`: `par(las)`.
-    pub las: Option<i32>,
-    /// R's inline `xpd`: where the text clips, at least the figure region
-    /// (`false` is `true` here; [`Xpd::Device`] for the whole device);
-    /// `None`: `par(xpd)`. `outer` text clips to the device. This is what
-    /// R's `C_mtext` means to do; it tests `outer` as a pointer rather
-    /// than its value, so R always clips `mtext()` to the device (an R
-    /// bug, not copied).
-    pub xpd: Option<Xpd>,
+crate::setters::options! {
+    /// The arguments of R's `mtext()` other than `text` and `side`, with
+    /// R's defaults. As in R, the text and the vector arguments are recycled
+    /// over the longest: `mtext(["a", "b"], 3).at([1, 2])` writes two labels.
+    /// Empty: R's default for every label; a `NaN` entry is R's `NA`, the
+    /// default for that label.
+    #[derive(Clone, Debug, Default)]
+    pub struct MtextOptions => [MtextCall] {
+        /// Margin line, starting at 0 next to the plot region (or the inner
+        /// region for `outer`); may be negative or fractional. Empty: 0 (R's
+        /// default). A `NaN` entry (R's `NA`) leaves its label out; R writes
+        /// it with a `nan` coordinate, an invalid PDF (an R bug, not copied).
+        pub line: Vec<f64> => values f64,
+        /// Draw in the outer margins (`par(oma)`) rather than the figure's.
+        /// Default `false`.
+        pub outer: bool => value bool,
+        /// Position along the side: a user coordinate for inner margins, or a
+        /// fraction (0 to 1) of the inner region for outer ones. Empty or
+        /// `NaN`: from `adj` (text parallel to the side) or centred
+        /// (perpendicular).
+        pub at: Vec<f64> => values f64,
+        /// Justification along the text; empty or `NaN`: 0.5 for text
+        /// parallel to the side, otherwise justified at the end nearest the
+        /// plot (1 on sides 1 and 2, 0 on sides 3 and 4).
+        pub adj: Vec<f64> => values f64,
+        /// Justification across the text; empty or `NaN`: depends on `side`
+        /// and `las` (0, i.e. baseline on the line, for `las = 0`).
+        pub padj: Vec<f64> => values f64,
+        /// Empty, `None` (R's `NA`) or `NaN`: 1. Unlike most text, *not* scaled by `par(cex)` (so
+        /// neither by the multi-panel reduction), as in R. (For an `NA` after a
+        /// finite value, R keeps the previous label's size, as `C_mtext`
+        /// forgets to reset it; that bug isn't copied.)
+        pub cex: Vec<Option<f64>> => na_values f64,
+        /// Empty: `par(col)`.
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Empty: `par(font)`.
+        /// `None` (R's `NA`): `par(font)`.
+        pub font: Vec<Option<FontFace>> => na_values FontFace,
+        /// Text orientation (R's inline `las`, through `mtext()`'s `...`): 0
+        /// parallel to the side, 1 horizontal, 2 perpendicular to the side, 3
+        /// vertical. It also sets the default `adj`, `padj` and `at`, as in R.
+        /// `None`: `par(las)`.
+        pub las: Option<i32> => option i32,
+        /// R's inline `xpd`: where the text clips, at least the figure region
+        /// (`false` is `true` here; [`Xpd::Device`] for the whole device);
+        /// `None`: `par(xpd)`. `outer` text clips to the device. This is what
+        /// R's `C_mtext` means to do; it tests `outer` as a pointer rather
+        /// than its value, so R always clips `mtext()` to the device (an R
+        /// bug, not copied).
+        pub xpd: Option<Xpd> => option Xpd,
+    }
 }
-
-crate::setters::setters!(MtextOptions => [MtextCall] {
-    line: values f64,
-    outer: value bool,
-    at: values f64,
-    adj: values f64,
-    padj: values f64,
-    cex: na_values f64,
-    col: values ColorSpec,
-    font: na_values FontFace,
-    las: option i32,
-    xpd: option Xpd,
-});
 
 /// One label's arguments, after recycling (`None`: R's default).
 struct One {

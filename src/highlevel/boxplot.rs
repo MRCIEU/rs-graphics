@@ -113,284 +113,217 @@ pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Into<f64>) -> BoxStats 
     }
 }
 
-/// Options for [`Graphics::boxplot`](crate::graphics::Graphics::boxplot):
-/// the arguments of R's `boxplot.default` and `bxp()`, including the
-/// drawing parameters R takes in `pars` or directly (`boxplot(x, medlwd =
-/// 2)`). Unset fields are R's defaults, given for each.
-///
-/// Like R's, the per-box values (`col`, `border`, `boxwex` and every
-/// `box*`/`med*`/`whisk*`/`staple*`/`out*` style) are recycled over the
-/// boxes. The style of each part falls back to the general `lty`, `lwd`,
-/// `pch`, `cex` and `bg` here, then to `par()`, as in `bxp()`. Of the
-/// title parameters, only the `cex.*` and `col.*` ones are passed to
-/// `title()`, as `bxp()` does (`font.main` and co. come from `par()`), and
-/// the frame follows `par(bty)` (`bxp()`'s `box()` takes no `bty`).
-#[derive(Clone, Debug)]
-pub struct BoxplotOptions {
-    /// Group labels on the name axis (side 1, or 2 if `horizontal`);
-    /// `None` gives `1, 2, ...`. Only drawn when there's more than one
-    /// box, matching R's `show.names <- n > 1`.
-    pub names: Option<Vec<Label>>,
-    /// Box fills (R's `col`, passed to `bxp()` as `boxfill`), recycled
-    /// over the boxes; empty: `"lightgray"`.
-    pub col: Vec<ColorSpec>,
-    /// Colours of the box outlines, median, whiskers, staples and
-    /// outliers, recycled over the boxes; empty: `par(fg)`.
-    pub border: Vec<ColorSpec>,
-    /// Whiskers reach the most extreme point within `range` times the
-    /// box length (IQR) of the box; points beyond are outliers. `None`:
-    /// 1.5 (R's default).
-    pub range: Option<f64>,
-    /// Box positions on the name axis, one per group; `None`: `1, 2,
-    /// ..., n`.
-    pub at: Option<Vec<f64>>,
-    /// Relative box widths, one per group (scaled so the widest is
-    /// `boxwex`); `None`: equal widths, or by group size with `varwidth`;
-    /// a single box is half of `boxwex` wide (as `bxp()`).
-    pub width: Option<Vec<f64>>,
-    /// Draw on the current plot (R's `add = TRUE`) instead of starting a
-    /// new one. Default `false`.
-    pub add: bool,
-    /// Draw outliers (and include them in the default value range).
-    /// Default `true`.
-    pub outline: bool,
-    /// Log x axis (R's `log = "x"`): the position axis, or the value axis
-    /// when `horizontal`. Default `false`.
-    pub xlog: bool,
-    /// Log y axis (R's `log = "y"`): the value axis, or the position axis
-    /// when `horizontal`. Default `false`.
-    pub ylog: bool,
-    /// Limits of the position axis; `None`: `range(at) + c(-0.5, 0.5)`.
-    pub xlim: Option<(f64, f64)>,
-    /// Limits of the value axis (also when `horizontal`, as in R);
-    /// `None`: the range of the statistics, plus the outliers (unless
-    /// `outline` is off) and the notches (with `notch`).
-    pub ylim: Option<(f64, f64)>,
-    /// Main title, as for `plot()` (text or a plotmath expression);
-    /// `None`: none.
-    pub main: Option<Label>,
-    /// Subtitle; `None`: none.
-    pub sub: Option<Label>,
-    /// x axis label; `None`: none.
-    pub xlab: Option<Label>,
-    /// y axis label; `None`: none.
-    pub ylab: Option<Label>,
-    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
-    /// to `title()`); `None`: `par(cex.main)`.
-    pub cex_main: Option<f64>,
-    /// Colour of `main` (R's `col.main`, passed to `title()`);
-    /// `None`: `par(col.main)`.
-    pub col_main: Option<ColorSpec>,
-    /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
-    /// to `title()`); `None`: `par(cex.sub)`.
-    pub cex_sub: Option<f64>,
-    /// Colour of `sub` (R's `col.sub`, passed to `title()`);
-    /// `None`: `par(col.sub)`.
-    pub col_sub: Option<ColorSpec>,
-    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
-    /// to `title()`); `None`: `par(cex.lab)`.
-    pub cex_lab: Option<f64>,
-    /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
-    /// `None`: `par(col.lab)`.
-    pub col_lab: Option<ColorSpec>,
-    /// Draw the titles (R's `ann`); `None`: unless `add` (R's default
-    /// `ann = !add`, not `par(ann)`).
-    pub ann: Option<bool>,
-    /// Draw the axes and the box around the plot (also with `add`, as in
-    /// R); default `true`.
-    pub axes: bool,
-    /// Notched boxes: the box narrows to half its width at the median,
-    /// between [`BoxStats::conf`]'s limits (R's `notch.frac = 0.5`).
-    /// Default `false`.
-    pub notch: bool,
-    /// Box widths proportional to the square root of the group size.
-    /// Default `false`.
-    pub varwidth: bool,
-    /// Horizontal boxes: group names on side 2, values on side 1. Default
-    /// `false`.
-    pub horizontal: bool,
+crate::setters::options! {
+    /// Options for [`Graphics::boxplot`](crate::graphics::Graphics::boxplot):
+    /// the arguments of R's `boxplot.default` and `bxp()`, including the
+    /// drawing parameters R takes in `pars` or directly (`boxplot(x, medlwd =
+    /// 2)`). Unset fields are R's defaults, given for each.
+    ///
+    /// Like R's, the per-box values (`col`, `border`, `boxwex` and every
+    /// `box*`/`med*`/`whisk*`/`staple*`/`out*` style) are recycled over the
+    /// boxes. The style of each part falls back to the general `lty`, `lwd`,
+    /// `pch`, `cex` and `bg` here, then to `par()`, as in `bxp()`. Of the
+    /// title parameters, only the `cex.*` and `col.*` ones are passed to
+    /// `title()`, as `bxp()` does (`font.main` and co. come from `par()`), and
+    /// the frame follows `par(bty)` (`bxp()`'s `box()` takes no `bty`).
+    #[derive(Clone, Debug)]
+    pub struct BoxplotOptions => [BoxplotCall] {
+        /// Group labels on the name axis (side 1, or 2 if `horizontal`);
+        /// `None` gives `1, 2, ...`. Only drawn when there's more than one
+        /// box, matching R's `show.names <- n > 1`.
+        pub names: Option<Vec<Label>> => list Label,
+        /// Box fills (R's `col`, passed to `bxp()` as `boxfill`), recycled
+        /// over the boxes; empty: `"lightgray"`.
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Colours of the box outlines, median, whiskers, staples and
+        /// outliers, recycled over the boxes; empty: `par(fg)`.
+        pub border: Vec<ColorSpec> => values ColorSpec,
+        /// Whiskers reach the most extreme point within `range` times the
+        /// box length (IQR) of the box; points beyond are outliers. `None`:
+        /// 1.5 (R's default).
+        pub range: Option<f64> => option f64,
+        /// Box positions on the name axis, one per group; `None`: `1, 2,
+        /// ..., n`.
+        pub at: Option<Vec<f64>> => option_values f64,
+        /// Relative box widths, one per group (scaled so the widest is
+        /// `boxwex`); `None`: equal widths, or by group size with `varwidth`;
+        /// a single box is half of `boxwex` wide (as `bxp()`).
+        pub width: Option<Vec<f64>> => option_values f64,
+        /// Draw on the current plot (R's `add = TRUE`) instead of starting a
+        /// new one. Default `false`.
+        pub add: bool => value bool,
+        /// Draw outliers (and include them in the default value range).
+        /// Default `true`.
+        pub outline: bool => value bool,
+        /// Log x axis (R's `log = "x"`): the position axis, or the value axis
+        /// when `horizontal`. Default `false`.
+        pub xlog: bool => value bool,
+        /// Log y axis (R's `log = "y"`): the value axis, or the position axis
+        /// when `horizontal`. Default `false`.
+        pub ylog: bool => value bool,
+        /// Limits of the position axis; `None`: `range(at) + c(-0.5, 0.5)`.
+        pub xlim: Option<(f64, f64)> => pair f64,
+        /// Limits of the value axis (also when `horizontal`, as in R);
+        /// `None`: the range of the statistics, plus the outliers (unless
+        /// `outline` is off) and the notches (with `notch`).
+        pub ylim: Option<(f64, f64)> => pair f64,
+        /// Main title, as for `plot()` (text or a plotmath expression);
+        /// `None`: none.
+        pub main: Option<Label> => option Label,
+        /// Subtitle; `None`: none.
+        pub sub: Option<Label> => option Label,
+        /// x axis label; `None`: none.
+        pub xlab: Option<Label> => option Label,
+        /// y axis label; `None`: none.
+        pub ylab: Option<Label> => option Label,
+        /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+        /// to `title()`); `None`: `par(cex.main)`.
+        pub cex_main: Option<f64> => option f64,
+        /// Colour of `main` (R's `col.main`, passed to `title()`);
+        /// `None`: `par(col.main)`.
+        pub col_main: Option<ColorSpec> => option ColorSpec,
+        /// Size of `sub`, relative to `par(cex)` (R's `cex.sub`, passed
+        /// to `title()`); `None`: `par(cex.sub)`.
+        pub cex_sub: Option<f64> => option f64,
+        /// Colour of `sub` (R's `col.sub`, passed to `title()`);
+        /// `None`: `par(col.sub)`.
+        pub col_sub: Option<ColorSpec> => option ColorSpec,
+        /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
+        /// to `title()`); `None`: `par(cex.lab)`.
+        pub cex_lab: Option<f64> => option f64,
+        /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
+        /// `None`: `par(col.lab)`.
+        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        /// Draw the titles (R's `ann`); `None`: unless `add` (R's default
+        /// `ann = !add`, not `par(ann)`).
+        pub ann: Option<bool> => option bool,
+        /// Draw the axes and the box around the plot (also with `add`, as in
+        /// R); default `true`.
+        pub axes: bool => value bool,
+        /// Notched boxes: the box narrows to half its width at the median,
+        /// between [`BoxStats::conf`]'s limits (R's `notch.frac = 0.5`).
+        /// Default `false`.
+        pub notch: bool => value bool,
+        /// Box widths proportional to the square root of the group size.
+        /// Default `false`.
+        pub varwidth: bool => value bool,
+        /// Horizontal boxes: group names on side 2, values on side 1. Default
+        /// `false`.
+        pub horizontal: bool => value bool,
 
-    /// Box widths, in units of the position axis (of its natural log on a
-    /// log axis); empty: 0.8 (R's `boxplot()` default, whatever `at` is).
-    pub boxwex: Vec<f64>,
-    /// Staple width as a fraction of the box width; empty: 0.5.
-    pub staplewex: Vec<f64>,
-    /// Width of the outlier lines (see `outlty`) as a fraction of the box
-    /// width; empty: 0.5.
-    pub outwex: Vec<f64>,
+        /// Box widths, in units of the position axis (of its natural log on a
+        /// log axis); empty: 0.8 (R's `boxplot()` default, whatever `at` is).
+        pub boxwex: Vec<f64> => values f64,
+        /// Staple width as a fraction of the box width; empty: 0.5.
+        pub staplewex: Vec<f64> => values f64,
+        /// Width of the outlier lines (see `outlty`) as a fraction of the box
+        /// width; empty: 0.5.
+        pub outwex: Vec<f64> => values f64,
 
-    /// Default line type of the box, median and staples, and of the
-    /// whiskers; empty: `par(lty)` (the whiskers: dashed).
-    /// `None` (R's `NA`): that box's box outline, median, whiskers and staples aren't drawn (unless their own type is given).
-    pub lty: Vec<Option<LineType>>,
-    /// Default line width of every part (the median: 3 times it); empty:
-    /// `par(lwd)`.
-    /// `None` (R's `NA`): none of that box's lines or outliers are drawn (unless their own width is given).
-    pub lwd: Vec<Option<f64>>,
-    /// Default outlier symbol; empty: `par(pch)`.
-    /// `None` (R's `NA`): that box's outliers aren't drawn (unless `outpch` is given).
-    pub pch: Vec<Option<i32>>,
-    /// Default size of the median and outlier symbols; empty: 1.
-    /// `None` (R's `NA`): that box's median and outlier symbols aren't drawn (unless their own size is given).
-    pub cex: Vec<Option<f64>>,
-    /// Default fill of the median and outlier symbols (21 to 25); empty:
-    /// `par(bg)`.
-    pub bg: Vec<ColorSpec>,
+        /// Default line type of the box, median and staples, and of the
+        /// whiskers; empty: `par(lty)` (the whiskers: dashed).
+        /// `None` (R's `NA`): that box's box outline, median, whiskers and staples aren't drawn (unless their own type is given).
+        pub lty: Vec<Option<LineType>> => na_values LineType,
+        /// Default line width of every part (the median: 3 times it); empty:
+        /// `par(lwd)`.
+        /// `None` (R's `NA`): none of that box's lines or outliers are drawn (unless their own width is given).
+        pub lwd: Vec<Option<f64>> => na_values f64,
+        /// Default outlier symbol; empty: `par(pch)`.
+        /// `None` (R's `NA`): that box's outliers aren't drawn (unless `outpch` is given).
+        pub pch: Vec<Option<i32>> => na_values i32,
+        /// Default size of the median and outlier symbols; empty: 1.
+        /// `None` (R's `NA`): that box's median and outlier symbols aren't drawn (unless their own size is given).
+        pub cex: Vec<Option<f64>> => na_values f64,
+        /// Default fill of the median and outlier symbols (21 to 25); empty:
+        /// `par(bg)`.
+        pub bg: Vec<ColorSpec> => values ColorSpec,
 
-    /// Line type of the box outline; empty: `lty`.
-    /// `None` (R's `NA`): no box outline.
-    pub boxlty: Vec<Option<LineType>>,
-    /// Line width of the box outline; empty: `lwd`.
-    /// `None` (R's `NA`): no box outline.
-    pub boxlwd: Vec<Option<f64>>,
-    /// Colour of the box outline; empty: `border`.
-    pub boxcol: Vec<ColorSpec>,
-    /// Line type of the median; empty: `lty`.
-    /// `None` (R's `NA`): no median line.
-    pub medlty: Vec<Option<LineType>>,
-    /// Line width of the median; empty: 3 times `lwd`.
-    /// `None` (R's `NA`): no median line.
-    pub medlwd: Vec<Option<f64>>,
-    /// A symbol drawn at the median; empty: none.
-    /// `None` (R's `NA`): no median symbol.
-    pub medpch: Vec<Option<i32>>,
-    /// Size of the median symbol; empty: `cex`.
-    /// `None` (R's `NA`): no median symbol.
-    pub medcex: Vec<Option<f64>>,
-    /// Colour of the median line and symbol; empty: `border`.
-    pub medcol: Vec<ColorSpec>,
-    /// Fill of the median symbol; empty: `bg`.
-    pub medbg: Vec<ColorSpec>,
-    /// Line type of the whiskers; empty: `lty`, else dashed.
-    /// `None` (R's `NA`): no whiskers.
-    pub whisklty: Vec<Option<LineType>>,
-    /// Line width of the whiskers; empty: `lwd`.
-    /// `None` (R's `NA`): no whiskers.
-    pub whisklwd: Vec<Option<f64>>,
-    /// Colour of the whiskers; empty: `border`.
-    pub whiskcol: Vec<ColorSpec>,
-    /// Line type of the staples; empty: `lty`.
-    /// `None` (R's `NA`): no staples.
-    pub staplelty: Vec<Option<LineType>>,
-    /// Line width of the staples; empty: `lwd`.
-    /// `None` (R's `NA`): no staples.
-    pub staplelwd: Vec<Option<f64>>,
-    /// Colour of the staples; empty: `border`.
-    pub staplecol: Vec<ColorSpec>,
-    /// Line type of a short line across each outlier (`outwex` wide);
-    /// empty: blank (no line).
-    /// `None` (R's `NA`): no outlier lines.
-    pub outlty: Vec<Option<LineType>>,
-    /// Line width of the outlier lines and symbols; empty: `lwd`.
-    /// `None` (R's `NA`): no outlier lines or symbols.
-    pub outlwd: Vec<Option<f64>>,
-    /// Outlier symbol; empty: `pch`.
-    /// `None` (R's `NA`): no outlier symbols.
-    pub outpch: Vec<Option<i32>>,
-    /// Size of the outlier symbols; empty: `cex`.
-    /// `None` (R's `NA`): no outlier symbols.
-    pub outcex: Vec<Option<f64>>,
-    /// Colour of the outlier lines and symbols; empty: `border`.
-    pub outcol: Vec<ColorSpec>,
-    /// Fill of the outlier symbols; empty: `bg`.
-    pub outbg: Vec<ColorSpec>,
-    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
-    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
-    /// `None`: `par(las)`.
-    pub las: Option<i32>,
-    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
-    pub cex_axis: Option<f64>,
-    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
-    pub col_axis: Option<ColorSpec>,
-    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
-    /// R's default.
-    pub gap_axis: Option<f64>,
-    /// `AxisType::None` leaves out the x axis (R's `xaxt`, which `bxp()`
-    /// passes to its axes); `None`: `par(xaxt)`.
-    pub xaxt: Option<AxisType>,
-    /// As `xaxt`, for the y axis; `None`: `par(yaxt)`.
-    pub yaxt: Option<AxisType>,
-    /// The default ticks of the x axis (R's `xaxp`; used by the value axis
-    /// when `horizontal`); `None`: `par(xaxp)`.
-    pub xaxp: Option<[f64; 3]>,
-    /// As `xaxp`, for the y axis; `None`: `par(yaxp)`.
-    pub yaxp: Option<[f64; 3]>,
-    /// Draw the box around the plot region (R's `frame.plot`); `None`:
-    /// `axes`.
-    pub frame_plot: Option<bool>,
-    /// Label the boxes with `names` (R's `show.names`); `None`: when there
-    /// is more than one box.
-    pub show_names: Option<bool>,
+        /// Line type of the box outline; empty: `lty`.
+        /// `None` (R's `NA`): no box outline.
+        pub boxlty: Vec<Option<LineType>> => na_values LineType,
+        /// Line width of the box outline; empty: `lwd`.
+        /// `None` (R's `NA`): no box outline.
+        pub boxlwd: Vec<Option<f64>> => na_values f64,
+        /// Colour of the box outline; empty: `border`.
+        pub boxcol: Vec<ColorSpec> => values ColorSpec,
+        /// Line type of the median; empty: `lty`.
+        /// `None` (R's `NA`): no median line.
+        pub medlty: Vec<Option<LineType>> => na_values LineType,
+        /// Line width of the median; empty: 3 times `lwd`.
+        /// `None` (R's `NA`): no median line.
+        pub medlwd: Vec<Option<f64>> => na_values f64,
+        /// A symbol drawn at the median; empty: none.
+        /// `None` (R's `NA`): no median symbol.
+        pub medpch: Vec<Option<i32>> => na_values i32,
+        /// Size of the median symbol; empty: `cex`.
+        /// `None` (R's `NA`): no median symbol.
+        pub medcex: Vec<Option<f64>> => na_values f64,
+        /// Colour of the median line and symbol; empty: `border`.
+        pub medcol: Vec<ColorSpec> => values ColorSpec,
+        /// Fill of the median symbol; empty: `bg`.
+        pub medbg: Vec<ColorSpec> => values ColorSpec,
+        /// Line type of the whiskers; empty: `lty`, else dashed.
+        /// `None` (R's `NA`): no whiskers.
+        pub whisklty: Vec<Option<LineType>> => na_values LineType,
+        /// Line width of the whiskers; empty: `lwd`.
+        /// `None` (R's `NA`): no whiskers.
+        pub whisklwd: Vec<Option<f64>> => na_values f64,
+        /// Colour of the whiskers; empty: `border`.
+        pub whiskcol: Vec<ColorSpec> => values ColorSpec,
+        /// Line type of the staples; empty: `lty`.
+        /// `None` (R's `NA`): no staples.
+        pub staplelty: Vec<Option<LineType>> => na_values LineType,
+        /// Line width of the staples; empty: `lwd`.
+        /// `None` (R's `NA`): no staples.
+        pub staplelwd: Vec<Option<f64>> => na_values f64,
+        /// Colour of the staples; empty: `border`.
+        pub staplecol: Vec<ColorSpec> => values ColorSpec,
+        /// Line type of a short line across each outlier (`outwex` wide);
+        /// empty: blank (no line).
+        /// `None` (R's `NA`): no outlier lines.
+        pub outlty: Vec<Option<LineType>> => na_values LineType,
+        /// Line width of the outlier lines and symbols; empty: `lwd`.
+        /// `None` (R's `NA`): no outlier lines or symbols.
+        pub outlwd: Vec<Option<f64>> => na_values f64,
+        /// Outlier symbol; empty: `pch`.
+        /// `None` (R's `NA`): no outlier symbols.
+        pub outpch: Vec<Option<i32>> => na_values i32,
+        /// Size of the outlier symbols; empty: `cex`.
+        /// `None` (R's `NA`): no outlier symbols.
+        pub outcex: Vec<Option<f64>> => na_values f64,
+        /// Colour of the outlier lines and symbols; empty: `border`.
+        pub outcol: Vec<ColorSpec> => values ColorSpec,
+        /// Fill of the outlier symbols; empty: `bg`.
+        pub outbg: Vec<ColorSpec> => values ColorSpec,
+        /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+        /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+        /// `None`: `par(las)`.
+        pub las: Option<i32> => option i32,
+        /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+        pub cex_axis: Option<f64> => option f64,
+        /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
+        /// R's default.
+        pub gap_axis: Option<f64> => option f64,
+        /// `AxisType::None` leaves out the x axis (R's `xaxt`, which `bxp()`
+        /// passes to its axes); `None`: `par(xaxt)`.
+        pub xaxt: Option<AxisType> => option AxisType,
+        /// As `xaxt`, for the y axis; `None`: `par(yaxt)`.
+        pub yaxt: Option<AxisType> => option AxisType,
+        /// The default ticks of the x axis (R's `xaxp`; used by the value axis
+        /// when `horizontal`); `None`: `par(xaxp)`.
+        pub xaxp: Option<[f64; 3]> => array [f64; 3],
+        /// As `xaxp`, for the y axis; `None`: `par(yaxp)`.
+        pub yaxp: Option<[f64; 3]> => array [f64; 3],
+        /// Draw the box around the plot region (R's `frame.plot`); `None`:
+        /// `axes`.
+        pub frame_plot: Option<bool> => option bool,
+        /// Label the boxes with `names` (R's `show.names`); `None`: when there
+        /// is more than one box.
+        pub show_names: Option<bool> => option bool,
+    }
 }
-
-crate::setters::setters!(BoxplotOptions => [BoxplotCall] {
-    names: list Label,
-    col: values ColorSpec,
-    border: values ColorSpec,
-    range: option f64,
-    at: option_values f64,
-    width: option_values f64,
-    add: value bool,
-    outline: value bool,
-    xlog: value bool,
-    ylog: value bool,
-    xlim: pair f64,
-    ylim: pair f64,
-    main: option Label,
-    sub: option Label,
-    xlab: option Label,
-    ylab: option Label,
-    cex_main: option f64,
-    col_main: option ColorSpec,
-    cex_sub: option f64,
-    col_sub: option ColorSpec,
-    cex_lab: option f64,
-    col_lab: option ColorSpec,
-    ann: option bool,
-    axes: value bool,
-    notch: value bool,
-    varwidth: value bool,
-    horizontal: value bool,
-    boxwex: values f64,
-    staplewex: values f64,
-    outwex: values f64,
-    lty: na_values LineType,
-    lwd: na_values f64,
-    pch: na_values i32,
-    cex: na_values f64,
-    bg: values ColorSpec,
-    boxlty: na_values LineType,
-    boxlwd: na_values f64,
-    boxcol: values ColorSpec,
-    medlty: na_values LineType,
-    medlwd: na_values f64,
-    medpch: na_values i32,
-    medcex: na_values f64,
-    medcol: values ColorSpec,
-    medbg: values ColorSpec,
-    whisklty: na_values LineType,
-    whisklwd: na_values f64,
-    whiskcol: values ColorSpec,
-    staplelty: na_values LineType,
-    staplelwd: na_values f64,
-    staplecol: values ColorSpec,
-    outlty: na_values LineType,
-    outlwd: na_values f64,
-    outpch: na_values i32,
-    outcex: na_values f64,
-    outcol: values ColorSpec,
-    outbg: values ColorSpec,
-    las: option i32,
-    cex_axis: option f64,
-    col_axis: option ColorSpec,
-    gap_axis: option f64,
-    xaxt: option AxisType,
-    yaxt: option AxisType,
-    xaxp: array [f64; 3],
-    yaxp: array [f64; 3],
-    frame_plot: option bool,
-    show_names: option bool,
-});
 
 impl Default for BoxplotOptions {
     fn default() -> Self {

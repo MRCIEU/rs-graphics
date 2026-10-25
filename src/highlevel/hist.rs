@@ -365,168 +365,130 @@ impl<L: Into<Label>> From<Vec<L>> for HistLabels {
     }
 }
 
-/// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
-/// and `plot.histogram`'s arguments this crate implements. Unset fields
-/// are R's defaults, given for each.
-#[derive(Clone, Debug)]
-pub struct HistOptions {
-    /// R's `breaks`: edges (`.breaks([0, 2, 5, 10])`, sorted as R does), a
-    /// suggested number of classes (`.breaks(20)`), a rule (`.breaks("FD")`,
-    /// `"Scott"`, `"Sturges"`) or a function of the data
-    /// ([`HistBreaks::function`]); a number of classes gives the edges
-    /// `pretty(range(x), n = classes, min.n = 1)`. `None`: `"Sturges"`, R's
-    /// default.
-    ///
-    /// # Panics
-    /// When drawn (or recorded), if a number of classes isn't finite or is
-    /// less than 1 (R: "invalid number of 'breaks'"); for an unknown rule
-    /// name, at the setter.
-    pub breaks: Option<HistBreaks>,
-    /// `true`: plot counts; `false`: plot densities (`count / (n * bin
-    /// width)`). `None`: counts if the bins are equally wide, as R.
-    pub freq: Option<bool>,
-    /// x axis limits (R's `xlim`); `None`: the range of the breaks.
-    pub xlim: Option<(f64, f64)>,
-    /// y axis limits (R's `ylim`); `None`: 0 to the tallest bar.
-    pub ylim: Option<(f64, f64)>,
-    /// Bar fills, recycled over the bars; empty: `"lightgray"` (R's
-    /// default).
-    pub col: Vec<ColorSpec>,
-    /// Bar borders, recycled; empty: `par(fg)`, or with shading the bar's
-    /// `col` (R's `border = NULL`).
-    pub border: Vec<ColorSpec>,
-    /// Bar border line types, recycled; empty: `par(lty)`.
-    /// `None` (R's `NA`): that bar has no border.
-    pub lty: Vec<Option<LineType>>,
-    /// Shading lines per inch in the bars (R's `density`), recycled per bar;
-    /// the lines take the bar's `col`; see [`RectOptions::density`]. Empty:
-    /// no shading.
-    pub density: Vec<Option<f64>>,
-    /// Angle of the shading lines in degrees (R's `angle`), recycled as
-    /// `density`; empty: 45.
-    pub angle: Vec<f64>,
-    /// R's `labels`: [`HistLabels::Values`] writes each bar's count (or,
-    /// with densities, its density to 3 decimals) above it, `Text` the
-    /// given labels; default none.
-    pub labels: HistLabels,
-    /// Bins are `(a, b]` (R's `right = TRUE`, the default), else `[a, b)`.
-    /// `None`: `true`.
-    pub right: Option<bool>,
-    /// The first bin is also closed on the left (the last on the right
-    /// when not `right`) (R's `include.lowest`); `None`: `true`. Always
-    /// `true` for computed breaks, as R (which warns).
-    pub include_lowest: Option<bool>,
-    /// How far, as a fraction of a typical bin width, values on an edge may
-    /// stray and still count as on it (R's `fuzz`); `None`: `1e-7`.
-    pub fuzz: Option<f64>,
-    /// Main title, as for `plot()` (text or a plotmath expression);
-    /// `None`: "Histogram of x".
-    pub main: Option<Label>,
-    /// x axis label; `None`: "x".
-    pub xlab: Option<Label>,
-    /// y axis label; `None`: "Frequency" or "Density".
-    pub ylab: Option<Label>,
-    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
-    /// to `title()`); `None`: `par(cex.main)`.
-    pub cex_main: Option<f64>,
-    /// Colour of `main` (R's `col.main`, passed to `title()`);
-    /// `None`: `par(col.main)`.
-    pub col_main: Option<ColorSpec>,
-    /// Font of `main` (a [`FontFace`]; R's
-    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
-    pub font_main: Option<FontFace>,
-    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
-    /// to `title()`); `None`: `par(cex.lab)`.
-    pub cex_lab: Option<f64>,
-    /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
-    /// `None`: `par(col.lab)`.
-    pub col_lab: Option<ColorSpec>,
-    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
-    /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
-    pub font_lab: Option<FontFace>,
-    /// Draw the titles (R's `ann`, which defaults to `TRUE`, not
-    /// `par(ann)`); default `true`.
-    pub ann: bool,
-    /// Draw the axes; default `true`.
-    pub axes: bool,
-    /// Log x axis (R's `log = "x"`); default `false`.
-    pub xlog: bool,
-    /// Log y axis (R's `log = "y"`); default `false`. As in R, it still
-    /// takes its range from 0, which R "corrects" to about 1e-307 (with a
-    /// warning).
-    pub ylog: bool,
-    /// `add = TRUE`: draw the bars on the current plot, without a new
-    /// plot, window, title or axes (so `main`/`xlab`/`ylab`/`axes`/`xlog`/
-    /// `ylog` are ignored). Default `false`.
-    pub add: bool,
-    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
-    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
-    /// `None`: `par(las)`.
-    pub las: Option<i32>,
-    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
-    pub cex_axis: Option<f64>,
-    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
-    pub col_axis: Option<ColorSpec>,
-    /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
-    pub font_axis: Option<FontFace>,
-    /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
-    /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
-    pub mgp: Option<[f64; 3]>,
-    /// Tick length as a fraction of the plot region (R's inline `tck`);
-    /// `None`: `par(tck)`.
-    pub tck: Option<f64>,
-    /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
-    pub tcl: Option<f64>,
-    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
-    /// R's default.
-    pub gap_axis: Option<f64>,
-    /// Width of the axes' line and ticks (R's inline `lwd`, which `hist()` passes
-    /// only to `axis()`); `None`: 1, `axis()`'s default.
-    pub lwd: Option<f64>,
-    /// `false` returns the bins without drawing (R's `plot = FALSE`);
-    /// `None`: `true`.
-    pub plot: Option<bool>,
+crate::setters::options! {
+    /// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
+    /// and `plot.histogram`'s arguments this crate implements. Unset fields
+    /// are R's defaults, given for each.
+    #[derive(Clone, Debug)]
+    pub struct HistOptions => [HistCall] {
+        /// R's `breaks`: edges (`.breaks([0, 2, 5, 10])`, sorted as R does), a
+        /// suggested number of classes (`.breaks(20)`), a rule (`.breaks("FD")`,
+        /// `"Scott"`, `"Sturges"`) or a function of the data
+        /// ([`HistBreaks::function`]); a number of classes gives the edges
+        /// `pretty(range(x), n = classes, min.n = 1)`. `None`: `"Sturges"`, R's
+        /// default.
+        ///
+        /// # Panics
+        /// When drawn (or recorded), if a number of classes isn't finite or is
+        /// less than 1 (R: "invalid number of 'breaks'"); for an unknown rule
+        /// name, at the setter.
+        pub breaks: Option<HistBreaks> => option HistBreaks,
+        /// `true`: plot counts; `false`: plot densities (`count / (n * bin
+        /// width)`). `None`: counts if the bins are equally wide, as R.
+        pub freq: Option<bool> => option bool,
+        /// x axis limits (R's `xlim`); `None`: the range of the breaks.
+        pub xlim: Option<(f64, f64)> => pair f64,
+        /// y axis limits (R's `ylim`); `None`: 0 to the tallest bar.
+        pub ylim: Option<(f64, f64)> => pair f64,
+        /// Bar fills, recycled over the bars; empty: `"lightgray"` (R's
+        /// default).
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Bar borders, recycled; empty: `par(fg)`, or with shading the bar's
+        /// `col` (R's `border = NULL`).
+        pub border: Vec<ColorSpec> => values ColorSpec,
+        /// Bar border line types, recycled; empty: `par(lty)`.
+        /// `None` (R's `NA`): that bar has no border.
+        pub lty: Vec<Option<LineType>> => na_values LineType,
+        /// Shading lines per inch in the bars (R's `density`), recycled per bar;
+        /// the lines take the bar's `col`; see [`RectOptions::density`]. Empty:
+        /// no shading.
+        pub density: Vec<Option<f64>> => na_values f64,
+        /// Angle of the shading lines in degrees (R's `angle`), recycled as
+        /// `density`; empty: 45.
+        pub angle: Vec<f64> => values f64,
+        /// R's `labels`: [`HistLabels::Values`] writes each bar's count (or,
+        /// with densities, its density to 3 decimals) above it, `Text` the
+        /// given labels; default none.
+        pub labels: HistLabels => value HistLabels,
+        /// Bins are `(a, b]` (R's `right = TRUE`, the default), else `[a, b)`.
+        /// `None`: `true`.
+        pub right: Option<bool> => option bool,
+        /// The first bin is also closed on the left (the last on the right
+        /// when not `right`) (R's `include.lowest`); `None`: `true`. Always
+        /// `true` for computed breaks, as R (which warns).
+        pub include_lowest: Option<bool> => option bool,
+        /// How far, as a fraction of a typical bin width, values on an edge may
+        /// stray and still count as on it (R's `fuzz`); `None`: `1e-7`.
+        pub fuzz: Option<f64> => option f64,
+        /// Main title, as for `plot()` (text or a plotmath expression);
+        /// `None`: "Histogram of x".
+        pub main: Option<Label> => option Label,
+        /// x axis label; `None`: "x".
+        pub xlab: Option<Label> => option Label,
+        /// y axis label; `None`: "Frequency" or "Density".
+        pub ylab: Option<Label> => option Label,
+        /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+        /// to `title()`); `None`: `par(cex.main)`.
+        pub cex_main: Option<f64> => option f64,
+        /// Colour of `main` (R's `col.main`, passed to `title()`);
+        /// `None`: `par(col.main)`.
+        pub col_main: Option<ColorSpec> => option ColorSpec,
+        /// Font of `main` (a [`FontFace`]; R's
+        /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
+        pub font_main: Option<FontFace> => option FontFace,
+        /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
+        /// to `title()`); `None`: `par(cex.lab)`.
+        pub cex_lab: Option<f64> => option f64,
+        /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
+        /// `None`: `par(col.lab)`.
+        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
+        /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
+        pub font_lab: Option<FontFace> => option FontFace,
+        /// Draw the titles (R's `ann`, which defaults to `TRUE`, not
+        /// `par(ann)`); default `true`.
+        pub ann: bool => value bool,
+        /// Draw the axes; default `true`.
+        pub axes: bool => value bool,
+        /// Log x axis (R's `log = "x"`); default `false`.
+        pub xlog: bool => value bool,
+        /// Log y axis (R's `log = "y"`); default `false`. As in R, it still
+        /// takes its range from 0, which R "corrects" to about 1e-307 (with a
+        /// warning).
+        pub ylog: bool => value bool,
+        /// `add = TRUE`: draw the bars on the current plot, without a new
+        /// plot, window, title or axes (so `main`/`xlab`/`ylab`/`axes`/`xlog`/
+        /// `ylog` are ignored). Default `false`.
+        pub add: bool => value bool,
+        /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
+        /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
+        /// `None`: `par(las)`.
+        pub las: Option<i32> => option i32,
+        /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
+        pub cex_axis: Option<f64> => option f64,
+        /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
+        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
+        pub font_axis: Option<FontFace> => option FontFace,
+        /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
+        /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
+        pub mgp: Option<[f64; 3]> => array [f64; 3],
+        /// Tick length as a fraction of the plot region (R's inline `tck`);
+        /// `None`: `par(tck)`.
+        pub tck: Option<f64> => option f64,
+        /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
+        pub tcl: Option<f64> => option f64,
+        /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
+        /// R's default.
+        pub gap_axis: Option<f64> => option f64,
+        /// Width of the axes' line and ticks (R's inline `lwd`, which `hist()` passes
+        /// only to `axis()`); `None`: 1, `axis()`'s default.
+        pub lwd: Option<f64> => option f64,
+        /// `false` returns the bins without drawing (R's `plot = FALSE`);
+        /// `None`: `true`.
+        pub plot: Option<bool> => option bool,
+    }
 }
-
-crate::setters::setters!(HistOptions => [HistCall] {
-    breaks: option HistBreaks,
-    freq: option bool,
-    xlim: pair f64,
-    ylim: pair f64,
-    col: values ColorSpec,
-    border: values ColorSpec,
-    lty: na_values LineType,
-    density: na_values f64,
-    angle: values f64,
-    labels: value HistLabels,
-    right: option bool,
-    include_lowest: option bool,
-    fuzz: option f64,
-    main: option Label,
-    xlab: option Label,
-    ylab: option Label,
-    cex_main: option f64,
-    col_main: option ColorSpec,
-    font_main: option FontFace,
-    cex_lab: option f64,
-    col_lab: option ColorSpec,
-    font_lab: option FontFace,
-    ann: value bool,
-    axes: value bool,
-    xlog: value bool,
-    ylog: value bool,
-    add: value bool,
-    las: option i32,
-    cex_axis: option f64,
-    col_axis: option ColorSpec,
-    font_axis: option FontFace,
-    mgp: array [f64; 3],
-    tck: option f64,
-    tcl: option f64,
-    gap_axis: option f64,
-    lwd: option f64,
-    plot: option bool,
-});
 
 impl Default for HistOptions {
     fn default() -> Self {

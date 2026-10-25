@@ -31,85 +31,67 @@ const DEFAULT_COLORS: [&str; 6] = [
     "cornsilk",
 ];
 
-/// Options for [`Graphics::pie`](crate::graphics::Graphics::pie), covering the subset of `pie()`'s arguments this
-/// crate implements. Unset fields are R's defaults, given for each.
-#[derive(Clone, Debug)]
-pub struct PieOptions {
-    /// Slice labels (text or plotmath expressions); `None` gives `1, 2,
-    /// ...`. An empty text label, or a missing one (fewer labels than
-    /// slices, R's `NA`), draws no label or tick for its slice.
-    pub labels: Option<Vec<Label>>,
-    /// Rotation of the labels in degrees, counterclockwise (R's `srt`,
-    /// passed to `text()`); `None`: `par(srt)`.
-    pub srt: Option<f64>,
-    /// Size of the labels (R's inline `cex`, passed to `text()`; `main`
-    /// keeps `cex.main`); `None`: 1.
-    pub cex: Option<f64>,
-    /// Font of the labels (R's inline `font`, passed to `text()`); `None`:
-    /// `par(font)`.
-    pub font: Option<FontFace>,
-    /// Pie radius in user units, where the plot region's shorter side
-    /// spans `[-1, 1]` before the usual 4% axis extension; `None`: 0.8
-    /// (R's default).
-    pub radius: Option<f64>,
-    /// Slice fill colours, recycled over the slices; empty: R's default
-    /// cycle of 6 pastel colours, or `par(fg)` (the shading lines' colour)
-    /// when `density` is given.
-    pub col: Vec<ColorSpec>,
-    /// Slice borders, recycled per slice; empty: `polygon()`'s default,
-    /// `par(fg)`, or with shading the slice's `col` (R's `border = NULL`).
-    pub border: Vec<ColorSpec>,
-    /// Slice border line types, recycled per slice; empty: `par(lty)`.
-    /// `None` (R's `NA`): that slice has no border.
-    pub lty: Vec<Option<LineType>>,
-    /// Shading lines per inch in the slices (R's `density`), recycled per
-    /// slice, as for [`PolygonOptions::density`]; the lines take `col`, whose
-    /// default is then `par(fg)`. Empty: no shading.
-    pub density: Vec<Option<f64>>,
-    /// Angle of the shading lines in degrees (R's `angle`), recycled per
-    /// slice; empty: 45.
-    pub angle: Vec<f64>,
-    /// Title, as for `plot()` (text or a plotmath expression); `None`:
-    /// none. Drawn whatever `par(ann)` is, as in R.
-    pub main: Option<Label>,
-    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
-    /// to `title()`); `None`: `par(cex.main)`.
-    pub cex_main: Option<f64>,
-    /// Colour of `main` (R's `col.main`, passed to `title()`);
-    /// `None`: `par(col.main)`.
-    pub col_main: Option<ColorSpec>,
-    /// Font of `main` (a [`FontFace`]; R's
-    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
-    pub font_main: Option<FontFace>,
-    /// Approximate number of polygon edges for a full circle; `None`: 200
-    /// (R's default).
-    pub edges: Option<usize>,
-    /// Slices go clockwise; default `false` (counterclockwise).
-    pub clockwise: bool,
-    /// Starting angle in degrees (R's `init.angle`). `None`: R's default,
-    /// 90 (12 o'clock) when `clockwise`, else 0 (3 o'clock).
-    pub init_angle: Option<f64>,
+crate::setters::options! {
+    /// Options for [`Graphics::pie`](crate::graphics::Graphics::pie), covering the subset of `pie()`'s arguments this
+    /// crate implements. Unset fields are R's defaults, given for each.
+    #[derive(Clone, Debug)]
+    pub struct PieOptions => [PieCall] {
+        /// Slice labels (text or plotmath expressions); `None` gives `1, 2,
+        /// ...`. An empty text label, or a missing one (fewer labels than
+        /// slices, R's `NA`), draws no label or tick for its slice.
+        pub labels: Option<Vec<Label>> => list Label,
+        /// Rotation of the labels in degrees, counterclockwise (R's `srt`,
+        /// passed to `text()`); `None`: `par(srt)`.
+        pub srt: Option<f64> => option f64,
+        /// Size of the labels (R's inline `cex`, passed to `text()`; `main`
+        /// keeps `cex.main`); `None`: 1.
+        pub cex: Option<f64> => option f64,
+        /// Font of the labels (R's inline `font`, passed to `text()`); `None`:
+        /// `par(font)`.
+        pub font: Option<FontFace> => option FontFace,
+        /// Pie radius in user units, where the plot region's shorter side
+        /// spans `[-1, 1]` before the usual 4% axis extension; `None`: 0.8
+        /// (R's default).
+        pub radius: Option<f64> => option f64,
+        /// Slice fill colours, recycled over the slices; empty: R's default
+        /// cycle of 6 pastel colours, or `par(fg)` (the shading lines' colour)
+        /// when `density` is given.
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Slice borders, recycled per slice; empty: `polygon()`'s default,
+        /// `par(fg)`, or with shading the slice's `col` (R's `border = NULL`).
+        pub border: Vec<ColorSpec> => values ColorSpec,
+        /// Slice border line types, recycled per slice; empty: `par(lty)`.
+        /// `None` (R's `NA`): that slice has no border.
+        pub lty: Vec<Option<LineType>> => na_values LineType,
+        /// Shading lines per inch in the slices (R's `density`), recycled per
+        /// slice, as for [`PolygonOptions::density`]; the lines take `col`, whose
+        /// default is then `par(fg)`. Empty: no shading.
+        pub density: Vec<Option<f64>> => na_values f64,
+        /// Angle of the shading lines in degrees (R's `angle`), recycled per
+        /// slice; empty: 45.
+        pub angle: Vec<f64> => values f64,
+        /// Title, as for `plot()` (text or a plotmath expression); `None`:
+        /// none. Drawn whatever `par(ann)` is, as in R.
+        pub main: Option<Label> => option Label,
+        /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
+        /// to `title()`); `None`: `par(cex.main)`.
+        pub cex_main: Option<f64> => option f64,
+        /// Colour of `main` (R's `col.main`, passed to `title()`);
+        /// `None`: `par(col.main)`.
+        pub col_main: Option<ColorSpec> => option ColorSpec,
+        /// Font of `main` (a [`FontFace`]; R's
+        /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
+        pub font_main: Option<FontFace> => option FontFace,
+        /// Approximate number of polygon edges for a full circle; `None`: 200
+        /// (R's default).
+        pub edges: Option<usize> => option usize,
+        /// Slices go clockwise; default `false` (counterclockwise).
+        pub clockwise: bool => value bool,
+        /// Starting angle in degrees (R's `init.angle`). `None`: R's default,
+        /// 90 (12 o'clock) when `clockwise`, else 0 (3 o'clock).
+        pub init_angle: Option<f64> => option f64,
+    }
 }
-
-crate::setters::setters!(PieOptions => [PieCall] {
-    labels: list Label,
-    srt: option f64,
-    cex: option f64,
-    font: option FontFace,
-    radius: option f64,
-    col: values ColorSpec,
-    border: values ColorSpec,
-    lty: na_values LineType,
-    density: na_values f64,
-    angle: values f64,
-    main: option Label,
-    cex_main: option f64,
-    col_main: option ColorSpec,
-    font_main: option FontFace,
-    edges: option usize,
-    clockwise: value bool,
-    init_angle: option f64,
-});
 
 impl Default for PieOptions {
     fn default() -> Self {
