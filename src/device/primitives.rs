@@ -510,7 +510,7 @@ impl<B: Backend> Device<B> {
         for (i, (&x, &y)) in x.iter().zip(y).enumerate() {
             // Checked after conversion, like R, so values <= 0 on a log
             // axis are skipped too.
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             if !p.x.is_finite() || !p.y.is_finite() {
                 continue;
             }
@@ -566,8 +566,8 @@ impl<B: Backend> Device<B> {
         let (lty, lwd) = (self.par.lty, self.par.lwd);
         self.push_clip_region(self.clip_for(opts.xpd));
         for i in 0..n {
-            let p0 = self.user_to_inches(x0[i % x0.len()], y0[i % y0.len()]);
-            let p1 = self.user_to_inches(x1[i % x1.len()], y1[i % y1.len()]);
+            let p0 = self.data_to_inches(x0[i % x0.len()], y0[i % y0.len()]);
+            let p1 = self.data_to_inches(x1[i % x1.len()], y1[i % y1.len()]);
             if ![p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
                 continue;
             }
@@ -622,8 +622,8 @@ impl<B: Backend> Device<B> {
                 x1[i % x1.len()],
                 y1[i % y1.len()],
             );
-            let from = self.user_to_inches(a, b);
-            let to = self.user_to_inches(c, d);
+            let from = self.data_to_inches(a, b);
+            let to = self.data_to_inches(c, d);
             if ![from.x, from.y, to.x, to.y].iter().all(|v| v.is_finite()) {
                 continue;
             }
@@ -718,8 +718,8 @@ impl<B: Backend> Device<B> {
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
         for i in 0..n {
-            let p0 = self.user_to_inches(x0[i % x0.len()], y0[i % y0.len()]);
-            let p1 = self.user_to_inches(x1[i % x1.len()], y1[i % y1.len()]);
+            let p0 = self.data_to_inches(x0[i % x0.len()], y0[i % y0.len()]);
+            let p1 = self.data_to_inches(x1[i % x1.len()], y1[i % y1.len()]);
             if ![p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
                 continue;
             }
@@ -793,7 +793,7 @@ impl<B: Backend> Device<B> {
                     None => continue,
                 }
             };
-            let p = self.user_to_inches(x[i % x.len()], y[i % y.len()]);
+            let p = self.data_to_inches(x[i % x.len()], y[i % y.len()]);
             // As `C_text`: a label at a non-finite position (`NA`, or <= 0
             // on a log axis) is skipped; the others keep their index.
             if !(p.x.is_finite() && p.y.is_finite()) {

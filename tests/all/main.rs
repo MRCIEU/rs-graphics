@@ -73,6 +73,6 @@ mod required_args;
 mod start_ps_matches_r;
 mod tck_srt_matches_r;
 mod text_matches_r;
-mod text_metrics_matches_r;
+mod strwidth_matches_r;
 mod xpd_na_matches_r;
 mod xy_lengths_matches_r;

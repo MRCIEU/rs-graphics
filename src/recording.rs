@@ -51,7 +51,7 @@
 //!   call for `mar`, `pty`, ...). `add_figure` restores the device's `par`
 //!   afterwards, so a figure's settings don't leak into the next one.
 //! - **What isn't recorded:** device queries (`usr()`, `plot_region()`,
-//!   `text_metrics()`, ...) and page layout (`mfrow`, `layout`, `fig`,
+//!   `strwidth()`, ...) and page layout (`mfrow`, `layout`, `fig`,
 //!   ...) are [`Device`] methods only, and a figure's `par()` call has
 //!   no `mfrow`/`mfcol` setters (a figure is one panel).
 //! - **Data is copied** into the figure. For very large plots, draw on

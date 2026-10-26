@@ -205,9 +205,9 @@ impl<B: Backend> Device<B> {
                     let x0 = if self.xlog { 10f64.powf(ux0) } else { ux0 };
                     let y0 = if self.ylog { 10f64.powf(uy0) } else { uy0 };
                     if horizontal_side {
-                        self.user_to_inches(at, y0).x
+                        self.data_to_inches(at, y0).x
                     } else {
-                        self.user_to_inches(x0, at).y
+                        self.data_to_inches(x0, at).y
                     }
                 }
                 None => {

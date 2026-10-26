@@ -285,6 +285,152 @@ impl<B: Backend> LayoutCall<'_, B> {
     }
 }
 
+/// The units [`strwidth`](Device::strwidth) and
+/// [`strheight`](Device::strheight) measure in.
+///
+/// Setters take R's strings (`"user"`, `"inches"`, `"figure"`, or a
+/// unique prefix), panicking on any other.
+///
+/// This is R's `strwidth(units = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!(StrUnits::parse("in"), Some(StrUnits::Inches));
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum StrUnits {
+    /// Data units along the axis (the default): x for a width, y for a
+    /// height; log10 values on a log axis, as [`Device::usr`] is.
+    #[default]
+    User,
+    /// Inches.
+    Inches,
+    /// Fractions of the figure region's width or height.
+    Figure,
+}
+
+impl StrUnits {
+    /// Reads `"user"`, `"inches"` or `"figure"`, or a unique prefix of one
+    /// (R's `match.arg()`); `None` for anything else.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(StrUnits::parse("figure"), Some(StrUnits::Figure));
+    /// assert_eq!(StrUnits::parse("cm"), None);
+    /// ```
+    pub fn parse(s: &str) -> Option<StrUnits> {
+        let all = [
+            ("user", StrUnits::User),
+            ("inches", StrUnits::Inches),
+            ("figure", StrUnits::Figure),
+        ];
+        let mut hits = all
+            .iter()
+            .filter(|(name, _)| !s.is_empty() && name.starts_with(s));
+        match (hits.next(), hits.next()) {
+            (Some(&(_, u)), None) => Some(u),
+            _ => None,
+        }
+    }
+}
+
+crate::error::from_str_via_parse!(StrUnits, "string units");
+crate::error::from_r_string!(StrUnits, "string units", "\"user\", \"inches\" or \"figure\"");
+
+/// A [`strwidth()`](Device::strwidth) or [`strheight()`](Device::strheight)
+/// measurement being built.
+///
+/// Set its arguments with the setters below, then get the size with
+/// [`get`](StrSizeCall::get). See [`Device::strwidth`] for an example.
+#[must_use = "nothing is measured until `.get()`"]
+pub struct StrSizeCall<'a, B: Backend> {
+    dev: &'a mut Device<B>,
+    height: bool,
+    s: Option<Label>,
+    cex: Option<f64>,
+    font: Option<FontFace>,
+    units: StrUnits,
+}
+
+impl<'a, B: Backend> StrSizeCall<'a, B> {
+    fn start(dev: &'a mut Device<B>, height: bool) -> Self {
+        StrSizeCall {
+            dev,
+            height,
+            s: None,
+            cex: None,
+            font: None,
+            units: StrUnits::User,
+        }
+    }
+
+    /// The text (lines separated by `\n`) or plotmath expression
+    /// (`Label::math("x^2")`) to measure. Required.
+    pub fn s(mut self, s: impl Into<Label>) -> Self {
+        self.s = Some(s.into());
+        self
+    }
+
+    /// Size, relative to `par(cex)`. `None`: 1, so `par(cex)`.
+    pub fn cex(mut self, cex: impl Into<f64>) -> Self {
+        self.cex = Some(cex.into());
+        self
+    }
+
+    /// Font face of text ([`FontFace`]; R's number, a name or the enum).
+    /// `None`: `par(font)`. Expressions use their own fonts.
+    pub fn font(mut self, font: impl Into<FontFace>) -> Self {
+        self.font = Some(font.into());
+        self
+    }
+
+    /// The units of the result: data units (the default), inches, or
+    /// fractions of the figure region (see [`StrUnits`]).
+    pub fn units(mut self, units: impl Into<StrUnits>) -> Self {
+        self.units = units.into();
+        self
+    }
+
+    /// Returns the width or height in the chosen units.
+    ///
+    /// # Panics
+    ///
+    /// If `s` wasn't set (`argument "s" is missing, with no default`).
+    pub fn get(self) -> f64 {
+        let label = crate::graphics::required(self.s, "s");
+        let cex = self.cex.unwrap_or(1.0);
+        let dev = self.dev;
+        let face = self.font.unwrap_or(dev.par.font);
+        let inches = match &label {
+            Label::Text(t) => {
+                let (w, h) = dev.text_size_inches(t, face, cex);
+                if self.height { h } else { w }
+            }
+            Label::Math(_) => {
+                if self.height {
+                    dev.label_height(&label, face, cex)
+                } else {
+                    dev.label_width(&label, face, cex)
+                }
+            }
+        };
+        let (plot, fig, range) = if self.height {
+            (dev.plt.height(), dev.fig.height(), dev.usr.3 - dev.usr.2)
+        } else {
+            (dev.plt.width(), dev.fig.width(), dev.usr.1 - dev.usr.0)
+        };
+        match self.units {
+            StrUnits::Inches => inches,
+            StrUnits::User => inches / plot * range,
+            StrUnits::Figure => inches / fig,
+        }
+    }
+}
+
 /// A figure region set with `fig()` or `fin()`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum FigSpec {
@@ -484,34 +630,19 @@ impl<B: Backend> Device<B> {
         output.close(&self.finish())
     }
 
-    /// Returns the page width in inches.
+    /// Returns the page size in inches, `(width, height)`.
     ///
-    /// This is R's `par("din")[1]`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
-    /// assert_eq!(dev.width_in(), 7.0);
-    /// ```
-    pub fn width_in(&self) -> f64 {
-        self.width_in
-    }
-
-    /// Returns the page height in inches.
-    ///
-    /// This is R's `par("din")[2]`.
+    /// This is R's `par("din")`.
     ///
     /// # Examples
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
-    /// assert_eq!(dev.height_in(), 7.0);
+    /// let dev = Device::new(SvgBackend::new(7, 5), Par::default());
+    /// assert_eq!(dev.din(), (7.0, 5.0));
     /// ```
-    pub fn height_in(&self) -> f64 {
-        self.height_in
+    pub fn din(&self) -> (f64, f64) {
+        (self.width_in, self.height_in)
     }
 
     /// Returns the current plot region, in inches from the page's bottom-left
@@ -526,7 +657,7 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let r = dev.plot_region();
-    /// assert!(r.x0 > 0.0 && r.x1 < dev.width_in());
+    /// assert!(r.x0 > 0.0 && r.x1 < dev.din().0);
     /// ```
     pub fn plot_region(&self) -> Rect {
         self.plt
@@ -898,7 +1029,7 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
     /// dev.par().mfrow(1, 2).draw();
     /// dev.plot().x([1, 2]).draw();
-    /// assert_eq!(dev.figure_region().x1, dev.width_in() / 2.0);
+    /// assert_eq!(dev.figure_region().x1, dev.din().0 / 2.0);
     /// ```
     pub fn figure_region(&self) -> Rect {
         self.fig
@@ -1072,9 +1203,9 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
     /// dev.plot_new();
     /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
-    /// assert_eq!(dev.default_ticks(1), [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
+    /// assert_eq!(dev.ax_ticks(1), [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
     /// ```
-    pub fn default_ticks(&self, side: impl Into<Side>) -> Vec<f64> {
+    pub fn ax_ticks(&self, side: impl Into<Side>) -> Vec<f64> {
         let side = side.into();
         let axp = if side.is_horizontal() {
             self.par.xaxp
@@ -1113,15 +1244,12 @@ impl<B: Backend> Device<B> {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
-    /// let p = dev.user_to_inches(5, 5);
-    /// let (x, y) = dev.inches_to_user(p);
-    /// assert!((x - 5.0).abs() < 1e-9 && (y - 5.0).abs() < 1e-9);
+    /// let p = dev.user_to_inches(Point::new(5.0, 5.0));
+    /// let q = dev.inches_to_user(p);
+    /// assert!((q.x - 5.0).abs() < 1e-9 && (q.y - 5.0).abs() < 1e-9);
     /// ```
-    pub fn user_to_inches(&self, x: impl Into<f64>, y: impl Into<f64>) -> Point {
-        let (x, y) = (x.into(), y.into());
-        let ux = if self.xlog { x.log10() } else { x };
-        let uy = if self.ylog { y.log10() } else { y };
-        self.usr_to_inches(ux, uy)
+    pub fn user_to_inches(&self, p: Point) -> Point {
+        self.data_to_inches(p.x, p.y)
     }
 
     /// Converts a point in inches from the page's bottom-left corner to data
@@ -1139,10 +1267,24 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let r = dev.plot_region();
-    /// let (x, _) = dev.inches_to_user(Point::new(r.x0, r.y0));
-    /// assert!((x - dev.usr().0).abs() < 1e-9);
+    /// let corner = dev.inches_to_user(Point::new(r.x0, r.y0));
+    /// assert!((corner.x - dev.usr().0).abs() < 1e-9);
     /// ```
-    pub fn inches_to_user(&self, p: Point) -> (f64, f64) {
+    pub fn inches_to_user(&self, p: Point) -> Point {
+        let (x, y) = self.inches_to_data(p);
+        Point::new(x, y)
+    }
+
+    /// [`Device::user_to_inches`] for a data point given as two numbers.
+    pub(crate) fn data_to_inches(&self, x: impl Into<f64>, y: impl Into<f64>) -> Point {
+        let (x, y) = (x.into(), y.into());
+        let ux = if self.xlog { x.log10() } else { x };
+        let uy = if self.ylog { y.log10() } else { y };
+        self.usr_to_inches(ux, uy)
+    }
+
+    /// [`Device::inches_to_user`] as a pair of data values.
+    pub(crate) fn inches_to_data(&self, p: Point) -> (f64, f64) {
         let (ux, uy) = self.inches_to_usr(p);
         let x = if self.xlog { 10f64.powf(ux) } else { ux };
         let y = if self.ylog { 10f64.powf(uy) } else { uy };
@@ -1442,7 +1584,7 @@ impl<B: Backend> Device<B> {
         self.push_clip_region(clip);
         let mut run: Vec<Point> = Vec::new();
         for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             if p.x.is_finite() && p.y.is_finite() {
                 run.push(p);
             } else if run.len() >= 2 {
@@ -1480,7 +1622,7 @@ impl<B: Backend> Device<B> {
         self.push_clip_region(clip);
         let mut old: Option<Point> = None;
         for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
             if let (Some(a), Some(b)) = (old, p) {
                 let len = (b.x - a.x).hypot(b.y - a.y);
@@ -1521,7 +1663,7 @@ impl<B: Backend> Device<B> {
         };
         self.push_clip_region(clip);
         for (i, (&x, &y)) in xs.iter().zip(ys).enumerate() {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             if !p.x.is_finite() || !p.y.is_finite() {
                 continue;
             }
@@ -1557,7 +1699,7 @@ impl<B: Backend> Device<B> {
         let mut run: Vec<Point> = Vec::new();
         let mut old: Option<Point> = None;
         for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
             match (old, p) {
                 (Some(a), Some(b)) => {
@@ -1606,32 +1748,58 @@ impl<B: Backend> Device<B> {
     // Text
     // ---------------------------------------------------------------
 
-    /// Returns the width and height of `text` in inches, at size `cex` in
-    /// font `font`.
+    /// Starts measuring how wide a string or plotmath expression is when
+    /// drawn: set it with [`s`](StrSizeCall::s), then get the width with
+    /// [`get`](StrSizeCall::get).
     ///
-    /// The size is `par(ps) * par(cex) * cex` points (after the backend's
-    /// font-size rounding). The width is that of the widest line; the height
-    /// is the ascent of "M" plus one line height (`par(lheight) * 1.2 * ps /
-    /// 72` inches, times the size factors) per `\n`.
+    /// The width is in data units along the x axis by default (see
+    /// [`units`](StrSizeCall::units)), at the size `text()` would draw it
+    /// (`par(ps) * par(cex) * cex` points, after the backend's font-size
+    /// rounding). For text with several lines, the widest line counts.
     ///
-    /// This is R's `strwidth()` and `strheight()` in inches.
+    /// This is R's `strwidth()`, for one string at a time.
     ///
     /// # Examples
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
-    /// let (w, h) = dev.text_metrics("Title", FontFace::Bold, 1.2);
-    /// assert!(w > h && h > 0.0);
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let w = dev.strwidth().s("Title").cex(1.2).get(); // in x data units
+    /// let w_in = dev.strwidth().s("Title").cex(1.2).units("inches").get();
+    /// assert!(w > 0.0 && w_in > 0.0);
     /// ```
-    pub fn text_metrics(
-        &self,
-        text: &str,
-        font: impl Into<FontFace>,
-        cex: impl Into<f64>,
-    ) -> (f64, f64) {
-        let cex = cex.into();
-        let face = font.into();
+    pub fn strwidth(&mut self) -> StrSizeCall<'_, B> {
+        StrSizeCall::start(self, false)
+    }
+
+    /// Starts measuring how tall a string or plotmath expression is when
+    /// drawn; as [`strwidth`](Device::strwidth).
+    ///
+    /// For text, the height is that of "M", plus one line height
+    /// (`par(lheight) * 1.2 * ps / 72` inches, times the size factors) per
+    /// `\n`; for an expression, its height above and depth below the
+    /// baseline. In data units along the y axis by default.
+    ///
+    /// This is R's `strheight()`, for one string at a time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let one = dev.strheight().s("a").units("inches").get();
+    /// let two = dev.strheight().s("a\nb").units("inches").get();
+    /// assert!(two > one);
+    /// ```
+    pub fn strheight(&mut self) -> StrSizeCall<'_, B> {
+        StrSizeCall::start(self, true)
+    }
+
+    /// Width and height in inches of text in `face` at `cex` (times
+    /// `par(cex)`): R's `GEStrWidth`/`GEStrHeight`.
+    fn text_size_inches(&self, text: &str, face: FontFace, cex: f64) -> (f64, f64) {
         let size = self.font_size_pt(cex);
         let width = text
             .split('\n')
@@ -2040,7 +2208,7 @@ mod tests {
         dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x);
         assert!(dev.xlog() && !dev.ylog());
         for (x, y) in [(1.0, -2.0), (31.6, 0.25), (1000.0, 3.0)] {
-            let (x2, y2) = dev.inches_to_user(dev.user_to_inches(x, y));
+            let (x2, y2) = dev.inches_to_data(dev.data_to_inches(x, y));
             assert!(
                 (x2 - x).abs() < 1e-9 * x && (y2 - y).abs() < 1e-9,
                 "{x}, {y}"

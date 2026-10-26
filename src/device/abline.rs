@@ -208,7 +208,7 @@ impl<B: Backend> Device<B> {
             return None;
         }
         let pts: Vec<Point> = (start..=stop)
-            .map(|i| self.user_to_inches(xx[i], yy[i]))
+            .map(|i| self.data_to_inches(xx[i], yy[i]))
             .collect();
         pts.iter()
             .all(|p| p.x.is_finite() && p.y.is_finite())

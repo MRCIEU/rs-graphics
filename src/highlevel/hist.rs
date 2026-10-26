@@ -809,12 +809,12 @@ impl<B: Backend> Device<B> {
                 self.axis_impl(1, &inline.apply(AxisOptions::default()));
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
                 let yticks = if freq {
-                    self.default_ticks(2)
+                    self.ax_ticks(2)
                         .into_iter()
                         .filter(|v| v % 1.0 == 0.0)
                         .collect()
                 } else {
-                    self.default_ticks(2)
+                    self.ax_ticks(2)
                 };
                 let y_axis = AxisOptions {
                     at: Some(yticks),

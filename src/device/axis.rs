@@ -42,7 +42,7 @@ crate::setters::options! {
     pub struct AxisOptions => [AxisCall] {
         /// Tick positions, in user coordinates (data units, also on a log
         /// axis). `None`: the default ticks from `axp` (else
-        /// `par(xaxp/yaxp)`), as [`Device::default_ticks`].
+        /// `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
         pub at: Option<Vec<f64>> => option_values f64,
         /// Labels for the ticks in `at` (requires `at`): text or plotmath
         /// expressions (`Some("a".into())`, `Some(Label::math("10^5"))`).
@@ -208,7 +208,7 @@ impl<B: Backend> Device<B> {
 
         let at = opts.at.clone().unwrap_or_else(|| match opts.axp {
             Some(axp) => self.ticks_from_axp(side, axp),
-            None => self.default_ticks(side),
+            None => self.ax_ticks(side),
         });
         let labels = if opts.draw_labels {
             let labels = match &opts.labels {
@@ -300,9 +300,9 @@ impl<B: Backend> Device<B> {
         let axis_base = match pos {
             Some(p) => {
                 if x_axis {
-                    self.user_to_inches(1.0, p).y
+                    self.data_to_inches(1.0, p).y
                 } else {
-                    self.user_to_inches(p, 1.0).x
+                    self.data_to_inches(p, 1.0).x
                 }
             }
             None => {

@@ -337,8 +337,9 @@ against a real R installation by shelling out to `Rscript`:
   `radius`, `par(xaxs = "i")`) vs. an uncompressed R `pdf()`.
 - `tests/all/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
-- `tests/all/text_metrics_matches_r.rs` - `Device::text_metrics` vs. R's
-  `strwidth()`/`strheight()`: `cex`, `font`, multi-line text, `par(ps)`,
+- `tests/all/strwidth_matches_r.rs` - `Device::strwidth`/`strheight` vs.
+  R's `strwidth()`/`strheight()` in inches, user (incl. a reversed axis)
+  and figure units: `cex`, `font`, multi-line text, `par(ps)`,
   `par(lheight)` and a 2x2 `mfrow`.
 - `tests/all/colour_zero_matches_r.rs` - colour 0 is `par("bg")` (with
   `pdf(bg = )`, the transparent default, and after `par(bg = )`): every

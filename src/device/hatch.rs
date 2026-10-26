@@ -68,7 +68,7 @@ impl<B: Backend> Device<B> {
         let mut run = (Vec::new(), Vec::new());
         let n = x.len().min(y.len());
         for i in 0..=n {
-            let p = (i < n).then(|| self.user_to_inches(x[i], y[i]));
+            let p = (i < n).then(|| self.data_to_inches(x[i], y[i]));
             if let Some(p) = p.filter(|p| p.x.is_finite() && p.y.is_finite()) {
                 run.0.push((x[i], y[i]));
                 run.1.push(p);

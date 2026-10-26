@@ -735,8 +735,8 @@ impl<B: Backend> Device<B> {
         let (left, top, w, h, xextra);
         match pos {
             LegendPos::Corners(xa, ya, xb, yb) => {
-                let pa = self.user_to_inches(xa, ya);
-                let pb = self.user_to_inches(xb, yb);
+                let pa = self.data_to_inches(xa, ya);
+                let pb = self.data_to_inches(xb, yb);
                 left = pa.x.min(pb.x);
                 top = pa.y.max(pb.y);
                 w = (pa.x - pb.x).abs();
@@ -775,7 +775,7 @@ impl<B: Backend> Device<B> {
 
                 let (l, t) = match pos {
                     LegendPos::Xy(x, y) => {
-                        let p = self.user_to_inches(x, y);
+                        let p = self.data_to_inches(x, y);
                         let xjust = opts.xjust.unwrap_or(0.0);
                         let yjust = opts.yjust.unwrap_or(1.0);
                         (p.x - xjust * w_, p.y + (1.0 - yjust) * h_)
@@ -859,8 +859,8 @@ impl<B: Backend> Device<B> {
                     .map(|i| {
                         let top = yt[i] + ybox[i] / 2.0;
                         (
-                            self.inches_to_user(Point::new(xt[i], top)),
-                            self.inches_to_user(Point::new(xt[i] + xbox[i], top - ybox[i])),
+                            self.inches_to_data(Point::new(xt[i], top)),
+                            self.inches_to_data(Point::new(xt[i] + xbox[i], top - ybox[i])),
                         )
                     })
                     .collect();
