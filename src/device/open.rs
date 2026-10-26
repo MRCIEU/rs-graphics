@@ -24,14 +24,18 @@ use crate::color::{Color, ColorSpec};
 use crate::par::Par;
 
 crate::setters::options! {
-    /// The arguments of R's `pdf()`, `svg()` and `png()` for a file, started by
-    /// [`Device::format`] (or [`Device::pdf`], [`Device::svg`],
-    /// [`Device::png`]) and finished by [`open`](DeviceBuilder::open). Unset
-    /// fields are R's defaults, given for each. Sizes are in inches for every
-    /// format (R's `png()` counts pixels by default; its default 480 x 480
-    /// pixels at 72 ppi is 6.67 x 6.67 inches here). The default PNG size
-    /// stays 6.67 inches at any `res`, so a higher `res` gives more pixels,
-    /// where R's `png(res = )` keeps 480 x 480 pixels.
+    /// The options of a device being opened for a file.
+    ///
+    /// Start one with [`Device::pdf`], [`Device::svg`], [`Device::png`] or
+    /// [`Device::format`], set its options and finish with
+    /// [`open`](DeviceBuilder::open). Unset options take R's defaults, given
+    /// for each. Sizes are in inches for every format unless
+    /// [`units`](DeviceBuilder::units) says otherwise. The default PNG is 6.67
+    /// x 6.67 inches, R's default 480 x 480 pixels at 72 ppi; it stays 6.67
+    /// inches at any `res`, so a higher `res` gives more pixels, where R's
+    /// `png(res = )` keeps 480 x 480 pixels.
+    ///
+    /// These are the arguments of R's `pdf()`, `svg()` and `png()`.
     #[must_use = "a device is only opened by `.open()`"]
     #[derive(Clone, Debug)]
     pub struct DeviceBuilder {
@@ -73,30 +77,45 @@ crate::setters::options! {
 }
 
 impl DeviceBuilder {
-    /// Opens the device and creates (or empties) its file, as R's `pdf()`
-    /// and co. do, so a bad path fails here rather than after drawing; the
-    /// error names the file.
+    /// Opens the device and creates (or empties) its file, so a bad path fails
+    /// here rather than after drawing.
     ///
-    /// As in R, the file name may hold a C integer format for the page
-    /// number, `"Rplot%03d.png"` (at most one `%d`, `%i`, `%u`, `%o`, `%x`
-    /// or `%X`, with flags, width and precision; `%%` is a `%`): a PNG or
-    /// SVG device then writes one file per page (`Rplot001.png`,
-    /// `Rplot002.png`, ...), each when the next page starts and the last
-    /// at `close()`. Without one, the file holds the last page, as in R. A
-    /// PDF keeps every page in one file, named for page 1 (R's
-    /// `pdf(onefile = TRUE)`), unless [`onefile`](DeviceBuilder::onefile)
-    /// is `false`: then it writes a file per page as PNG and SVG do. Any
-    /// other `%` is an
-    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid
-    /// 'file' argument"), as R's `checkIntFormat()`.
+    /// The output is written by [`close`](Device::close); a device dropped
+    /// without it leaves the file empty. The file name may hold a C integer
+    /// format for the page number, `"Rplot%03d.png"` (at most one `%d`, `%i`,
+    /// `%u`, `%o`, `%x` or `%X`, with flags, width and precision; `%%` is a
+    /// `%`): a PNG or SVG device then writes one file per page
+    /// (`Rplot001.png`, `Rplot002.png`, ...), each when the next page starts
+    /// and the last at `close()`. Without one, the file holds the last page. A
+    /// PDF keeps every page in one file, named for page 1, unless
+    /// [`onefile`](DeviceBuilder::onefile) is `false`: then it writes a file
+    /// per page as PNG and SVG do.
     ///
-    /// [`units`](DeviceBuilder::units) of pixels for a PDF or SVG device
-    /// are an [`InvalidInput`](std::io::ErrorKind::InvalidInput) error,
-    /// checked before the file is created.
+    /// As in R, opening the device creates the file; the page-number format is
+    /// R's `checkIntFormat()`.
     ///
-    /// The contents are written by
-    /// [`close`](Device::close) (R's `dev.off()`); a device dropped
-    /// without it leaves the file empty.
+    /// # Examples
+    ///
+    /// One PNG file per page:
+    ///
+    /// ```no_run
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> std::io::Result<()> {
+    /// let mut dev = Device::png("panel%02d.png").open()?;
+    /// dev.plot().x([1, 2, 3]).draw(); // panel01.png
+    /// dev.plot().x([3, 2, 1]).draw(); // panel02.png
+    /// dev.close()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// If the file can't be created (the error names the file); if `file` has
+    /// any other `%`, or more than one page-number format, an
+    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid 'file'
+    /// argument"); and for [`units`](DeviceBuilder::units) of pixels on a PDF
+    /// or SVG device, an `InvalidInput` error, before the file is created.
     pub fn open(self) -> std::io::Result<Device<AnyBackend>> {
         let units = self.units.unwrap_or(Units::In);
         if units == Units::Px && self.format != Format::Png {
@@ -425,29 +444,33 @@ impl<B: Backend> Device<B> {
 }
 
 impl Device<AnyBackend> {
-    /// Starts opening a device of `format` for `file`, like R's `pdf()`,
-    /// `svg()` or `png()` with the format chosen at run time: `format` is
-    /// a [`Format`] or its name (`"pdf"`, `"svg"`, `"png"`, ignoring
-    /// case). Set R's other arguments on the [`DeviceBuilder`] and finish
-    /// with [`open`](DeviceBuilder::open), which creates the file;
-    /// [`close`](Device::close) writes it. The format never comes from
-    /// `file`'s extension.
+    /// Starts opening a device for `file` in a format chosen at run time.
     ///
-    /// # Panics
-    /// If `format` is a string that names no format; use [`Format::parse`]
-    /// or `str::parse` to handle that yourself.
+    /// `format` is a [`Format`] or its name (`"pdf"`, `"svg"`, `"png"`,
+    /// ignoring case); it never comes from `file`'s extension. Set the other
+    /// options on the returned [`DeviceBuilder`] and finish with
+    /// [`open`](DeviceBuilder::open), which creates the file;
+    /// [`close`](Device::close) writes it.
+    ///
+    /// This is R's `pdf()`, `svg()` or `png()`, chosen at run time.
+    ///
+    /// # Examples
     ///
     /// ```no_run
-    /// use rs_graphics::prelude::*;
-    ///
+    /// # use rs_graphics::prelude::*;
     /// # fn main() -> std::io::Result<()> {
     /// let format = "png"; // e.g. from a command-line option
-    /// let mut dev = Device::format(format, "plot.png").res(300.0).open()?;
-    /// dev.plot().x(&[1.0, 2.0, 3.0]).y(&[2.0, 1.0, 3.0]).draw();
+    /// let mut dev = Device::format(format, "plot.png").res(300).open()?;
+    /// dev.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
     /// dev.close()?;
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// If `format` is a string that names no format; use [`Format::parse`] or
+    /// `str::parse` to handle that yourself.
     pub fn format(format: impl Into<Format>, file: impl AsRef<Path>) -> DeviceBuilder {
         DeviceBuilder {
             format: format.into(),
@@ -463,18 +486,21 @@ impl Device<AnyBackend> {
         }
     }
 
-    /// R's `pdf(file, ...)`: [`Device::format`] with PDF, whatever `file`'s
-    /// extension. Default page 7 x 7 inches, transparent background, all
-    /// pages in one file (see [`onefile`](DeviceBuilder::onefile)).
+    /// Starts opening a PDF device for `file`, whatever its extension.
+    ///
+    /// Defaults: a 7 x 7 inch page, a transparent background, and all pages in
+    /// one file (see [`onefile`](DeviceBuilder::onefile)). See [`Device::format`].
+    ///
+    /// This is R's `pdf()`.
+    ///
+    /// # Examples
     ///
     /// ```no_run
-    /// use rs_graphics::prelude::*;
-    ///
+    /// # use rs_graphics::prelude::*;
     /// # fn main() -> std::io::Result<()> {
-    /// // R: pdf("scatter.pdf", width = 7, height = 5)
-    /// let mut dev = Device::pdf("scatter.pdf").width(7.0).height(5.0).open()?;
-    /// dev.plot().x(&[1.0, 2.0, 3.0]).y(&[2.0, 1.0, 3.0]).draw();
-    /// dev.close()?; // R: dev.off()
+    /// let mut dev = Device::pdf("scatter.pdf").width(7).height(5).open()?;
+    /// dev.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
+    /// dev.close()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -482,21 +508,51 @@ impl Device<AnyBackend> {
         Device::format(Format::Pdf, file)
     }
 
-    /// R's `svg(filename, ...)`: [`Device::format`] with SVG. Default page
-    /// 7 x 7 inches, white background. One file per page with a page
-    /// number in `file` (`"plot%03d.svg"`; see
-    /// [`open`](DeviceBuilder::open)).
+    /// Starts opening an SVG device for `file`, whatever its extension.
+    ///
+    /// Defaults: a 7 x 7 inch page and a white background. A page number in
+    /// `file` (`"plot%03d.svg"`) gives one file per page (see
+    /// [`open`](DeviceBuilder::open)). See [`Device::format`].
+    ///
+    /// This is R's `svg()`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> std::io::Result<()> {
+    /// let mut dev = Device::svg("plot.svg").width(5).height(5).open()?;
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// dev.close()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn svg(file: impl AsRef<Path>) -> DeviceBuilder {
         Device::format(Format::Svg, file)
     }
 
-    /// R's `png(filename, ...)`: [`Device::format`] with PNG. Sizes are in
-    /// inches (R's `units = "in"`) unless [`units`](DeviceBuilder::units)
-    /// says otherwise (`"px"` for R's default), with
-    /// [`res`](DeviceBuilder::res) pixels per inch (default 72); the default 6.67 x 6.67 inches at 72 ppi is
-    /// R's default 480 x 480 pixel image. White background. One file per
-    /// page with a page number in `file`, as R's default
-    /// `"Rplot%03d.png"` (see [`open`](DeviceBuilder::open)).
+    /// Starts opening a PNG device for `file`, whatever its extension.
+    ///
+    /// Sizes are in inches unless [`units`](DeviceBuilder::units) says
+    /// otherwise, at [`res`](DeviceBuilder::res) pixels per inch (default 72);
+    /// the default 6.67 x 6.67 inches at 72 ppi is R's default 480 x 480
+    /// pixels. White background. A page number in `file` gives one file per
+    /// page (see [`open`](DeviceBuilder::open)). See [`Device::format`].
+    ///
+    /// This is R's `png()`, with sizes in inches by default where R uses
+    /// pixels.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> std::io::Result<()> {
+    /// let mut dev = Device::png("plot.png").width(6).height(4).res(300).open()?;
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// dev.close()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn png(file: impl AsRef<Path>) -> DeviceBuilder {
         Device::format(Format::Png, file)
     }

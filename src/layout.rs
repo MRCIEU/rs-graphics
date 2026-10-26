@@ -18,16 +18,23 @@
 
 use std::fmt;
 
-/// R's `MAX_LAYOUT_ROWS` / `MAX_LAYOUT_COLS` / `MAX_LAYOUT_CELLS`.
+/// The most rows a [`Layout`] can have (R's `MAX_LAYOUT_ROWS`).
 pub const MAX_LAYOUT_ROWS: usize = 50;
+/// The most columns a [`Layout`] can have (R's `MAX_LAYOUT_COLS`).
 pub const MAX_LAYOUT_COLS: usize = 50;
+/// The most cells a [`Layout`] can have (R's `MAX_LAYOUT_CELLS`).
 pub const MAX_LAYOUT_CELLS: usize = 500;
 
-/// A column width or row height for [`Layout`]: relative to the other
-/// relative sizes (R's plain numbers) or absolute (R's `lcm(x)`).
+/// A column width or row height in a [`Layout`]: relative to the other
+/// relative sizes, or absolute in centimetres.
+///
+/// Numbers convert to relative sizes, so `&[2, 1]` works where sizes are
+/// taken. Absolute sizes are R's `lcm(x)`.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LayoutSize {
+    /// A size relative to the other relative sizes in the same direction.
     Relative(f64),
+    /// An absolute size in centimetres (R's `lcm(x)`).
     Cm(f64),
 }
 
@@ -57,7 +64,7 @@ impl LayoutSize {
     }
 }
 
-/// Why a [`Layout`] could not be built.
+/// Why a [`Layout`] couldn't be built, with R's message.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LayoutError(pub String);
 
@@ -78,9 +85,22 @@ enum Respect {
     Matrix(Vec<bool>),
 }
 
-/// A `layout()` specification: which figure number occupies each cell of
-/// a grid, plus relative/absolute column widths and row heights and the
-/// `respect` option (equal x and y scales).
+/// A page divided into figures of different sizes, for
+/// [`Device::layout`](crate::device::Device::layout): which figure occupies
+/// each cell of a grid, with column widths, row heights and whether x and
+/// y units are kept equal.
+///
+/// This is the specification of R's `layout()`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let layout = Layout::new(&[vec![1, 1], vec![2, 3]]).unwrap().heights(&[2, 1]);
+/// assert_eq!(layout.num_figures(), 3);
+/// dev.layout(layout);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct Layout {
     nrow: usize,
@@ -96,10 +116,28 @@ pub struct Layout {
 }
 
 impl Layout {
-    /// `layout(mat)`; `mat` is given as rows, top to bottom (the way the
-    /// matrix reads on screen). Every figure number `1..=max(mat)` must
-    /// appear; `0` marks an empty cell. Widths and heights default to
-    /// equal relative sizes.
+    /// Creates a layout from a grid of figure numbers, given as rows, top to
+    /// bottom (as the matrix reads on screen).
+    ///
+    /// Every figure number from 1 to the largest must appear; `0` marks an
+    /// empty cell, and a number in several cells makes that figure span them.
+    /// Widths and heights start as equal relative sizes.
+    ///
+    /// This is R's `layout(mat)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let layout = Layout::new(&[vec![1, 2], vec![3, 0]]).unwrap();
+    /// assert_eq!((layout.nrow(), layout.ncol()), (2, 2));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// With R's message, if the grid is empty or not rectangular, has more than
+    /// [`MAX_LAYOUT_ROWS`] rows, [`MAX_LAYOUT_COLS`] columns or
+    /// [`MAX_LAYOUT_CELLS`] cells, has no figure, or skips a figure number.
     pub fn new(mat: &[Vec<usize>]) -> Result<Layout, LayoutError> {
         let nrow = mat.len();
         let ncol = mat.first().map_or(0, Vec::len);
@@ -156,11 +194,12 @@ impl Layout {
         })
     }
 
-    /// Column widths (`widths =`): numbers are relative sizes (`&[2, 1]`,
-    /// R's `widths = c(2, 1)`), or give [`LayoutSize`]s to mix in
-    /// absolute ones (`LayoutSize::Cm`, R's `lcm()`). Padded with relative
-    /// `1`s if shorter than the number of columns, extra entries are
-    /// ignored.
+    /// Sets the column widths: numbers are relative sizes (`&[2, 1]`), or give
+    /// [`LayoutSize`]s to mix in absolute ones (`LayoutSize::Cm`).
+    ///
+    /// A shorter list is padded with relative `1`s; extra entries are ignored.
+    ///
+    /// This is R's `layout(widths = )`.
     pub fn widths<S: Into<LayoutSize> + Copy>(mut self, widths: &[S]) -> Layout {
         let widths: Vec<LayoutSize> = widths.iter().map(|&w| w.into()).collect();
         let (w, cm) = pad_sizes(&widths, self.ncol);
@@ -169,7 +208,9 @@ impl Layout {
         self
     }
 
-    /// Row heights (`heights =`); see [`Layout::widths`].
+    /// Sets the row heights; as [`Layout::widths`].
+    ///
+    /// This is R's `layout(heights = )`.
     pub fn heights<S: Into<LayoutSize> + Copy>(mut self, heights: &[S]) -> Layout {
         let heights: Vec<LayoutSize> = heights.iter().map(|&h| h.into()).collect();
         let (h, cm) = pad_sizes(&heights, self.nrow);
@@ -178,15 +219,23 @@ impl Layout {
         self
     }
 
-    /// `respect = TRUE/FALSE`: one unit of width equals one unit of
-    /// height in every relative-size cell.
+    /// Sets whether one unit of width equals one unit of height in every
+    /// relative-size cell.
+    ///
+    /// This is R's `layout(respect = TRUE/FALSE)`.
     pub fn respect(mut self, respect: bool) -> Layout {
         self.respect = if respect { Respect::All } else { Respect::No };
         self
     }
 
-    /// `respect = <matrix>`: respect only the marked cells (given as rows,
-    /// like `mat`).
+    /// Keeps width and height units equal only in the marked cells, given as
+    /// rows like the grid.
+    ///
+    /// This is R's `layout(respect = <matrix>)`.
+    ///
+    /// # Errors
+    ///
+    /// If `respect` doesn't have the grid's dimensions (R's message).
     pub fn respect_matrix(mut self, respect: &[Vec<bool>]) -> Result<Layout, LayoutError> {
         if respect.len() != self.nrow || respect.iter().any(|r| r.len() != self.ncol) {
             return Err(LayoutError(
@@ -203,14 +252,17 @@ impl Layout {
         Ok(self)
     }
 
+    /// Returns the number of figures (the largest figure number).
     pub fn num_figures(&self) -> usize {
         self.num_figures
     }
 
+    /// Returns the number of rows in the grid.
     pub fn nrow(&self) -> usize {
         self.nrow
     }
 
+    /// Returns the number of columns in the grid.
     pub fn ncol(&self) -> usize {
         self.ncol
     }

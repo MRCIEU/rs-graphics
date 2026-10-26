@@ -53,7 +53,7 @@ use crate::setters::{char_pch, pick_na};
 use super::hatch::ShapeStyle;
 use super::{Device, Xpd};
 
-/// Where to put a legend: R's `legend(x, y)` forms.
+/// Where to put a legend: a keyword, a point or two corners.
 ///
 /// [`legend()`](crate::graphics::Graphics::legend) takes anything that
 /// converts into one, so positions can be written as in R:
@@ -160,7 +160,11 @@ corners!(
     (i32, i32, i32, i32)
 );
 
-/// R's `"bottomright"`, `"bottom"`, ... keyword positions.
+/// A legend position by keyword: a corner, an edge or the centre of the
+/// plot region.
+///
+/// Strings work too, as R's keywords (`"bottomright"`, `"top"`, ...; see
+/// [`LegendKeyword::parse`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LegendKeyword {
     BottomRight,
@@ -205,7 +209,9 @@ impl LegendKeyword {
 
 crate::error::from_str_via_parse!(LegendKeyword, "legend position");
 
-/// R's `legend(bty = )`: whether the legend has a box around it.
+/// Whether a legend has a box around it.
+///
+/// This is R's `legend(bty = )`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LegendBty {
     /// `"o"` (the default): draw the box.
@@ -507,9 +513,14 @@ pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) {
     assert!(!bad, "'text.width' must be numeric, >= 0, or a scalar NA");
 }
 
-/// Where `legend()` drew, as R's (invisible) return value `list(rect =
-/// list(w, h, left, top), text = list(x, y))`. All in `usr` units, as in
-/// R: log10 values on a log axis (see [`Device::usr`]).
+/// Where a legend was drawn: its box and each label's anchor, returned by
+/// `legend()` on a [`Device`].
+///
+/// All values are in `usr` units, so log10 values on a log axis (see
+/// [`Device::usr`]).
+///
+/// This is R's (invisible) return value of `legend()`, `list(rect =
+/// list(w, h, left, top), text = list(x, y))`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LegendLayout {
     /// `rect$left`, `rect$top`: the box's top-left corner.

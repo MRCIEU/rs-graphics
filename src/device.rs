@@ -61,10 +61,11 @@ pub use primitives::{
     SegmentsOptions, TextOptions, XyOptions,
 };
 
-/// A side of the plot, figure or page, as R's `side` argument. Functions
-/// take `impl Into<Side>`, so R's numbers work too: `1` = bottom, `2` =
-/// left, `3` = top, `4` = right (`dev.axis().side(1)` is
-/// `dev.axis().side(Side::Bottom)`).
+/// A side of the plot, figure or page.
+///
+/// Functions take `impl Into<Side>`, so R's side numbers work too: `1`
+/// bottom, `2` left, `3` top, `4` right (`.side(1)` is
+/// `.side(Side::Bottom)`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     Bottom = 1,
@@ -104,11 +105,25 @@ impl From<i32> for Side {
     }
 }
 
-/// A graphics device: a page (or several, for PDF) drawn onto a
-/// [`Backend`], plus R's `par()` state and the page layout. Open one for
-/// a file with [`Device::pdf`], [`Device::svg`], [`Device::png`] or
-/// [`Device::format`], or wrap a backend with [`Device::new`]; draw with
-/// the [`Graphics`](crate::graphics::Graphics) methods.
+/// A graphics device: one or more pages drawn onto a [`Backend`], with the
+/// graphical parameters (`par()`) and the page layout.
+///
+/// Open one for a file with [`Device::pdf`], [`Device::svg`],
+/// [`Device::png`] or [`Device::format`], or wrap a backend kept in memory
+/// with [`Device::new`]; draw on it with the
+/// [`Graphics`](crate::graphics::Graphics) methods.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use rs_graphics::prelude::*;
+/// # fn main() -> std::io::Result<()> {
+/// let mut dev = Device::pdf("plot.pdf").width(6).height(4).open()?;
+/// dev.plot().x([1, 2, 3]).y([2, 4, 3]).draw();
+/// dev.close()?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct Device<B: Backend> {
     backend: B,
     /// R's `par()` state: changed by
@@ -236,15 +251,27 @@ crate::setters::options! {
 }
 
 impl<B: Backend> Device<B> {
-    /// A device drawing onto `backend` with graphical parameters `par`: the
-    /// general route, for any [`Backend`] and backend options that
-    /// [`DeviceBuilder`] doesn't cover (e.g. PNG
-    /// [`with_threads`](crate::backend::raster::RasterBackend::with_threads)). If `par.bg` is left
-    /// at its default (white), it starts as the backend's background
-    /// instead, as R's `par("bg")` does - transparent for PDF. The device
-    /// has no file: get its output with [`finish`](Device::finish). To open
-    /// a device for a file, use [`Device::pdf`], [`Device::svg`],
-    /// [`Device::png`] or [`Device::format`].
+    /// Creates a device drawing onto `backend`, starting with the graphical
+    /// parameters `par`.
+    ///
+    /// This is the general route: for any [`Backend`], for output kept in
+    /// memory (get it with [`finish`](Device::finish)), and for backend options
+    /// that [`DeviceBuilder`] doesn't cover, such as PNG
+    /// [`with_threads`](crate::backend::raster::RasterBackend::with_threads).
+    /// The device has no file; to open one for a file, use [`Device::pdf`],
+    /// [`Device::svg`], [`Device::png`] or [`Device::format`]. If `par.bg` is
+    /// left at its default (white), the device starts with the backend's own
+    /// background instead: transparent for PDF.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::new(SvgBackend::new(5, 4), Par::default());
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// let svg = String::from_utf8(dev.finish()).unwrap();
+    /// assert!(svg.starts_with("<svg") || svg.starts_with("<?xml"));
+    /// ```
     pub fn new(backend: B, mut par: Par) -> Self {
         if par.bg == Par::default().bg {
             par.bg = backend.default_bg();
@@ -281,36 +308,64 @@ impl<B: Backend> Device<B> {
         dev
     }
 
-    /// The backend, to finish it with its own `finish()` or set options.
-    /// On a device opened for a file this doesn't write the file (the
-    /// current page's file stays empty; with one file per page, earlier
-    /// pages' files are already written and the backend holds only the
-    /// last page); use [`close`](Device::close) for that.
+    /// Returns the backend, to finish it yourself or set its options.
+    ///
+    /// On a device opened for a file this doesn't write the file: the current
+    /// page's file stays empty (with one file per page, earlier pages' files
+    /// are already written and the backend holds only the last page). Use
+    /// [`close`](Device::close) for that.
     pub fn into_backend(self) -> B {
         self.backend
     }
 
-    /// The finished output's bytes (PDF, PNG, or SVG as UTF-8). On a device
-    /// opened for a file this doesn't write the file (the current page's
-    /// file stays empty; with one file per page, earlier pages' files are
-    /// already written and these are the last page's bytes); use
+    /// Finishes the output and returns its bytes: PDF, PNG, or SVG as UTF-8.
+    ///
+    /// On a device opened for a file this doesn't write the file: the current
+    /// page's file stays empty (with one file per page, earlier pages' files
+    /// are already written and these are the last page's bytes). Use
     /// [`close`](Device::close) for that.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::new(PdfBackend::new(5, 4), Par::default());
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// let pdf: Vec<u8> = dev.finish();
+    /// assert!(pdf.starts_with(b"%PDF"));
+    /// ```
     pub fn finish(self) -> Vec<u8> {
         self.backend.into_bytes()
     }
 
-    /// Closes the device (R's `dev.off()`): finishes the output and writes
-    /// it to the file created when the device was opened
-    /// ([`DeviceBuilder::open`]); with one file per page (a PNG or SVG
-    /// file name with a page number such as `%03d`, or a PDF with
-    /// [`onefile(false)`](DeviceBuilder::onefile)), the last page's file.
-    /// A device dropped
-    /// without `close()` leaves that file empty. Also returns the first
-    /// error from writing an earlier page's file.
+    /// Closes the device: finishes the output and writes it to the file
+    /// created when the device was opened ([`DeviceBuilder::open`]).
     ///
-    /// A device made with [`Device::new`] has no file: this returns an
-    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error; use
-    /// [`finish`](Device::finish) for its bytes.
+    /// With one file per page (a PNG or SVG file name with a page number such
+    /// as `%03d`, or a PDF with [`onefile(false)`](DeviceBuilder::onefile)),
+    /// this writes the last page's file. A device dropped without `close()`
+    /// leaves that file empty.
+    ///
+    /// This is R's `dev.off()`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> std::io::Result<()> {
+    /// let mut dev = Device::png("plot.png").res(150).open()?;
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// dev.close()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// If writing the file fails, or writing an earlier page's file failed
+    /// (the first such error). A device made with [`Device::new`] has no file:
+    /// closing it is an [`InvalidInput`](std::io::ErrorKind::InvalidInput)
+    /// error; use [`finish`](Device::finish) for its bytes.
     pub fn close(mut self) -> std::io::Result<()> {
         let Some(output) = self.output.take() else {
             return Err(std::io::Error::new(
@@ -322,41 +377,109 @@ impl<B: Backend> Device<B> {
         output.close(&self.finish())
     }
 
-    /// Page width in inches (R's `par("din")[1]`).
+    /// Returns the page width in inches.
+    ///
+    /// This is R's `par("din")[1]`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// assert_eq!(dev.width_in(), 7.0);
+    /// ```
     pub fn width_in(&self) -> f64 {
         self.width_in
     }
 
-    /// Page height in inches (R's `par("din")[2]`).
+    /// Returns the page height in inches.
+    ///
+    /// This is R's `par("din")[2]`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// assert_eq!(dev.height_in(), 7.0);
+    /// ```
     pub fn height_in(&self) -> f64 {
         self.height_in
     }
 
-    /// The current plot region, in device inches from the bottom-left
-    /// corner of the page (R's `par("plt")`, but in inches).
+    /// Returns the current plot region, in inches from the page's bottom-left
+    /// corner.
+    ///
+    /// This is R's `par("plt")`, in inches rather than fractions of the figure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let r = dev.plot_region();
+    /// assert!(r.x0 > 0.0 && r.x1 < dev.width_in());
+    /// ```
     pub fn plot_region(&self) -> Rect {
         self.plt
     }
 
-    /// R's `par("usr")`: the user coordinate limits `(x0, x1, y0, y1)` of
-    /// the plot region. As in R, a log axis's limits are log10 values
-    /// (`par("usr")` of `plot(1:100, log = "x")` starts at about 0, not
-    /// 1); everything that takes coordinates (`points()`, `axis(at = )`,
-    /// [`Device::user_to_inches`], ...) takes data units instead. Set by
-    /// `plot_window()` or `par(usr = )`.
+    /// Returns the coordinate limits of the plot region, `(x0, x1, y0, y1)`.
+    ///
+    /// On a log axis the limits are log10 values (for data from 1 to 100 the x
+    /// limits start near 0, not 1), while everything that takes coordinates
+    /// (`points()`, `axis(at = )`, [`Device::user_to_inches`], ...) takes data
+    /// units. Set by `plot_window()` (which high-level plots call) or
+    /// `par(usr = )`.
+    ///
+    /// This is R's `par("usr")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot_new();
+    /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
+    /// let (x0, x1, ..) = dev.usr();
+    /// assert!((x0 + 0.4).abs() < 1e-9 && (x1 - 10.4).abs() < 1e-9); // 4% added at each end
+    /// ```
     pub fn usr(&self) -> (f64, f64, f64, f64) {
         self.usr
     }
 
-    /// Whether the x axis is logarithmic (R's `par("xlog")`), as set by
-    /// the last `plot_window()` or `par(xlog = )` (`plot_new()` resets
-    /// it).
+    /// Returns whether the x axis is logarithmic.
+    ///
+    /// Set by the last `plot_window()` or `par(xlog = )`; `plot_new()` resets
+    /// it.
+    ///
+    /// This is R's `par("xlog")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot().x([1, 10, 100]).xlog(true).draw();
+    /// assert!(dev.xlog());
+    /// ```
     pub fn xlog(&self) -> bool {
         self.xlog
     }
 
-    /// Whether the y axis is logarithmic (R's `par("ylog")`); see
-    /// [`Device::xlog`].
+    /// Returns whether the y axis is logarithmic; see [`Device::xlog`].
+    ///
+    /// This is R's `par("ylog")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot().x([1, 10, 100]).ylog(true).draw();
+    /// assert!(dev.ylog());
+    /// ```
     pub fn ylog(&self) -> bool {
         self.ylog
     }
@@ -514,11 +637,29 @@ impl<B: Backend> Device<B> {
         });
     }
 
-    /// `layout(mat, widths, heights, respect)`: see [`Layout`]. Sets
-    /// `par(cex)`/`mex` like `par(mfrow = )`
-    /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow)) does, based on
-    /// the layout matrix's dimensions, and replaces `mfrow`/`mfcol` and
-    /// `fig`/`fin`.
+    /// Divides the page into figures of different sizes, as given by
+    /// `layout` (see [`Layout`]).
+    ///
+    /// Like `par()`'s [`mfrow`](crate::graphics::ParCall::mfrow), it sets
+    /// `par(cex)` and `mex` from the layout's dimensions, and the next
+    /// `plot_new()` starts a new page at the first figure. It replaces
+    /// `mfrow`/`mfcol` and `fig`/`fin`.
+    ///
+    /// This is R's `layout()`.
+    ///
+    /// # Examples
+    ///
+    /// A wide panel on top and two below:
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// let layout = Layout::new(&[vec![1, 1], vec![2, 3]]).unwrap();
+    /// dev.layout(layout);
+    /// dev.plot().x([1, 2, 3]).draw(); // top
+    /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
+    /// dev.pie().x([1, 2]).draw(); // bottom right
+    /// ```
     pub fn layout(&mut self, layout: Layout) {
         self.set_arrangement(Arrangement::Layout(layout));
     }
@@ -568,24 +709,78 @@ impl<B: Backend> Device<B> {
         self.used
     }
 
-    /// R's `par()` values as they are now (R's `par("cex")` is
-    /// `dev.current_par().cex`). Change them with
-    /// [`par()`](crate::graphics::Graphics::par).
+    /// Returns the graphical parameters as they are now.
+    ///
+    /// Change them with [`par()`](crate::graphics::Graphics::par).
+    ///
+    /// This is R's `par()` read form: R's `par("cex")` is
+    /// `dev.current_par().cex`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mfrow(2, 2).draw();
+    /// assert_eq!(dev.current_par().cex, 0.83);
+    /// ```
     pub fn current_par(&self) -> &Par {
         &self.par
     }
 
-    /// `par("new")`.
+    /// Returns whether the next plot will be drawn over the current one
+    /// instead of starting a new figure.
+    ///
+    /// Set with `dev.par().new(true)`; any drawing clears it.
+    ///
+    /// This is R's `par("new")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// dev.par().new(true).draw();
+    /// assert!(dev.is_new());
+    /// ```
     pub fn is_new(&self) -> bool {
         self.hold_figure
     }
 
-    /// The current figure number (`par("mfg")`'s position, 1-based).
+    /// Returns the number of the current figure (panel), counting from 1.
+    ///
+    /// This is the position in R's `par("mfg")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mfrow(1, 2).draw();
+    /// dev.plot().x([1, 2]).draw();
+    /// dev.plot().x([2, 1]).draw();
+    /// assert_eq!(dev.current_figure(), 2);
+    /// ```
     pub fn current_figure(&self) -> usize {
         self.current_figure
     }
 
-    /// The current figure region in device inches.
+    /// Returns the current figure region, in inches from the page's
+    /// bottom-left corner.
+    ///
+    /// This is R's `par("fig")`, in inches rather than fractions of the inner
+    /// region.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mfrow(1, 2).draw();
+    /// dev.plot().x([1, 2]).draw();
+    /// assert_eq!(dev.figure_region().x1, dev.width_in() / 2.0);
+    /// ```
     pub fn figure_region(&self) -> Rect {
         self.fig
     }
@@ -742,11 +937,24 @@ impl<B: Backend> Device<B> {
         (min, max)
     }
 
-    /// Default tick locations R's `axis()` would pick for `side` when no
-    /// `at=` is given (R's `axTicks(side)`), in data units: from
-    /// `par("xaxp")` (sides 1, 3) or `par("yaxp")` (sides 2, 4), which
-    /// `plot_new()` and `plot_window()` set with `pretty()` (or R's
-    /// log-axis rules) and `par("lab")`.
+    /// Returns the tick positions [`axis()`](crate::graphics::Graphics::axis)
+    /// would use on `side` without `at`, in data units.
+    ///
+    /// They come from `par("xaxp")` (sides 1 and 3) or `par("yaxp")` (sides 2
+    /// and 4), which `plot_new()` and `plot_window()` set from the axis range
+    /// and `par("lab")`.
+    ///
+    /// This is R's `axTicks()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot_new();
+    /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
+    /// assert_eq!(dev.default_ticks(1), [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
+    /// ```
     pub fn default_ticks(&self, side: impl Into<Side>) -> Vec<f64> {
         let side = side.into();
         let axp = if side.is_horizontal() {
@@ -772,8 +980,24 @@ impl<B: Backend> Device<B> {
     // Coordinate transforms
     // ---------------------------------------------------------------
 
-    /// Map a point in data units (not log10 on a log axis) to device
-    /// inches.
+    /// Converts a point in data units to inches from the page's bottom-left
+    /// corner.
+    ///
+    /// Data units are not log10 values on a log axis.
+    ///
+    /// This is R's `grconvertX()`/`grconvertY()` from `"user"` to `"inches"`,
+    /// measured from the page's bottom-left corner.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let p = dev.user_to_inches(5, 5);
+    /// let (x, y) = dev.inches_to_user(p);
+    /// assert!((x - 5.0).abs() < 1e-9 && (y - 5.0).abs() < 1e-9);
+    /// ```
     pub fn user_to_inches(&self, x: impl Into<f64>, y: impl Into<f64>) -> Point {
         let (x, y) = (x.into(), y.into());
         let ux = if self.xlog { x.log10() } else { x };
@@ -781,10 +1005,24 @@ impl<B: Backend> Device<B> {
         self.usr_to_inches(ux, uy)
     }
 
-    /// Map a point in device inches to data units (not log10 on a log
-    /// axis): the inverse of [`Device::user_to_inches`] (R's
-    /// `grconvertX(x, "inches", "user")`, but measured from the page's
-    /// bottom-left corner, and in data units on log axes).
+    /// Converts a point in inches from the page's bottom-left corner to data
+    /// units: the inverse of [`Device::user_to_inches`].
+    ///
+    /// Data units are not log10 values on a log axis.
+    ///
+    /// This is R's `grconvertX()`/`grconvertY()` from `"inches"` to `"user"`,
+    /// measured from the page's bottom-left corner.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let r = dev.plot_region();
+    /// let (x, _) = dev.inches_to_user(Point::new(r.x0, r.y0));
+    /// assert!((x - dev.usr().0).abs() < 1e-9);
+    /// ```
     pub fn inches_to_user(&self, p: Point) -> (f64, f64) {
         let (ux, uy) = self.inches_to_usr(p);
         let x = if self.xlog { 10f64.powf(ux) } else { ux };
@@ -843,24 +1081,58 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// The device's starting point size (R's `startps`): the
-    /// [`pointsize`](DeviceBuilder::pointsize) it was opened with, or
-    /// `par.ps` as passed to [`Device::new`]. Margin lines, plotting symbols and
-    /// `par("cin")` are sized from it, as from R's `cra`; changing
-    /// `par.ps` later only changes text size.
+    /// Returns the device's starting point size.
+    ///
+    /// It is the [`pointsize`](DeviceBuilder::pointsize) the device was opened
+    /// with, or `par.ps` as passed to [`Device::new`]. Margin lines and
+    /// plotting symbols are sized from it; changing `par(ps)` later only
+    /// changes the text size.
+    ///
+    /// This is R's `startps`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> std::io::Result<()> {
+    /// let dev = Device::svg("plot.svg").pointsize(10).open()?;
+    /// assert_eq!(dev.start_ps(), 10.0);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn start_ps(&self) -> f64 {
         self.start_ps
     }
 
-    /// The height in inches of one margin line, the unit of `mar`, `oma`,
-    /// `mgp` and `tcl`: `mex * cex * 1.2 * startps / 72` (R's
-    /// `yNDCPerLine`, from `cra[1]`, in `mapNDC2Dev()`).
+    /// Returns the height in inches of one margin line, the unit of `mar`,
+    /// `oma`, `mgp` and `tcl`.
+    ///
+    /// It is `mex * cex * 1.2 * startps / 72` (see [`start_ps`](Device::start_ps)).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// assert_eq!(dev.line_height_inches(), 1.2 * 12.0 / 72.0);
+    /// ```
     pub fn line_height_inches(&self) -> f64 {
         self.par.mex * self.par.cex * 1.2 * self.start_ps / 72.0
     }
 
-    /// `par("mai")`: the margins in inches (bottom, left, top, right):
-    /// `par.mai` if set, else `par.mar` converted.
+    /// Returns the margins in inches (bottom, left, top, right): `par(mai)` if
+    /// set, else `par(mar)` converted.
+    ///
+    /// This is R's `par("mai")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mar([5, 4, 4, 2]).draw();
+    /// assert_eq!(dev.mai().bottom, 5.0 * dev.line_height_inches());
+    /// ```
     pub fn mai(&self) -> Sides<f64> {
         if let Some(mai) = self.par.mai {
             return mai;
@@ -870,8 +1142,19 @@ impl<B: Backend> Device<B> {
         Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)
     }
 
-    /// `par("omi")`: the outer margins in inches (bottom, left, top,
-    /// right), from `par.omd`, else `par.omi`, else `par.oma`.
+    /// Returns the outer margins in inches (bottom, left, top, right), from
+    /// `par(omd)`, else `par(omi)`, else `par(oma)`.
+    ///
+    /// This is R's `par("omi")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().omi([0, 0, 1, 0]).draw();
+    /// assert_eq!(dev.omi().top, 1.0);
+    /// ```
     pub fn omi(&self) -> Sides<f64> {
         if let Some([x0, x1, y0, y1]) = self.par.omd {
             let (w, h) = (self.width_in, self.height_in);
@@ -1204,11 +1487,24 @@ impl<B: Backend> Device<B> {
     // Text
     // ---------------------------------------------------------------
 
-    /// `(strwidth(text, "inches", cex, font), strheight(...))`: R's
-    /// `GEStrWidth`/`GEStrHeight` at `par(ps) * par(cex) * cex` points
-    /// (after the backend's font-size rounding). The width is that of the
-    /// widest line; the height is the ascent of "M" plus one line height
-    /// (`par(lheight) * 1.2 * ps / 72` inches, times the cex) per `\n`.
+    /// Returns the width and height of `text` in inches, at size `cex` in
+    /// font `font`.
+    ///
+    /// The size is `par(ps) * par(cex) * cex` points (after the backend's
+    /// font-size rounding). The width is that of the widest line; the height
+    /// is the ascent of "M" plus one line height (`par(lheight) * 1.2 * ps /
+    /// 72` inches, times the size factors) per `\n`.
+    ///
+    /// This is R's `strwidth()` and `strheight()` in inches.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// let (w, h) = dev.text_metrics("Title", FontFace::Bold, 1.2);
+    /// assert!(w > h && h > 0.0);
+    /// ```
     pub fn text_metrics(
         &self,
         text: &str,

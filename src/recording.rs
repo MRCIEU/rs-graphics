@@ -104,9 +104,22 @@ use crate::highlevel::{
 use crate::par::ParOptions;
 use crate::plotmath::Label;
 
-/// The contents of a figure region (a plot and its margins), built
-/// without a device: a list of recorded [`Graphics`] calls, drawn with
-/// [`Device::add_figure`]. See the [module docs](self).
+/// A figure built without a device: a plot and its margins, recorded as a
+/// list of [`Graphics`] calls and drawn later with [`Device::add_figure`].
+///
+/// A figure is one panel: its `par()` call has no page layout setters. See
+/// the [module docs](self) for more.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let mut fig = Figure::new();
+/// fig.plot().x([1, 2, 3]).y([2, 4, 3]).main("Recorded").draw();
+/// fig.abline().h(3).lty("dashed").draw();
+/// dev.add_figure(&fig);
+/// ```
 #[derive(Clone, Debug, Default)]
 pub struct Figure {
     calls: Vec<Call>,
@@ -257,7 +270,8 @@ impl Graphics for Figure {
     }
 }
 
-/// What drawing a [`Figure`] produced that only a device can work out.
+/// What drawing a [`Figure`] produced that only a device can work out:
+/// the values its `legend()` and `axis()` calls return on a device.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct FigureResult {
@@ -270,20 +284,36 @@ pub struct FigureResult {
 }
 
 impl<B: Backend> Device<B> {
-    /// Draws `fig` on this device: its calls in order, exactly as if they
-    /// had been made here. A figure starting with a high-level call (other
-    /// than one with `add`) or `plot_new()` moves to the next panel, as
-    /// that call would.
+    /// Draws `fig` on this device, as if its calls had been made here.
     ///
-    /// `par` is restored afterwards (like R's `op <- par(...);
-    /// on.exit(par(op))`), so the figure's `par()` calls don't affect what
-    /// is drawn next. The panel position, `par(new)` and the coordinates
-    /// (`plot_window()`, `par(usr/xlog/ylog)`) are device state and are
-    /// not restored.
+    /// A figure starting with a high-level call (other than one with `add`) or
+    /// `plot_new()` moves to the next panel, as that call would. The graphical
+    /// parameters are restored afterwards, so the figure's `par()` calls don't
+    /// affect what is drawn next; the panel position, `par(new)` and the
+    /// coordinates (`plot_window()`, `par(usr/xlog/ylog)`) are device state and
+    /// are not restored. Returns what the figure's `legend()` and `axis()`
+    /// calls returned (see [`FigureResult`]).
+    ///
+    /// The restoring of `par()` is R's `op <- par(...); on.exit(par(op))`.
+    ///
+    /// # Examples
+    ///
+    /// The same figure in two panels:
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// let mut fig = Figure::new();
+    /// fig.plot().x([1, 2, 3]).y([2, 4, 3]).draw();
+    /// dev.par().mfrow(1, 2).draw();
+    /// dev.add_figure(&fig); // left
+    /// dev.add_figure(&fig); // right
+    /// ```
     ///
     /// # Panics
-    /// Where the recorded calls would panic on the device (e.g. `abline()`
-    /// with a non-finite `a`).
+    ///
+    /// Where the recorded calls would panic on the device (for example
+    /// "figure margins too large" on a small page).
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
         // `par` comes back afterwards, also if a recorded call panics.
         let mut dev = self.par_scope(|now, saved| *now = saved.clone());
@@ -328,15 +358,32 @@ impl<B: Backend> Device<B> {
         out
     }
 
-    /// [`add_figure`](Device::add_figure) into the panel at `row`, `col` of
-    /// the current `mfrow`/`mfcol`/`layout` arrangement (R's `par(mfg =
-    /// c(row, col))` before it), for a figure that starts with a
-    /// high-level call or `plot_new()`. On a device with nothing drawn yet
-    /// it first starts the page, since R ignores `mfg` until then (the
-    /// same as `plot_new()`, then `par(mfg = c(row, col))`).
+    /// Draws `fig` in the panel at (`row`, `col`), counting from 1, of the
+    /// current `mfrow`/`mfcol`/`layout` arrangement; otherwise as
+    /// [`add_figure`](Device::add_figure).
+    ///
+    /// Meant for a figure that starts with a high-level call or `plot_new()`.
+    /// On a device with nothing drawn yet, it first starts the page, since the
+    /// panel can't be chosen before then (the same as `plot_new()` followed by
+    /// `par()`'s [`mfg`](crate::graphics::ParCall::mfg)).
+    ///
+    /// This is R's `par(mfg = c(row, col))` before the figure's calls.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// let mut fig = Figure::new();
+    /// fig.plot().x([1, 2, 3]).draw();
+    /// dev.par().mfrow(2, 2).draw();
+    /// dev.add_figure_at(2, 2, &fig); // bottom right
+    /// ```
     ///
     /// # Panics
-    /// If `row` or `col` is outside the arrangement.
+    ///
+    /// If `row` or `col` is outside the arrangement, or where the recorded
+    /// calls would panic on the device.
     pub fn add_figure_at(&mut self, row: usize, col: usize, fig: &Figure) -> FigureResult {
         if !self.is_used() {
             self.plot_new_impl();
