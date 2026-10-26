@@ -126,17 +126,43 @@ pub struct Figure {
 }
 
 impl Figure {
-    /// An empty figure.
+    /// Creates an empty figure, ready to record calls.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut fig = Figure::new();
+    /// fig.plot().x([1, 2, 3]).draw();
+    /// assert_eq!(fig.len(), 1);
+    /// ```
     pub fn new() -> Self {
         Figure::default()
     }
 
-    /// The number of recorded calls.
+    /// Returns the number of recorded calls.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut fig = Figure::new();
+    /// fig.plot().x([1, 2, 3]).draw();
+    /// fig.abline().h(2).draw();
+    /// assert_eq!(fig.len(), 2);
+    /// ```
     pub fn len(&self) -> usize {
         self.calls.len()
     }
 
-    /// Whether nothing has been recorded.
+    /// Returns whether nothing has been recorded yet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert!(Figure::new().is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.calls.is_empty()
     }

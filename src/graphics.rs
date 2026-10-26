@@ -1037,7 +1037,17 @@ macro_rules! call {
 
             $( call!(@setter [$(#[$fdoc])*] $field $setter); )*
 
-            /// Runs the call with the arguments and options set so far.
+            /// Runs the call with the arguments and options set so far: draws
+            /// it on a [`Device`], or records it in a
+            /// [`Figure`](crate::recording::Figure).
+            ///
+            /// Returns what the R function returns, where it returns something
+            /// (see the call's method); otherwise `()`.
+            ///
+            /// # Panics
+            ///
+            /// With R's message if a required argument is missing or the
+            /// arguments are invalid (see the method's `# Panics`).
             pub fn draw(self) -> $ret {
                 #[allow(unused_variables)]
                 let $name { target: $t, $($field,)* $($($sfield,)*)? opts: $o } = self;
@@ -1048,14 +1058,22 @@ macro_rules! call {
 }
 
 call!(
-    /// [`Graphics::plot`]'s call.
+    /// A [`plot()`](Graphics::plot) call being built: it starts a new plot and
+    /// draws `y` against `x`.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](PlotCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::plot`] for the arguments and an example.
     PlotCall, PlotOptions => (),
     args {
         /// The x coordinates, or, without [`y`](PlotCall::y), the values to
         /// plot against their index (the x axis is then titled "Index").
         /// Required.
         x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
-        /// The y coordinates, as many as `x`.
+        /// The y coordinates, as many as `x`. Default: none, and `x` is
+        /// plotted against its index.
         y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
     },
     |t, o| {
@@ -1068,7 +1086,15 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::hist`]'s call.
+    /// A [`hist()`](Graphics::hist) call being built: it starts a new plot and
+    /// draws a histogram.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](HistCall::draw), which returns the bins and counts
+    /// ([`HistResult`]).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::hist`] for the arguments and an example.
     HistCall, HistOptions => HistResult,
     args {
         /// The values to bin. Required.
@@ -1077,7 +1103,14 @@ call!(
     |t, o| { t.emit_hist(&required(x, "x"), o) }
 );
 call!(
-    /// [`Graphics::barplot`]'s call.
+    /// A [`barplot()`](Graphics::barplot) call being built: it starts a new
+    /// plot and draws a bar chart.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](BarplotCall::draw), which returns the bar centres.
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::barplot`] for the arguments and an example.
     BarplotCall, BarplotOptions => Vec<f64>,
     args {
         /// The bar heights: a vector, one bar per value, or a matrix given
@@ -1087,7 +1120,15 @@ call!(
     |t, o| { t.emit_barplot(required(height, "height"), o) }
 );
 call!(
-    /// [`Graphics::boxplot`]'s call.
+    /// A [`boxplot()`](Graphics::boxplot) call being built: it starts a new
+    /// plot and draws box-and-whisker plots.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](BoxplotCall::draw), which returns each box's statistics
+    /// ([`BoxStats`]).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::boxplot`] for the arguments and an example.
     BoxplotCall, BoxplotOptions => Vec<BoxStats>,
     args {
         /// The groups: any [`Groups`], e.g. `&[a, b]` or `&groups`; one
@@ -1097,7 +1138,14 @@ call!(
     |t, o| { t.emit_boxplot(&required(x, "x"), o) }
 );
 call!(
-    /// [`Graphics::pie`]'s call.
+    /// A [`pie()`](Graphics::pie) call being built: it starts a new plot and
+    /// draws a pie chart.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](PieCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::pie`] for the arguments and an example.
     PieCall, PieOptions => (),
     args {
         /// The slice sizes. Required.
@@ -1106,7 +1154,14 @@ call!(
     |t, o| { t.emit_pie(&required(x, "x"), o) }
 );
 call!(
-    /// [`Graphics::plot_window`]'s call.
+    /// A [`plot_window()`](Graphics::plot_window) call being built: it sets
+    /// the plot region's coordinates.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](PlotWindowCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::plot_window`] for the arguments and an example.
     PlotWindowCall, PlotWindowOptions => (),
     args { xlim: (f64, f64) = (manual), ylim: (f64, f64) = (manual) },
     |t, o| { t.emit_plot_window(required(xlim, "xlim"), required(ylim, "ylim"), o) }
@@ -1128,13 +1183,20 @@ impl<G: Graphics> PlotWindowCall<'_, G> {
 }
 
 call!(
-    /// [`Graphics::points`]'s call.
+    /// A [`points()`](Graphics::points) call being built: it adds points.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](PointsCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::points`] for the arguments and an example.
     PointsCall, XyOptions => (),
     args {
         /// The x coordinates, or, without [`y`](PointsCall::y), the values
         /// to plot against their index. Required.
         x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
-        /// The y coordinates, as many as `x`.
+        /// The y coordinates, as many as `x`. Default: none, and `x` is
+        /// plotted against its index.
         y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
     },
     |t, o| {
@@ -1143,13 +1205,20 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::lines`]'s call.
+    /// A [`lines()`](Graphics::lines) call being built: it adds a line.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](LinesCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::lines`] for the arguments and an example.
     LinesCall, XyOptions => (),
     args {
         /// The x coordinates, or, without [`y`](LinesCall::y), the values
         /// to draw against their index. Required.
         x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
-        /// The y coordinates, as many as `x`.
+        /// The y coordinates, as many as `x`. Default: none, and `x` is
+        /// plotted against its index.
         y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
     },
     |t, o| {
@@ -1158,7 +1227,14 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::segments`]'s call.
+    /// A [`segments()`](Graphics::segments) call being built: it adds line
+    /// segments.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](SegmentsCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::segments`] for the arguments and an example.
     SegmentsCall, SegmentsOptions => (),
     args {
         /// The x coordinates of the starts. Required.
@@ -1176,7 +1252,13 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::arrows`]'s call.
+    /// A [`arrows()`](Graphics::arrows) call being built: it adds arrows.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](ArrowsCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::arrows`] for the arguments and an example.
     ArrowsCall, ArrowsOptions => (),
     args {
         /// The x coordinates of the starts. Required.
@@ -1194,7 +1276,13 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::rect`]'s call.
+    /// A [`rect()`](Graphics::rect) call being built: it adds rectangles.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](RectCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::rect`] for the arguments and an example.
     RectCall, RectOptions => (),
     args {
         /// The left edges. Required.
@@ -1217,14 +1305,21 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::polygon`]'s call.
+    /// A [`polygon()`](Graphics::polygon) call being built: it adds polygons.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](PolygonCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::polygon`] for the arguments and an example.
     PolygonCall, PolygonOptions => (),
     args {
         /// The x coordinates of the vertices, or, without
         /// [`y`](PolygonCall::y), the y values against their index.
         /// Required.
         x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
-        /// The y coordinates, as many as `x`.
+        /// The y coordinates, as many as `x`. Default: none, and `x` is
+        /// plotted against its index.
         y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
     },
     |t, o| {
@@ -1233,14 +1328,21 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::text`]'s call.
+    /// A [`text()`](Graphics::text) call being built: it adds text labels.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](TextCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::text`] for the arguments and an example.
     TextCall, TextOptions => (),
     args {
         /// The x coordinates of the labels, or, without [`y`](TextCall::y),
         /// the y values against their index. Required.
         x: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
         /// The y coordinates of the labels; `x` and `y` are recycled to the
-        /// longer.
+        /// longer. Default: none, and `x` gives the y values against their
+        /// index.
         y: Cow<'a, [f64]> = (impl Numbers<'a> => Numbers::into_numbers),
         /// The labels: text or plotmath expressions, one or several (see
         /// [`Labels`]); a `None` element (R's `NA`) is skipped. Default:
@@ -1253,41 +1355,63 @@ call!(
     }
 );
 call!(
-    /// [`Graphics::box_`]'s call.
+    /// A [`box_()`](Graphics::box_) call being built: it draws a box around a
+    /// region.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](BoxCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::box_`] for the arguments and an example.
     BoxCall, BoxOptions => (),
     args {},
     |t, o| { t.emit_box(o) }
 );
 call!(
-    /// [`Graphics::axis`]'s call.
+    /// A [`axis()`](Graphics::axis) call being built: it adds an axis.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](AxisCall::draw), which returns on a [`Device`], the tick
+    /// positions.
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::axis`] for the arguments and an example.
     AxisCall, AxisOptions => G::AxisResult,
     args {
         /// The side to draw on: a [`Side`], or its number (1 below, 2 left,
-        /// 3 above, 4 right). Required.
-        ///
-        /// # Panics
-        /// If the number isn't 1 to 4.
+        /// 3 above, 4 right). Required. Panics if the number isn't 1 to 4.
         side: Side = (impl Into<Side> => Into::into),
     },
     |t, o| { t.emit_axis(required(side, "side"), o) }
 );
 call!(
-    /// [`Graphics::abline`]'s call.
+    /// A [`abline()`](Graphics::abline) call being built: it adds straight
+    /// lines across the plot.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](AblineCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::abline`] for the arguments and an example.
     AblineCall, AblineOptions => (),
     args {},
     |t, o| { t.emit_abline(o) }
 );
 call!(
-    /// [`Graphics::legend`]'s call.
+    /// A [`legend()`](Graphics::legend) call being built: it adds a legend.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](LegendCall::draw), which returns on a [`Device`], where the
+    /// legend went ([`LegendLayout`]).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::legend`] for the arguments and an example.
     LegendCall, LegendOptions => G::LegendResult,
     args {
         /// Where the legend goes: a keyword such as `"topright"`, a point
         /// `(x, y)` for its top-left corner, or two corners `((xa, xb), (ya,
-        /// yb))` (see [`LegendPos`]). Required. R's `x` and `y`.
-        ///
-        /// # Panics
-        /// If a string isn't one of the nine keywords (or a unique prefix
-        /// of one).
+        /// yb))` (see [`LegendPos`]). Required. Panics if a string isn't one
+        /// of the nine keywords (or a unique prefix of one). R's `x` and `y`.
         pos: LegendPos = (impl Into<LegendPos> => Into::into),
         /// The keys' labels: text or plotmath expressions, one or several
         /// (see [`Labels`]); a `None` element (R's `NA`) keeps its key but
@@ -1297,7 +1421,14 @@ call!(
     |t, o| { t.emit_legend(required(pos, "pos"), required(labels, "labels"), o) }
 );
 call!(
-    /// [`Graphics::mtext`]'s call.
+    /// A [`mtext()`](Graphics::mtext) call being built: it writes text in a
+    /// margin.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](MtextCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::mtext`] for the arguments and an example.
     MtextCall, MtextOptions => (),
     args {
         /// The text: text or plotmath expressions, one or several (see
@@ -1305,22 +1436,33 @@ call!(
         /// (R's `NA`) is skipped. Required.
         text: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
         /// The margin to write in: a [`Side`], or its number (1 below, 2
-        /// left, 3 above, 4 right). Default 3, the top.
-        ///
-        /// # Panics
-        /// If the number isn't 1 to 4.
+        /// left, 3 above, 4 right). Default: 3, the top. Panics if the
+        /// number isn't 1 to 4.
         side: Side = (impl Into<Side> => Into::into),
     },
     |t, o| { t.emit_mtext(required(text, "text"), side.unwrap_or(Side::Top), o) }
 );
 call!(
-    /// [`Graphics::title`]'s call.
+    /// A [`title()`](Graphics::title) call being built: it adds titles.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](TitleCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::title`] for the arguments and an example.
     TitleCall, TitleOptions => (),
     args {},
     |t, o| { t.emit_title(o) }
 );
 call!(
-    /// [`Graphics::par`]'s call.
+    /// A [`par()`](Graphics::par) call being built: it changes graphical
+    /// parameters.
+    ///
+    /// Set its arguments with the setters below, then run it with
+    /// [`draw`](ParCall::draw).
+    /// Without `.draw()`, nothing happens (the compiler warns).
+    ///
+    /// See [`Graphics::par`] for the arguments and an example.
     ParCall, ParOptions => (),
     args {},
     state { page: ParPage },
