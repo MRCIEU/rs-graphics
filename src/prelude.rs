@@ -35,7 +35,7 @@ pub use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistBreaks, HistLabels, HistOptions,
     HistResult, OrderH, PieOptions, PlotOptions, PlotType, boxplot_stats,
 };
-pub use crate::layout::{Layout, LayoutSize};
+pub use crate::layout::{LayoutRespect, LayoutSize};
 pub use crate::lty::LineType;
 pub use crate::numbers::{Groups, Numbers, Pair};
 pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};

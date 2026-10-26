@@ -104,10 +104,10 @@ fn cases() -> Vec<Case> {
             size: (4.0, 4.0),
             r: "layout(matrix(1:2, 1), widths = c(lcm(8), lcm(8)))",
             rust: |d| {
-                let l = Layout::new(&[vec![1, 2]])
-                    .unwrap()
-                    .widths(&[LayoutSize::Cm(8.0), LayoutSize::Cm(8.0)]);
-                d.layout(l);
+                d.layout()
+                    .mat(&[[1, 2]])
+                    .widths([LayoutSize::Cm(8.0), LayoutSize::Cm(8.0)])
+                    .draw();
             },
         },
         Case {

@@ -302,7 +302,7 @@ fn draw_pch<B: Backend>(dev: &mut Device<B>) {
 
 /// `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))`: one wide panel above two.
 fn draw_multipanel<B: Backend>(dev: &mut Device<B>) {
-    dev.layout(Layout::new(&[vec![1, 1], vec![2, 3]]).expect("valid layout"));
+    dev.layout().mat(&[[1, 1], [2, 3]]).draw();
     draw_scatter(dev);
     draw_lineplot(dev);
     draw_barplot(dev);

@@ -989,7 +989,7 @@ fn xy_coords<'a>(
 }
 
 /// An R argument without a default: its value, or R's error.
-fn required<T>(value: Option<T>, name: &str) -> T {
+pub(crate) fn required<T>(value: Option<T>, name: &str) -> T {
     value.unwrap_or_else(|| panic!("argument \"{name}\" is missing, with no default"))
 }
 

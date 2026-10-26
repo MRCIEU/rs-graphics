@@ -86,8 +86,8 @@ usage, see [README.md](README.md).
   `Device::xlog()`/`ylog()` tell which axes are logarithmic, and
   `user_to_inches`/`inches_to_user` convert between data units and
   device inches.
-- Multi-panel layouts (`src/layout.rs`, `Device::{mfrow, mfcol, layout,
-  mfg}`, and `mfrow`/`mfcol` on a device's `par()` call):
+- Multi-panel layouts (`src/layout.rs`, the `Device::layout()` builder,
+  and `mfrow`/`mfcol`/`mfg` on a device's `par()` call):
   `par(mfrow=)`/`par(mfcol=)` (incl. R's automatic `cex` of
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
   `layout()` with spanning figures, relative / `lcm()` widths and
@@ -437,7 +437,7 @@ against a real R installation by shelling out to `Rscript`:
   font, size and colour vs. R `pdf()`.
 - `tests/all/integer_args.rs` (no R needed) - integers wherever R takes
   numbers (data vectors, ranges, recycled and single setters, limits,
-  arrays, pairs, `Layout` sizes, `fig()`, backend constructors) draw byte
+  arrays, pairs, `layout()` sizes, `fig()`, backend constructors) draw byte
   for byte what the same `f64`s do, on a device and in a `Figure`.
 - `tests/all/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
   and `DeviceBuilder`: every option byte-identical to `Device::new` with

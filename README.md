@@ -118,7 +118,7 @@ dev.close()?;
 
 `par()` needs to end in `.draw()` like every other call, although it draws nothing. It is the only way to change graphical parameters, including R's page layout ones (`mfrow`, `mfcol`, `mfg`, `fig`, `fin`, `new`). `dev.current_par()` reads them.
 
-`dev.layout(..)` is R's `layout()`.
+`dev.layout().mat(..).draw()` is R's `layout()`.
 
 ### Reusing arguments
 

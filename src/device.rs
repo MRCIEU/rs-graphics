@@ -38,7 +38,7 @@ use std::ops::{Deref, DerefMut};
 use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::{Point, Rect};
-use crate::layout::{Arrangement, Layout};
+use crate::layout::{Arrangement, Layout, LayoutRespect, LayoutSize};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par, Pty, Sides, Xpd};
 use crate::pch;
@@ -179,6 +179,110 @@ pub struct Device<B: Backend> {
     /// The file(s) of a device opened with [`DeviceBuilder::open`], which
     /// [`close`](Device::close) writes; `None` for [`Device::new`].
     output: Option<open::Output>,
+}
+
+/// A [`layout()`](Device::layout) call being built: it divides the page
+/// into figures of different sizes.
+///
+/// Set its arguments with the setters below, then apply it with
+/// [`draw`](LayoutCall::draw), which returns the number of figures.
+/// Without `.draw()`, nothing happens (the compiler warns).
+///
+/// See [`Device::layout`] for an example.
+#[must_use = "nothing is changed until `.draw()`"]
+pub struct LayoutCall<'a, B: Backend> {
+    dev: &'a mut Device<B>,
+    mat: Option<Vec<Vec<f64>>>,
+    widths: Vec<LayoutSize>,
+    heights: Vec<LayoutSize>,
+    respect: LayoutRespect,
+}
+
+impl<B: Backend> LayoutCall<'_, B> {
+    /// The grid of figure numbers, as rows, top to bottom (as the matrix
+    /// reads on screen). Every figure number from 1 to the largest must
+    /// appear; `0` marks an empty cell, and a number in several cells
+    /// makes that figure span them. Fractions are truncated, as R does.
+    /// Required. R's `mat`.
+    pub fn mat<R: AsRef<[T]>, T: crate::numbers::Num>(mut self, mat: &[R]) -> Self {
+        self.mat = Some(
+            mat.iter()
+                .map(|row| row.as_ref().iter().map(|v| v.to_f64()).collect())
+                .collect(),
+        );
+        self
+    }
+
+    /// Column widths: numbers are relative sizes (`[2, 1]`), or give
+    /// [`LayoutSize`]s to mix in absolute ones (`LayoutSize::Cm`, R's
+    /// `lcm()`). A shorter list is padded with relative `1`s; extra
+    /// entries are ignored. Default: equal relative widths.
+    pub fn widths(mut self, widths: impl crate::setters::Values<LayoutSize>) -> Self {
+        self.widths = widths.into_values();
+        self
+    }
+
+    /// Row heights; as [`widths`](LayoutCall::widths). Default: equal
+    /// relative heights.
+    pub fn heights(mut self, heights: impl crate::setters::Values<LayoutSize>) -> Self {
+        self.heights = heights.into_values();
+        self
+    }
+
+    /// Whether one unit of width equals one unit of height: `true` in every
+    /// relative-size cell, or a grid of cells as rows (see
+    /// [`LayoutRespect`]). Default: `false`.
+    pub fn respect(mut self, respect: impl Into<LayoutRespect>) -> Self {
+        self.respect = respect.into();
+        self
+    }
+
+    /// Applies the layout and returns its number of figures.
+    ///
+    /// This is R's (invisible) return value of `layout()`.
+    ///
+    /// # Panics
+    ///
+    /// With R's message (`argument "mat" is missing, with no default`) if
+    /// `mat` wasn't set; if the grid is empty or not rectangular, has more
+    /// than 50 rows, 50 columns or 500 cells, has no figure, or skips a
+    /// figure number; if `respect`'s grid doesn't have `mat`'s dimensions;
+    /// and, unlike R (which accepts them), if `mat` has a negative or
+    /// non-finite value.
+    pub fn draw(self) -> usize {
+        let mat = crate::graphics::required(self.mat, "mat");
+        let mat: Vec<Vec<usize>> = mat
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|&v| {
+                        assert!(
+                            v.is_finite() && v >= 0.0,
+                            "layout matrix values must be non-negative numbers"
+                        );
+                        v.trunc() as usize
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut layout = Layout::new(&mat).unwrap_or_else(|e| panic!("{}", e.0));
+        if !self.widths.is_empty() {
+            layout = layout.widths(&self.widths);
+        }
+        if !self.heights.is_empty() {
+            layout = layout.heights(&self.heights);
+        }
+        layout = match self.respect {
+            LayoutRespect::No => layout,
+            LayoutRespect::All => layout.respect(true),
+            LayoutRespect::Cells(cells) => layout
+                .respect_matrix(&cells)
+                .unwrap_or_else(|e| panic!("{}", e.0)),
+        };
+        let n = layout.num_figures();
+        self.dev.set_arrangement(Arrangement::Layout(layout));
+        n
+    }
 }
 
 /// A figure region set with `fig()` or `fin()`.
@@ -640,31 +744,43 @@ impl<B: Backend> Device<B> {
         });
     }
 
-    /// Divides the page into figures of different sizes, as given by
-    /// `layout` (see [`Layout`]).
+    /// Starts dividing the page into figures of different sizes: a grid in
+    /// which each figure takes one or more cells.
     ///
-    /// Like `par()`'s [`mfrow`](crate::graphics::ParCall::mfrow), it sets
-    /// `par(cex)` and `mex` from the layout's dimensions, and the next
-    /// `plot_new()` starts a new page at the first figure. It replaces
-    /// `mfrow`/`mfcol` and `fig`/`fin`.
+    /// Set the grid with [`mat`](LayoutCall::mat) (required) and,
+    /// optionally, [`widths`](LayoutCall::widths),
+    /// [`heights`](LayoutCall::heights) and
+    /// [`respect`](LayoutCall::respect), then apply it with
+    /// [`draw`](LayoutCall::draw). Like `par()`'s
+    /// [`mfrow`](crate::graphics::ParCall::mfrow), it sets `par(cex)` and
+    /// `mex` from the grid's size, and the next `plot_new()` starts a new
+    /// page at the first figure. It replaces `mfrow`/`mfcol` and `fig`/`fin`.
+    /// A [`Figure`](crate::recording::Figure) is one panel, so only a
+    /// device has it.
     ///
     /// This is R's `layout()`.
     ///
     /// # Examples
     ///
-    /// A wide panel on top and two below:
+    /// A wide panel on top and two below, the top one twice as tall:
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
-    /// let layout = Layout::new(&[vec![1, 1], vec![2, 3]]).unwrap();
-    /// dev.layout(layout);
+    /// let n = dev.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
+    /// assert_eq!(n, 3);
     /// dev.plot().x([1, 2, 3]).draw(); // top
     /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
     /// dev.pie().x([1, 2]).draw(); // bottom right
     /// ```
-    pub fn layout(&mut self, layout: Layout) {
-        self.set_arrangement(Arrangement::Layout(layout));
+    pub fn layout(&mut self) -> LayoutCall<'_, B> {
+        LayoutCall {
+            dev: self,
+            mat: None,
+            widths: Vec::new(),
+            heights: Vec::new(),
+            respect: LayoutRespect::No,
+        }
     }
 
     fn set_arrangement(&mut self, arrangement: Arrangement) {

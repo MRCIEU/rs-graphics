@@ -6,10 +6,12 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Pages divided into several figures (panels): [`Layout`], for figures of
-//! different sizes with [`Device::layout`](crate::device::Device::layout),
-//! and the grids that `par()`'s [`mfrow`](crate::graphics::ParCall::mfrow)
-//! and [`mfcol`](crate::graphics::ParCall::mfcol) set up.
+//! Pages divided into several figures (panels): the column and row sizes
+//! ([`LayoutSize`]) and `respect` ([`LayoutRespect`]) of
+//! [`Device::layout`](crate::device::Device::layout), for figures of
+//! different sizes, and the grids that `par()`'s
+//! [`mfrow`](crate::graphics::ParCall::mfrow) and
+//! [`mfcol`](crate::graphics::ParCall::mfcol) set up.
 //!
 //! These are R's `layout()` and `par(mfrow = )`/`par(mfcol = )`. The
 //! region arithmetic is a direct port of the "Code for layouts"
@@ -22,17 +24,29 @@
 use std::fmt;
 
 /// The most rows a [`Layout`] can have (R's `MAX_LAYOUT_ROWS`).
-pub const MAX_LAYOUT_ROWS: usize = 50;
+pub(crate) const MAX_LAYOUT_ROWS: usize = 50;
 /// The most columns a [`Layout`] can have (R's `MAX_LAYOUT_COLS`).
-pub const MAX_LAYOUT_COLS: usize = 50;
+pub(crate) const MAX_LAYOUT_COLS: usize = 50;
 /// The most cells a [`Layout`] can have (R's `MAX_LAYOUT_CELLS`).
-pub const MAX_LAYOUT_CELLS: usize = 500;
+pub(crate) const MAX_LAYOUT_CELLS: usize = 500;
 
-/// A column width or row height in a [`Layout`]: relative to the other
+/// A column width or row height in a layout: relative to the other
 /// relative sizes, or absolute in centimetres.
 ///
-/// Numbers convert to relative sizes, so `&[2, 1]` works where sizes are
-/// taken. Absolute sizes are R's `lcm(x)`.
+/// Numbers convert to relative sizes, so `[2, 1]` works where sizes are
+/// taken (the layout builder's [`widths`](crate::device::LayoutCall::widths)
+/// and [`heights`](crate::device::LayoutCall::heights)). Absolute sizes
+/// are R's `lcm(x)`.
+///
+/// # Examples
+///
+/// A fixed 4 cm column beside one that takes the rest:
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// dev.layout().mat(&[[1, 2]]).widths([LayoutSize::Cm(4.0), 1.into()]).draw();
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LayoutSize {
     /// A size relative to the other relative sizes in the same direction.
@@ -67,9 +81,64 @@ impl LayoutSize {
     }
 }
 
+/// Whether a layout keeps one unit of width equal to one unit of height:
+/// nowhere, in every relative-size cell, or only in chosen cells.
+///
+/// The layout builder's [`respect`](crate::device::LayoutCall::respect)
+/// setter takes `true`/`false` or a grid of cells (as rows, like the
+/// layout's `mat`), as R's `respect` takes a logical or a matrix.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// dev.layout().mat(&[[1, 2]]).respect(true).draw();
+/// dev.layout().mat(&[[1, 2]]).respect(&[[true, false]]).draw();
+/// assert_eq!(LayoutRespect::from(false), LayoutRespect::No);
+/// ```
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum LayoutRespect {
+    /// Widths and heights are independent (the default).
+    #[default]
+    No,
+    /// Equal units in every relative-size cell.
+    All,
+    /// Equal units only in the cells marked `true`, given as rows.
+    Cells(Vec<Vec<bool>>),
+}
+
+impl From<bool> for LayoutRespect {
+    /// `true` is [`LayoutRespect::All`], `false` [`LayoutRespect::No`].
+    fn from(all: bool) -> Self {
+        if all { LayoutRespect::All } else { LayoutRespect::No }
+    }
+}
+
+impl<R: AsRef<[bool]>> From<&[R]> for LayoutRespect {
+    /// The cells marked `true`, as rows.
+    fn from(rows: &[R]) -> Self {
+        LayoutRespect::Cells(rows.iter().map(|r| r.as_ref().to_vec()).collect())
+    }
+}
+
+impl<R: AsRef<[bool]>, const N: usize> From<&[R; N]> for LayoutRespect {
+    /// The cells marked `true`, as rows.
+    fn from(rows: &[R; N]) -> Self {
+        LayoutRespect::from(&rows[..])
+    }
+}
+
+impl From<Vec<Vec<bool>>> for LayoutRespect {
+    /// The cells marked `true`, as rows.
+    fn from(rows: Vec<Vec<bool>>) -> Self {
+        LayoutRespect::Cells(rows)
+    }
+}
+
 /// Why a [`Layout`] couldn't be built, with R's message.
 #[derive(Clone, Debug, PartialEq)]
-pub struct LayoutError(pub String);
+pub(crate) struct LayoutError(pub(crate) String);
 
 impl fmt::Display for LayoutError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -88,24 +157,12 @@ enum Respect {
     Matrix(Vec<bool>),
 }
 
-/// A page divided into figures of different sizes, for
-/// [`Device::layout`](crate::device::Device::layout): which figure occupies
+/// A page divided into figures of different sizes: which figure occupies
 /// each cell of a grid, with column widths, row heights and whether x and
-/// y units are kept equal.
-///
-/// This is the specification of R's `layout()`.
-///
-/// # Examples
-///
-/// ```
-/// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
-/// let layout = Layout::new(&[vec![1, 1], vec![2, 3]]).unwrap().heights(&[2, 1]);
-/// assert_eq!(layout.num_figures(), 3);
-/// dev.layout(layout);
-/// ```
+/// y units are kept equal. Built and applied by
+/// [`Device::layout`](crate::device::Device::layout)'s builder.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Layout {
+pub(crate) struct Layout {
     nrow: usize,
     ncol: usize,
     /// `mat[i, j] == order[i + j * nrow]` (R's storage).
@@ -128,20 +185,12 @@ impl Layout {
     ///
     /// This is R's `layout(mat)`.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// let layout = Layout::new(&[vec![1, 2], vec![3, 0]]).unwrap();
-    /// assert_eq!((layout.nrow(), layout.ncol()), (2, 2));
-    /// ```
-    ///
     /// # Errors
     ///
     /// With R's message, if the grid is empty or not rectangular, has more than
     /// [`MAX_LAYOUT_ROWS`] rows, [`MAX_LAYOUT_COLS`] columns or
     /// [`MAX_LAYOUT_CELLS`] cells, has no figure, or skips a figure number.
-    pub fn new(mat: &[Vec<usize>]) -> Result<Layout, LayoutError> {
+    pub(crate) fn new(mat: &[Vec<usize>]) -> Result<Layout, LayoutError> {
         let nrow = mat.len();
         let ncol = mat.first().map_or(0, Vec::len);
         if nrow == 0 || ncol == 0 || mat.iter().any(|r| r.len() != ncol) {
@@ -203,7 +252,7 @@ impl Layout {
     /// A shorter list is padded with relative `1`s; extra entries are ignored.
     ///
     /// This is R's `layout(widths = )`.
-    pub fn widths<S: Into<LayoutSize> + Copy>(mut self, widths: &[S]) -> Layout {
+    pub(crate) fn widths<S: Into<LayoutSize> + Copy>(mut self, widths: &[S]) -> Layout {
         let widths: Vec<LayoutSize> = widths.iter().map(|&w| w.into()).collect();
         let (w, cm) = pad_sizes(&widths, self.ncol);
         self.widths = w;
@@ -214,7 +263,7 @@ impl Layout {
     /// Sets the row heights; as [`Layout::widths`].
     ///
     /// This is R's `layout(heights = )`.
-    pub fn heights<S: Into<LayoutSize> + Copy>(mut self, heights: &[S]) -> Layout {
+    pub(crate) fn heights<S: Into<LayoutSize> + Copy>(mut self, heights: &[S]) -> Layout {
         let heights: Vec<LayoutSize> = heights.iter().map(|&h| h.into()).collect();
         let (h, cm) = pad_sizes(&heights, self.nrow);
         self.heights = h;
@@ -226,7 +275,7 @@ impl Layout {
     /// relative-size cell.
     ///
     /// This is R's `layout(respect = TRUE/FALSE)`.
-    pub fn respect(mut self, respect: bool) -> Layout {
+    pub(crate) fn respect(mut self, respect: bool) -> Layout {
         self.respect = if respect { Respect::All } else { Respect::No };
         self
     }
@@ -239,7 +288,7 @@ impl Layout {
     /// # Errors
     ///
     /// If `respect` doesn't have the grid's dimensions (R's message).
-    pub fn respect_matrix(mut self, respect: &[Vec<bool>]) -> Result<Layout, LayoutError> {
+    pub(crate) fn respect_matrix(mut self, respect: &[Vec<bool>]) -> Result<Layout, LayoutError> {
         if respect.len() != self.nrow || respect.iter().any(|r| r.len() != self.ncol) {
             return Err(LayoutError(
                 "'respect' must be logical or matrix with same dimension as 'mat'".into(),
@@ -256,19 +305,11 @@ impl Layout {
     }
 
     /// Returns the number of figures (the largest figure number).
-    pub fn num_figures(&self) -> usize {
+    pub(crate) fn num_figures(&self) -> usize {
         self.num_figures
     }
 
-    /// Returns the number of rows in the grid.
-    pub fn nrow(&self) -> usize {
-        self.nrow
-    }
 
-    /// Returns the number of columns in the grid.
-    pub fn ncol(&self) -> usize {
-        self.ncol
-    }
 
     // ---- port of graphics.c "Code for layouts" ----------------------
 

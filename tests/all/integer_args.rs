@@ -9,7 +9,7 @@
 //! Integers wherever R takes numbers: data vectors (`&[1, 2, 3]`, other
 //! integer types, ranges), recycled and single-value setters, limits,
 //! arrays (`mar`, `mgp`, `xaxp`), pairs (`plot_window`, legend positions,
-//! `inset`), legend `lwd`/`pt_cex`, `Layout` sizes, `fig()` and the
+//! `inset`), legend `lwd`/`pt_cex`, `layout()` sizes, `fig()` and the
 //! backend constructors draw byte for byte what the same `f64` values do,
 //! on a device and in a recorded `Figure`. No R needed.
 
@@ -226,13 +226,14 @@ fn layout_fig_and_backends_take_integers() {
             PdfBackend::new(8.0, 6.0)
         };
         let mut dev = Device::new(backend.with_compression(false), Par::default());
-        let layout = Layout::new(&[vec![1, 2]]).unwrap();
-        let layout = if ints {
-            layout.widths(&[2, 1])
+        if ints {
+            dev.layout().mat(&[[1, 2]]).widths([2, 1]).draw();
         } else {
-            layout.widths(&[LayoutSize::Relative(2.0), LayoutSize::Relative(1.0)])
-        };
-        dev.layout(layout);
+            dev.layout()
+                .mat(&[[1.0, 2.0]])
+                .widths([LayoutSize::Relative(2.0), LayoutSize::Relative(1.0)])
+                .draw();
+        }
         dev.plot().x([1.0, 2.0]).y([1.0, 2.0]).draw();
         if ints {
             dev.par().fig([0, 1, 0, 1]).draw();
