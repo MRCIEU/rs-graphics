@@ -6,13 +6,12 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! R's `barplot(height, ...)`, ported from `barplot.default` in
-//! `r-source/src/library/graphics/R/barplot.R`.
+//! Bar charts: the options of
+//! [`Graphics::barplot`](crate::graphics::Graphics::barplot), its heights
+//! ([`BarHeights`]) and the order of stacked segments ([`OrderH`]).
 //!
-//! Drawn by [`Graphics::barplot`](crate::graphics::Graphics::barplot).
-//! Supported: a plain vector (R's `vectorInput`
-//! case) and a matrix (see [`BarHeights`]) drawn either stacked or
-//! `beside`, vertical or
+//! Supported: a plain vector (R's `vectorInput` case) and a matrix (see
+//! [`BarHeights`]) drawn either stacked or `beside`, vertical or
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
 //! `gray.colors(nrow)`), `names.arg`, `legend.text` (and `args.legend`),
 //! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH`, `add`,
@@ -21,6 +20,9 @@
 //!
 //! Also `xpd` and `plot = FALSE`. Not supported: `panel.first`/
 //! `panel.last`.
+//!
+//! This is R's `barplot(height, ...)`, ported from `barplot.default` in
+//! `r-source/src/library/graphics/R/barplot.R`.
 //!
 //! **R bugs not copied:** with `orderH`, R reorders the colours of each
 //! stack's segments but not `density`/`angle`, so the shading moves to
@@ -255,8 +257,24 @@ impl Default for BarplotOptions {
     }
 }
 
-/// R's `orderH` for stacked bars: the order of the segments within each
-/// stack.
+/// The order of the segments within each stack of a stacked bar chart:
+/// row order, or sorted by size.
+///
+/// Each segment keeps its row's colour. Setters also take R's names or a
+/// unique prefix (`.order_h("decr")`), panicking on any other string.
+///
+/// This is R's `barplot(orderH = )`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let columns = vec![vec![1, 4, 2], vec![3, 1, 5]];
+/// dev.barplot().height(&columns).order_h(OrderH::Decr).draw();
+/// dev.barplot().height(&columns).order_h("incr").draw();
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum OrderH {
     /// `"none"`: in row order (the default).
@@ -269,8 +287,19 @@ pub enum OrderH {
 }
 
 impl OrderH {
-    /// `"none"`, `"incr"` or `"decr"`, or a unique prefix of one (R's
-    /// `match.arg()`); `None` for anything else.
+    /// Reads an order from its name: `"none"`, `"incr"` or `"decr"`, or a
+    /// unique prefix of one; `None` for anything else.
+    ///
+    /// This matches names as R's `match.arg()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// assert_eq!(OrderH::parse("d"), Some(OrderH::Decr));
+    /// assert_eq!(OrderH::parse("up"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<OrderH> {
         let all = [
             ("none", OrderH::None),
@@ -290,14 +319,34 @@ impl OrderH {
 from_str_via_parse!(OrderH, "orderH");
 from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 
-/// The `height` argument of [`Graphics::barplot`](crate::graphics::Graphics::barplot): R's vector or matrix.
-/// Built with `.into()` from a vector of numbers of any type (`f64` or
-/// integers; a slice, array or `Vec`, by reference or by value, or a
-/// range, see [`Numbers`]) or from a matrix given as its columns
-/// (`Vec<Vec<T>>`, a slice or array of `Vec<T>`).
+/// The heights of a bar chart: a vector (one bar per value) or a matrix
+/// given as its columns.
+///
+/// The `height` argument of
+/// [`Graphics::barplot`](crate::graphics::Graphics::barplot). Built with
+/// `.into()` (which the `height` setter does for you) from a vector of
+/// numbers of any type (`f64` or integers; a slice, array or `Vec`, by
+/// reference or by value, or a range, see [`Numbers`]) or from a matrix
+/// given as its columns (`Vec<Vec<T>>`, a slice or array of `Vec<T>`).
+///
+/// This is R's vector or matrix `height`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// assert_eq!(BarHeights::from([3, 5, 2]), BarHeights::Vector(vec![3.0, 5.0, 2.0]));
+/// // Two columns (stacks) of three rows (series) each.
+/// let columns = vec![vec![1.0, 4.0, 2.0], vec![3.0, 1.0, 5.0]];
+/// assert_eq!(BarHeights::from(&columns), BarHeights::Matrix(columns.clone()));
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let mids = dev.barplot().height(&columns).beside(true).draw();
+/// assert_eq!(mids.len(), 6);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub enum BarHeights {
-    /// R's `vectorInput` case: one bar per value.
+    /// One bar per value (R's `vectorInput` case).
     Vector(Vec<f64>),
     /// A matrix as its *columns*: each inner `Vec` is one column, i.e. one
     /// group or stack, and its entries are the rows, i.e. the series. All

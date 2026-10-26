@@ -6,27 +6,30 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The stateful graphics device: coordinate transforms (`plot.new()`/
-//! `plot.window()`), clipping, and the primitive drawing operations
-//! (`points`, `lines`, `segments`, `rect`, `polygon`, `text`, `box`,
-//! `abline`, `axis`, `title`, `mtext`, `legend`, `arrows`).
+//! The graphics device, [`Device`]: the page (or pages) being drawn, the
+//! graphical parameters (`par()`), the page layout, coordinates and
+//! clipping, and the code behind every drawing function.
 //!
 //! Devices are opened for a file with [`Device::pdf`], [`Device::svg`],
-//! [`Device::png`] or [`Device::format`] (a [`DeviceBuilder`], in
-//! `open.rs`) and written by [`Device::close`]; [`Device::new`] with
-//! [`Device::finish`] keeps the output in memory.
-//!
-//! The public entry to each R function is a [`Graphics`](crate::graphics::Graphics)
-//! method; the drawing code is here, in crate-private `*_impl` methods
-//! taking the data and an options struct, whose unset fields are R's
-//! defaults, mostly the `par()` values. `points()`, `lines()`,
-//! `segments()`, `arrows()`, `rect()`, `polygon()`, `text()`, `box()` and
-//! `plot.window()` are in `primitives.rs`; `axis()`, `abline()`,
-//! `legend()` and `mtext()` in their own child modules; the page,
-//! layout, coordinate and clipping state, `plot.new()` and `title()` here. Nearly every high-level plot (`plot()`,
-//! `hist()`, `barplot()`, ...) is built purely out of these primitives,
-//! mirroring how R's own `graphics.c` centers everything around a handful
-//! of `GE*` engine calls.
+//! [`Device::png`] or [`Device::format`] (a [`DeviceBuilder`]) and written
+//! by [`Device::close`]; [`Device::new`] with [`Device::finish`] keeps the
+//! output in memory. Draw on a device with the
+//! [`Graphics`](crate::graphics::Graphics) methods. The module also holds
+//! the options structs of the low-level functions ([`XyOptions`],
+//! [`AxisOptions`], [`LegendOptions`], ...) and the types they use
+//! ([`Side`], [`LegendPos`], ...).
+
+// For contributors: the public entry to each R function is a `Graphics`
+// method; the drawing code is here, in crate-private `*_impl` methods
+// taking the data and an options struct, whose unset fields are R's
+// defaults, mostly the `par()` values. `points()`, `lines()`,
+// `segments()`, `arrows()`, `rect()`, `polygon()`, `text()`, `box()` and
+// `plot.window()` are in `primitives.rs`; `axis()`, `abline()`,
+// `legend()` and `mtext()` in their own child modules; the page, layout,
+// coordinate and clipping state, `plot.new()` and `title()` here. Nearly
+// every high-level plot (`plot()`, `hist()`, `barplot()`, ...) is built
+// purely out of these primitives, mirroring how R's own `graphics.c`
+// centres everything around a handful of `GE*` engine calls.
 
 use crate::afm::{self};
 use crate::font::FontFace;

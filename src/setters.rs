@@ -6,15 +6,19 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Chainable setters for the options structs, so that
+//! Chainable setters for the options structs, and the traits ([`Values`],
+//! [`NaValues`]) that let them take one value or several.
+//!
+//! Setting fields through the setters is the same as filling them in:
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
 //! let opts = XyOptions::default().pch(19).col(["red", "blue"]).cex(1.5);
-//! # let _ = opts;
+//! assert_eq!(opts.pch, vec![Some(19)]);
+//! assert_eq!(opts.col.len(), 2);
 //! ```
 //!
-//! is the same as filling in the fields. Each setter is named after its
+//! Each setter is named after its
 //! field and carries the field's doc. `Option` fields take the value itself
 //! (`.las(1)`, `.main("Title")`); fields R recycles per element take one
 //! value or several (see [`Values`]), and in style vectors (symbols, line
@@ -30,10 +34,29 @@ use crate::color::{Color, ColorSpec};
 use crate::font::FontFace;
 use crate::lty::LineType;
 
-/// One value or several, for a field R recycles per element: `"red"`,
-/// `["red", "blue"]`, `vec![1.0, 2.0]`, `&cex[..]`, `2`, `[1, 2]`, ...
-/// (numeric fields take `f64`, `f32`, `i32` or `u32` values).
+/// One value or several, for a field R recycles per element.
+///
+/// Takes a single value or a `Vec`, array or slice of them, by value or
+/// by reference: `"red"`, `["red", "blue"]`, `vec![1.0, 2.0]`,
+/// `&cex[..]`, `2`, `[1, 2]`, ... Numeric fields take `f64`, `f32`, `i32`
+/// or `u32` values; colours take anything that converts to a
+/// [`ColorSpec`] (one palette index as an `i32`); line types take a
+/// [`LineType`], R's string or code; a character `pch` is its ASCII code,
+/// or minus its Unicode code point for other characters (`'é'` is -233),
+/// as in R.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::Values;
+/// # use rs_graphics::prelude::*;
+/// let one: Vec<f64> = 2_i32.into_values();
+/// assert_eq!(one, [2.0]);
+/// let cols: Vec<ColorSpec> = ["red", "blue"].into_values();
+/// assert_eq!(cols[1], ColorSpec::from("blue"));
+/// ```
 pub trait Values<T> {
+    /// The values, in order.
     fn into_values(self) -> Vec<T>;
 }
 
@@ -94,14 +117,30 @@ impl Values<i32> for char {
 }
 
 /// One value or several for a recycled style vector whose elements may be
-/// R's `NA`, written `None`: `19`, `[1, 2]`, `[Some(19), None]`,
-/// `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`, ...
+/// missing (`None`, R's `NA`).
+///
+/// Takes a single value, an `Option` of one, or an array, `Vec` or slice
+/// of either, by value or by reference: `19`, `[1, 2]`,
+/// `[Some(19), None]`, `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`,
+/// ... Rust arrays hold one element type, so once one element is `None`
+/// the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
 /// (for text sizes and fonts, and `legend()`'s spacing, it means the
-/// default instead; each field says which). Rust arrays hold one element
-/// type, so once one element is `None` the others are written `Some(..)`.
+/// default instead; each field says which).
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::NaValues;
+/// # use rs_graphics::prelude::*;
+/// let pch: Vec<Option<i32>> = [Some(19_i32), None].into_na_values();
+/// assert_eq!(pch, [Some(19), None]);
+/// let opts = XyOptions::default().pch([Some(19), None]);
+/// assert_eq!(opts.pch, pch);
+/// ```
 pub trait NaValues<T> {
+    /// The values, in order (`None`: R's `NA`).
     fn into_na_values(self) -> Vec<Option<T>>;
 }
 

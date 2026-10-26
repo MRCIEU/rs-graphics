@@ -6,12 +6,15 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The error type of the crate's `FromStr` impls.
+//! The error returned when a string isn't a valid value: the error type
+//! of the crate's `FromStr` impls.
 
 use std::fmt;
 
-/// A string that isn't a valid value of some parameter, e.g. `"zz"` as a
-/// colour or `"x"` as `par(xaxs)`. Returned by the `FromStr` impls of
+/// An error for a string that isn't a valid value of some parameter.
+///
+/// E.g. `"zz"` as a colour or `"x"` as an axis style (`par(xaxs)`).
+/// Returned by the `FromStr` impls of
 /// [`Color`](crate::color::Color), [`LineType`](crate::lty::LineType),
 /// [`LineEnd`](crate::backend::LineEnd), [`LineJoin`](crate::backend::LineJoin),
 /// [`PlotType`](crate::highlevel::PlotType),
@@ -20,7 +23,18 @@ use std::fmt;
 /// [`OrderH`](crate::highlevel::OrderH), [`Bty`](crate::par::Bty),
 /// [`FontFace`](crate::font::FontFace),
 /// [`Format`](crate::backend::Format), [`Units`](crate::device::Units)
-/// and the `par()` enums.
+/// and the `par()` enums. It displays as `invalid <kind>: "<value>"`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// use rs_graphics::error::ParseValueError;
+///
+/// let err: ParseValueError = "wavy".parse::<LineType>().unwrap_err();
+/// assert_eq!(err.kind, "line type");
+/// assert_eq!(err.to_string(), "invalid line type: \"wavy\"");
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {
     /// What was being parsed, e.g. `"colour"` or `"axis style"`.
@@ -67,10 +81,11 @@ pub(crate) use from_str_via_parse;
 macro_rules! from_r_string {
     ($ty:ident, $kind:literal, $valid:literal) => {
         impl From<&str> for $ty {
-            #[doc = concat!("The string form of a [`", stringify!($ty), "`] (R's, where R has \
-                one), via [`", stringify!($ty), "::parse`].")]
+            #[doc = concat!("Converts the string form of a [`", stringify!($ty), "`] (R's, \
+                where R has one), via [`", stringify!($ty), "::parse`].")]
             ///
             /// # Panics
+            ///
             #[doc = concat!("If `s` isn't one (as R errors); use [`",
                         stringify!($ty), "::parse`] or `str::parse` to handle that yourself.")]
             fn from(s: &str) -> Self {
@@ -82,14 +97,14 @@ macro_rules! from_r_string {
         }
 
         impl From<String> for $ty {
-            /// As `From<&str>`.
+            /// Converts as `From<&str>` does, panicking on the same strings.
             fn from(s: String) -> Self {
                 <$ty>::from(s.as_str())
             }
         }
 
         impl From<&String> for $ty {
-            /// As `From<&str>`.
+            /// Converts as `From<&str>` does, panicking on the same strings.
             fn from(s: &String) -> Self {
                 <$ty>::from(s.as_str())
             }

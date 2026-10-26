@@ -6,10 +6,13 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Multi-figure arrangements: `par(mfrow=)` / `par(mfcol=)` grids and
-//! `layout()`.
+//! Pages divided into several figures (panels): [`Layout`], for figures of
+//! different sizes with [`Device::layout`](crate::device::Device::layout),
+//! and the grids that `par()`'s [`mfrow`](crate::graphics::ParCall::mfrow)
+//! and [`mfcol`](crate::graphics::ParCall::mfcol) set up.
 //!
-//! The region arithmetic is a direct port of the "Code for layouts"
+//! These are R's `layout()` and `par(mfrow = )`/`par(mfcol = )`. The
+//! region arithmetic is a direct port of the "Code for layouts"
 //! section of `graphics.c` (`layoutRegions()` and friends, written by Paul
 //! Murrell for R's `layout()`), plus the `mfrow`/`mfcol` branch of
 //! `mapFigureRegion()`. Everything here works in NIC ("normalized inner

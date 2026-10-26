@@ -6,13 +6,18 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! R's `hist(x, ...)`, ported from `hist.default`/`plot.histogram` in
-//! `r-source/src/library/graphics/R/hist.R`, with every form of `breaks`
-//! (edges, a number of classes, the `"Sturges"`/`"Scott"`/`"FD"` rules, a
-//! function; see [`HistBreaks`]), `xlim`/`ylim`, R's binning with
-//! `right`/`include.lowest`/`fuzz`, `labels` and per-bar `col`/`border`/
-//! `lty`, shading lines (`density`/`angle`), and `plot = FALSE`. Not
-//! supported: `panel.first`.
+//! Histograms: the options of [`Graphics::hist`](crate::graphics::Graphics::hist),
+//! how its bins are chosen ([`HistBreaks`]), the labels above its bars
+//! ([`HistLabels`]) and the bins it returns ([`HistResult`]).
+//!
+//! Supported: every form of `breaks` (edges, a number of classes, the
+//! `"Sturges"`/`"Scott"`/`"FD"` rules, a function), `xlim`/`ylim`, R's
+//! binning with `right`/`include.lowest`/`fuzz`, `labels` and per-bar
+//! `col`/`border`/`lty`, shading lines (`density`/`angle`), and `plot =
+//! FALSE`. Not supported: `panel.first`.
+//!
+//! This is R's `hist(x, ...)`, ported from `hist.default`/`plot.histogram`
+//! in `r-source/src/library/graphics/R/hist.R`.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
@@ -136,7 +141,30 @@ fn nclass_fd(x: &[f64]) -> f64 {
 /// A function of the data giving edges or a number of classes.
 type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 
-/// R's `hist(breaks = )`.
+/// How a histogram's bins are chosen: a rule, a suggested number of
+/// classes, the bin edges, or a function of the data.
+///
+/// A rule or a number of classes `k` gives the edges `pretty(range(x), n =
+/// k, min.n = 1)`; edges are used as given (after sorting). Setters take
+/// a rule's name (`.breaks("FD")`, see [`HistBreaks::parse`]; an unknown
+/// name panics), a number (`.breaks(20)`) or several numbers as edges
+/// (`.breaks([0, 2, 5, 10])`; one value in an array, `Vec` or slice is a
+/// number of classes, as R's length rule).
+///
+/// This is R's `hist(breaks = )`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let x = [1, 2, 2, 3, 3, 3];
+/// let h = dev.hist().x(&x).breaks([0, 1, 2, 3]).draw();
+/// assert_eq!(h.counts, [1.0, 2.0, 3.0]);
+/// let h = dev.hist().x(&x).breaks(HistBreaks::Scott).draw();
+/// assert!(h.equidist);
+/// ```
 #[derive(Clone)]
 pub enum HistBreaks {
     /// `"Sturges"` (R's default): `ceiling(log2(n) + 1)` classes.
@@ -157,14 +185,45 @@ pub enum HistBreaks {
 }
 
 impl HistBreaks {
-    /// R's `breaks` as a function of the data: `.breaks(HistBreaks::function(|x| ..))`.
+    /// Bins chosen by a function of the finite data, which returns the
+    /// edges, or one value, a number of classes.
+    ///
+    /// This is R's `breaks = function(x) ...`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// // Edges at the data's minimum, middle and maximum.
+    /// let edges = HistBreaks::function(|x| {
+    ///     let lo = x.iter().copied().fold(f64::INFINITY, f64::min);
+    ///     let hi = x.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    ///     vec![lo, (lo + hi) / 2.0, hi]
+    /// });
+    /// let h = dev.hist().x(&[5, 2, 3, 1, 4]).breaks(edges).draw();
+    /// assert_eq!(h.breaks, [1.0, 3.0, 5.0]);
+    /// ```
     pub fn function(f: impl Fn(&[f64]) -> Vec<f64> + Send + Sync + 'static) -> Self {
         HistBreaks::Function(std::sync::Arc::new(f))
     }
 
-    /// A rule's name, as R's `match.arg(tolower(breaks), ..)`: `"Sturges"`,
-    /// `"Scott"`, `"FD"` or `"Freedman-Diaconis"` in any case, or a unique
-    /// prefix.
+    /// Reads a rule from its name: `"Sturges"`, `"Scott"`, `"FD"` or
+    /// `"Freedman-Diaconis"` in any case, or a unique prefix; `None` for
+    /// anything else.
+    ///
+    /// This is R's `match.arg(tolower(breaks), ..)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// assert!(matches!(HistBreaks::parse("fd"), Some(HistBreaks::FreedmanDiaconis)));
+    /// assert!(matches!(HistBreaks::parse("Sc"), Some(HistBreaks::Scott)));
+    /// assert!(HistBreaks::parse("F").is_none()); // "fd" or "freedman-diaconis"
+    /// ```
     pub fn parse(s: &str) -> Option<HistBreaks> {
         const ALL: [&str; 4] = ["sturges", "fd", "freedman-diaconis", "scott"];
         let s = s.to_lowercase();
@@ -328,7 +387,24 @@ fn bin_counts(
     counts
 }
 
-/// R's `hist(labels = )`: what to write above each bar.
+/// What a histogram writes above each bar: nothing, each bar's count (or
+/// density), or given labels.
+///
+/// Setters take `true`/`false` ([`Values`](HistLabels::Values) / none) or
+/// an array or `Vec` of labels.
+///
+/// This is R's `hist(labels = )`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let x = [1, 2, 2, 3, 3, 3];
+/// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(true).draw();
+/// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(["low", "mid", "high"]).draw();
+/// ```
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum HistLabels {
     /// Nothing (R's `labels = FALSE`, the default).
@@ -531,13 +607,34 @@ impl Default for HistOptions {
     }
 }
 
-/// The `"histogram"` object R's `hist()` returns: bin edges, counts,
-/// density, bin midpoints, and whether the bins are equally wide.
+/// The bins of a histogram: edges, counts, densities, mid-points, and
+/// whether the bins are equally wide.
+///
+/// Returned by [`Graphics::hist`](crate::graphics::Graphics::hist)'s
+/// `.draw()` (also with `.plot(false)`, which draws nothing).
+///
+/// This is the `"histogram"` object R's `hist()` returns.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let h = dev.hist().x(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).plot(false).draw();
+/// assert_eq!(h.mids, [0.5, 1.5, 2.5]);
+/// assert_eq!(h.density, [1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0]);
+/// ```
 #[derive(Clone, Debug)]
 pub struct HistResult {
+    /// The bin edges, one more than the bins.
     pub breaks: Vec<f64>,
+    /// The number of finite values in each bin.
     pub counts: Vec<f64>,
+    /// Each bin's density: its count divided by the number of finite
+    /// values and the bin's width (0 for an empty input or zero width).
     pub density: Vec<f64>,
+    /// The mid-point of each bin.
     pub mids: Vec<f64>,
     /// R's `equidist`: the bins came from a number of classes or rule, or
     /// the given edges are equally spaced (to `1e-7` of the mean width);

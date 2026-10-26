@@ -6,15 +6,19 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! `par()` state: the subset of R's graphics parameters this crate
+//! The graphical parameters ([`Par`]), the changes one `par()` call makes
+//! ([`ParOptions`]), and their value types ([`Sides`], [`AxisStyle`],
+//! [`Pty`], [`Bty`], [`Xpd`], [`AxisType`]).
+//!
+//! [`Par`] holds the subset of R's graphics parameters this crate
 //! implements, with R's exact default values (cross-checked against
 //! `Rscript -e 'str(par())'` and `r-source/src/library/graphics/src/par.c`).
 //!
-//! `par(cex)` is R's `cexbase` (assigning it resets the per-call `cex` to
-//! 1), so `cex` here scales both text *and* the "line" unit that margins
-//! are measured in, exactly as `mapNDC2Dev()` does (`yNDCPerLine = mex *
-//! cexbase * cra[1] / ...`). Multi-panel layouts (`par()`'s `mfrow`/
-//! `mfcol`, and `Device::layout()`) set `cex` (0.83 for 2 x 2, 0.66
+//! `cex` scales both text *and* the "line" unit that margins are measured
+//! in, as in R, where `par(cex)` sets the base `cex` (`cexbase`) and resets
+//! the per-call `cex` to 1, and a margin line is `mex * cexbase` times the
+//! character height (`mapNDC2Dev()`). Multi-panel layouts (`par()`'s
+//! `mfrow`/`mfcol`, and `Device::layout()`) set `cex` (0.83 for 2 x 2, 0.66
 //! beyond that) and `mex` just as R's `par(mfrow=)` does.
 
 use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};
@@ -23,16 +27,44 @@ use crate::lty::LineType;
 
 use super::backend::{LineEnd, LineJoin};
 
-/// The four sides in R's `mar`/`oma` order: bottom, left, top, right.
+/// One value per side of a region, in R's `mar`/`oma` order: bottom, left,
+/// top, right.
+///
+/// Converts from a `[bottom, left, top, right]` array, so margin setters
+/// take arrays.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let mar: Sides<f64> = [5, 4, 4, 2].into();
+/// assert_eq!(mar, Sides::new(5.0, 4.0, 4.0, 2.0));
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// dev.par().mar([5, 4, 1, 1]).draw();
+/// assert_eq!(dev.current_par().mar.top, 1.0);
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Sides<T> {
+    /// Side 1, the bottom.
     pub bottom: T,
+    /// Side 2, the left.
     pub left: T,
+    /// Side 3, the top.
     pub top: T,
+    /// Side 4, the right.
     pub right: T,
 }
 
 impl<T: Copy> Sides<T> {
+    /// Returns the sides with these values, in R's order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let oma = Sides::new(0.0, 0.0, 2.0, 0.0);
+    /// assert_eq!(oma.top, 2.0);
+    /// ```
     pub const fn new(bottom: T, left: T, top: T, right: T) -> Self {
         Sides {
             bottom,
@@ -44,8 +76,8 @@ impl<T: Copy> Sides<T> {
 }
 
 impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
-    /// `[bottom, left, top, right]`, R's order for `mar = c(...)`; any
-    /// numbers for a `Sides<f64>` (`[5, 4, 4, 2]`).
+    /// The sides from `[bottom, left, top, right]`, R's order for
+    /// `mar = c(...)`; any numbers for a `Sides<f64>` (`[5, 4, 4, 2]`).
     fn from([bottom, left, top, right]: [U; 4]) -> Self {
         Sides {
             bottom: bottom.into(),
@@ -56,21 +88,50 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
     }
 }
 
-/// Axis style (`par(xaxs=)`/`par(yaxs=)`). Only `"r"` (the default, 4%
-/// range expansion) and `"i"` (exact, no expansion) are implemented. R's
-/// `par()` also accepts `"s"`, `"e"` and `"d"`, but `GScale()` then errors
-/// ("axis style unimplemented"); here they are treated as `"r"`.
+/// How an axis range is set from its limits: extended by 4% or exact.
+///
+/// Only `"r"` (the default, 4% range expansion) and `"i"` (exact, no
+/// expansion) are implemented. R's `par()` also accepts `"s"`, `"e"` and
+/// `"d"`, but then errors when plotting ("axis style unimplemented"); here
+/// they are treated as `"r"`. Setters take the strings.
+///
+/// This is R's `par(xaxs = )` / `par(yaxs = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// dev.par().xaxs("i").draw();
+/// dev.plot_window().xlim(0, 10).ylim(0, 10).draw();
+/// let (x0, x1, y0, _) = dev.usr();
+/// assert_eq!((x0, x1), (0.0, 10.0)); // exact
+/// assert!(y0 < 0.0); // yaxs "r": extended
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AxisStyle {
+    /// The range extended by 4% at each end (the default). R's `"r"`.
     Regular,
+    /// The range exactly as given. R's `"i"`.
     Exact,
 }
 
 impl AxisStyle {
-    /// R's `xaxs`/`yaxs` values: `"i"` is [`AxisStyle::Exact`]; `"r"`,
-    /// `"s"`, `"e"` and `"d"` are [`AxisStyle::Regular`] (R accepts them
-    /// in `par()` but errors when plotting). `None` for
-    /// anything else (R: "invalid 'xaxs' value").
+    /// Parses an axis style string, or returns `None` if it isn't one.
+    ///
+    /// `"i"` is [`AxisStyle::Exact`]; `"r"`, `"s"`, `"e"` and `"d"` are
+    /// [`AxisStyle::Regular`] (R accepts the last three in `par()` but errors
+    /// when plotting). `None` for anything else (R: "invalid 'xaxs' value").
+    ///
+    /// These are R's `xaxs`/`yaxs` values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(AxisStyle::parse("i"), Some(AxisStyle::Exact));
+    /// assert_eq!(AxisStyle::parse("x"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<AxisStyle> {
         match s {
             "i" => Some(AxisStyle::Exact),
@@ -83,18 +144,42 @@ impl AxisStyle {
 crate::error::from_str_via_parse!(AxisStyle, "axis style");
 crate::error::from_r_string!(AxisStyle, "axis style", "\"r\" or \"i\"");
 
-/// `par(pty)`: the shape of the plot region when it comes from `mar`.
+/// The shape of the plot region when it comes from the margins: maximal or
+/// square.
+///
+/// Setters take R's strings, `"m"` and `"s"`.
+///
+/// This is R's `par(pty = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 5), Par::default());
+/// dev.par().pty("s").draw();
+/// dev.plot_new();
+/// let r = dev.plot_region();
+/// assert!((r.width() - r.height()).abs() < 1e-9);
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Pty {
-    /// `"m"`: as large as the margins allow (the default).
+    /// As large as the margins allow (the default). R's `"m"`.
     Maximal,
-    /// `"s"`: square, the longer side shrunk about its centre.
+    /// Square, the longer side shrunk about its centre. R's `"s"`.
     Square,
 }
 
 impl Pty {
-    /// `"m"` or `"s"`; `None` for anything else (R: "invalid value
-    /// specified for graphical parameter \"pty\"").
+    /// Parses `"m"` or `"s"`, or returns `None` for anything else (R:
+    /// "invalid value specified for graphical parameter \"pty\"").
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Pty::parse("s"), Some(Pty::Square));
+    /// assert_eq!(Pty::parse("q"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<Pty> {
         match s {
             "m" => Some(Pty::Maximal),
@@ -107,33 +192,60 @@ impl Pty {
 crate::error::from_str_via_parse!(Pty, "pty");
 crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 
-/// `par(bty)`: which sides of the plot region `box()` (and `plot()`'s
-/// frame) draws. As R's `GBox()`, it applies to the plot region only;
-/// `box(which = "figure")` and the others always draw all four sides.
+/// Which sides of the plot region `box()` (and `plot()`'s frame) draws.
+///
+/// It applies to the plot region only, as in R; `box()` with
+/// `which = "figure"` and the other regions always draws all four sides.
+/// Setters take R's strings (`"l"`, `"n"`, ...).
+///
+/// This is R's `par(bty = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// dev.plot().x([1, 2, 3]).y([3, 1, 2]).bty("l").draw();
+/// dev.par().bty("n").draw();
+/// assert_eq!(dev.current_par().bty, Bty::N);
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Bty {
-    /// `"o"`: all four sides (the default).
+    /// All four sides (the default). R's `"o"`.
     #[default]
     O,
-    /// `"l"`: left and bottom.
+    /// Left and bottom. R's `"l"`.
     L,
-    /// `"7"`: top and right.
+    /// Top and right. R's `"7"`.
     Seven,
-    /// `"c"` (or `"["`): top, left and bottom.
+    /// Top, left and bottom. R's `"c"` (or `"["`).
     C,
-    /// `"u"`: left, bottom and right.
+    /// Left, bottom and right. R's `"u"`.
     U,
-    /// `"]"`: top, right and bottom.
+    /// Top, right and bottom. R's `"]"`.
     Bracket,
-    /// `"n"`: none.
+    /// None. R's `"n"`.
     N,
 }
 
 impl Bty {
-    /// R's `bty` strings, read as R does from their first character:
-    /// `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"` (letters
-    /// in either case). `None` for anything else (R: "invalid value
-    /// specified for graphical parameter \"bty\"").
+    /// Parses a box type string from its first character, or returns `None`
+    /// if it isn't one.
+    ///
+    /// Takes `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"`
+    /// (letters in either case). `None` for anything else (R: "invalid
+    /// value specified for graphical parameter \"bty\"").
+    ///
+    /// These are R's `bty` strings, read as R does.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Bty::parse("L"), Some(Bty::L));
+    /// assert_eq!(Bty::parse("["), Some(Bty::C));
+    /// assert_eq!(Bty::parse("x"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<Bty> {
         match s.chars().next()? {
             'o' | 'O' => Some(Bty::O),
@@ -155,39 +267,83 @@ crate::error::from_r_string!(
     "one of \"o\", \"l\", \"7\", \"c\", \"u\", \"]\" or \"n\""
 );
 
-/// `par(xpd)`: where drawing is clipped to. `true`/`false` convert, so
-/// `.xpd(true)` is R's `xpd = TRUE`.
+/// The region drawing is clipped to: the plot region, the figure region or
+/// the whole device.
+///
+/// `true`/`false` convert, so `.xpd(true)` is R's `xpd = TRUE`.
+///
+/// This is R's `par(xpd = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # dev.plot_new();
+/// dev.par().xpd(true).draw();
+/// assert_eq!(dev.current_par().xpd, Xpd::Figure);
+/// dev.text().x(1.1).y(0.5).labels("in the margin").xpd(Xpd::Device).draw();
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Xpd {
-    /// R's `FALSE` (the default): the plot region.
+    /// The plot region (the default). R's `FALSE`.
     #[default]
     Plot,
-    /// R's `TRUE`: the figure region.
+    /// The figure region. R's `TRUE`.
     Figure,
-    /// R's `NA`: the whole device.
+    /// The whole device. R's `NA`.
     Device,
 }
 
 impl From<bool> for Xpd {
-    /// `false` is [`Xpd::Plot`], `true` [`Xpd::Figure`], as R's logical
-    /// `xpd`.
+    /// The clip region for a logical `xpd`: `false` is [`Xpd::Plot`],
+    /// `true` [`Xpd::Figure`], as in R.
     fn from(xpd: bool) -> Self {
         if xpd { Xpd::Figure } else { Xpd::Plot }
     }
 }
 
-/// `par(xaxt/yaxt)`: whether `axis()` draws on that axis. R's `"s"`, `"l"`
-/// and `"t"` all mean [`AxisType::Standard`]; `"n"` suppresses the axis
-/// (`plot(x, y, xaxt = "n")` before a custom `axis(1, ...)`).
+/// Whether `axis()` draws on an axis: standard, or suppressed.
+///
+/// Suppressing the default axis is how a custom one is drawn instead (a
+/// `plot()` with `xaxt("n")` before an `axis()` on side 1). R's `"s"`,
+/// `"l"` and `"t"` all mean [`AxisType::Standard`]; `"n"` is
+/// [`AxisType::None`]. Setters take the strings.
+///
+/// This is R's `par(xaxt = )` / `par(yaxt = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// dev.plot().x([1, 2, 3]).y([3, 1, 2]).xaxt("n").draw();
+/// dev.axis().side(1).at([1, 2, 3]).labels(["a", "b", "c"]).draw();
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AxisType {
+    /// The axis is drawn (the default). R's `"s"` (also `"l"`, `"t"`).
     Standard,
+    /// The axis isn't drawn. R's `"n"`.
     None,
 }
 
 impl AxisType {
+    /// Parses an axis type string, or returns `None` if it isn't one.
+    ///
     /// `"n"` is [`AxisType::None`]; `"s"`, `"l"` and `"t"` are
     /// [`AxisType::Standard`]. `None` for anything else.
+    ///
+    /// These are R's `xaxt`/`yaxt` values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(AxisType::parse("n"), Some(AxisType::None));
+    /// assert_eq!(AxisType::parse("t"), Some(AxisType::Standard));
+    /// assert_eq!(AxisType::parse("y"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<AxisType> {
         match s {
             "n" => Some(AxisType::None),

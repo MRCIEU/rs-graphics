@@ -6,7 +6,10 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Line types (`par(lty=)`), ported from the packed-nibble dash-pattern
+//! Line types: [`LineType`], blank, solid or a dash pattern.
+//!
+//! Every `lty` argument takes one, by R's number, name or hex string, or
+//! as a [`LineType`] constant. The patterns follow the packed-nibble
 //! encoding R uses internally (`R_ext/GraphicsEngine.h`: `LTY_SOLID`,
 //! `LTY_DASHED`, etc.) and the pattern-extraction loop every device driver
 //! repeats (e.g. `SetLineStyle()` in `devPS.c`):
@@ -20,37 +23,74 @@
 //!
 //! Each nibble is a segment length in units of `lwd` (line width), with
 //! even indices "pen down" and odd indices "pen up".
+//!
+//! These are R's `lty` values (`par(lty = )`).
 
-/// A resolved line type: either "blank" (nothing drawn) or a dash pattern
-/// in units of `lwd`. An empty pattern means solid.
+/// A line type: blank (nothing drawn) or a dash pattern in units of `lwd`.
+///
+/// An empty pattern means solid, the default. The named constants
+/// ([`LineType::DASHED`], ...) are R's codes 0 to 6; [`LineType::parse`]
+/// and `From<&str>` take R's names and hex strings (`"dashed"`, `"42"`),
+/// `From<i32>` R's codes.
+///
+/// This is R's `lty`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!(LineType::from("dashed"), LineType::DASHED);
+/// assert_eq!(LineType::from(2), LineType::DASHED);
+/// assert_eq!(LineType::from("42"), LineType::Pattern(&[4, 2]));
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # dev.plot_new();
+/// dev.abline().h(0.5).lty("dotted").draw();
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LineType {
+    /// Nothing drawn. R's `"blank"` (code 0).
     Blank,
+    /// A dash pattern: segment lengths in `lwd` units, alternately drawn
+    /// and skipped, starting with a drawn one. Empty means solid.
     Pattern(&'static [u8]),
 }
 
 impl LineType {
-    /// `lty = 0` / `"blank"`: nothing drawn.
+    /// Nothing drawn; R's `lty = 0` / `"blank"`.
     pub const BLANK: LineType = LineType::Blank;
-    /// `lty = 1` / `"solid"` (the default).
+    /// A solid line (the default); R's `lty = 1` / `"solid"`.
     pub const SOLID: LineType = LineType::Pattern(&[]);
-    /// `lty = 2` / `"dashed"`.
+    /// Dashes of 4 `lwd`, gaps of 4; R's `lty = 2` / `"dashed"`.
     pub const DASHED: LineType = LineType::Pattern(&[4, 4]);
-    /// `lty = 3` / `"dotted"`.
+    /// Dots of 1 `lwd`, gaps of 3; R's `lty = 3` / `"dotted"`.
     pub const DOTTED: LineType = LineType::Pattern(&[1, 3]);
-    /// `lty = 4` / `"dotdash"`.
+    /// Dot, gap, dash, gap (1, 3, 4, 3 `lwd`); R's `lty = 4` / `"dotdash"`.
     pub const DOTDASH: LineType = LineType::Pattern(&[1, 3, 4, 3]);
-    /// `lty = 5` / `"longdash"`.
+    /// Long dashes of 7 `lwd`, gaps of 3; R's `lty = 5` / `"longdash"`.
     pub const LONGDASH: LineType = LineType::Pattern(&[7, 3]);
-    /// `lty = 6` / `"twodash"`.
+    /// Short and long dashes (2, 2, 6, 2 `lwd`); R's `lty = 6` / `"twodash"`.
     pub const TWODASH: LineType = LineType::Pattern(&[2, 2, 6, 2]);
 
-    /// Parse an `lty` string as R's `par(lty=)` does: a name (`"solid"`,
-    /// `"dashed"`, ...) or 2, 4, 6 or 8 hex digits (1-9, A-F; no zeros),
-    /// each a segment length in `lwd` units, e.g. `"42"` or `"1343"`. One
-    /// extra form: a single digit is a numeric code (`"2"` =
-    /// [`LineType::from_code`]`(2)`; `"7"` to `"9"` recycle as it does),
-    /// which R rejects as a string. `None` for anything R rejects.
+    /// Parses a line type string, or returns `None` for anything R rejects.
+    ///
+    /// Takes a name (`"blank"`, `"solid"`, `"dashed"`, `"dotted"`,
+    /// `"dotdash"`, `"longdash"`, `"twodash"`) or 2, 4, 6 or 8 hex digits
+    /// (1-9, A-F; no zeros), each a segment length in `lwd` units, e.g.
+    /// `"42"` or `"1343"`. Surrounding whitespace is ignored and names may
+    /// be in any case. One extra form: a single digit is a numeric code
+    /// (`"2"` = [`LineType::from_code`]`(2)`; `"7"` to `"9"` recycle as it
+    /// does), which R rejects as a string.
+    ///
+    /// This is how R's `par(lty = )` reads strings.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineType::parse("longdash"), Some(LineType::LONGDASH));
+    /// assert_eq!(LineType::parse("1343"), Some(LineType::Pattern(&[1, 3, 4, 3])));
+    /// assert_eq!(LineType::parse("10"), None); // zeros aren't allowed
+    /// ```
     pub fn parse(spec: &str) -> Option<LineType> {
         let s = spec.trim();
         if s.len() == 1 {
@@ -89,11 +129,24 @@ impl LineType {
         Some(Self::from_packed_nibbles(code))
     }
 
-    /// R's numeric `lty` codes: `0` = blank, `1` = solid, `2..=6` the named
-    /// dash patterns. Codes above 6 recycle as in R's `GE_LTYpar`
-    /// (`(code - 1) % 6 + 1`: `7` is solid, `8` dashed, ...).
+    /// Returns the line type for a numeric code.
+    ///
+    /// `0` is blank, `1` solid, `2..=6` the named dash patterns. Codes above
+    /// 6 recycle as R does (`(code - 1) % 6 + 1`: `7` is solid, `8` dashed,
+    /// ...).
+    ///
+    /// These are R's numeric `lty` codes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineType::from_code(3), LineType::DOTTED);
+    /// assert_eq!(LineType::from_code(8), LineType::DASHED);
+    /// ```
     ///
     /// # Panics
+    ///
     /// If `code` is negative (R: "invalid line type").
     pub fn from_code(code: i32) -> LineType {
         assert!(code >= 0, "invalid line type: lty code {code} is negative");
@@ -175,15 +228,19 @@ impl LineType {
 }
 
 impl Default for LineType {
-    /// [`LineType::SOLID`], R's default `par(lty)`.
+    /// Returns [`LineType::SOLID`], R's default `par(lty)`.
     fn default() -> Self {
         LineType::SOLID
     }
 }
 
 impl From<i32> for LineType {
-    /// R's numeric `lty` codes, as [`LineType::from_code`] (codes above 6
-    /// recycle; a negative code panics).
+    /// The line type for a numeric code, as [`LineType::from_code`] (codes
+    /// above 6 recycle).
+    ///
+    /// # Panics
+    ///
+    /// If `code` is negative.
     fn from(code: i32) -> Self {
         LineType::from_code(code)
     }

@@ -6,10 +6,13 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! A port of R's `graphics` package: `plot()`, `hist()`, `barplot()`,
-//! `boxplot()`, `pie()`, and the low-level functions they are built from
-//! (`axis()`, `title()`, `legend()`, `mtext()`, ...), drawing to PDF,
-//! SVG or PNG with R's layout rules and defaults.
+//! Plots in PDF, SVG and PNG that look the way they do in R: scatter and
+//! line plots, histograms, bar charts, box plots and pie charts, and the
+//! axes, titles, legends and margin text they are built from.
+//!
+//! This is a port of R's `graphics` package (`plot()`, `hist()`,
+//! `barplot()`, `boxplot()`, `pie()`, `axis()`, `title()`, `legend()`,
+//! `mtext()`, ...), with R's layout rules and defaults.
 //!
 //! ```no_run
 //! use rs_graphics::prelude::*;

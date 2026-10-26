@@ -6,9 +6,10 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! R's graphics functions as the [`Graphics`] trait, implemented by
-//! [`Device`] (which draws) and [`Figure`](crate::recording::Figure) (which
-//! records, to draw later).
+//! The plotting functions, as the methods of the [`Graphics`] trait,
+//! implemented by [`Device`] (which draws) and
+//! [`Figure`](crate::recording::Figure) (which records, to draw later).
+//! Each method is one of R's graphics functions, named as in R.
 //!
 //! Each method starts a call for one R function; the call's chainable
 //! setters take all of R's arguments, named as in R (data too: `.x(&x)`),

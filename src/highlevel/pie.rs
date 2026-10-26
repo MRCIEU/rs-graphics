@@ -6,7 +6,10 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! R's `pie(x, ...)`, ported from `r-source/src/library/graphics/R/pie.R`.
+//! Pie charts: the options of [`Graphics::pie`](crate::graphics::Graphics::pie).
+//!
+//! This is R's `pie(x, ...)`, ported from
+//! `r-source/src/library/graphics/R/pie.R`.
 
 use std::f64::consts::PI;
 

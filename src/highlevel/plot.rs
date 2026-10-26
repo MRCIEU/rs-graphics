@@ -6,11 +6,16 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! R's `plot(x, y, ...)`, ported from `plot.default` in
-//! `r-source/src/library/graphics/R/plot.R`, restricted to numeric x/y
-//! scatter/line plots (the vast majority of `plot.default` is dispatch
-//! logic and argument munging for other input types, which is out of
-//! scope here).
+//! Scatter and line plots of numeric x and y: the options of
+//! [`Graphics::plot`](crate::graphics::Graphics::plot) and the plot types
+//! ([`PlotType`]) it shares with `points()` and `lines()`.
+//!
+//! Only numeric x/y plots are supported: the vast majority of R's
+//! `plot.default` is dispatch logic and argument munging for other input
+//! types, which is out of scope here.
+//!
+//! This is R's `plot(x, y, ...)`, ported from `plot.default` in
+//! `r-source/src/library/graphics/R/plot.R`.
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
@@ -23,10 +28,27 @@ use crate::recording::Figure;
 
 use super::{InlineAxis, data_range};
 
-/// `plot(..., type = )` (and `points()`/`lines()`'s `type`): every type
-/// R has. Lines (all but `"p"` and `"n"`) take the first `col`, `lwd`
-/// and `lty`, except `"h"`, whose lines recycle `col`. Lines break at
-/// `NA`s (and at values <= 0 on a log axis).
+/// What a plot draws for its points: points, lines, both, vertical lines,
+/// stair steps or nothing.
+///
+/// Used by `plot()`, `points()` and `lines()`; every type R has is here.
+/// Lines (all but `"p"` and `"n"`) take the first `col`, `lwd` and `lty`,
+/// except `"h"`, whose lines recycle `col`. Lines break at `NA`s (and at
+/// values <= 0 on a log axis). Setters also take R's letters
+/// (`.type_("b")`), panicking on any other string.
+///
+/// This is R's `type` argument.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let y = [3, 1, 4, 1, 5];
+/// dev.plot().x(&y).type_(PlotType::Both).draw();
+/// dev.lines().x(&y).type_("s").draw();
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlotType {
     /// `"p"`: points (`plot()`'s default).
@@ -58,9 +80,20 @@ pub enum PlotType {
 }
 
 impl PlotType {
-    /// R's `type =` letters `"p"`, `"l"`, `"b"`, `"c"`, `"o"`, `"h"`,
-    /// `"s"`, `"S"` and `"n"`; `None` for anything else (R: "invalid plot
-    /// type").
+    /// Reads a plot type from its letter: `"p"`, `"l"`, `"b"`, `"c"`,
+    /// `"o"`, `"h"`, `"s"`, `"S"` or `"n"`; `None` for anything else (R
+    /// errors: "invalid plot type").
+    ///
+    /// These are R's `type =` letters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// assert_eq!(PlotType::parse("S"), Some(PlotType::StepsVerticalFirst));
+    /// assert_eq!(PlotType::parse("x"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<PlotType> {
         match s {
             "p" => Some(PlotType::Points),

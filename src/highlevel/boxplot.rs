@@ -6,10 +6,17 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! R's `boxplot(x, ...)`, ported from `boxplot.default`/`bxp`/`boxplot.stats`
-//! in `r-source/src/library/graphics/R/boxplot.R`, for a list of numeric
-//! groups: positions (`at`), widths, `notch`, `varwidth`, `horizontal`,
-//! `add`, `outline`, log axes and `bxp()`'s drawing parameters.
+//! Box plots: the options of
+//! [`Graphics::boxplot`](crate::graphics::Graphics::boxplot) and the
+//! statistics of each box ([`BoxStats`], [`boxplot_stats`]).
+//!
+//! For a list of numeric groups, with positions (`at`), widths, `notch`,
+//! `varwidth`, `horizontal`, `add`, `outline`, log axes and the drawing
+//! parameters of R's `bxp()`.
+//!
+//! This is R's `boxplot(x, ...)`, ported from
+//! `boxplot.default`/`bxp`/`boxplot.stats` in
+//! `r-source/src/library/graphics/R/boxplot.R`.
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
@@ -40,15 +47,40 @@ fn fivenum(sorted: &[f64]) -> [f64; 5] {
     [get(d[0]), get(d[1]), get(d[2]), get(d[3]), get(d[4])]
 }
 
-/// A single box's statistics, matching `boxplot.stats()$stats` plus
-/// `$out` (the values `boxplot.stats()` reports as outliers).
+/// The statistics of one box: whisker ends, hinges, median, outliers,
+/// count and notch.
+///
+/// Computed by [`boxplot_stats`], and returned for each group by
+/// [`Graphics::boxplot`](crate::graphics::Graphics::boxplot)'s `.draw()`.
+/// For a group with no finite values the five statistics and `conf` are
+/// `NaN` and there are no outliers.
+///
+/// This is R's `boxplot.stats()` result: `$stats`, `$out`, `$n` and
+/// `$conf`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let stats = dev.boxplot().x(&[1, 2, 3, 4, 5, 100]).draw();
+/// assert_eq!(stats[0].median, 3.5);
+/// assert_eq!(stats[0].outliers, [100.0]);
+/// ```
 #[derive(Clone, Debug)]
 pub struct BoxStats {
+    /// The lower whisker's end: the smallest value that isn't an outlier.
     pub lower_whisker: f64,
+    /// The lower hinge (Tukey's, close to the first quartile).
     pub q1: f64,
+    /// The median.
     pub median: f64,
+    /// The upper hinge (Tukey's, close to the third quartile).
     pub q3: f64,
+    /// The upper whisker's end: the largest value that isn't an outlier.
     pub upper_whisker: f64,
+    /// The values beyond the whiskers, in increasing order.
     pub outliers: Vec<f64>,
     /// The number of non-`NaN` values (`boxplot.stats()$n`).
     pub n: usize,
@@ -56,9 +88,31 @@ pub struct BoxStats {
     pub conf: (f64, f64),
 }
 
-/// `boxplot.stats(x, coef)`: five-number summary + whiskers extended to
-/// the most extreme non-outlying data point, +/- `coef * IQR` beyond the
-/// hinges defining an outlier.
+/// Computes the statistics of one box from the values `x`: hinges, median,
+/// whiskers and outliers.
+///
+/// The hinges and median are Tukey's five-number summary of the finite
+/// values (R's `fivenum()`, not `quantile()`). Values more than `coef`
+/// times the inter-hinge range beyond a hinge are outliers, and the
+/// whiskers extend to the most extreme values that aren't. With `coef <=
+/// 0` (or an infinite range) there are no outliers and the whiskers reach
+/// the extremes. `n` counts the non-`NaN` values (infinities included),
+/// and the notch is `median -/+ 1.58 * IQR / sqrt(n)`. With no finite
+/// values, the statistics are `NaN` (see [`BoxStats`]).
+///
+/// This is R's `boxplot.stats(x, coef)`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// let s = boxplot_stats(&[1, 2, 3, 4, 5, 100], 1.5);
+/// assert_eq!((s.q1, s.median, s.q3), (2.0, 3.5, 5.0));
+/// assert_eq!((s.lower_whisker, s.upper_whisker), (1.0, 5.0));
+/// assert_eq!(s.outliers, [100.0]);
+/// assert_eq!(s.n, 6);
+/// ```
 pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Into<f64>) -> BoxStats {
     let (x, coef) = (x.into_numbers(), coef.into());
     let x: &[f64] = &x;

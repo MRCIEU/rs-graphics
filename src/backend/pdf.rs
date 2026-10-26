@@ -6,13 +6,13 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Minimal hand-rolled PDF writer, using the 4 standard
-//! Type1 Helvetica faces (`Helvetica`, `-Bold`, `-Oblique`,
-//! `-BoldOblique`), plus `Symbol` when plotmath uses it, that every PDF
-//! viewer/renderer bundles - so, like R's
-//! own `pdf()` device default, no font embedding is needed at all, and
-//! text metrics/rendering come from the exact same Adobe AFM data this
-//! crate already uses for layout (`crate::afm`).
+//! The PDF backend, [`PdfBackend`]: a small hand-written PDF writer.
+//!
+//! It uses the four standard Helvetica faces (`Helvetica`, `-Bold`,
+//! `-Oblique`, `-BoldOblique`), plus `Symbol` when plotmath needs it, which
+//! every PDF viewer has, so no fonts are embedded (as in R's `pdf()`), and
+//! text is measured with the same Adobe font metrics used for layout
+//! everywhere else (`crate::afm`).
 //!
 //! PDF's native page coordinate system is already "inches (well, points)
 //! from the bottom-left, y-up", matching this crate's internal `Backend`

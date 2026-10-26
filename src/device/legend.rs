@@ -235,18 +235,47 @@ impl LegendBty {
 crate::error::from_str_via_parse!(LegendBty, "legend box type");
 crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
 
-/// `legend()`'s `pch`: one or several numbers (`19`, `[1, 2]`, `&pch`),
-/// characters (`'a'`, `['a', 'b']`) or strings (`["a", "b"]`), recycled
-/// over the keys; `None` elements are R's `NA`, a key without a point
-/// (`[Some(19), None]`, `[Some("x"), None]`).
+/// Values the legend's `pch` setter takes: plotting symbols for the keys,
+/// as numbers, characters or strings.
+///
+/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
+/// `['a', 'b']`) or strings (`["a", "b"]`), recycled over the keys;
+/// `None` elements are R's `NA`, a key without a point (`[Some(19), None]`,
+/// `[Some("x"), None]`).
 ///
 /// As in R: a string's first character is its symbol (`""` draws none),
 /// except that when the first string has several characters, it alone is
 /// used, one character per key (`"abc"` gives keys `a`, `b`, `c`, as R's
-/// `legend(pch = "abc")`). Characters other than ASCII are stored as minus
-/// their Unicode code point (R's negative `pch`), so `'é'` is `-233`.
+/// `legend(pch = "abc")`). ASCII characters are their character codes;
+/// other characters are stored as minus their Unicode code point (R's
+/// negative `pch`), so `'é'` is `-233`.
+///
+/// This is R's `legend(pch = )`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// assert_eq!([19, 1].into_pch(), [Some(19), Some(1)]);
+/// assert_eq!("abc".into_pch(), [Some(97), Some(98), Some(99)]);
+/// assert_eq!([Some("x"), None].into_pch(), [Some(120), None]);
+/// assert_eq!('é'.into_pch(), [Some(-233)]);
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # dev.plot().x(&[1, 2]).draw();
+/// dev.legend().pos("topleft").labels(["a", "b"]).pch([19, 1]).draw();
+/// ```
 pub trait LegendPch {
-    /// The `pch` codes, in order; `None` for no point.
+    /// Converts the value into `pch` codes, one per key in order; `None`
+    /// for a key without a point.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// assert_eq!(vec![Some(19), None].into_pch(), [Some(19), None]);
+    /// ```
     fn into_pch(self) -> Vec<Option<i32>>;
 }
 
