@@ -219,8 +219,10 @@ pub(crate) fn char_pch(c: char) -> i32 {
 ///
 /// gives the struct, a setter per field on it, and the same setters on
 /// each listed builder in [`crate::graphics`] (writing to its `opts`),
-/// plus `with(&Struct)` there. Each setter's doc is a line saying what it
-/// sets and how (from its kind), then the field's own doc. Every field
+/// plus `with(&Struct)` there. Each setter's doc is the field's own doc,
+/// then (for kinds that take several forms) a line on what it takes.
+/// Field docs should therefore have no headings (`# Panics`): that line
+/// would land under them. Every field
 /// needs its `=> kind Type`, so a field can't be added without a setter
 /// by mistake; one set by a constructor is marked `=> no_setter`. The
 /// builder list `=> [..]` may be left out.
@@ -289,8 +291,6 @@ macro_rules! options {
         $crate::setters::options!(@one [$($p)?] [$($a)*] $ty $field $kind $t);
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident value $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        #[doc = ""]
         $($a)*
         pub fn $field(mut self, value: impl Into<$t>) -> Self {
             self$(.$p)?.$field = value.into();
@@ -298,8 +298,6 @@ macro_rules! options {
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        #[doc = ""]
         $($a)*
         pub fn $field(mut self, value: impl Into<$t>) -> Self {
             self$(.$p)?.$field = Some(value.into());
@@ -307,20 +305,18 @@ macro_rules! options {
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident values $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one value or several.")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes one value or several (see [`Values`](crate::setters::Values))."]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
             self$(.$p)?.$field = values.into_values();
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident count $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] from any integer.")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes any integer."]
         #[doc = ""]
         /// # Panics
         /// If the value is negative.
@@ -336,58 +332,51 @@ macro_rules! options {
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident legend_pch $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`]: numbers, characters or strings (see [`LegendPch`](crate::device::LegendPch)).")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes numbers, characters or strings (see [`LegendPch`](crate::device::LegendPch))."]
         pub fn $field(mut self, values: impl $crate::device::LegendPch) -> Self {
             self$(.$p)?.$field = values.into_pch();
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident na_values $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one value or several; `None` is R's `NA` (see [`NaValues`](crate::setters::NaValues)).")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes one value or several; `None` is R's `NA` (see [`NaValues`](crate::setters::NaValues))."]
         pub fn $field(mut self, values: impl $crate::setters::NaValues<$t>) -> Self {
             self$(.$p)?.$field = values.into_na_values();
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_values $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one value or several.")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes one value or several (see [`Values`](crate::setters::Values))."]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
             self$(.$p)?.$field = Some(values.into_values());
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident list $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one label or several (see [`LabelValues`](crate::plotmath::LabelValues)).")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes one label or several (see [`LabelValues`](crate::plotmath::LabelValues))."]
         pub fn $field(mut self, values: impl $crate::plotmath::LabelValues) -> Self {
             self$(.$p)?.$field = Some(values.into_label_values());
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident labels $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one label or several; `None` is R's `NA` (see [`Labels`](crate::plotmath::Labels)).")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes one label or several; `None` is R's `NA` (see [`Labels`](crate::plotmath::Labels))."]
         pub fn $field(mut self, values: impl $crate::plotmath::Labels) -> Self {
             self$(.$p)?.$field = Some(values.into_labels());
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pair $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        #[doc = ""]
         $($a)*
         pub fn $field(mut self, a: impl Into<f64>, b: impl Into<f64>) -> Self {
             self$(.$p)?.$field = Some((a.into(), b.into()));
@@ -395,8 +384,6 @@ macro_rules! options {
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_pair $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        #[doc = ""]
         $($a)*
         pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
             self$(.$p)?.$field = Some(value.into_pair());
@@ -404,9 +391,9 @@ macro_rules! options {
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident na $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`]; `f64::NAN` is R's `NA`.")]
-        #[doc = ""]
         $($a)*
+        #[doc = ""]
+        #[doc = "`f64::NAN` is R's `NA`."]
         pub fn $field(mut self, value: impl Into<f64>) -> Self {
             let v: f64 = value.into();
             self$(.$p)?.$field = Some(v.is_finite().then_some(v));
@@ -414,8 +401,6 @@ macro_rules! options {
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident array $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        #[doc = ""]
         $($a)*
         pub fn $field<U: Into<f64>, const N: usize>(mut self, values: [U; N]) -> Self
         where

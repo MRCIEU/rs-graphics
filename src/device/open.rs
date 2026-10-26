@@ -37,38 +37,37 @@ crate::setters::options! {
     pub struct DeviceBuilder {
         format: Format => no_setter,
         file: PathBuf => no_setter,
-        /// Page width in [`units`](DeviceBuilder::units); `None`: 7 inches for
+        /// Page width in [`units`](DeviceBuilder::units). `None`: 7 inches for
         /// PDF and SVG, 480/72 inches for PNG, whatever the units.
         pub width: Option<f64> => option f64,
-        /// Page height in [`units`](DeviceBuilder::units); `None`: as `width`.
+        /// Page height in [`units`](DeviceBuilder::units). `None`: as `width`.
         pub height: Option<f64> => option f64,
-        /// The units of `width` and `height` (R's `units`, which only R's
-        /// bitmap devices such as `png()` take); `None`: inches (R's `png()`
-        /// defaults to pixels). Here inches, centimetres and millimetres work
-        /// for every format; pixels only for PNG, where they are divided by
-        /// `res` (so `.width(1200).units("px").res(300)` is 4 inches, as R's
-        /// `png(width = 1200, res = 300)`). Pixels for a PDF or SVG device make
-        /// [`open`](DeviceBuilder::open) fail.
+        /// Units of `width` and `height`. `None`: inches. Inches, centimetres
+        /// and millimetres work for every format; pixels only for PNG, where
+        /// they are divided by `res` (so `.width(1200).units("px").res(300)` is
+        /// 4 inches, as R's `png(width = 1200, res = 300)`). Pixels for a PDF
+        /// or SVG device make [`open`](DeviceBuilder::open) fail. In R only
+        /// bitmap devices such as `png()` take `units`, defaulting to pixels.
         pub units: Option<Units> => option Units,
-        /// R's `pointsize`: the starting `par(ps)`, which also fixes the size
-        /// of plotting symbols and margin lines from the start (R's
-        /// `startps`); `None`: 12.
+        /// Starting text size, `par(ps)`, in big points; it also fixes the
+        /// size of plotting symbols and margin lines from the start. `None`:
+        /// 12.
         pub pointsize: Option<f64> => option f64,
-        /// The page background, and the starting `par(bg)`; a colour that
-        /// draws nothing (`ColorSpec::None`, `"transparent"`) is transparent.
-        /// `None`: transparent for PDF, white for SVG and PNG (R's defaults).
+        /// Page background, and the starting `par(bg)`; a colour that draws
+        /// nothing (`ColorSpec::None`, `"transparent"`) is transparent. `None`:
+        /// transparent for PDF, white for SVG and PNG (R's defaults).
         pub bg: Option<ColorSpec> => option ColorSpec,
-        /// PNG only: pixels per inch (R's `res`); `None`: 72. Ignored for PDF
-        /// and SVG.
+        /// Resolution in pixels per inch, PNG only (ignored for PDF and SVG).
+        /// `None`: 72. R's `res`.
         pub res: Option<f64> => option f64,
-        /// PDF only: compress the page contents (R's `compress`); `None`:
-        /// `true`. Ignored for SVG and PNG.
+        /// Compresses the page contents, PDF only (ignored for SVG and PNG).
+        /// `None`: `true`.
         pub compress: Option<bool> => option bool,
-        /// PDF only: all pages in one file (R's `onefile`); `false` writes a
-        /// file per page, named with the page number in `file` (as
-        /// `"Rplot%03d.pdf"`; without one, the file holds the last page, as in
-        /// R). `None`: `true`. Ignored for SVG and PNG, which always write a
-        /// file per page when `file` has a page number.
+        /// Puts all pages in one file, PDF only. `false` writes a file per
+        /// page, named with the page number in `file` (as `"Rplot%03d.pdf"`;
+        /// without one, the file holds the last page, as in R). `None`:
+        /// `true`. Ignored for SVG and PNG, which always write a file per page
+        /// when `file` has a page number.
         pub onefile: Option<bool> => option bool,
     }
 }

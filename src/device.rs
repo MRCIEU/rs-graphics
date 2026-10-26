@@ -186,52 +186,51 @@ crate::setters::options! {
         pub xlab: Option<Label> => option Label,
         /// y axis label.
         pub ylab: Option<Label> => option Label,
-        /// Size of `main`, relative to `par(cex)` (R's inline `cex.main`);
-        /// `None`: `par(cex.main)`.
+        /// Size of the main title, relative to `par(cex)`. `None`:
+        /// `par(cex.main)`. R's `cex.main`.
         pub cex_main: Option<f64> => option f64,
-        /// Colour of `main` (R's inline `col.main`); `None`:
-        /// `par(col.main)`.
+        /// Colour of the main title. `None`: `par(col.main)`. R's `col.main`.
         pub col_main: Option<ColorSpec> => option ColorSpec,
-        /// Font of `main` (a [`FontFace`]; R's
-        /// inline `font.main`); `None`: `par(font.main)`.
+        /// Font face of the main title ([`FontFace`]). `None`:
+        /// `par(font.main)`. R's `font.main`.
         pub font_main: Option<FontFace> => option FontFace,
-        /// Size of `sub`, relative to `par(cex)` (R's inline `cex.sub`);
-        /// `None`: `par(cex.sub)`.
+        /// Size of the subtitle, relative to `par(cex)`. `None`:
+        /// `par(cex.sub)`. R's `cex.sub`.
         pub cex_sub: Option<f64> => option f64,
-        /// Colour of `sub` (R's inline `col.sub`); `None`:
-        /// `par(col.sub)`.
+        /// Colour of the subtitle. `None`: `par(col.sub)`. R's `col.sub`.
         pub col_sub: Option<ColorSpec> => option ColorSpec,
-        /// Font of `sub` (a [`FontFace`]; R's
-        /// inline `font.sub`); `None`: `par(font.sub)`.
+        /// Font face of the subtitle ([`FontFace`]). `None`: `par(font.sub)`.
+        /// R's `font.sub`.
         pub font_sub: Option<FontFace> => option FontFace,
-        /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's inline `cex.lab`);
-        /// `None`: `par(cex.lab)`.
+        /// Size of the axis labels (`xlab`, `ylab`), relative to `par(cex)`.
+        /// `None`: `par(cex.lab)`. R's `cex.lab`.
         pub cex_lab: Option<f64> => option f64,
-        /// Colour of `xlab` and `ylab` (R's inline `col.lab`); `None`:
-        /// `par(col.lab)`.
+        /// Colour of the axis labels (`xlab`, `ylab`). `None`: `par(col.lab)`.
+        /// R's `col.lab`.
         pub col_lab: Option<ColorSpec> => option ColorSpec,
-        /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
-        /// inline `font.lab`); `None`: `par(font.lab)`.
+        /// Font face of the axis labels (`xlab`, `ylab`; [`FontFace`]).
+        /// `None`: `par(font.lab)`. R's `font.lab`.
         pub font_lab: Option<FontFace> => option FontFace,
         /// Where each title sits along its side of the plot region, and how
         /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
-        /// right (top) (R's inline `adj`); `None`: `par(adj)`.
+        /// right (top). `None`: `par(adj)`.
         pub adj: Option<f64> => option f64,
-        /// Margin lines for `xlab`/`ylab` (`mgp[0]`) and `sub` (`mgp[0] + 1`)
-        /// (R's inline `mgp`); `None`: `par(mgp)`.
+        /// Margin lines for the axis labels (`mgp[0]`) and the subtitle
+        /// (`mgp[0] + 1`). `None`: `par(mgp)`.
         pub mgp: Option<[f64; 3]> => array [f64; 3],
-        /// Margin line for every title given (R's `line`), instead of their
-        /// defaults (half the top margin for `main`, `mgp[0]` for `xlab`/`ylab`,
-        /// `mgp[0] + 1` for `sub`); `main` then sits with its baseline on it.
-        /// `None` (or non-finite): the defaults.
+        /// Margin line for every title given, instead of their defaults (half
+        /// the top margin for `main`, `mgp[0]` for `xlab`/`ylab`, `mgp[0] + 1`
+        /// for `sub`); `main` then sits with its baseline on it. `None` (or
+        /// non-finite): the defaults.
         pub line: Option<f64> => option f64,
-        /// Draw in the outer margins (`par(oma)`) instead, positioned along the
-        /// inner region (R's `outer = TRUE`); `main` defaults to half the top
-        /// outer margin. Default `false`.
+        /// Draws in the outer margins (`par(oma)`) instead, positioned along
+        /// the inner region; `main` defaults to half the top outer margin.
+        /// Default `false`.
         pub outer: bool => value bool,
-        /// R's inline `xpd`: where the titles clip, at least the figure region
-        /// (`false` is `true` here, as in R; [`Xpd::Device`] for the whole
-        /// device); `None`: `par(xpd)`. `outer` titles clip to the device.
+        /// Where the titles are clipped: at least the figure region
+        /// ([`Xpd::Plot`] acts as [`Xpd::Figure`], as in R), or
+        /// [`Xpd::Device`] for the whole device. `None`: `par(xpd)`. `outer`
+        /// titles clip to the device.
         pub xpd: Option<Xpd> => option Xpd,
     }
 }

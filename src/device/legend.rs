@@ -383,117 +383,116 @@ crate::setters::options! {
     ///
     #[derive(Clone, Debug, Default)]
     pub struct LegendOptions => [LegendCall] {
-        /// Colours of the lines and points; empty: `par("col")`.
+        /// Colours of the lines and points. Empty: `par("col")`.
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Plotting symbols (see [`LegendPch`] for characters); empty: no
-        /// points.
-        /// `None` (R's `NA`): no point on that key.
+        /// Plotting symbols (see [`LegendPch`] for characters). Empty: no
+        /// points; `None`: no point on that key.
         pub pch: Vec<Option<i32>> => legend_pch Option<i32>,
-        /// Line types of the lines; empty: solid, if `lwd` asks for lines.
-        /// `None` (R's `NA`): no line on that key.
+        /// Line types of the lines. Empty: solid, if `lwd` asks for lines;
+        /// `None`: no line on that key.
         pub lty: Vec<Option<LineType>> => na_values LineType,
-        /// Line widths of the lines (giving any draws lines); empty:
-        /// `par("lwd")`.
-        /// `None` (R's `NA`): no line on that key (its point, if any, uses `par(lwd)`).
+        /// Line widths of the lines; giving any draws lines. Empty:
+        /// `par("lwd")`; `None`: no line on that key (its point, if any, uses
+        /// `par(lwd)`).
         pub lwd: Vec<Option<f64>> => na_values f64,
-        /// Fill colours of box keys (giving any draws boxes); empty: no fill,
+        /// Fill colours of box keys; giving any draws boxes. Empty: no fill,
         /// and no boxes unless `density` is given. With shading, the colour of
         /// the lines (empty or `None`: `par(fg)`).
         pub fill: Vec<ColorSpec> => values ColorSpec,
-        /// Border colours of box keys; empty: black (R's default).
+        /// Border colours of box keys. Empty: black (R's default).
         pub border: Vec<ColorSpec> => values ColorSpec,
-        /// Shading lines per inch in the box keys (R's `density`; giving any
-        /// draws boxes), as for [`rect()`](crate::graphics::Graphics::rect):
-        /// the lines take the `fill` colour (empty: `par(fg)`); `None` (R's
-        /// `NA`) or negative fills the box instead, 0 leaves it empty. Empty:
-        /// no shading.
+        /// Shading lines per inch in the box keys; giving any draws boxes.
+        /// As for [`rect()`](crate::graphics::Graphics::rect): the lines take
+        /// the `fill` colour (empty: `par(fg)`); `None` or negative fills the
+        /// box instead, 0 leaves it empty. Empty: no shading.
         pub density: Vec<Option<f64>> => na_values f64,
-        /// Angle of the shading lines in degrees (R's `angle`), recycled over
-        /// the keys; empty: 45.
+        /// Angle of the shading lines in degrees, recycled over the keys.
+        /// Empty: 45.
         pub angle: Vec<f64> => values f64,
-        /// `pt.bg`: fill of `pch` 21 to 25; empty: none (R's `NA`).
+        /// Fill colour of `pch` 21 to 25. Empty: none. R's `pt.bg`.
         pub pt_bg: Vec<ColorSpec> => values ColorSpec,
-        /// `pt.cex`: size of the points; empty: `cex`.
-        /// `None` (R's `NA`): no point on that key.
+        /// Size of the points. Empty: `cex`; `None`: no point on that key.
+        /// R's `pt.cex`.
         pub pt_cex: Vec<Option<f64>> => na_values f64,
-        /// `pt.lwd`: line width of the points; empty: `lwd`.
-        /// `None` (R's `NA`): no point on that key.
+        /// Line width of the points. Empty: `lwd`; `None`: no point on that
+        /// key. R's `pt.lwd`.
         pub pt_lwd: Vec<Option<f64>> => na_values f64,
-        /// `bty`: whether to draw the surrounding box; `None`: a box (R's
-        /// `"o"`).
+        /// Whether to draw the surrounding box. `None`: a box (R's `"o"`).
         pub bty: Option<LegendBty> => option LegendBty,
-        /// Box fill (`bg=`); `None` = `par("bg")` (transparent, so unfilled,
-        /// on PDF by default: see [`Backend::default_bg`]).
+        /// Fill colour of the legend box. `None`: `par("bg")` (transparent, so
+        /// unfilled, on PDF by default: see [`Backend::default_bg`]).
         pub bg: Option<ColorSpec> => option ColorSpec,
-        /// Size of each key's text and symbol, times `par(cex)`; empty: 1.
-        /// `None` (R's `NA`): 1.
+        /// Size of each key's text and symbol, times `par(cex)`. Empty and
+        /// `None`: 1.
         pub cex: Vec<Option<f64>> => na_values f64,
-        /// Horizontal justification of the box relative to `x`; `None`: R's
-        /// default (0, or 0.5 for [`LegendPos::Corners`]).
+        /// Horizontal justification of the box relative to its `x` position.
+        /// `None`: 0, or 0.5 for [`LegendPos::Corners`] (R's defaults).
         pub xjust: Option<f64> => option f64,
-        /// Vertical justification of the box relative to `y`; `None`: R's
-        /// default (1, or 0.5 for [`LegendPos::Corners`]).
+        /// Vertical justification of the box relative to its `y` position.
+        /// `None`: 1, or 0.5 for [`LegendPos::Corners`] (R's defaults).
         pub yjust: Option<f64> => option f64,
         /// Space between each key and its label, in character widths (a
-        /// column is as wide as its widest); empty: 1.
-        /// `None` (R's `NA`): 1.
+        /// column is as wide as its widest). Empty and `None`: 1. R's
+        /// `x.intersp`.
         pub x_intersp: Vec<Option<f64>> => na_values f64,
-        /// Space between rows, in character heights, recycled over the rows;
-        /// empty: 1.
-        /// `None` (R's `NA`): 1.
+        /// Space between rows, in character heights, recycled over the rows.
+        /// Empty and `None`: 1. R's `y.intersp`.
         pub y_intersp: Vec<Option<f64>> => na_values f64,
-        /// Length of each key's line, in character widths; empty: 2.
-        /// `None` (R's `NA`): 2.
+        /// Length of each key's line, in character widths. Empty and `None`:
+        /// 2. R's `seg.len`.
         pub seg_len: Vec<Option<f64>> => na_values f64,
-        /// `text.width`, in x *user* units: one width for every column, or
-        /// one per column; `f64::NAN` (R's `NA`) makes each column as wide as
-        /// its own widest label; empty: every column as wide as the widest
-        /// label.
+        /// Width of the label text, in x *user* units: one width for every
+        /// column, or one per column; `f64::NAN` (R's `NA`) makes each column
+        /// as wide as its own widest label. Empty: every column as wide as the
+        /// widest label. R's `text.width`.
         pub text_width: Vec<f64> => values f64,
-        /// `adj[1]`: horizontal adjustment of the labels; `None`: 0 (left).
+        /// Horizontal adjustment of the labels. `None`: 0 (left). R's
+        /// `adj[1]`.
         pub adj: Option<f64> => option f64,
-        /// `adj[2]`: vertical adjustment of the labels; `None`: 0.5.
-        /// `Some(None)` (the setter's `f64::NAN`) is R's `NA`, centring each
-        /// label's ink, as R's one-value `adj = x` does.
+        /// Vertical adjustment of the labels. `None`: 0.5. `Some(None)` (the
+        /// setter's `f64::NAN`, R's `NA`) centres each label's ink, as R's
+        /// one-value `adj = x` does. R's `adj[2]`.
         pub vadj: Option<Option<f64>> => na f64,
-        /// `merge`; `None` = R's default (lines and points both drawn).
+        /// Whether to draw each point in the middle of its line. `None`: R's
+        /// default, `true` when the keys have both lines and points.
         pub merge: Option<bool> => option bool,
-        /// Number of columns; `None`: 1.
+        /// Number of columns. `None`: 1.
         pub ncol: Option<usize> => count usize,
-        /// Lay the entries out in one row. Default `false`.
+        /// Whether to lay the entries out in one row. Default `false`.
         pub horiz: bool => value bool,
-        /// Text or a plotmath expression above the entries; `None`: no title.
+        /// Text or a plotmath expression above the entries. `None`: no title.
         pub title: Option<Label> => option Label,
-        /// `title.cex`; `None` = the first `cex`.
+        /// Size of the title. `None`: the first `cex`. R's `title.cex`.
         pub title_cex: Option<f64> => option f64,
-        /// `title.col`; `None` = the first `text_col`.
+        /// Colour of the title. `None`: the first `text_col`. R's `title.col`.
         pub title_col: Option<ColorSpec> => option ColorSpec,
-        /// `title.adj`: where the title sits across the box (0 left, 1
-        /// right) and its justification there; `None`: 0.5 (centred).
+        /// Where the title sits across the box (0 left, 1 right) and its
+        /// justification there. `None`: 0.5 (centred). R's `title.adj`.
         pub title_adj: Option<f64> => option f64,
-        /// `title.font`; `None` = the first `text_font`.
+        /// Font of the title. `None`: the first `text_font`. R's
+        /// `title.font`.
         pub title_font: Option<FontFace> => option FontFace,
-        /// `inset` as fractions of the plot region, `(x, y)`, for keyword
-        /// positions; `None`: `(0, 0)`.
+        /// Inset from the plot region's edges for keyword positions, as
+        /// fractions of the plot region, `(x, y)`. `None`: `(0, 0)`.
         pub inset: Option<(f64, f64)> => option_pair (f64, f64),
-        /// `text.col`: label colours; empty: `par("col")`.
+        /// Colours of the labels. Empty: `par("col")`. R's `text.col`.
         pub text_col: Vec<ColorSpec> => values ColorSpec,
-        /// `text.font`: label fonts (also for measuring them); empty:
-        /// `par("font")`.
-        /// `None` (R's `NA`): `par("font")`.
+        /// Fonts of the labels (also for measuring them). Empty and `None`:
+        /// `par("font")`. R's `text.font`.
         pub text_font: Vec<Option<FontFace>> => na_values FontFace,
-        /// `box.lwd`: line width of the legend box; `None`: `par("lwd")`.
+        /// Line width of the legend box. `None`: `par("lwd")`. R's `box.lwd`.
         pub box_lwd: Option<f64> => option f64,
-        /// `box.lty`: line type of the legend box; `None`: `par("lty")`.
+        /// Line type of the legend box. `None`: `par("lty")`. R's `box.lty`.
         pub box_lty: Option<LineType> => option LineType,
-        /// `box.col`: colour of the legend box's border (`ColorSpec::None`:
-        /// no border); `None`: `par("fg")`.
+        /// Colour of the legend box's border (`ColorSpec::None`: no border).
+        /// `None`: `par("fg")`. R's `box.col`.
         pub box_col: Option<ColorSpec> => option ColorSpec,
-        /// R's inline `xpd` while drawing ([`Xpd`]; the setter also takes
-        /// `false`/`true`); `None`: `par(xpd)`.
+        /// How far drawing may reach ([`Xpd`]; the setter also takes
+        /// `false`/`true`). `None`: `par(xpd)`; overrides it for this call
+        /// only.
         pub xpd: Option<Xpd> => option Xpd,
-        /// R's `plot`: `false` works out the layout (returned as usual) but
-        /// draws nothing; `None`: `true`.
+        /// Whether to draw: `false` works out the layout (returned as usual)
+        /// but draws nothing. `None`: `true`.
         pub plot: Option<bool> => option bool,
     }
 }

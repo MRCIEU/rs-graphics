@@ -52,43 +52,43 @@ crate::setters::options! {
     /// Arguments of `points()` and `lines()`, both R's `plot.xy()`.
     #[derive(Clone, Debug, Default)]
     pub struct XyOptions => [PointsCall, LinesCall] {
-        /// R's `type` (see [`PlotType`]): `None` is `"p"` for `points()` and
-        /// `"l"` for `lines()`.
+        /// What to draw: points, lines, both, steps, ... (see [`PlotType`]).
+        /// `None`: points for `points()`, lines for `lines()`. R's `type`.
         pub type_: Option<PlotType> => option PlotType,
-        /// Plotting symbols, recycled per point (a negative value is minus a
-        /// Unicode code point, as in R; the setter takes characters too);
-        /// empty: `par(pch)`.
-        /// `None` (R's `NA`): no point there.
+        /// Plotting symbols, recycled over the points; characters work too
+        /// (a negative value is minus a Unicode code point, as in R). Empty:
+        /// `par(pch)`; `None`: no point there.
         pub pch: Vec<Option<i32>> => na_values i32,
-        /// Colours, recycled per point (lines use the first, except
-        /// `type = "h"`'s, one per point); empty: `par(col)`.
+        /// Colours, recycled over the points. Lines use the first, except
+        /// for `type = "h"`, which has one per point. Empty: `par(col)`.
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Fill of symbols 21-25, recycled per point; empty: none (R's `NA`).
+        /// Fill colours of symbols 21 to 25, recycled over the points.
+        /// Empty: no fill.
         pub bg: Vec<ColorSpec> => values ColorSpec,
-        /// Symbol sizes, recycled per point, times `par(cex)`; empty: 1.
-        /// `None` (R's `NA`): no point there.
+        /// Symbol sizes, relative to `par(cex)`, recycled over the points.
+        /// Empty: 1; `None`: no point there.
         pub cex: Vec<Option<f64>> => na_values f64,
-        /// Line widths, recycled per point (lines use the first); empty:
-        /// `par(lwd)`.
-        /// `None` (R's `NA`): no point there (the lines use `par(lwd)`, as in R).
+        /// Line widths, recycled over the points (lines use the first).
+        /// Empty: `par(lwd)`; `None`: no point there, while lines use
+        /// `par(lwd)`, as in R.
         pub lwd: Vec<Option<f64>> => na_values f64,
-        /// Line type of lines; `None`: `par(lty)`.
+        /// Line type of the lines. `None`: `par(lty)`.
         pub lty: Option<LineType> => option LineType,
-        /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
-        /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
-        /// `par(xpd)`.
+        /// Where drawing is clipped: [`Xpd::Plot`], [`Xpd::Figure`] or
+        /// [`Xpd::Device`] (the setter also takes `false`/`true`). `None`:
+        /// `par(xpd)`; overrides it for this call only.
         pub xpd: Option<Xpd> => option Xpd,
-        /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
-        /// `None`: `par(lend)`.
+        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
+        /// `None`: `par(lend)`; overrides it for this call only.
         pub lend: Option<LineEnd> => option LineEnd,
-        /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-        /// `None`: `par(ljoin)`.
+        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
+        /// `None`: `par(ljoin)`; overrides it for this call only.
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-        /// `par(lmitre)`.
+        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// overrides it for this call only.
         pub lmitre: Option<f64> => option f64,
-        /// R's inline `font`: the font of character symbols (`pch = "a"`, or
-        /// `'é'`); `None`: `par(font)`.
+        /// Font of character symbols (such as `pch = "a"` or `'é'`). `None`:
+        /// `par(font)`; overrides it for this call only.
         pub font: Option<FontFace> => option FontFace,
     }
 }
@@ -97,26 +97,26 @@ crate::setters::options! {
     /// Arguments of `segments()`.
     #[derive(Clone, Debug, Default)]
     pub struct SegmentsOptions => [SegmentsCall] {
-        /// Recycled per segment; empty: `par(fg)` (R's default).
+        /// Segment colours, recycled per segment. Empty: `par(fg)`, as in R.
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Recycled per segment; empty: `par(lty)`.
-        /// `None` (R's `NA`): no segment.
+        /// Line types, recycled per segment. Empty: `par(lty)`; `None`: no
+        /// segment.
         pub lty: Vec<Option<LineType>> => na_values LineType,
-        /// Recycled per segment; empty: `par(lwd)`.
-        /// `None` (R's `NA`): no segment.
+        /// Line widths, recycled per segment. Empty: `par(lwd)`; `None`: no
+        /// segment.
         pub lwd: Vec<Option<f64>> => na_values f64,
-        /// R's inline `lend`: how the segments end (`"round"`, `"butt"`,
-        /// `"square"`); `None`: `par(lend)`.
+        /// How the segment ends are drawn: `"round"`, `"butt"` or
+        /// `"square"`. `None`: `par(lend)`; overrides it for this call only.
         pub lend: Option<LineEnd> => option LineEnd,
-        /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
-        /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
-        /// `par(xpd)`.
+        /// Where drawing is clipped: [`Xpd::Plot`], [`Xpd::Figure`] or
+        /// [`Xpd::Device`] (the setter also takes `false`/`true`). `None`:
+        /// `par(xpd)`; overrides it for this call only.
         pub xpd: Option<Xpd> => option Xpd,
-        /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-        /// `None`: `par(ljoin)`.
+        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
+        /// `None`: `par(ljoin)`; overrides it for this call only.
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-        /// `par(lmitre)`.
+        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// overrides it for this call only.
         pub lmitre: Option<f64> => option f64,
     }
 }
@@ -125,34 +125,34 @@ crate::setters::options! {
     /// Arguments of `arrows()`.
     #[derive(Clone, Debug, Default)]
     pub struct ArrowsOptions => [ArrowsCall] {
-        /// Length of the head's edges in inches; `None`: 0.25 (R's default).
+        /// Length of the edges of each head, in inches. `None`: 0.25.
         pub length: Option<f64> => option f64,
         /// Angle between the shaft and each edge of the head, in degrees (90
-        /// gives flat caps, as for error bars); `None`: 30 (R's default).
+        /// gives flat caps, as for error bars). `None`: 30.
         pub angle: Option<f64> => option f64,
-        /// Heads at the start (1), the end (2) or both ends (3); `None`: 2
-        /// (R's default).
+        /// Where the heads go: at the start (1), the end (2) or both ends
+        /// (3). `None`: 2.
         pub code: Option<u8> => option u8,
-        /// Recycled per arrow; empty: `par(fg)` (R's default).
+        /// Arrow colours, recycled per arrow. Empty: `par(fg)`, as in R.
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Recycled per arrow; empty: `par(lty)`.
-        /// `None` (R's `NA`): no arrow.
+        /// Line types, recycled per arrow. Empty: `par(lty)`; `None`: no
+        /// arrow.
         pub lty: Vec<Option<LineType>> => na_values LineType,
-        /// Recycled per arrow; empty: `par(lwd)`.
-        /// `None` (R's `NA`): no arrow.
+        /// Line widths, recycled per arrow. Empty: `par(lwd)`; `None`: no
+        /// arrow.
         pub lwd: Vec<Option<f64>> => na_values f64,
-        /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
-        /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
-        /// `par(xpd)`.
+        /// Where drawing is clipped: [`Xpd::Plot`], [`Xpd::Figure`] or
+        /// [`Xpd::Device`] (the setter also takes `false`/`true`). `None`:
+        /// `par(xpd)`; overrides it for this call only.
         pub xpd: Option<Xpd> => option Xpd,
-        /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
-        /// `None`: `par(lend)`.
+        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
+        /// `None`: `par(lend)`; overrides it for this call only.
         pub lend: Option<LineEnd> => option LineEnd,
-        /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-        /// `None`: `par(ljoin)`.
+        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
+        /// `None`: `par(ljoin)`; overrides it for this call only.
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-        /// `par(lmitre)`.
+        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// overrides it for this call only.
         pub lmitre: Option<f64> => option f64,
     }
 }
@@ -161,40 +161,41 @@ crate::setters::options! {
     /// Arguments of `rect()`.
     #[derive(Clone, Debug, Default)]
     pub struct RectOptions => [RectCall] {
-        /// Fill colours, recycled per rectangle; empty: no fill (R's `NA`).
-        /// With `density`, see there.
+        /// Fill colours, recycled per rectangle. Empty: no fill. With
+        /// shading, the colour of the shading lines instead (see
+        /// [`RectOptions::density`]).
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Border colours, recycled; empty: `par(fg)` (with `density`: `col`).
-        /// `ColorSpec::None` draws no border.
+        /// Border colours, recycled per rectangle. Empty: `par(fg)` (with
+        /// shading: `col`); `ColorSpec::None`: no border.
         pub border: Vec<ColorSpec> => values ColorSpec,
-        /// Recycled per rectangle; empty: `par(lty)`.
-        /// `None` (R's `NA`): no border and no shading lines (a fill is drawn).
+        /// Border line types, recycled per rectangle. Empty: `par(lty)`;
+        /// `None`: no border and no shading lines (the fill is still drawn).
         pub lty: Vec<Option<LineType>> => na_values LineType,
-        /// Recycled per rectangle; empty: `par(lwd)`.
-        /// `None` (R's `NA`): no border and no shading lines (a fill is drawn).
+        /// Border line widths, recycled per rectangle. Empty: `par(lwd)`;
+        /// `None`: no border and no shading lines (the fill is still drawn).
         pub lwd: Vec<Option<f64>> => na_values f64,
-        /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
-        /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
-        /// `par(xpd)`.
+        /// Where drawing is clipped: [`Xpd::Plot`], [`Xpd::Figure`] or
+        /// [`Xpd::Device`] (the setter also takes `false`/`true`). `None`:
+        /// `par(xpd)`; overrides it for this call only.
         pub xpd: Option<Xpd> => option Xpd,
-        /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
-        /// `None`: `par(lend)`.
+        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
+        /// `None`: `par(lend)`; overrides it for this call only.
         pub lend: Option<LineEnd> => option LineEnd,
-        /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-        /// `None`: `par(ljoin)`.
+        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
+        /// `None`: `par(ljoin)`; overrides it for this call only.
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-        /// `par(lmitre)`.
+        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// overrides it for this call only.
         pub lmitre: Option<f64> => option f64,
-        /// Shading lines per inch (R's `density`), recycled per rectangle: `None`
-        /// (R's `NA`) or negative fills with `col` instead, 0 draws neither
-        /// lines nor fill. Empty (or all `None`/negative): no shading. With
+        /// Shading lines per inch, recycled per rectangle. `None` or a
+        /// negative value fills with `col` instead; 0 draws neither lines
+        /// nor fill. Empty (or all `None`/negative): no shading. With
         /// shading, `col` is the colour of the lines (empty or `None`:
-        /// `par(fg)`) and `border` defaults to `col`; the lines are skipped on
-        /// log axes, as in R (where they also give a warning).
+        /// `par(fg)`) and `border` defaults to `col`. The lines are skipped
+        /// on log axes, as in R (where they also give a warning).
         pub density: Vec<Option<f64>> => na_values f64,
-        /// Angle of the shading lines in degrees, anticlockwise (R's
-        /// `angle`), recycled per rectangle; empty: 45.
+        /// Angle of the shading lines in degrees, anticlockwise, recycled
+        /// per rectangle. Empty: 45.
         pub angle: Vec<f64> => values f64,
     }
 }
@@ -205,44 +206,46 @@ crate::setters::options! {
     /// `angle` are recycled over those polygons.
     #[derive(Clone, Debug, Default)]
     pub struct PolygonOptions => [PolygonCall] {
-        /// Fill colours; empty: no fill (R's `NA`). With `density`, see there.
+        /// Fill colours, recycled per polygon. Empty: no fill. With shading,
+        /// the colour of the shading lines instead (see
+        /// [`PolygonOptions::density`]).
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Border colours; empty: `par(fg)` (with `density`: `col`).
-        /// `ColorSpec::None` draws no border.
+        /// Border colours, recycled per polygon. Empty: `par(fg)` (with
+        /// shading: `col`); `ColorSpec::None`: no border.
         pub border: Vec<ColorSpec> => values ColorSpec,
-        /// Empty: `par(lty)`.
-        /// `None` (R's `NA`): no border and no shading lines (a fill is drawn).
+        /// Border line types, recycled per polygon. Empty: `par(lty)`;
+        /// `None`: no border and no shading lines (the fill is still drawn).
         pub lty: Vec<Option<LineType>> => na_values LineType,
-        /// One width for all; `None`: `par(lwd)`.
+        /// Border line width, one for all polygons. `None`: `par(lwd)`.
         pub lwd: Option<f64> => option f64,
-        /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
-        /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
-        /// `par(xpd)`.
+        /// Where drawing is clipped: [`Xpd::Plot`], [`Xpd::Figure`] or
+        /// [`Xpd::Device`] (the setter also takes `false`/`true`). `None`:
+        /// `par(xpd)`; overrides it for this call only.
         pub xpd: Option<Xpd> => option Xpd,
-        /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
-        /// `None`: `par(lend)`.
+        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
+        /// `None`: `par(lend)`; overrides it for this call only.
         pub lend: Option<LineEnd> => option LineEnd,
-        /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-        /// `None`: `par(ljoin)`.
+        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
+        /// `None`: `par(ljoin)`; overrides it for this call only.
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-        /// `par(lmitre)`.
+        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// overrides it for this call only.
         pub lmitre: Option<f64> => option f64,
-        /// Shading lines per inch (R's `density`), recycled per polygon: `None`
-        /// (R's `NA`) or negative fills with `col` instead, 0 draws neither
-        /// lines nor fill. Empty (or all `None`/negative): no shading. With
+        /// Shading lines per inch, recycled per polygon. `None` or a
+        /// negative value fills with `col` instead; 0 draws neither lines
+        /// nor fill. Empty (or all `None`/negative): no shading. With
         /// shading, `col` is the colour of the lines (empty or `None`:
-        /// `par(fg)`) and `border` defaults to `col`; the lines are skipped on
-        /// log axes, as in R (where they also give a warning).
+        /// `par(fg)`) and `border` defaults to `col`. The lines are skipped
+        /// on log axes, as in R (where they also give a warning).
         pub density: Vec<Option<f64>> => na_values f64,
-        /// Angle of the shading lines in degrees, anticlockwise (R's
-        /// `angle`), recycled per polygon; empty: 45.
+        /// Angle of the shading lines in degrees, anticlockwise, recycled
+        /// per polygon. Empty: 45.
         pub angle: Vec<f64> => values f64,
-        /// R's `fillOddEven`: shading lines go where the border encircles a
-        /// point an odd number of times, rather than a non-zero number (so a
-        /// pentagram's centre isn't shaded). Default `false`. Only the shading:
-        /// solid fills use the non-zero rule, as R's `pdf()` and the other
-        /// devices here do.
+        /// Uses the even-odd rule for shading: lines go where the border
+        /// encircles a point an odd number of times, rather than a non-zero
+        /// number (so a pentagram's centre isn't shaded). Default `false`.
+        /// Affects only the shading: solid fills use the non-zero rule, as
+        /// R's `pdf()` and the other devices here do. R's `fillOddEven`.
         pub fill_odd_even: bool => value bool,
     }
 }
@@ -251,37 +254,36 @@ crate::setters::options! {
     /// Arguments of `text()`.
     #[derive(Clone, Debug, Default)]
     pub struct TextOptions => [TextCall] {
-        /// Horizontal adjustment, R's `adj[1]` (0 left, 0.5 centred, 1 right);
-        /// `None`: `par(adj)`.
+        /// Horizontal justification: 0 left, 0.5 centred, 1 right. `None`:
+        /// `par(adj)`. R's `adj[1]`.
         pub adj: Option<f64> => option f64,
-        /// Vertical adjustment, R's `adj[2]`: a finite value puts a text's
-        /// baseline `vadj * height("M")` below the point, or puts the point
-        /// that fraction of an expression's box height above the box's bottom;
-        /// `None` (R's `NA`, the default) centres the text's ink, or an
-        /// expression's box, on it.
+        /// Vertical justification. A finite value puts a text's baseline
+        /// `vadj * height("M")` below the point, or puts the point that
+        /// fraction of an expression's box height above the box's bottom.
+        /// `None` (the default) centres the text's ink, or an expression's
+        /// box, on the point. R's `adj[2]`.
         pub vadj: Option<f64> => option f64,
-        /// Rotation in degrees, counterclockwise (R's `srt`); `None`:
-        /// `par(srt)` (0 by default).
+        /// Rotation in degrees, anticlockwise. `None`: `par(srt)` (0 by
+        /// default). R's `srt`.
         pub srt: Option<f64> => option f64,
-        /// Recycled per label, times `par(cex)`; empty: 1.
-        /// `None` (R's `NA`): 1.
+        /// Text sizes, relative to `par(cex)`, recycled per label. Empty or
+        /// `None`: 1.
         pub cex: Vec<Option<f64>> => na_values f64,
-        /// Recycled per label; empty: `par(col)`.
+        /// Text colours, recycled per label. Empty: `par(col)`.
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Fonts ([`FontFace`]: R's numbers 1 to 5, names or the enum),
-        /// recycled per label; empty: `par(font)`.
-        /// `None` (R's `NA`): `par(font)`.
+        /// Fonts, recycled per label: R's numbers 1 to 5, names or
+        /// [`FontFace`] values. Empty or `None`: `par(font)`.
         pub font: Vec<Option<FontFace>> => na_values FontFace,
-        /// R's inline `xpd`: where to clip ([`Xpd::Plot`], [`Xpd::Figure`] or
-        /// [`Xpd::Device`]; the setter also takes `false`/`true`); `None`:
-        /// `par(xpd)`.
+        /// Where drawing is clipped: [`Xpd::Plot`], [`Xpd::Figure`] or
+        /// [`Xpd::Device`] (the setter also takes `false`/`true`). `None`:
+        /// `par(xpd)`; overrides it for this call only.
         pub xpd: Option<Xpd> => option Xpd,
-        /// R's `pos`, recycled per label: put the label below (1), to the left
-        /// of (2), above (3) or to the right of (4) its point, `offset` away;
-        /// overrides `adj`/`vadj`. Empty: none.
+        /// Puts each label below (1), to the left of (2), above (3) or to
+        /// the right of (4) its point, `offset` away, recycled per label;
+        /// overrides `adj`/`vadj`. Empty: not used.
         pub pos: Vec<i32> => values i32,
-        /// With `pos`, the distance from the point in character widths (R's
-        /// `offset`); `None`: 0.5.
+        /// Distance of a label from its point when `pos` is given, in
+        /// character widths. `None`: 0.5.
         pub offset: Option<f64> => option f64,
     }
 }
@@ -309,31 +311,31 @@ crate::setters::options! {
     /// Arguments of `box()`.
     #[derive(Clone, Debug, Default)]
     pub struct BoxOptions => [BoxCall] {
-        /// Which region to outline; `None`: the plot region (R's default).
+        /// Which region to outline. `None`: the plot region.
         pub which: Option<BoxWhich> => option BoxWhich,
-        /// The colour; `None` or `ColorSpec::None` (R's `NA`): `fg` if given,
-        /// else `par(col)`, as R's `C_box` (R's `par(fg = )` sets `col` too,
-        /// so set both `par.fg` and `par.col` to follow it).
+        /// Colour of the box. `None` or `ColorSpec::None`: `fg` if given,
+        /// else `par(col)`, as in R. (R's `par(fg = )` sets `col` too, so
+        /// set both `par(fg)` and `par(col)` to follow it.)
         pub col: Option<ColorSpec> => option ColorSpec,
-        /// R's inline `fg`: the colour when `col` isn't given (or is `NA`);
-        /// `None` or `ColorSpec::None`: `par(col)`.
+        /// Colour of the box when `col` isn't given (or is `None`). `None`
+        /// or `ColorSpec::None`: `par(col)`.
         pub fg: Option<ColorSpec> => option ColorSpec,
-        /// `None`: solid (R's `box(lty = "solid")`, not `par(lty)`).
+        /// Line type. `None`: solid, not `par(lty)` (R's `box()` passes
+        /// `lty = "solid"`).
         pub lty: Option<LineType> => option LineType,
-        /// `None`: `par(lwd)`.
+        /// Line width. `None`: `par(lwd)`.
         pub lwd: Option<f64> => option f64,
-        /// Which sides of the plot region to draw (R's inline `bty`); `None`:
-        /// `par(bty)`. Ignored for the other regions, which always get all
-        /// four sides (R's `GBox()`).
+        /// Which sides of the plot region to draw. `None`: `par(bty)`.
+        /// Ignored for the other regions, which always get all four sides.
         pub bty: Option<Bty> => option Bty,
-        /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
-        /// `None`: `par(lend)`.
+        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
+        /// `None`: `par(lend)`; overrides it for this call only.
         pub lend: Option<LineEnd> => option LineEnd,
-        /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-        /// `None`: `par(ljoin)`.
+        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
+        /// `None`: `par(ljoin)`; overrides it for this call only.
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-        /// `par(lmitre)`.
+        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// overrides it for this call only.
         pub lmitre: Option<f64> => option f64,
     }
 }
@@ -342,21 +344,21 @@ crate::setters::options! {
     /// Arguments of `plot.window()` besides the limits.
     #[derive(Clone, Debug, Default)]
     pub struct PlotWindowOptions => [PlotWindowCall] {
-        /// Log x axis (R's `log = "x"`); default `false`.
+        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
         pub xlog: bool => value bool,
-        /// Log y axis (R's `log = "y"`); default `false`.
+        /// Makes the y axis logarithmic. Default `false`. R's `log = "y"`.
         pub ylog: bool => value bool,
-        /// R's `asp`: one x unit is `asp` y units long on the page. Ignored on
-        /// log axes, as in R. `None` (R's `NA`): no constraint.
+        /// Aspect ratio: one x unit is `asp` y units long on the page.
+        /// Ignored on log axes, as in R. `None`: no constraint.
         pub asp: Option<f64> => option f64,
-        /// x axis style for this window (R's inline `xaxs`: `"r"` adds 4% at
-        /// each end, `"i"` none); `None`: `par(xaxs)`.
+        /// How the x range is extended: `"r"` adds 4% at each end, `"i"`
+        /// nothing. `None`: `par(xaxs)`; overrides it for this call only.
         pub xaxs: Option<AxisStyle> => option AxisStyle,
-        /// As `xaxs`, for the y axis; `None`: `par(yaxs)`.
+        /// As `xaxs`, for the y axis. `None`: `par(yaxs)`.
         pub yaxs: Option<AxisStyle> => option AxisStyle,
         /// Approximate numbers of x and y ticks (and label length) for the
-        /// default ticks this window sets (R's inline `lab`); `None`:
-        /// `par(lab)`.
+        /// default ticks this window sets. `None`: `par(lab)`; overrides it
+        /// for this call only.
         pub lab: Option<[i32; 3]> => option [i32; 3],
     }
 }
