@@ -225,13 +225,23 @@ macro_rules! par_options {
         }
 
         $crate::setters::options! {
-            /// The [`Par`] fields a `par()` call changes (`None`: unchanged),
-            /// plus `new`, `usr`, `xlog` and `ylog` (device state rather than
-            /// `Par` fields). R's `mfrow`/`mfcol`/`mfg`/
-            /// `fig`/`fin` aren't here: they change the device's page layout,
-            /// not `Par`, so only a device's `par()` call takes them
-            /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow) and
-            /// co.).
+            /// The graphical parameters one `par()` call changes: every [`Par`] field
+            /// as an `Option` (`None`: unchanged), plus `new`, `usr`, `xlog` and `ylog`,
+            /// which are device state.
+            ///
+            /// Build one to reuse a set of parameters with `.with(&opts)`. The page
+            /// layout (`mfrow`, `mfcol`, `mfg`, `fig`, `fin`) isn't here: it belongs to
+            /// the device, so only a device's `par()` call takes it
+            /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow) and co.).
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// # use rs_graphics::prelude::*;
+            /// let compact = ParOptions::default().mar([4, 4, 1, 1]).cex_axis(0.8);
+            /// let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+            /// dev.par().with(&compact).draw();
+            /// ```
             #[derive(Clone, Debug, Default, PartialEq)]
             pub struct ParOptions => [ParCall] {
                 $(
@@ -295,8 +305,25 @@ macro_rules! par_options {
 }
 
 par_options! {
-    /// The graphics parameter set (`par()`), restricted to what this crate
-    /// implements. Field names match R's own where practical.
+    /// The graphical parameters: margins, colours, fonts, line styles, axis
+    /// styles and the rest of what `par()` sets.
+    ///
+    /// A device starts with the `Par` it was made with (usually
+    /// `Par::default()`, R's defaults); change it with
+    /// [`par()`](crate::graphics::Graphics::par) and read it with
+    /// [`Device::current_par`](crate::device::Device::current_par). Field names
+    /// match R's where practical (`cex_main` is R's `cex.main`).
+    ///
+    /// This is R's `par()` state, restricted to what this crate implements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().las(1).cex_axis(0.8).draw();
+    /// assert_eq!(dev.current_par().las, 1);
+    /// ```
     #[derive(Clone, Debug)]
     pub struct Par {
         /// Margins around the plot region, in lines: bottom, left, top,
@@ -552,10 +579,25 @@ impl Default for Par {
 }
 
 impl Par {
-    /// The colour to draw `spec` with, or `None` for nothing. Colour 0 is
-    /// the background, `par.bg`, as in R (`RGBpar3`); like any fully
-    /// transparent colour it draws nothing when `bg` is transparent (the
-    /// PDF default).
+    /// Returns the colour to draw `spec` with, or `None` for nothing.
+    ///
+    /// Colour 0 is the background, `bg`; like any fully transparent colour it
+    /// draws nothing when `bg` is transparent (the PDF default). Numbers index
+    /// `palette`.
+    ///
+    /// R's colour 0 is the background too.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let par = Par::default();
+    /// assert_eq!(par.resolve_color(ColorSpec::Index(2)), Some(par.palette[1]));
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// If `spec` is a negative palette number.
     pub fn resolve_color(&self, spec: ColorSpec) -> Option<Color> {
         match spec {
             ColorSpec::Index(0) => Some(self.bg).filter(|c| c.a > 0),

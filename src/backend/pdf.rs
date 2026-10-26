@@ -41,6 +41,22 @@ use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
 
+/// A backend writing PDF, using the standard Helvetica (and Symbol) fonts
+/// that every PDF viewer has, so no fonts are embedded.
+///
+/// Pages are kept as they are finished, so one file holds them all. Text
+/// sizes are rounded to whole points and the page is transparent by
+/// default, as in R's `pdf()` device. See the [module docs](self).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let pdf = PdfBackend::new(6, 4).with_background(Color::WHITE);
+/// let mut dev = Device::new(pdf, Par::default());
+/// dev.plot().x([1, 2, 3]).draw();
+/// assert!(dev.finish().starts_with(b"%PDF"));
+/// ```
 pub struct PdfBackend {
     width_in: f64,
     height_in: f64,
@@ -81,6 +97,8 @@ struct LineState {
 }
 
 impl PdfBackend {
+    /// Creates a PDF backend for a `width_in` x `height_in` inch page, with a
+    /// transparent background and compressed content.
     pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
         let (width_in, height_in) = (width_in.into(), height_in.into());
         PdfBackend {
@@ -103,16 +121,20 @@ impl PdfBackend {
         }
     }
 
-    /// The page background, like R's `pdf(bg = )`; transparent by default.
+    /// Sets the page background; transparent by default.
+    ///
+    /// This is R's `pdf(bg = )`.
     pub fn with_background(mut self, background: Color) -> Self {
         self.background = background;
         self
     }
 
-    /// Whether to Flate-compress the content stream (default `true`), like
-    /// R's `pdf(compress = )`. Uncompressed output is much larger but its
-    /// drawing operators can be read as text, as the tests comparing it
-    /// with R's `pdf(compress = FALSE)` do.
+    /// Sets whether the page content is compressed; `true` by default.
+    ///
+    /// Uncompressed output is much larger, but its drawing operators can be
+    /// read as text, as the tests comparing it with R's output do.
+    ///
+    /// This is R's `pdf(compress = )`.
     pub fn with_compression(mut self, compress: bool) -> Self {
         self.compress = compress;
         self
@@ -314,8 +336,8 @@ impl PdfBackend {
         out
     }
 
-    /// Serialize the PDF as bytes: every page started, including the
-    /// current one.
+    /// Finishes the PDF and returns its bytes, with every page started,
+    /// including the current one.
     pub fn finish(self) -> Vec<u8> {
         let w_pt = self.width_in * 72.0;
         let h_pt = self.height_in * 72.0;
