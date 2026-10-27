@@ -30,8 +30,8 @@
 ///
 /// An empty pattern means solid, the default. The named constants
 /// ([`LineType::DASHED`], ...) are R's codes 0 to 6; [`LineType::parse`]
-/// and `From<&str>` take R's names and hex strings (`"dashed"`, `"42"`),
-/// `From<i32>` R's codes.
+/// and `TryFrom<&str>` take R's names and hex strings (`"dashed"`, `"42"`),
+/// `TryFrom<i32>` R's codes.
 ///
 /// This is R's `lty`.
 ///
@@ -39,9 +39,9 @@
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// assert_eq!(LineType::from("dashed"), LineType::DASHED);
-/// assert_eq!(LineType::from(2), LineType::DASHED);
-/// assert_eq!(LineType::from("42"), LineType::Pattern(&[4, 2]));
+/// assert_eq!(LineType::try_from("dashed"), Ok(LineType::DASHED));
+/// assert_eq!(LineType::try_from(2), Ok(LineType::DASHED));
+/// assert_eq!(LineType::try_from("42"), Ok(LineType::Pattern(&[4, 2])));
 /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
 /// # dev.plot_new();
 /// dev.abline().h(0.5).lty("dotted").draw();
@@ -95,7 +95,7 @@ impl LineType {
         let s = spec.trim();
         if s.len() == 1 {
             if let Some(n) = s.chars().next().and_then(|c| c.to_digit(10)) {
-                return Some(Self::from_code(n as i32));
+                return Self::from_code(n as i32);
             }
         }
         match s.to_ascii_lowercase().as_str() {
@@ -141,17 +141,16 @@ impl LineType {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineType::from_code(3), LineType::DOTTED);
-    /// assert_eq!(LineType::from_code(8), LineType::DASHED);
+    /// assert_eq!(LineType::from_code(3), Some(LineType::DOTTED));
+    /// assert_eq!(LineType::from_code(8), Some(LineType::DASHED));
+    /// assert_eq!(LineType::from_code(-1), None);
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// If `code` is negative (R: "invalid line type").
-    pub fn from_code(code: i32) -> LineType {
-        assert!(code >= 0, "invalid line type: lty code {code} is negative");
+    pub fn from_code(code: i32) -> Option<LineType> {
+        if code < 0 {
+            return None;
+        }
         let code = if code > 0 { (code - 1) % 6 + 1 } else { 0 };
-        match code {
+        Some(match code {
             0 => LineType::BLANK,
             1 => LineType::SOLID,
             2 => LineType::DASHED,
@@ -160,7 +159,7 @@ impl LineType {
             5 => LineType::LONGDASH,
             6 => LineType::TWODASH,
             _ => unreachable!("lty code recycled to 0..=6"),
-        }
+        })
     }
 
     fn from_packed_nibbles(mut code: i32) -> LineType {
@@ -234,15 +233,17 @@ impl Default for LineType {
     }
 }
 
-impl From<i32> for LineType {
+impl TryFrom<i32> for LineType {
+    type Error = crate::error::Error;
+
     /// The line type for a numeric code, as [`LineType::from_code`] (codes
     /// above 6 recycle).
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// If `code` is negative.
-    fn from(code: i32) -> Self {
-        LineType::from_code(code)
+    /// If `code` is negative (R: "invalid line type").
+    fn try_from(code: i32) -> Result<Self, Self::Error> {
+        LineType::from_code(code).ok_or_else(|| crate::error::Error::invalid("invalid line type"))
     }
 }
 
@@ -259,8 +260,8 @@ mod tests {
 
     #[test]
     fn named_and_numeric_agree() {
-        assert_eq!(LineType::parse("dashed"), Some(LineType::from_code(2)));
-        assert_eq!(LineType::parse("2"), Some(LineType::from_code(2)));
+        assert_eq!(LineType::parse("dashed"), LineType::from_code(2));
+        assert_eq!(LineType::parse("2"), LineType::from_code(2));
     }
 
     #[test]
@@ -275,7 +276,7 @@ mod tests {
             LineType::TWODASH,
         ];
         for (code, lty) in named.into_iter().enumerate() {
-            assert_eq!(LineType::from(code as i32), lty);
+            assert_eq!(LineType::try_from(code as i32), Ok(lty));
         }
         assert_eq!(LineType::default(), LineType::SOLID);
         assert_eq!("dotdash".parse::<LineType>(), Ok(LineType::DOTDASH));
@@ -286,7 +287,7 @@ mod tests {
     #[test]
     fn hex_strings_follow_r() {
         assert_eq!(LineType::parse("42"), Some(LineType::Pattern(&[4, 2])));
-        assert_eq!(LineType::parse("44"), Some(LineType::from_code(2)));
+        assert_eq!(LineType::parse("44"), LineType::from_code(2));
         assert_eq!(
             LineType::parse("4F2A"),
             Some(LineType::Pattern(&[4, 15, 2, 10]))
@@ -304,25 +305,26 @@ mod tests {
 
     #[test]
     fn solid_has_no_dash_pattern() {
-        assert_eq!(LineType::from_code(1).dash_lengths_pt(1.0, false), None);
+        assert_eq!(LineType::SOLID.dash_lengths_pt(1.0, false), None);
     }
 
     #[test]
     fn codes_above_6_recycle_as_r() {
         // R (pdf()): lty 7 and 13 are solid, 8 dashed, 12 twodash.
-        assert_eq!(LineType::from_code(7), LineType::SOLID);
-        assert_eq!(LineType::from_code(8), LineType::DASHED);
-        assert_eq!(LineType::from_code(12), LineType::TWODASH);
-        assert_eq!(LineType::from_code(13), LineType::SOLID);
-        assert_eq!(LineType::from(8), LineType::DASHED);
+        assert_eq!(LineType::from_code(7), Some(LineType::SOLID));
+        assert_eq!(LineType::from_code(8), Some(LineType::DASHED));
+        assert_eq!(LineType::from_code(12), Some(LineType::TWODASH));
+        assert_eq!(LineType::from_code(13), Some(LineType::SOLID));
+        assert_eq!(LineType::try_from(8), Ok(LineType::DASHED));
         assert_eq!(LineType::parse("7"), Some(LineType::SOLID));
         // Hex strings are still patterns, not codes.
         assert_eq!(LineType::parse("77"), Some(LineType::Pattern(&[7, 7])));
     }
 
     #[test]
-    #[should_panic(expected = "invalid line type")]
-    fn negative_code_panics() {
-        let _ = LineType::from_code(-1);
+    fn negative_code_is_an_error() {
+        assert_eq!(LineType::from_code(-1), None);
+        let e = LineType::try_from(-1).unwrap_err();
+        assert_eq!(e.message(), "invalid line type");
     }
 }

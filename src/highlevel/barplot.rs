@@ -205,6 +205,7 @@ crate::setters::options! {
 impl Default for BarplotOptions {
     fn default() -> Self {
         BarplotOptions {
+            deferred_error: None,
             names: None,
             col: Vec::new(),
             border: None,
@@ -261,7 +262,8 @@ impl Default for BarplotOptions {
 /// row order, or sorted by size.
 ///
 /// Each segment keeps its row's colour. Setters also take R's names or a
-/// unique prefix (`.order_h("decr")`), panicking on any other string.
+/// unique prefix (`.order_h("decr")`); any other string is an error of the
+/// call.
 ///
 /// This is R's `barplot(orderH = )`.
 ///

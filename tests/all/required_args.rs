@@ -12,7 +12,7 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use rs_graphics::error::{Error, ErrorKind};
+use rs_graphics::Error;
 use rs_graphics::prelude::*;
 
 fn device() -> Device<SvgBackend> {

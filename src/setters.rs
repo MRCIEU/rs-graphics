@@ -28,11 +28,62 @@
 //! (`.xlim(0.0, 10.0)`). As in R, numbers may be integers or floats
 //! (`.cex(2)`, `.xlim(0, 10)`, `.mar([5, 4, 4, 2])`). Fields holding one of R's string-valued choices
 //! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
-//! `.order_h("decr")`); an invalid string panics, as R errors.
+//! `.order_h("decr")`).
+//!
+//! A value that can't be converted (`.lty("wavy")`, `.side(5)`,
+//! `.col("notacolour")`) doesn't panic: the setter keeps the error, and
+//! the call's `try_draw()` returns it (`.draw()` panics with it), as R
+//! errors when the function runs. On an options struct used with
+//! `.with(&opts)`, the error goes with it.
+//!
+//! ```
+//! # use rs_graphics::prelude::*;
+//! # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+//! # dev.plot().x([1, 2, 3]).draw();
+//! let e = dev.lines().x([1, 2]).y([1, 2]).lty("wavy").try_draw().unwrap_err();
+//! assert_eq!(e.call(), "lines");
+//! ```
 
 use crate::color::{Color, ColorSpec};
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
+
+/// A value a setter can take for a `T`: anything that converts to it,
+/// possibly failing (`"dashed"` for a [`LineType`], `5` for a
+/// [`Side`](crate::device::Side)).
+///
+/// Implemented for every type with `TryInto<T>` (so also `Into<T>`) whose
+/// error is an [`Error`]. A failed conversion doesn't panic in the
+/// setter: the error is kept and returned by the call's `try_draw()`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::IntoArg;
+/// # use rs_graphics::prelude::*;
+/// let lty: LineType = "dashed".into_arg().unwrap();
+/// assert_eq!(lty, LineType::DASHED);
+/// assert!(IntoArg::<LineType>::into_arg("wavy").is_err());
+/// ```
+pub trait IntoArg<T> {
+    /// The value, or why it isn't one.
+    ///
+    /// # Errors
+    ///
+    /// If the conversion fails, with R's message where R has one.
+    fn into_arg(self) -> Result<T, Error>;
+}
+
+impl<T, U> IntoArg<T> for U
+where
+    U: TryInto<T>,
+    Error: From<U::Error>,
+{
+    fn into_arg(self) -> Result<T, Error> {
+        self.try_into().map_err(Error::from)
+    }
+}
 
 /// One value or several, for a field R recycles per element.
 ///
@@ -50,43 +101,48 @@ use crate::lty::LineType;
 /// ```
 /// use rs_graphics::setters::Values;
 /// # use rs_graphics::prelude::*;
-/// let one: Vec<f64> = 2_i32.into_values();
+/// let one: Vec<f64> = 2_i32.into_values().unwrap();
 /// assert_eq!(one, [2.0]);
-/// let cols: Vec<ColorSpec> = ["red", "blue"].into_values();
-/// assert_eq!(cols[1], ColorSpec::from("blue"));
+/// let cols: Vec<ColorSpec> = ["red", "blue"].into_values().unwrap();
+/// assert_eq!(cols[1], ColorSpec::Color(Color::parse("blue").unwrap()));
 /// ```
 pub trait Values<T> {
     /// The values, in order.
-    fn into_values(self) -> Vec<T>;
+    ///
+    /// # Errors
+    ///
+    /// If a value doesn't convert (an unknown colour name, ...); see
+    /// [`IntoArg`].
+    fn into_values(self) -> Result<Vec<T>, Error>;
 }
 
-impl<T, U: Into<T>> Values<T> for Vec<U> {
-    fn into_values(self) -> Vec<T> {
-        self.into_iter().map(Into::into).collect()
+impl<T, U: IntoArg<T>> Values<T> for Vec<U> {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.into_iter().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T>, const N: usize> Values<T> for [U; N] {
-    fn into_values(self) -> Vec<T> {
-        self.into_iter().map(Into::into).collect()
+impl<T, U: IntoArg<T>, const N: usize> Values<T> for [U; N] {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.into_iter().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T> + Clone> Values<T> for &[U] {
-    fn into_values(self) -> Vec<T> {
-        self.iter().cloned().map(Into::into).collect()
+impl<T, U: IntoArg<T> + Clone> Values<T> for &[U] {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.iter().cloned().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T> + Clone, const N: usize> Values<T> for &[U; N] {
-    fn into_values(self) -> Vec<T> {
-        self.iter().cloned().map(Into::into).collect()
+impl<T, U: IntoArg<T> + Clone, const N: usize> Values<T> for &[U; N] {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.iter().cloned().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T> + Clone> Values<T> for &Vec<U> {
-    fn into_values(self) -> Vec<T> {
-        self.iter().cloned().map(Into::into).collect()
+impl<T, U: IntoArg<T> + Clone> Values<T> for &Vec<U> {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.iter().cloned().map(IntoArg::into_arg).collect()
     }
 }
 
@@ -95,8 +151,8 @@ macro_rules! single_values {
     ($t:ty: $($single:ty),*) => {
         $(
             impl Values<$t> for $single {
-                fn into_values(self) -> Vec<$t> {
-                    vec![self.into()]
+                fn into_values(self) -> Result<Vec<$t>, Error> {
+                    Ok(vec![self.into_arg()?])
                 }
             }
         )*
@@ -111,8 +167,8 @@ single_values!(LineType: LineType, &str, String, &String, i32);
 /// A character `pch`, e.g. `'.'` or `'+'`: its ASCII code, or minus its
 /// Unicode code point for other characters (`'é'` is -233), as in R.
 impl Values<i32> for char {
-    fn into_values(self) -> Vec<i32> {
-        vec![char_pch(self)]
+    fn into_values(self) -> Result<Vec<i32>, Error> {
+        Ok(vec![char_pch(self)])
     }
 }
 
@@ -134,96 +190,77 @@ impl Values<i32> for char {
 /// ```
 /// use rs_graphics::setters::NaValues;
 /// # use rs_graphics::prelude::*;
-/// let pch: Vec<Option<i32>> = [Some(19_i32), None].into_na_values();
+/// let pch: Vec<Option<i32>> = [Some(19_i32), None].into_na_values().unwrap();
 /// assert_eq!(pch, [Some(19), None]);
 /// let opts = XyOptions::default().pch([Some(19), None]);
 /// assert_eq!(opts.pch, pch);
 /// ```
 pub trait NaValues<T> {
     /// The values, in order (`None`: R's `NA`).
-    fn into_na_values(self) -> Vec<Option<T>>;
+    ///
+    /// # Errors
+    ///
+    /// If a value doesn't convert (an unknown line type, ...); see
+    /// [`IntoArg`].
+    fn into_na_values(self) -> Result<Vec<Option<T>>, Error>;
 }
 
 /// `NaValues<$t>` for each element type, one value or a collection of them,
-/// also as `Option`s.
+/// also as `Option`s. `$conv` converts one element to a `Result<$t, Error>`.
 macro_rules! na_values {
     ($t:ty: $conv:expr; $($e:ty),*) => {
         $(
             impl NaValues<$t> for $e {
-                fn into_na_values(self) -> Vec<Option<$t>> {
-                    vec![Some($conv(self))]
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    Ok(vec![Some($conv(self)?)])
                 }
             }
             impl NaValues<$t> for Option<$e> {
-                fn into_na_values(self) -> Vec<Option<$t>> {
-                    vec![self.map($conv)]
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    Ok(vec![self.map($conv).transpose()?])
                 }
             }
             na_values!(@many $t: $conv; $e);
-            na_values!(@many_opt $t: $conv; $e);
         )*
     };
     (@many $t:ty: $conv:expr; $e:ty) => {
+        na_values!(@impls $t; $e; |v: $e| $conv(v).map(Some));
+        na_values!(@impls $t; Option<$e>; |v: Option<$e>| v.map($conv).transpose());
+    };
+    (@impls $t:ty; $e:ty; $one:expr) => {
         impl<const N: usize> NaValues<$t> for [$e; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.into_iter().map($one).collect()
             }
         }
         impl NaValues<$t> for Vec<$e> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.into_iter().map($one).collect()
             }
         }
         impl NaValues<$t> for &[$e] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.iter().cloned().map($one).collect()
             }
         }
         impl<const N: usize> NaValues<$t> for &[$e; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.iter().cloned().map($one).collect()
             }
         }
         impl NaValues<$t> for &Vec<$e> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| Some($conv(v))).collect()
-            }
-        }
-    };
-    (@many_opt $t:ty: $conv:expr; $e:ty) => {
-        impl<const N: usize> NaValues<$t> for [Option<$e>; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl NaValues<$t> for Vec<Option<$e>> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl NaValues<$t> for &[Option<$e>] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl<const N: usize> NaValues<$t> for &[Option<$e>; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl NaValues<$t> for &Vec<Option<$e>> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| v.map($conv)).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.iter().cloned().map($one).collect()
             }
         }
     };
 }
 
-na_values!(f64: f64::from; f64, f32, i32, u32);
-na_values!(i32: i32::from; i32, i16, u8, u16);
-na_values!(i32: char_pch; char);
-na_values!(LineType: LineType::from; LineType, &str, String, &String, i32);
-na_values!(FontFace: FontFace::from; FontFace, i32, &str, String, &String);
+na_values!(f64: IntoArg::<f64>::into_arg; f64, f32, i32, u32);
+na_values!(i32: IntoArg::<i32>::into_arg; i32, i16, u8, u16);
+na_values!(i32: |c: char| Ok::<i32, Error>(char_pch(c)); char);
+na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
+na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
 
 /// Element `i` of a recycled [`NaValues`] vector: `Some(default)` when
 /// the vector is empty (R's default), `None` for an `NA` element.
@@ -297,6 +334,10 @@ macro_rules! options {
         $($sattr)*
         $($svis)* struct $ty {
             $( $(#[$fattr])* $fvis $field: $fty, )*
+            /// The first value a setter couldn't convert, returned by the
+            /// call's `try_draw()`.
+            #[doc(hidden)]
+            pub deferred_error: Option<$crate::error::Error>,
         }
     };
     (@opts $ty:ident {
@@ -307,6 +348,13 @@ macro_rules! options {
         #[allow(clippy::should_implement_trait)]
         impl $ty {
             $( $crate::setters::options!(@field [] [$(#[$fattr])*] $ty $field $kind $($t)?); )*
+
+            /// Keeps `e` for `try_draw()`, unless an earlier error is kept.
+            pub(crate) fn defer(&mut self, e: $crate::error::Error) {
+                if self.deferred_error.is_none() {
+                    self.deferred_error = Some(e);
+                }
+            }
         }
     };
     (@call $ty:ident $call:ident {
@@ -331,15 +379,21 @@ macro_rules! options {
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident value $t:ty) => {
         $($a)*
-        pub fn $field(mut self, value: impl Into<$t>) -> Self {
-            self$(.$p)?.$field = value.into();
+        pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
+            match value.into_arg() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option $t:ty) => {
         $($a)*
-        pub fn $field(mut self, value: impl Into<$t>) -> Self {
-            self$(.$p)?.$field = Some(value.into());
+        pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
+            match value.into_arg() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
@@ -348,25 +402,28 @@ macro_rules! options {
         #[doc = ""]
         #[doc = "Takes one value or several (see [`Values`](crate::setters::Values))."]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
-            self$(.$p)?.$field = values.into_values();
+            match values.into_values() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident count $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes any integer."]
-        #[doc = ""]
-        /// # Panics
-        /// If the value is negative.
+        #[doc = "Takes any integer; a negative one is an error of the call."]
         pub fn $field<N>(mut self, value: N) -> Self
         where
             N: TryInto<$t> + Copy + std::fmt::Display,
         {
-            let v = value.try_into().unwrap_or_else(|_| {
-                panic!(concat!("'", stringify!($field), "' must be a count, not {}"), value)
-            });
-            self$(.$p)?.$field = Some(v);
+            match value.try_into() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
+                Err(_) => self$(.$p)?.defer($crate::error::Error::invalid(format!(
+                    concat!("'", stringify!($field), "' must be a count, not {}"),
+                    value
+                ))),
+            }
             self
         }
     };
@@ -384,7 +441,10 @@ macro_rules! options {
         #[doc = ""]
         #[doc = "Takes one value or several; `None` is R's `NA` (see [`NaValues`](crate::setters::NaValues))."]
         pub fn $field(mut self, values: impl $crate::setters::NaValues<$t>) -> Self {
-            self$(.$p)?.$field = values.into_na_values();
+            match values.into_na_values() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
@@ -393,7 +453,10 @@ macro_rules! options {
         #[doc = ""]
         #[doc = "Takes one value or several (see [`Values`](crate::setters::Values))."]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
-            self$(.$p)?.$field = Some(values.into_values());
+            match values.into_values() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
@@ -458,12 +521,12 @@ mod tests {
     use super::*;
 
     fn values<T>(v: impl Values<T>) -> Vec<T> {
-        v.into_values()
+        v.into_values().unwrap()
     }
 
     #[test]
     fn one_value_or_several() {
-        let red = ColorSpec::from("red");
+        let red = ColorSpec::try_from("red").unwrap();
         assert_eq!(values::<ColorSpec>("red"), vec![red]);
         assert_eq!(values::<ColorSpec>(2), vec![ColorSpec::Index(2)]);
         assert_eq!(values::<ColorSpec>(["red", "blue"]).len(), 2);
@@ -471,7 +534,10 @@ mod tests {
         assert_eq!(values::<f64>(1.5), vec![1.5]);
         assert_eq!(values::<f64>(&[1.0, 2.0][..]), vec![1.0, 2.0]);
         assert_eq!(values::<i32>('.'), vec![46]);
-        assert_eq!(values::<LineType>([LineType::SOLID, 2.into()]).len(), 2);
+        assert_eq!(values::<LineType>([1, 2]).len(), 2);
+        // A value that doesn't convert is an error, not a panic.
+        assert!(Values::<ColorSpec>::into_values(["red", "notacolour"]).is_err());
+        assert!(Values::<LineType>::into_values(-1).is_err());
     }
 
     #[test]
@@ -482,7 +548,10 @@ mod tests {
         assert_eq!(ab.h, vec![1.0, 2.0]);
         assert_eq!(
             ab.col,
-            vec![ColorSpec::from("red"), ColorSpec::from("blue")]
+            vec![
+                ColorSpec::try_from("red").unwrap(),
+                ColorSpec::try_from("blue").unwrap()
+            ]
         );
         let xy = XyOptions::default().pch(&[1, 2]).lwd(&[Some(1.0), None]);
         assert_eq!(xy.pch, vec![Some(1), Some(2)]);
@@ -508,7 +577,10 @@ mod tests {
             .col([Some("red"), None]);
         assert_eq!(seg.lty, vec![None, Some(LineType::DASHED)]);
         assert_eq!(seg.lwd, vec![Some(2.0), None]);
-        assert_eq!(seg.col, vec![ColorSpec::from("red"), ColorSpec::None]);
+        assert_eq!(
+            seg.col,
+            vec![ColorSpec::try_from("red").unwrap(), ColorSpec::None]
+        );
         // `None` survives recycling; an empty vector gives the default.
         let v = [Some(1.0), None];
         assert_eq!(
@@ -555,7 +627,10 @@ mod tests {
         assert_eq!(xy.pch, vec![Some(46)]);
         assert_eq!(
             xy.col,
-            vec![ColorSpec::from("red"), ColorSpec::from("blue")]
+            vec![
+                ColorSpec::try_from("red").unwrap(),
+                ColorSpec::try_from("blue").unwrap()
+            ]
         );
         assert_eq!(xy.lty, Some(LineType::DASHED));
 
@@ -583,7 +658,7 @@ mod tests {
 
         let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
         assert_eq!(bars.names, Some(vec![Label::from("a"), Label::from("b")]));
-        assert_eq!(bars.col, vec![ColorSpec::from("grey")]);
+        assert_eq!(bars.col, vec![ColorSpec::try_from("grey").unwrap()]);
 
         assert_eq!(TextOptions::default().srt(45.0).srt, Some(45.0));
     }
@@ -688,14 +763,33 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "\"z\" is not a valid plot type")]
-    fn invalid_r_string_panics() {
-        let _ = crate::device::XyOptions::default().type_("z");
-    }
-
-    #[test]
-    #[should_panic(expected = "\"0x\" is not a valid line type")]
-    fn invalid_lty_string_panics() {
-        let _ = crate::device::XyOptions::default().lty("0x");
+    fn invalid_values_are_kept_not_panicked_on() {
+        use crate::device::{AxisOptions, XyOptions};
+        let xy = XyOptions::default().type_("z").lty("0x");
+        // The first error is kept; the fields keep their defaults.
+        let e = xy.deferred_error.clone().unwrap();
+        assert!(
+            e.message().starts_with("\"z\" is not a valid plot type"),
+            "{e}"
+        );
+        assert_eq!((xy.type_, xy.lty), (None, None));
+        let e = XyOptions::default().lty("0x").deferred_error.unwrap();
+        assert!(
+            e.message().starts_with("\"0x\" is not a valid line type"),
+            "{e}"
+        );
+        let e = XyOptions::default()
+            .col(["red", "notacolour"])
+            .deferred_error
+            .unwrap();
+        assert_eq!(e.message(), "invalid color name 'notacolour'");
+        let e = AxisOptions::default().font(9).deferred_error.unwrap();
+        assert!(e.message().starts_with("invalid font 9"), "{e}");
+        let e = crate::device::LegendOptions::default()
+            .ncol(-1)
+            .deferred_error
+            .unwrap();
+        assert_eq!(e.message(), "'ncol' must be a count, not -1");
+        assert!(XyOptions::default().lty("dashed").deferred_error.is_none());
     }
 }

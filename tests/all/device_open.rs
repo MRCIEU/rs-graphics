@@ -214,9 +214,17 @@ fn format_by_name_or_value() {
 }
 
 #[test]
-#[should_panic(expected = "\"jpg\" is not a valid output format")]
-fn unknown_format_name_panics() {
-    let _ = Device::format("jpg", temp("a.jpg"));
+fn unknown_format_name_fails_at_open() {
+    let path = temp("unknown_format.jpg");
+    let _ = std::fs::remove_file(&path);
+    let e = Device::format("jpg", &path).open().err().unwrap();
+    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(
+        e.to_string()
+            .starts_with("\"jpg\" is not a valid output format"),
+        "{e}"
+    );
+    assert!(!path.exists());
 }
 
 #[test]
@@ -374,7 +382,16 @@ fn units_parse_like_match_arg() {
 }
 
 #[test]
-#[should_panic(expected = "\"pt\" is not a valid units")]
-fn unknown_units_panic() {
-    let _ = Device::pdf(temp("a.pdf")).units("pt");
+fn unknown_units_and_colours_fail_at_open() {
+    let path = temp("unknown_units.pdf");
+    let _ = std::fs::remove_file(&path);
+    let e = Device::pdf(&path).units("pt").open().err().unwrap();
+    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(
+        e.to_string().starts_with("\"pt\" is not a valid units"),
+        "{e}"
+    );
+    let e = Device::pdf(&path).bg("notacolour").open().err().unwrap();
+    assert_eq!(e.to_string(), "invalid color name 'notacolour'");
+    assert!(!path.exists());
 }

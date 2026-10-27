@@ -15,7 +15,9 @@
 //! The device, the `Graphics` trait (R's graphics functions) and their
 //! options types, recorded `Figure`s, `par()`, points and rectangles in
 //! device inches, colours, line types, labels, layouts, the high-level
-//! plots' options and results, and the backends.
+//! plots' options and results, the backends, and [`ErrorKind`] (the
+//! error type itself is [`rs_graphics::Error`](crate::Error), kept out of
+//! the glob import so it doesn't clash with other `Error`s).
 
 pub use crate::backend::pdf::PdfBackend;
 pub use crate::backend::raster::RasterBackend;
@@ -28,6 +30,7 @@ pub use crate::device::{
     PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
     StrUnits, TitleOptions, Units, XyOptions,
 };
+pub use crate::error::ErrorKind;
 pub use crate::font::FontFace;
 pub use crate::geometry::{Point, Rect};
 pub use crate::graphics::Graphics;

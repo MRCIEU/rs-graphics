@@ -147,7 +147,7 @@ type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 /// A rule or a number of classes `k` gives the edges `pretty(range(x), n =
 /// k, min.n = 1)`; edges are used as given (after sorting). Setters take
 /// a rule's name (`.breaks("FD")`, see [`HistBreaks::parse`]; an unknown
-/// name panics), a number (`.breaks(20)`) or several numbers as edges
+/// name is an error of the call), a number (`.breaks(20)`) or several numbers as edges
 /// (`.breaks([0, 2, 5, 10])`; one value in an array, `Vec` or slice is a
 /// number of classes, as R's length rule).
 ///
@@ -310,7 +310,7 @@ impl<T: Num> From<&[T]> for HistBreaks {
 /// `include_lowest` (the first bin closed on the left, or with `right =
 /// false` the last closed on the right).
 ///
-/// # Panics
+/// # Errors
 /// If some values fall outside the edges (R: "some 'x' not counted; maybe
 /// 'breaks' do not span range of 'x'").
 fn bin_counts(
@@ -453,9 +453,9 @@ crate::setters::options! {
         /// the edges `pretty(range(x), n = classes, min.n = 1)`), a rule
         /// (`.breaks("FD")`, `"Scott"`, `"Sturges"`) or a function of the
         /// data ([`HistBreaks::function`]). `None`: `"Sturges"`, R's
-        /// default. Panics when drawn (or recorded) if a number of classes
-        /// isn't finite or is less than 1 (R: "invalid number of
-        /// 'breaks'"), and at the setter for an unknown rule name.
+        /// default. A number of classes that isn't finite or is less than 1
+        /// (R: "invalid number of 'breaks'") or an unknown rule name is an
+        /// error of the call.
         pub breaks: Option<HistBreaks> => option HistBreaks,
         /// Whether to plot counts (`true`) or densities (`false`:
         /// `count / (n * bin width)`). `None`: counts if the bins are equally
@@ -567,6 +567,7 @@ crate::setters::options! {
 impl Default for HistOptions {
     fn default() -> Self {
         HistOptions {
+            deferred_error: None,
             breaks: None,
             freq: None,
             xlim: None,

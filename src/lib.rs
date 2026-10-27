@@ -187,3 +187,5 @@ pub mod prelude;
 pub mod pretty;
 pub mod recording;
 pub mod setters;
+
+pub use error::{Error, ErrorKind};

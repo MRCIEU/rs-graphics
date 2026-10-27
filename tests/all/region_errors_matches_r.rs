@@ -16,7 +16,6 @@ use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::error::ErrorKind;
 use rs_graphics::prelude::*;
 
 /// One case: R code after `pdf(file, w, h)` that ends in `plot.new()`, and

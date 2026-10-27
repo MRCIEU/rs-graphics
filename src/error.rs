@@ -27,8 +27,7 @@ use std::fmt;
 /// # Examples
 ///
 /// ```
-/// # use rs_graphics::prelude::*;
-/// use rs_graphics::error::ErrorKind;
+/// use rs_graphics::prelude::*; // includes `ErrorKind`
 ///
 /// let mut dev = Device::new(SvgBackend::new(0.5, 0.5), Par::default());
 /// let err = dev.plot().x([1, 2, 3]).try_draw().unwrap_err();
@@ -126,6 +125,22 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// For conversions that can't fail (`TryFrom` from a `From` impl), so
+/// setters can take either kind ([`IntoArg`](crate::setters::IntoArg)).
+impl From<std::convert::Infallible> for Error {
+    fn from(e: std::convert::Infallible) -> Error {
+        match e {}
+    }
+}
+
+/// An integer that doesn't fit the setter's type (`.code(300)` for a
+/// `u8`), so setters for small integers take any integer literal.
+impl From<std::num::TryFromIntError> for Error {
+    fn from(e: std::num::TryFromIntError) -> Error {
+        Error::invalid(e.to_string())
+    }
+}
+
 /// An error for a string that isn't a valid value of some parameter.
 ///
 /// E.g. `"zz"` as a colour or `"x"` as an axis style (`par(xaxs)`).
@@ -189,39 +204,47 @@ macro_rules! from_str_via_parse {
 }
 pub(crate) use from_str_via_parse;
 
-/// `impl From<&str>` (and `String`, `&String`) for `$ty` via its
-/// `parse(&str) -> Option<$ty>`, so setters taking `impl Into<$ty>` accept
-/// R's strings (`.order_h("decr")`). Panics on an invalid string, naming
-/// `$kind` and the accepted values `$valid`, as R errors.
+/// `impl TryFrom<&str>` (and `String`, `&String`) for `$ty` via its
+/// `parse(&str) -> Option<$ty>`, so setters taking an
+/// [`IntoArg<$ty>`](crate::setters::IntoArg) accept R's strings
+/// (`.order_h("decr")`). An invalid string is an [`Error`] naming `$kind`
+/// and the accepted values `$valid`, as R errors.
 macro_rules! from_r_string {
     ($ty:ident, $kind:literal, $valid:literal) => {
-        impl From<&str> for $ty {
+        impl TryFrom<&str> for $ty {
+            type Error = $crate::error::Error;
+
             #[doc = concat!("Converts the string form of a [`", stringify!($ty), "`] (R's, \
                 where R has one), via [`", stringify!($ty), "::parse`].")]
             ///
-            /// # Panics
+            /// # Errors
             ///
-            #[doc = concat!("If `s` isn't one (as R errors); use [`",
-                        stringify!($ty), "::parse`] or `str::parse` to handle that yourself.")]
-            fn from(s: &str) -> Self {
-                match <$ty>::parse(s) {
-                    Some(v) => v,
-                    None => panic!(concat!("{:?} is not a valid ", $kind, "; use ", $valid), s),
-                }
+            /// If `s` isn't one (as R errors), naming the accepted values.
+            fn try_from(s: &str) -> Result<Self, Self::Error> {
+                <$ty>::parse(s).ok_or_else(|| {
+                    $crate::error::Error::invalid(format!(
+                        concat!("{:?} is not a valid ", $kind, "; use ", $valid),
+                        s
+                    ))
+                })
             }
         }
 
-        impl From<String> for $ty {
-            /// Converts as `From<&str>` does, panicking on the same strings.
-            fn from(s: String) -> Self {
-                <$ty>::from(s.as_str())
+        impl TryFrom<String> for $ty {
+            type Error = $crate::error::Error;
+
+            /// Converts as `TryFrom<&str>` does.
+            fn try_from(s: String) -> Result<Self, Self::Error> {
+                <$ty>::try_from(s.as_str())
             }
         }
 
-        impl From<&String> for $ty {
-            /// Converts as `From<&str>` does, panicking on the same strings.
-            fn from(s: &String) -> Self {
-                <$ty>::from(s.as_str())
+        impl TryFrom<&String> for $ty {
+            type Error = $crate::error::Error;
+
+            /// Converts as `TryFrom<&str>` does.
+            fn try_from(s: &String) -> Result<Self, Self::Error> {
+                <$ty>::try_from(s.as_str())
             }
         }
     };

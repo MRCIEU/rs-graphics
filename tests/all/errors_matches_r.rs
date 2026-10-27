@@ -15,7 +15,7 @@ use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::error::{Error, ErrorKind};
+use rs_graphics::Error;
 use rs_graphics::prelude::*;
 
 /// A call on a device or a `Figure`, through `try_draw()`.
@@ -98,6 +98,14 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
         }),
         ("boxplot(1:5, at = 1:2)", "boxplot", |g| {
             g.boxplot().x(1..=5).at([1, 2]).try_draw().map(drop)
+        }),
+        // Setters' values that don't convert: kept, returned by try_draw().
+        ("points(1, 1, col = 'notacolour')", "points", |g| {
+            g.points().x(1).y(1).col("notacolour").try_draw()
+        }),
+        ("axis(5)", "axis", |g| g.axis().side(5).try_draw().map(drop)),
+        ("lines(1:2, 1:2, lty = -1)", "lines", |g| {
+            g.lines().x([1, 2]).y([1, 2]).lty(-1).try_draw()
         }),
         (
             "boxplot(list(1:5, 2:6), width = c(1, -1))",
@@ -328,6 +336,74 @@ fn log_axis_with_an_invalid_axp_code_is_an_error() {
     );
     assert!(dev.axis().side(1).axp([1, 100, 3]).try_draw().is_ok());
     assert!(dev.axis().side(1).axp([1, 100, -4]).try_draw().is_ok());
+}
+
+/// A setter's value that doesn't convert is returned by `try_draw()`, also
+/// through `.with(&opts)` and on the other builders; only the first is
+/// kept, and the call isn't drawn.
+#[test]
+fn setter_errors_are_deferred_to_the_call() {
+    let mut dev = device();
+    let e = dev
+        .lines()
+        .x([1, 2])
+        .y([1, 2])
+        .type_("z")
+        .col("notacolour")
+        .try_draw()
+        .unwrap_err();
+    assert!(
+        e.message().starts_with("\"z\" is not a valid plot type"),
+        "{e}"
+    );
+
+    let opts = AxisOptions::default().font("heavy");
+    let e = dev.axis().side(1).with(&opts).try_draw().unwrap_err();
+    assert_eq!(e.call(), "axis");
+    // `with` replaces the options, and with them errors set before it.
+    let call = dev.axis().lwd(2).font(9).with(&AxisOptions::default());
+    assert!(call.side(1).try_draw().is_ok());
+
+    let e = dev
+        .legend()
+        .pos("middle")
+        .labels("a")
+        .try_draw()
+        .unwrap_err();
+    assert_eq!(e.call(), "legend");
+    let e = dev.par().lty("wavy").try_draw().unwrap_err();
+    assert_eq!(e.call(), "par");
+    let e = dev.strwidth().s("a").units("feet").try_get().unwrap_err();
+    assert_eq!(e.call(), "strwidth");
+
+    // In a figure, the error is the recording call's.
+    let mut fig = Figure::new();
+    let e = fig.mtext().text("a").side(7).try_draw().unwrap_err();
+    assert_eq!(e.to_string(), "mtext(): invalid axis number 7");
+}
+
+/// A setter's error means nothing is drawn: the output is as without the
+/// call.
+#[test]
+fn a_call_with_a_setter_error_draws_nothing() {
+    let mut with = device();
+    assert!(
+        with.points()
+            .x(5)
+            .y(5)
+            .pch('x')
+            .col("nocolour")
+            .try_draw()
+            .is_err()
+    );
+    assert_eq!(with.finish(), device().finish());
+}
+
+/// `ax_ticks()` is a query, not a call, so a bad side panics.
+#[test]
+#[should_panic(expected = "axTicks(): invalid axis number 5")]
+fn ax_ticks_panics_on_a_bad_side() {
+    let _ = device().ax_ticks(5);
 }
 
 /// A negative palette number as a device's `bg` fails at `open()`, before

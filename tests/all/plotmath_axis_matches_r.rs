@@ -513,7 +513,9 @@ fn plotmath_title_mtext_text_legend_match_r() {
     let labels = ["alpha", "beta^2", "x[i]^(y^2)"].map(Label::math);
     let opts = LegendOptions {
         col: vec![black],
-        lty: (1..=3).map(|c| Some(LineType::from_code(c))).collect(),
+        lty: (1..=3)
+            .map(|c| Some(LineType::from_code(c).unwrap()))
+            .collect(),
         lwd: vec![Some(1.0)],
         title: Some(Label::math("Sigma[j]")),
         ..LegendOptions::default()

@@ -13,9 +13,11 @@
 //!
 //! Each method starts a call for one R function; the call's chainable
 //! setters take all of R's arguments, named as in R (data too: `.x(&x)`),
-//! and `.draw()` runs it. An argument R requires (one without a default)
-//! that is left out panics at `.draw()` with R's message (`argument "x" is
-//! missing, with no default`), also when a `Figure` records the call. As in R, numbers may be integers or floats: data
+//! and `.draw()` runs it. Where R would stop with an error (an argument R
+//! requires left out, `argument "x" is missing, with no default`; a value
+//! a setter can't convert, such as `.lty("wavy")`; data or regions that
+//! don't work), `.try_draw()` returns it and `.draw()` panics with it,
+//! also when a `Figure` records the call. As in R, numbers may be integers or floats: data
 //! vectors are any [`Numbers`], by reference or by value (`&x`, `x`,
 //! `[1, 2, 3]`, `1..=10` for R's `1:10`, or one number, `1`, as R's
 //! length-one vector; `f64` data isn't copied, whether
@@ -70,6 +72,7 @@ use crate::highlevel::{
 use crate::numbers::{Groups, Numbers};
 use crate::par::ParOptions;
 use crate::plotmath::{Label, Labels};
+use crate::setters::IntoArg;
 
 pub(crate) mod sealed {
     pub trait Sealed {}
@@ -650,15 +653,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// dev.abline().h(at).col("grey").lty("dotted").draw();
     /// ```
     ///
-    /// # Panics
-    ///
-    /// In the setter, if `side` is a number other than 1 to 4.
-    ///
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `side` is missing, `labels` is given without `at` or their lengths
-    /// differ, or a log axis's `axp` code isn't 1, 2 or 3.
+    /// `side` is missing or not 1 to 4, `labels` is given without `at` or
+    /// their lengths differ, or a log axis's `axp` code isn't 1, 2 or 3.
     fn axis(&mut self) -> AxisCall<'_, Self> {
         AxisCall::start(self)
     }
@@ -719,15 +718,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// dev.legend().pos((5, 8)).labels("fit").lty(2).lwd(2).draw();
     /// ```
     ///
-    /// # Panics
-    ///
-    /// In the setter, if `pos` is a string that isn't one of the nine keywords
-    /// (or a unique prefix of one).
-    ///
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `pos`
-    /// or `labels` is missing, there are no labels ("'legend' is of length
+    /// or `labels` is missing, `pos` is a string that isn't one of the nine
+    /// keywords (or a unique prefix of one), there are no labels ("'legend' is of length
     /// 0"), or a `text_width` is negative or has `NaN` among several values.
     fn legend(&mut self) -> LegendCall<'_, Self> {
         LegendCall::start(self)
@@ -754,14 +749,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// dev.mtext().text("Right margin").side(4).line(1).draw();
     /// ```
     ///
-    /// # Panics
-    ///
-    /// In the setter, if `side` is a number other than 1 to 4.
-    ///
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `text` is missing or empty.
+    /// `text` is missing or empty, or `side` isn't 1 to 4.
     fn mtext(&mut self) -> MtextCall<'_, Self> {
         MtextCall::start(self)
     }
@@ -1142,6 +1133,17 @@ pub(crate) fn required<T>(value: Option<T>, name: &str) -> Result<T, Error> {
 /// defaults, or [`required`]) and calls the target's `emit_*` method.
 macro_rules! call {
     (@setter [$(#[$doc:meta])*] $field:ident (manual)) => {};
+    // A conversion that can fail: the error is kept for `try_draw()`.
+    (@setter [$(#[$doc:meta])*] $field:ident (fallible $aty:ty => $conv:expr)) => {
+        $(#[$doc])*
+        pub fn $field(mut self, value: $aty) -> Self {
+            match ($conv)(value) {
+                Ok(v) => self.$field = Some(v),
+                Err(e) => self.opts.defer(e),
+            }
+            self
+        }
+    };
     (@setter [$(#[$doc:meta])*] $field:ident ($aty:ty => $conv:expr)) => {
         $(#[$doc])*
         pub fn $field(mut self, value: $aty) -> Self {
@@ -1198,11 +1200,16 @@ macro_rules! call {
             /// # Errors
             ///
             /// Every R error the call can raise: a missing required argument,
-            /// an invalid value, data that can't be drawn as given, or regions
-            /// that don't fit the page (see [`Error`](crate::error::Error)). An
-            /// error found while drawing (such as a negative colour number)
-            /// may come after part of the output was drawn, as in R.
-            pub fn try_draw(self) -> Result<$ret, crate::error::Error> {
+            /// an invalid value (also one a setter couldn't convert, such as
+            /// `.lty("wavy")`; the first such is returned), data that can't
+            /// be drawn as given, or regions that don't fit the page (see
+            /// [`Error`](crate::error::Error)). An error found while drawing
+            /// (such as a negative colour number) may come after part of the
+            /// output was drawn, as in R.
+            pub fn try_draw(mut self) -> Result<$ret, crate::error::Error> {
+                if let Some(e) = self.opts.deferred_error.take() {
+                    return Err(e.in_call($rname));
+                }
                 #[allow(unused_variables)]
                 let $name { target: $t, $($field,)* $($($sfield,)*)? opts: $o } = self;
                 // A closure, so that `?` in the body ends the body only.
@@ -1536,8 +1543,9 @@ call!(
     AxisCall("axis"), AxisOptions => G::AxisResult,
     args {
         /// The side to draw on: a [`Side`], or its number (1 below, 2 left,
-        /// 3 above, 4 right). Required. Panics if the number isn't 1 to 4.
-        side: Side = (impl Into<Side> => Into::into),
+        /// 3 above, 4 right). Required. Another number is an error of the
+        /// call.
+        side: Side = (fallible impl IntoArg<Side> => IntoArg::into_arg),
     },
     |t, o| { t.emit_axis(required(side, "side")?, o) }
 );
@@ -1567,9 +1575,10 @@ call!(
     args {
         /// Where the legend goes: a keyword such as `"topright"`, a point
         /// `(x, y)` for its top-left corner, or two corners `((xa, xb), (ya,
-        /// yb))` (see [`LegendPos`]). Required. Panics if a string isn't one
-        /// of the nine keywords (or a unique prefix of one). R's `x` and `y`.
-        pos: LegendPos = (impl Into<LegendPos> => Into::into),
+        /// yb))` (see [`LegendPos`]). Required. A string that isn't one of
+        /// the nine keywords (or a unique prefix of one) is an error of the
+        /// call. R's `x` and `y`.
+        pos: LegendPos = (fallible impl IntoArg<LegendPos> => IntoArg::into_arg),
         /// The keys' labels: text or plotmath expressions, one or several
         /// (see [`Labels`]); a `None` element (R's `NA`) keeps its key but
         /// has no text and takes no room. Required. R's `legend`.
@@ -1593,9 +1602,9 @@ call!(
         /// (R's `NA`) is skipped. Required.
         text: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
         /// The margin to write in: a [`Side`], or its number (1 below, 2
-        /// left, 3 above, 4 right). Default: 3, the top. Panics if the
-        /// number isn't 1 to 4.
-        side: Side = (impl Into<Side> => Into::into),
+        /// left, 3 above, 4 right). Default: 3, the top. Another number is
+        /// an error of the call.
+        side: Side = (fallible impl IntoArg<Side> => IntoArg::into_arg),
     },
     |t, o| { t.emit_mtext(required(text, "text")?, side.unwrap_or(Side::Top), o) }
 );
@@ -1781,7 +1790,8 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// # Errors
     ///
-    /// From `.try_draw()` (`.draw()` panics with it), unless `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1`.
+    /// `.try_draw()` returns R's error, and `.draw()` panics with it, unless
+    /// `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1`.
     pub fn fig(mut self, fig: [impl Into<f64>; 4]) -> Self {
         self.page.fig = Some(fig.map(Into::into));
         self
@@ -1803,7 +1813,8 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// # Errors
     ///
-    /// From `.try_draw()` (`.draw()` panics with it), unless both sizes are positive.
+    /// `.try_draw()` returns R's error, and `.draw()` panics with it, unless
+    /// both sizes are positive.
     pub fn fin(mut self, fin: [impl Into<f64>; 2]) -> Self {
         self.page.fin = Some(fin.map(Into::into));
         self

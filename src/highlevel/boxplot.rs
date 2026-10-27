@@ -374,6 +374,7 @@ crate::setters::options! {
 impl Default for BoxplotOptions {
     fn default() -> Self {
         BoxplotOptions {
+            deferred_error: None,
             names: None,
             col: Vec::new(),
             border: Vec::new(),

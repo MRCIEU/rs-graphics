@@ -36,7 +36,7 @@ use super::{InlineAxis, data_range};
 /// Lines (all but `"p"` and `"n"`) take the first `col`, `lwd` and `lty`,
 /// except `"h"`, whose lines recycle `col`. Lines break at `NA`s (and at
 /// values <= 0 on a log axis). Setters also take R's letters
-/// (`.type_("b")`), panicking on any other string.
+/// (`.type_("b")`); any other string is an error of the call.
 ///
 /// This is R's `type` argument.
 ///
@@ -271,6 +271,7 @@ crate::setters::options! {
 impl Default for PlotOptions {
     fn default() -> Self {
         PlotOptions {
+            deferred_error: None,
             type_: None,
             pch: Vec::new(),
             col: Vec::new(),
@@ -350,6 +351,7 @@ impl<B: Backend> Device<B> {
         self.plot_new_impl()?;
         // `localWindow(xlim, ylim, log, asp, ...)`.
         let window = PlotWindowOptions {
+            deferred_error: None,
             xlog: opts.xlog,
             ylog: opts.ylog,
             asp: opts.asp,

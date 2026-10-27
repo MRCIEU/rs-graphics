@@ -64,7 +64,7 @@ fn draw_ours(start: f64, ps: f64) -> String {
         .labels(["a", "bb"])
         .col(black)
         .pch(1)
-        .lty(LineType::from_code(1))
+        .lty(LineType::from_code(1).unwrap())
         .draw();
     String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
 }

@@ -83,38 +83,43 @@ impl From<LegendKeyword> for LegendPos {
     }
 }
 
-impl From<&str> for LegendPos {
+impl TryFrom<&str> for LegendPos {
+    type Error = crate::error::Error;
+
     /// One of R's keywords, matched like R's `match.arg()`
     /// ([`LegendKeyword::parse`]: the full name, or a unique prefix such
     /// as `"topr"`).
     ///
-    /// # Panics
-    /// If `s` is not a keyword or is an ambiguous prefix (R errors too);
-    /// use [`LegendKeyword::parse`] or `str::parse` to handle that
-    /// yourself.
-    fn from(s: &str) -> Self {
+    /// # Errors
+    ///
+    /// If `s` is not a keyword or is an ambiguous prefix (R errors too).
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         match LegendKeyword::parse(s) {
-            Some(k) => LegendPos::Keyword(k),
-            None => panic!(
-                "legend: {s:?} is not a legend position; use one of \
+            Some(k) => Ok(LegendPos::Keyword(k)),
+            None => Err(crate::error::Error::invalid(format!(
+                "{s:?} is not a legend position; use one of \
                  \"bottomright\", \"bottom\", \"bottomleft\", \"left\", \
                  \"topleft\", \"top\", \"topright\", \"right\" or \"center\""
-            ),
+            ))),
         }
     }
 }
 
-impl From<String> for LegendPos {
-    /// As `From<&str>`.
-    fn from(s: String) -> Self {
-        LegendPos::from(s.as_str())
+impl TryFrom<String> for LegendPos {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        LegendPos::try_from(s.as_str())
     }
 }
 
-impl From<&String> for LegendPos {
-    /// As `From<&str>`.
-    fn from(s: &String) -> Self {
-        LegendPos::from(s.as_str())
+impl TryFrom<&String> for LegendPos {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: &String) -> Result<Self, Self::Error> {
+        LegendPos::try_from(s.as_str())
     }
 }
 
@@ -1026,17 +1031,12 @@ mod tests {
     #[test]
     fn positions_convert_like_r() {
         let p = |p: LegendPos| p;
+        let s = |s: &str| LegendPos::try_from(s).unwrap();
+        assert_eq!(s("topright"), LegendPos::Keyword(LegendKeyword::TopRight));
+        assert_eq!(s("topr"), LegendPos::Keyword(LegendKeyword::TopRight));
         assert_eq!(
-            p("topright".into()),
-            LegendPos::Keyword(LegendKeyword::TopRight)
-        );
-        assert_eq!(
-            p("topr".into()),
-            LegendPos::Keyword(LegendKeyword::TopRight)
-        );
-        assert_eq!(
-            p(String::from("center").into()),
-            LegendPos::Keyword(LegendKeyword::Center)
+            LegendPos::try_from(String::from("center")),
+            Ok(LegendPos::Keyword(LegendKeyword::Center))
         );
         assert_eq!(
             p(LegendKeyword::Left.into()),
@@ -1050,15 +1050,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "\"middle\" is not a legend position")]
-    fn unknown_keyword_panics() {
-        let _ = LegendPos::from("middle");
-    }
-
-    #[test]
-    #[should_panic(expected = "\"to\" is not a legend position")]
-    fn ambiguous_prefix_panics() {
-        let _ = LegendPos::from("to");
+    fn unknown_or_ambiguous_keywords_are_errors() {
+        for s in ["middle", "to"] {
+            let e = LegendPos::try_from(s).unwrap_err();
+            assert!(
+                e.message()
+                    .starts_with(&format!("{s:?} is not a legend position")),
+                "{e}"
+            );
+        }
     }
 
     #[test]

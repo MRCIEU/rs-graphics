@@ -203,10 +203,10 @@ fn breaks_rules_and_functions_match_r() {
     ties.extend([1.0, 9.0, 10.0]);
     let skewed = [-5.0, -3.0, -1.0, 0.0, 1.0, 2.0, 4.0, 8.0, 10.0, 12.0, 15.0];
     let rules: [(&str, HistBreaks); 4] = [
-        ("'Scott'", "Scott".into()),
-        ("'FD'", "FD".into()),
-        ("'fd'", "fd".into()),
-        ("'freedman'", "freedman".into()),
+        ("'Scott'", HistBreaks::try_from("Scott").unwrap()),
+        ("'FD'", HistBreaks::try_from("FD").unwrap()),
+        ("'fd'", HistBreaks::try_from("fd").unwrap()),
+        ("'freedman'", HistBreaks::try_from("freedman").unwrap()),
     ];
     for data in [&spread[..], &ties[..], &skewed[..]] {
         for (r_breaks, breaks) in &rules {
@@ -268,9 +268,12 @@ fn breaks_rules_and_functions_match_r() {
 }
 
 #[test]
-#[should_panic(expected = "is not a valid histogram breaks rule")]
-fn unknown_breaks_rule_panics() {
-    let _ = HistBreaks::from("f");
+fn unknown_breaks_rule_is_an_error() {
+    let e = HistBreaks::try_from("f").unwrap_err();
+    assert!(
+        e.message().contains("is not a valid histogram breaks rule"),
+        "{e}"
+    );
 }
 
 /// `right`, `include.lowest` and `fuzz` with integer data on the edges.

@@ -22,6 +22,7 @@ use crate::backend::svg::SvgBackend;
 use crate::backend::{AnyBackend, Format};
 use crate::color::{Color, ColorSpec};
 use crate::par::Par;
+use crate::setters::IntoArg;
 
 crate::setters::options! {
     /// The options of a device being opened for a file.
@@ -114,10 +115,18 @@ impl DeviceBuilder {
     /// If the file can't be created (the error names the file); if `file` has
     /// any other `%`, or more than one page-number format, an
     /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid 'file'
-    /// argument"); for [`units`](DeviceBuilder::units) of pixels on a PDF
-    /// or SVG device, or a negative palette number as `bg`, an `InvalidInput`
-    /// error, before the file is created.
+    /// argument"); for a format name that names no format, a setter's value
+    /// that isn't one (`.bg("notacolour")`, `.units("ft")`),
+    /// [`units`](DeviceBuilder::units) of pixels on a PDF or SVG device, or a
+    /// negative palette number as `bg`, an `InvalidInput` error, before the
+    /// file is created.
     pub fn open(self) -> std::io::Result<Device<AnyBackend>> {
+        if let Some(e) = &self.deferred_error {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                e.to_string(),
+            ));
+        }
         let units = self.units.unwrap_or(Units::In);
         if units == Units::Px && self.format != Format::Png {
             return Err(std::io::Error::new(
@@ -476,13 +485,16 @@ impl Device<AnyBackend> {
     /// # }
     /// ```
     ///
-    /// # Panics
-    ///
-    /// If `format` is a string that names no format; use [`Format::parse`] or
-    /// `str::parse` to handle that yourself.
-    pub fn format(format: impl Into<Format>, file: impl AsRef<Path>) -> DeviceBuilder {
+    /// A `format` string that names no format is an error of
+    /// [`open`](DeviceBuilder::open).
+    pub fn format(format: impl IntoArg<Format>, file: impl AsRef<Path>) -> DeviceBuilder {
+        let (format, deferred_error) = match format.into_arg() {
+            Ok(f) => (f, None),
+            Err(e) => (Format::Pdf, Some(e)),
+        };
         DeviceBuilder {
-            format: format.into(),
+            deferred_error,
+            format,
             file: file.as_ref().to_path_buf(),
             width: None,
             height: None,

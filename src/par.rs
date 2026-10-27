@@ -419,8 +419,8 @@ macro_rules! par_options {
                 /// tick settings (`xaxp`/`yaxp`) are worked out again from them.
                 /// Applied after the other fields and `xlog`/`ylog` in the same
                 /// call, so a `usr` given with them is in their units, uses a new
-                /// `lab`, and replaces an `xaxp`/`yaxp` given there. Panics at
-                /// `.draw()` if a value is `NaN`, `x0 == x1` or `y0 == y1` (R's
+                /// `lab`, and replaces an `xaxp`/`yaxp` given there. A value
+                /// `NaN`, `x0 == x1` or `y0 == y1` is an error of the call (R's
                 /// "invalid value specified for graphical parameter \"usr\"").
                 pub usr: Option<[f64; 4]> => array [f64; 4],
                 /// Makes the x axis logarithmic, or linear again: from now on, x

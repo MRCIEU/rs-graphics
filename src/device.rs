@@ -38,6 +38,7 @@ use std::ops::{Deref, DerefMut};
 use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::error::Error;
+use crate::setters::IntoArg;
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout, LayoutRespect, LayoutSize};
 use crate::lty::LineType;
@@ -70,9 +71,9 @@ pub use primitives::{
 
 /// A side of the plot, figure or page.
 ///
-/// Functions take `impl Into<Side>`, so R's side numbers work too: `1`
-/// bottom, `2` left, `3` top, `4` right (`.side(1)` is
-/// `.side(Side::Bottom)`).
+/// Setters also take R's side numbers (`TryFrom<i32>`): `1` bottom, `2`
+/// left, `3` top, `4` right (`.side(1)` is `.side(Side::Bottom)`); any
+/// other number is an error of the call ("invalid axis number").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     Bottom = 1,
@@ -96,18 +97,21 @@ impl Side {
     }
 }
 
-impl From<i32> for Side {
+impl TryFrom<i32> for Side {
+    type Error = crate::error::Error;
+
     /// R's side numbers.
     ///
-    /// # Panics
+    /// # Errors
+    ///
     /// If `n` isn't 1 to 4 (R: "invalid axis number").
-    fn from(n: i32) -> Side {
+    fn try_from(n: i32) -> Result<Side, Self::Error> {
         match n {
-            1 => Side::Bottom,
-            2 => Side::Left,
-            3 => Side::Top,
-            4 => Side::Right,
-            _ => panic!("invalid side {n}: must be 1 (bottom), 2 (left), 3 (top) or 4 (right)"),
+            1 => Ok(Side::Bottom),
+            2 => Ok(Side::Left),
+            3 => Ok(Side::Top),
+            4 => Ok(Side::Right),
+            _ => Err(crate::error::Error::invalid(format!("invalid axis number {n}"))),
         }
     }
 }
@@ -203,6 +207,8 @@ pub struct LayoutCall<'a, B: Backend> {
     widths: Vec<LayoutSize>,
     heights: Vec<LayoutSize>,
     respect: LayoutRespect,
+    /// The first value a setter couldn't convert.
+    error: Option<Error>,
 }
 
 impl<B: Backend> LayoutCall<'_, B> {
@@ -225,14 +231,24 @@ impl<B: Backend> LayoutCall<'_, B> {
     /// `lcm()`). A shorter list is padded with relative `1`s; extra
     /// entries are ignored. Default: equal relative widths.
     pub fn widths(mut self, widths: impl crate::setters::Values<LayoutSize>) -> Self {
-        self.widths = widths.into_values();
+        match widths.into_values() {
+            Ok(v) => self.widths = v,
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
         self
     }
 
     /// Row heights; as [`widths`](LayoutCall::widths). Default: equal
     /// relative heights.
     pub fn heights(mut self, heights: impl crate::setters::Values<LayoutSize>) -> Self {
-        self.heights = heights.into_values();
+        match heights.into_values() {
+            Ok(v) => self.heights = v,
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
         self
     }
 
@@ -267,6 +283,9 @@ impl<B: Backend> LayoutCall<'_, B> {
     /// and, unlike R (which accepts them), if `mat` has a negative or
     /// non-finite value. The device is unchanged after an error.
     pub fn try_draw(self) -> Result<usize, Error> {
+        if let Some(e) = self.error {
+            return Err(e.in_call("layout"));
+        }
         let fail = |m: String| Error::invalid(m).in_call("layout");
         let mat = crate::graphics::required(self.mat, "mat").map_err(|e| e.in_call("layout"))?;
         let mut rows: Vec<Vec<usize>> = Vec::with_capacity(mat.len());
@@ -306,7 +325,7 @@ impl<B: Backend> LayoutCall<'_, B> {
 /// [`strheight`](Device::strheight) measure in.
 ///
 /// Setters take R's strings (`"user"`, `"inches"`, `"figure"`, or a
-/// unique prefix), panicking on any other.
+/// unique prefix); any other is an error of the call.
 ///
 /// This is R's `strwidth(units = )`.
 ///
@@ -375,6 +394,8 @@ pub struct StrSizeCall<'a, B: Backend> {
     cex: Option<f64>,
     font: Option<FontFace>,
     units: StrUnits,
+    /// The first value a setter couldn't convert.
+    error: Option<Error>,
 }
 
 impl<'a, B: Backend> StrSizeCall<'a, B> {
@@ -386,6 +407,7 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
             cex: None,
             font: None,
             units: StrUnits::User,
+            error: None,
         }
     }
 
@@ -404,15 +426,25 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
 
     /// Font face of text ([`FontFace`]; R's number, a name or the enum).
     /// `None`: `par(font)`. Expressions use their own fonts.
-    pub fn font(mut self, font: impl Into<FontFace>) -> Self {
-        self.font = Some(font.into());
+    pub fn font(mut self, font: impl IntoArg<FontFace>) -> Self {
+        match font.into_arg() {
+            Ok(f) => self.font = Some(f),
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
         self
     }
 
     /// The units of the result: data units (the default), inches, or
     /// fractions of the figure region (see [`StrUnits`]).
-    pub fn units(mut self, units: impl Into<StrUnits>) -> Self {
-        self.units = units.into();
+    pub fn units(mut self, units: impl IntoArg<StrUnits>) -> Self {
+        match units.into_arg() {
+            Ok(u) => self.units = u,
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
         self
     }
 
@@ -420,8 +452,9 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
     ///
     /// # Panics
     ///
-    /// If `s` wasn't set, as [`try_get`](StrSizeCall::try_get) would
-    /// return it (`strwidth(): argument "s" is missing, with no default`).
+    /// If `s` wasn't set or a setter's value was invalid, as
+    /// [`try_get`](StrSizeCall::try_get) would return it
+    /// (`strwidth(): argument "s" is missing, with no default`).
     pub fn get(self) -> f64 {
         self.try_get().unwrap_or_else(|e| panic!("{e}"))
     }
@@ -431,9 +464,13 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
     ///
     /// # Errors
     ///
-    /// If `s` wasn't set (`argument "s" is missing, with no default`).
+    /// If `s` wasn't set (`argument "s" is missing, with no default`), or
+    /// `font` or `units` was given a value that isn't one.
     pub fn try_get(self) -> Result<f64, Error> {
         let call = if self.height { "strheight" } else { "strwidth" };
+        if let Some(e) = self.error {
+            return Err(e.in_call(call));
+        }
         let label = crate::graphics::required(self.s, "s").map_err(|e| e.in_call(call))?;
         let cex = self.cex.unwrap_or(1.0);
         let dev = self.dev;
@@ -951,6 +988,7 @@ impl<B: Backend> Device<B> {
             widths: Vec::new(),
             heights: Vec::new(),
             respect: LayoutRespect::No,
+            error: None,
         }
     }
 
@@ -1279,8 +1317,12 @@ impl<B: Backend> Device<B> {
     /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
     /// assert_eq!(dev.ax_ticks(1), [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
     /// ```
-    pub fn ax_ticks(&self, side: impl Into<Side>) -> Vec<f64> {
-        let side = side.into();
+    ///
+    /// # Panics
+    ///
+    /// If `side` isn't 1 to 4 (R: "invalid axis number").
+    pub fn ax_ticks(&self, side: impl IntoArg<Side>) -> Vec<f64> {
+        let side = side.into_arg().unwrap_or_else(|e| panic!("axTicks(): {}", e.message()));
         let axp = if side.is_horizontal() {
             self.par.xaxp
         } else {
@@ -2341,13 +2383,13 @@ mod tests {
                 "{x}, {y}"
             );
         }
-        assert_eq!(Side::from(3), Side::Top);
+        assert_eq!(Side::try_from(3), Ok(Side::Top));
         assert_eq!(Side::Right.number(), 4);
     }
 
     #[test]
-    #[should_panic(expected = "invalid side 5")]
-    fn side_numbers_outside_1_to_4_panic() {
-        let _ = super::Side::from(5);
+    fn side_numbers_outside_1_to_4_are_errors() {
+        let e = super::Side::try_from(5).unwrap_err();
+        assert_eq!(e.message(), "invalid axis number 5");
     }
 }

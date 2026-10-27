@@ -97,6 +97,7 @@ crate::setters::options! {
 impl Default for PieOptions {
     fn default() -> Self {
         PieOptions {
+            deferred_error: None,
             labels: None,
             srt: None,
             cex: None,

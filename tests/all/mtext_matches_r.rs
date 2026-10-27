@@ -165,10 +165,11 @@ fn mtext_placement_matches_r() {
                 font: c
                     .font
                     .into_iter()
-                    .map(|f| Some(FontFace::from(f)))
+                    .map(|f| Some(FontFace::try_from(f).unwrap()))
                     .collect(),
                 las: Some(c.las),
                 xpd: None,
+                ..MtextOptions::default()
             })
             .draw();
     }

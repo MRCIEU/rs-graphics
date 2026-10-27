@@ -26,8 +26,8 @@
 
 /// A font face: plain, bold, italic, bold italic or the Symbol font.
 ///
-/// Convert from a number 1 to 5 ([`FontFace::from_code`], `From<i32>`) or
-/// a name ([`FontFace::parse`], `From<&str>`): grid's `fontface` names
+/// Convert from a number 1 to 5 ([`FontFace::from_code`], `TryFrom<i32>`)
+/// or a name ([`FontFace::parse`], `TryFrom<&str>`): grid's `fontface` names
 /// (`"plain"`, `"bold"`, `"italic"`, `"bold.italic"`), plus `"symbol"`.
 /// The default is [`FontFace::Plain`].
 ///
@@ -41,8 +41,8 @@
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// assert_eq!(FontFace::from(2), FontFace::Bold);
-/// assert_eq!(FontFace::from("bold.italic").code(), 4);
+/// assert_eq!(FontFace::try_from(2), Ok(FontFace::Bold));
+/// assert_eq!(FontFace::try_from("bold.italic").unwrap().code(), 4);
 /// assert_eq!(FontFace::default(), FontFace::Plain);
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -130,15 +130,20 @@ impl FontFace {
     }
 }
 
-impl From<i32> for FontFace {
+impl TryFrom<i32> for FontFace {
+    type Error = crate::error::Error;
+
     /// The face for a font number 1 to 5, as [`FontFace::from_code`].
     ///
-    /// # Panics
+    /// # Errors
     ///
     /// If `code` isn't 1 to 5 (R errors on an invalid `par(font)`).
-    fn from(code: i32) -> Self {
-        FontFace::from_code(code)
-            .unwrap_or_else(|| panic!("invalid font {code}: R's fonts are 1 (plain) to 5 (symbol)"))
+    fn try_from(code: i32) -> Result<Self, Self::Error> {
+        FontFace::from_code(code).ok_or_else(|| {
+            crate::error::Error::invalid(format!(
+                "invalid font {code}: R's fonts are 1 (plain) to 5 (symbol)"
+            ))
+        })
     }
 }
 
@@ -156,10 +161,10 @@ mod tests {
     #[test]
     fn faces_convert_like_r() {
         for code in 1..=5 {
-            assert_eq!(FontFace::from(code).code(), code);
+            assert_eq!(FontFace::try_from(code).unwrap().code(), code);
         }
         assert_eq!(FontFace::default(), FontFace::Plain);
-        assert_eq!(FontFace::from("bold.italic"), FontFace::BoldItalic);
+        assert_eq!(FontFace::try_from("bold.italic"), Ok(FontFace::BoldItalic));
         assert_eq!(FontFace::parse("3"), Some(FontFace::Italic));
         assert_eq!("symbol".parse::<FontFace>().ok(), Some(FontFace::Symbol));
         assert_eq!(FontFace::parse("heavy"), None);
@@ -167,14 +172,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "invalid font 7")]
-    fn invalid_numbers_panic() {
-        let _ = FontFace::from(7);
-    }
-
-    #[test]
-    #[should_panic(expected = "\"heavy\" is not a valid font")]
-    fn invalid_names_panic() {
-        let _ = FontFace::from("heavy");
+    fn invalid_numbers_and_names_are_errors() {
+        let e = FontFace::try_from(7).unwrap_err();
+        assert!(e.message().starts_with("invalid font 7"), "{e}");
+        let e = FontFace::try_from("heavy").unwrap_err();
+        assert!(
+            e.message().starts_with("\"heavy\" is not a valid font"),
+            "{e}"
+        );
     }
 }

@@ -136,6 +136,7 @@ crate::setters::options! {
 impl Default for AxisOptions {
     fn default() -> Self {
         AxisOptions {
+            deferred_error: None,
             at: None,
             labels: None,
             draw_labels: true,
@@ -183,11 +184,11 @@ impl<B: Backend> Device<B> {
     /// describe it.
     pub(crate) fn axis_impl(
         &mut self,
-        side: impl Into<Side>,
+        side: impl crate::setters::IntoArg<Side>,
         opts: &AxisOptions,
     ) -> Result<Vec<f64>, Error> {
         check_axis(opts)?;
-        let side = side.into();
+        let side = side.into_arg()?;
         if opts.at.is_none() {
             self.check_axis_axp(side, opts.axp)?;
         }

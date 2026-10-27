@@ -136,7 +136,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
         .xlab("x")
         .ylab("y");
     dev.plot().x(&x).y(&y).with(&opts).draw();
-    let grey = ColorSpec::from("grey");
+    let grey = ColorSpec::try_from("grey").unwrap();
     dev.abline()
         .h(1000.0)
         .v(10.0)
