@@ -15,7 +15,7 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
+//! # let mut dev = Device::null().width(5.0).height(5.0).open().unwrap();
 //! dev.plot_new();
 //! dev.text().x(&[0.5]).y(&[0.5]).labels("a").font(2).draw(); // R's number
 //! dev.text().x(&[0.5]).y(&[0.4]).labels("b").font("bold").draw();

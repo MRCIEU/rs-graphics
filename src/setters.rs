@@ -38,7 +38,7 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+//! # let mut dev = Device::null().open().unwrap();
 //! # dev.plot().x([1, 2, 3]).draw();
 //! let e = dev.lines().x([1, 2]).y([1, 2]).lty("wavy").try_draw().unwrap_err();
 //! assert_eq!(e.call(), "lines");

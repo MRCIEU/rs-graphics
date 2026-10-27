@@ -272,7 +272,7 @@ impl Default for BarplotOptions {
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let columns = vec![vec![1, 4, 2], vec![3, 1, 5]];
 /// dev.barplot().height(&columns).order_h(OrderH::Decr).draw();
 /// dev.barplot().height(&columns).order_h("incr").draw();
@@ -342,7 +342,7 @@ from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 /// // Two columns (stacks) of three rows (series) each.
 /// let columns = vec![vec![1.0, 4.0, 2.0], vec![3.0, 1.0, 5.0]];
 /// assert_eq!(BarHeights::from(&columns), BarHeights::Matrix(columns.clone()));
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let mids = dev.barplot().height(&columns).beside(true).draw();
 /// assert_eq!(mids.len(), 6);
 /// ```

@@ -461,6 +461,14 @@ impl PdfBackend {
     }
 }
 
+/// The font size R's `pdf()` sets and measures text in: `requested_pt`
+/// rounded to whole points (`floor(x + 0.5)`; see
+/// [`PdfBackend`]'s `effective_font_size`). Shared with the null device,
+/// which measures as `pdf()` does.
+pub(crate) fn pdf_font_size(requested_pt: f64) -> f64 {
+    (requested_pt + 0.5).floor()
+}
+
 impl Backend for PdfBackend {
     fn into_bytes(self) -> Vec<u8> {
         self.finish()
@@ -476,7 +484,7 @@ impl Backend for PdfBackend {
     /// 14pt (not 14.4pt) and laid out with 14pt widths. Text whose rounded
     /// size is 0 is not drawn at all (callers check for a size `<= 0`).
     fn effective_font_size(&self, requested_pt: f64) -> f64 {
-        (requested_pt + 0.5).floor()
+        pdf_font_size(requested_pt)
     }
 
     fn default_bg(&self) -> Color {

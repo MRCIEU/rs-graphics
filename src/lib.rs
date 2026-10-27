@@ -75,9 +75,12 @@
 //! page number in a PNG or SVG file name (`"Rplot%03d.png"`) gives one
 //! file per page, as in R; for PDF, a page number plus `onefile(false)`
 //! (R's `pdf("Rplot%03d.pdf", onefile = FALSE)`).
-//! [`Device::new`](device::Device::new) takes a backend directly instead:
-//! for output kept in memory ([`finish`](device::Device::finish)) and
-//! backend options the builder doesn't cover.
+//! [`Device::null`](device::Device::null) (R's `pdf(NULL)`) opens a device
+//! that draws nothing and writes no file, but measures as a PDF device: to
+//! check that a figure fits a page, to measure, or to run drawing code
+//! fast. [`Device::new`](device::Device::new) takes a backend directly
+//! instead: for output kept in memory ([`finish`](device::Device::finish))
+//! and backend options the builder doesn't cover.
 //!
 //! # High-level and low-level functions
 //!

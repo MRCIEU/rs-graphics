@@ -15,8 +15,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use rs_graphics::Error;
 use rs_graphics::prelude::*;
 
-fn device() -> Device<SvgBackend> {
-    let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
+fn device() -> Device<AnyBackend> {
+    let mut dev = Device::null().width(5).height(5).open().unwrap();
     dev.plot_new();
     dev
 }

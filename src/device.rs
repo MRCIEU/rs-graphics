@@ -725,7 +725,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let r = dev.plot_region();
     /// assert!(r.x0 > 0.0 && r.x1 < dev.din().0);
@@ -748,7 +748,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
     /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
     /// let (x0, x1, ..) = dev.usr();
@@ -769,7 +769,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot().x([1, 10, 100]).xlog(true).draw();
     /// assert!(dev.xlog());
     /// ```
@@ -785,7 +785,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot().x([1, 10, 100]).ylog(true).draw();
     /// assert!(dev.ylog());
     /// ```
@@ -974,7 +974,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let n = dev.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
     /// assert_eq!(n, 3);
     /// dev.plot().x([1, 2, 3]).draw(); // top
@@ -1053,7 +1053,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfrow(2, 2).draw();
     /// assert_eq!(dev.current_par().cex, 0.83);
     /// ```
@@ -1072,7 +1072,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// dev.par().new(true).draw();
     /// assert!(dev.is_new());
@@ -1089,7 +1089,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfrow(1, 2).draw();
     /// dev.plot().x([1, 2]).draw();
     /// dev.plot().x([2, 1]).draw();
@@ -1109,7 +1109,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfrow(1, 2).draw();
     /// dev.plot().x([1, 2]).draw();
     /// assert_eq!(dev.figure_region().x1, dev.din().0 / 2.0);
@@ -1312,7 +1312,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
     /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
     /// assert_eq!(dev.ax_ticks(1), [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
@@ -1376,7 +1376,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let p = dev.user_to_inches(Point::new(5.0, 5.0));
     /// let q = dev.inches_to_user(p);
@@ -1398,7 +1398,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let r = dev.plot_region();
     /// let corner = dev.inches_to_user(Point::new(r.x0, r.y0));
@@ -1508,7 +1508,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// assert_eq!(dev.line_height_inches(), 1.2 * 12.0 / 72.0);
     /// ```
     pub fn line_height_inches(&self) -> f64 {
@@ -1524,7 +1524,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mar([5, 4, 4, 2]).draw();
     /// assert_eq!(dev.mai().bottom, 5.0 * dev.line_height_inches());
     /// ```
@@ -1546,7 +1546,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().omi([0, 0, 1, 0]).draw();
     /// assert_eq!(dev.omi().top, 1.0);
     /// ```
@@ -1905,7 +1905,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let w = dev.strwidth().s("Title").cex(1.2).get(); // in x data units
     /// let w_in = dev.strwidth().s("Title").cex(1.2).units("inches").get();
@@ -1929,7 +1929,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let one = dev.strheight().s("a").units("inches").get();
     /// let two = dev.strheight().s("a\nb").units("inches").get();

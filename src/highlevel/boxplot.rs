@@ -64,7 +64,7 @@ fn fivenum(sorted: &[f64]) -> [f64; 5] {
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let stats = dev.boxplot().x(&[1, 2, 3, 4, 5, 100]).draw();
 /// assert_eq!(stats[0].median, 3.5);
 /// assert_eq!(stats[0].outliers, [100.0]);

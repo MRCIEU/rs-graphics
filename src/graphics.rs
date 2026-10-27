@@ -38,7 +38,7 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
+//! # let mut dev = Device::null().width(5.0).height(5.0).open().unwrap();
 //! # dev.plot_new();
 //! let grey = SegmentsOptions::default().col("grey").lty("dashed");
 //! dev.segments().x0(&[0.1]).y0(&[0.2]).x1(&[0.9]).y1(&[0.2]).with(&grey).draw();
@@ -148,7 +148,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
     /// dev.plot_window().xlim(0, 10).ylim(0, 100).draw();
     /// dev.points().x([2, 5, 8]).y([10, 50, 90]).draw();
@@ -201,7 +201,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let x = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let y = [2.1, 3.9, 6.2, 7.8, 10.1];
     /// dev.plot().x(&x).y(&y).pch(19).xlab("Dose").ylab("Response").draw();
@@ -234,7 +234,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let h = dev.hist().x(&[4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7]).col("lightblue").draw();
     /// assert_eq!(h.counts.iter().sum::<f64>(), 7.0);
     /// ```
@@ -268,7 +268,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let mids = dev.barplot().height([3, 5, 2]).names(["A", "B", "C"]).ylim(0, 6).draw();
     /// dev.text().x(&mids).y([3.3, 5.3, 2.3]).labels(["3", "5", "2"]).draw();
     /// ```
@@ -301,7 +301,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let stats = dev
     ///     .boxplot()
     ///     .x(&[vec![1.0, 2.0, 3.0, 9.0], vec![4.0, 5.0, 6.0]])
@@ -333,7 +333,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.pie().x([3, 5, 2]).labels(["A", "B", "C"]).draw();
     /// ```
     ///
@@ -378,7 +378,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
     /// dev.plot_window().xlim(1, 1000).ylim(0, 1).xlog(true).draw();
     /// dev.axis().side(1).draw();
@@ -407,7 +407,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.points().x([2, 3]).y([5, 1]).pch(17).col("red").draw();
     /// ```
@@ -434,7 +434,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.lines().x([1, 2, 3]).y([2, 4, 3]).col("blue").lwd(2).draw();
     /// ```
@@ -462,7 +462,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.segments().x0([1, 2]).y0([1, 1]).x1([1, 2]).y1([3, 4]).draw();
     /// ```
@@ -495,7 +495,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.arrows().x0([1, 2]).y0([2, 3]).y1([4, 5]).angle(90).code(3).length(0.05).draw();
     /// ```
@@ -525,7 +525,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.rect().xleft(1).ybottom(1).xright(3).ytop(2).col("grey").draw();
     /// ```
@@ -556,7 +556,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.polygon().x([2, 5, 8]).y([2, 8, 2]).col("lightblue").border("navy").draw();
     /// ```
@@ -589,7 +589,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.text().x([2, 5]).y([8, 3]).labels(["peak", "dip"]).col("red").draw();
     /// ```
@@ -616,7 +616,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.box_().bty("l").lwd(2).draw();
     /// ```
@@ -647,7 +647,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// let at = dev.axis().side(2).draw();
     /// dev.abline().h(at).col("grey").lty("dotted").draw();
@@ -678,7 +678,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.abline().h(6).col("grey").lty("dashed").draw();
     /// dev.abline().a(1).b(0.5).col("red").draw();
@@ -712,7 +712,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.legend().pos("topright").labels(["a", "b"]).pch(19).col([1, 2]).draw();
     /// dev.legend().pos((5, 8)).labels("fit").lty(2).lwd(2).draw();
@@ -744,7 +744,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.mtext().text("Right margin").side(4).line(1).draw();
     /// ```
@@ -773,7 +773,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot_new();
     /// # dev.box_().draw();
     /// dev.title().main("Growth").xlab("Day").ylab("Height (cm)").draw();
@@ -815,7 +815,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfrow(1, 2).oma([0, 0, 2, 0]).las(1).draw();
     /// ```
     ///
@@ -1697,7 +1697,7 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfrow(1, 2).draw();
     /// dev.plot().x([1, 2, 3]).draw(); // left panel
     /// dev.hist().x([1, 2, 2, 3]).draw(); // right panel
@@ -1721,7 +1721,7 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfcol(2, 1).draw();
     /// dev.plot().x([1, 2, 3]).draw(); // top panel
     /// dev.plot().x([3, 2, 1]).draw(); // bottom panel
@@ -1751,7 +1751,7 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfrow(2, 2).draw();
     /// dev.plot().x([1, 2, 3]).draw(); // top left
     /// dev.par().mfg(2, 2).draw();
@@ -1782,7 +1782,7 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot().x([1, 2, 3, 4]).draw();
     /// dev.par().fig([0.5, 0.95, 0.5, 0.95]).new(true).draw();
     /// dev.plot().x([4, 3, 2, 1]).draw();
@@ -1806,7 +1806,7 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().fin([4, 3]).draw();
     /// dev.plot().x([1, 2, 3]).draw();
     /// ```

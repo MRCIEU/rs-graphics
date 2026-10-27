@@ -11,6 +11,7 @@
 //! generic `B`. [`Device::format`](crate::device::Device::format) and
 //! [`Device::pdf`](crate::device::Device::pdf) & co. open devices on it.
 
+use super::null::NullBackend;
 use super::pdf::PdfBackend;
 use super::raster::RasterBackend;
 use super::svg::SvgBackend;
@@ -83,6 +84,9 @@ pub enum AnyBackend {
     Svg(SvgBackend),
     /// A PNG backend.
     Png(RasterBackend),
+    /// The null backend: no output, PDF's measurements (see
+    /// [`Device::null`](crate::device::Device::null)).
+    Null(NullBackend),
 }
 
 impl AnyBackend {
@@ -96,7 +100,7 @@ impl AnyBackend {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// let backend = AnyBackend::new(Format::Svg, 6, 4, 72);
-    /// assert_eq!(backend.format(), Format::Svg);
+    /// assert_eq!(backend.format(), Some(Format::Svg));
     /// ```
     pub fn new(
         format: Format,
@@ -114,12 +118,14 @@ impl AnyBackend {
         }
     }
 
-    /// Returns the wrapped backend's format.
-    pub fn format(&self) -> Format {
+    /// Returns the wrapped backend's format, or `None` for the null
+    /// backend, which has no output.
+    pub fn format(&self) -> Option<Format> {
         match self {
-            AnyBackend::Pdf(_) => Format::Pdf,
-            AnyBackend::Svg(_) => Format::Svg,
-            AnyBackend::Png(_) => Format::Png,
+            AnyBackend::Pdf(_) => Some(Format::Pdf),
+            AnyBackend::Svg(_) => Some(Format::Svg),
+            AnyBackend::Png(_) => Some(Format::Png),
+            AnyBackend::Null(_) => None,
         }
     }
 }
@@ -142,6 +148,12 @@ impl From<RasterBackend> for AnyBackend {
     }
 }
 
+impl From<NullBackend> for AnyBackend {
+    fn from(b: NullBackend) -> Self {
+        AnyBackend::Null(b)
+    }
+}
+
 /// Calls `$call` on whichever backend is wrapped.
 macro_rules! forward {
     ($self:expr, $b:ident => $call:expr) => {
@@ -149,6 +161,7 @@ macro_rules! forward {
             AnyBackend::Pdf($b) => $call,
             AnyBackend::Svg($b) => $call,
             AnyBackend::Png($b) => $call,
+            AnyBackend::Null($b) => $call,
         }
     };
 }

@@ -44,7 +44,7 @@ pub(crate) const MAX_LAYOUT_CELLS: usize = 500;
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.layout().mat(&[[1, 2]]).widths([LayoutSize::Cm(4.0), 1.into()]).draw();
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -92,7 +92,7 @@ impl LayoutSize {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.layout().mat(&[[1, 2]]).respect(true).draw();
 /// dev.layout().mat(&[[1, 2]]).respect(&[[true, false]]).draw();
 /// assert_eq!(LayoutRespect::from(false), LayoutRespect::No);

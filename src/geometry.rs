@@ -60,7 +60,7 @@ impl From<(f64, f64)> for Point {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.plot_new();
 /// let plot: Rect = dev.plot_region();
 /// assert!(plot.width() > 0.0 && plot.x1 <= 7.0);

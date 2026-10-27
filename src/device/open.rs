@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 
 use super::Device;
 use crate::backend::Backend;
+use crate::backend::null::NullBackend;
 use crate::backend::pdf::PdfBackend;
 use crate::backend::raster::RasterBackend;
 use crate::backend::svg::SvgBackend;
@@ -41,7 +42,8 @@ crate::setters::options! {
     #[derive(Clone, Debug)]
     pub struct DeviceBuilder {
         format: Format => no_setter,
-        file: PathBuf => no_setter,
+        /// `None`: the null device ([`Device::null`]).
+        file: Option<PathBuf> => no_setter,
         /// Page width in [`units`](DeviceBuilder::units). `None`: 7 inches for
         /// PDF and SVG, 480/72 inches for PNG, whatever the units.
         pub width: Option<f64> => option f64,
@@ -142,9 +144,15 @@ impl DeviceBuilder {
                 ));
             }
         }
-        let name = FileName::parse(&self.file)?;
-        let first = name.for_page(1);
-        let file = create(&first)?;
+        // The file, unless it's the null device.
+        let (name, file) = match &self.file {
+            Some(path) => {
+                let name = FileName::parse(path)?;
+                let file = create(&name.for_page(1))?;
+                (Some(name), Some(file))
+            }
+            None => (None, None),
+        };
         let default_size = match self.format {
             Format::Png => 480.0 / 72.0,
             Format::Pdf | Format::Svg => 7.0,
@@ -163,6 +171,9 @@ impl DeviceBuilder {
             .bg
             .map(|c| c.resolve(&par.palette).unwrap_or(Color::TRANSPARENT));
         let backend: AnyBackend = match self.format {
+            _ if file.is_none() => NullBackend::new(width, height)
+                .with_background(bg.unwrap_or(Color::TRANSPARENT))
+                .into(),
             Format::Pdf => {
                 let pdf =
                     PdfBackend::new(width, height).with_compression(self.compress.unwrap_or(true));
@@ -193,9 +204,10 @@ impl DeviceBuilder {
             // keeps every page in its one file unless `onefile = FALSE`, as
             // R's `pdf()` (then, without a page number, each page replaces
             // the last in the same file).
-            per_page: match self.format {
-                Format::Pdf => !self.onefile.unwrap_or(true),
-                Format::Png | Format::Svg => name.numbered(),
+            per_page: match (&name, self.format) {
+                (None, _) => false,
+                (Some(_), Format::Pdf) => !self.onefile.unwrap_or(true),
+                (Some(name), Format::Png | Format::Svg) => name.numbered(),
             },
             name,
             page: 1,
@@ -409,9 +421,10 @@ impl FileName {
 
 /// The file(s) of a device opened for a file.
 pub(crate) struct Output {
-    /// The current page's file (the only one unless `per_page`).
-    file: File,
-    name: FileName,
+    /// The current page's file (the only one unless `per_page`); `None`
+    /// for the null device, which writes nothing.
+    file: Option<File>,
+    name: Option<FileName>,
     /// One file per page: each finished page is written to its file and
     /// the next page's file is created.
     per_page: bool,
@@ -424,17 +437,19 @@ impl Output {
     /// Writes a finished page's `bytes` to the current file and creates the
     /// next page's (after the first error, does nothing).
     fn next_page(&mut self, bytes: &[u8]) {
+        let (Some(file), Some(name)) = (&mut self.file, &self.name) else {
+            return;
+        };
         if self.error.is_some() {
             return;
         }
-        let result = self
-            .file
+        let result = file
             .write_all(bytes)
-            .and_then(|_| self.file.flush())
-            .and_then(|_| create(&self.name.for_page(self.page + 1)));
+            .and_then(|_| file.flush())
+            .and_then(|_| create(&name.for_page(self.page + 1)));
         match result {
-            Ok(file) => {
-                self.file = file;
+            Ok(next) => {
+                self.file = Some(next);
                 self.page += 1;
             }
             Err(e) => self.error = Some(e),
@@ -446,8 +461,13 @@ impl Output {
         if let Some(e) = self.error.take() {
             return Err(e);
         }
-        self.file.write_all(bytes)?;
-        self.file.flush()
+        match &mut self.file {
+            Some(file) => {
+                file.write_all(bytes)?;
+                file.flush()
+            }
+            None => Ok(()),
+        }
     }
 }
 
@@ -495,7 +515,7 @@ impl Device<AnyBackend> {
         DeviceBuilder {
             deferred_error,
             format,
-            file: file.as_ref().to_path_buf(),
+            file: Some(file.as_ref().to_path_buf()),
             width: None,
             height: None,
             units: None,
@@ -576,5 +596,42 @@ impl Device<AnyBackend> {
     /// ```
     pub fn png(file: impl AsRef<Path>) -> DeviceBuilder {
         Device::format(Format::Png, file)
+    }
+
+    /// Starts opening a device that draws nothing and writes no file.
+    ///
+    /// Everything works as on a PDF device of the same size: calls return
+    /// the same values (`legend()`'s box, `axis()`'s ticks, `strwidth()`),
+    /// and the same errors (margins too large for the page), but nothing is
+    /// drawn or written, so it is also the fastest way to run drawing code.
+    /// Use it to check that a [`Figure`](crate::recording::Figure) fits a
+    /// page before opening a file, or to measure. It takes
+    /// [`Device::pdf`]'s options (`width`, `height`, `units`, `pointsize`,
+    /// `bg`); [`open`](DeviceBuilder::open) creates nothing, and
+    /// [`close`](Device::close) succeeds without writing.
+    ///
+    /// This is R's `pdf(NULL)`.
+    ///
+    /// # Examples
+    ///
+    /// Does a figure fit a 1.5 x 1.5 inch page?
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut fig = Figure::new();
+    /// fig.plot().x([1, 2, 3]).main("A").draw();
+    ///
+    /// let mut dev = Device::null().width(1.5).height(1.5).open()?;
+    /// let e = dev.try_add_figure(&fig).unwrap_err();
+    /// assert_eq!(e.kind(), ErrorKind::DoesNotFit); // figure margins too large
+    /// dev.close()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn null() -> DeviceBuilder {
+        let mut builder = Device::format(Format::Pdf, "");
+        builder.file = None;
+        builder
     }
 }

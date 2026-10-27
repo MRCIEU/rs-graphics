@@ -115,7 +115,7 @@ use crate::plotmath::Label;
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let mut fig = Figure::new();
 /// fig.plot().x([1, 2, 3]).y([2, 4, 3]).main("Recorded").draw();
 /// fig.abline().h(3).lty("dashed").draw();
@@ -432,7 +432,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let mut fig = Figure::new();
     /// fig.plot().x([1, 2, 3]).y([2, 4, 3]).draw();
     /// dev.par().mfrow(1, 2).draw();
@@ -513,7 +513,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let mut fig = Figure::new();
     /// fig.plot().x([1, 2, 3]).draw();
     /// dev.par().mfrow(2, 2).draw();

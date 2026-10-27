@@ -158,7 +158,7 @@ type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let x = [1, 2, 2, 3, 3, 3];
 /// let h = dev.hist().x(&x).breaks([0, 1, 2, 3]).draw();
 /// assert_eq!(h.counts, [1.0, 2.0, 3.0]);
@@ -195,7 +195,7 @@ impl HistBreaks {
     /// ```
     /// use rs_graphics::prelude::*;
     ///
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// // Edges at the data's minimum, middle and maximum.
     /// let edges = HistBreaks::function(|x| {
     ///     let lo = x.iter().copied().fold(f64::INFINITY, f64::min);
@@ -401,7 +401,7 @@ fn bin_counts(
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let x = [1, 2, 2, 3, 3, 3];
 /// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(true).draw();
 /// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(["low", "mid", "high"]).draw();
@@ -622,7 +622,7 @@ impl Default for HistOptions {
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let h = dev.hist().x(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).plot(false).draw();
 /// assert_eq!(h.mids, [0.5, 1.5, 2.5]);
 /// assert_eq!(h.density, [1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0]);

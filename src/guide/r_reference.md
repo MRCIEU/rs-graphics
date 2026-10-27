@@ -708,7 +708,7 @@ R's arguments not available: `vfont`.
 
 | R | Rust | |
 |---|---|---|
-| `file` | `Device::pdf(file)` | The file to write (with a page number format, a file per page). |
+| `file` | `Device::pdf(file)` | The file to write (with a page number format, a file per page); `Device::null()` for R's `pdf(NULL)`. |
 | `width` | `.width()` | Page width in `units`. |
 | `height` | `.height()` | Page height in `units`. |
 | `onefile` | `.onefile()` | Puts all pages in one file, PDF only. |

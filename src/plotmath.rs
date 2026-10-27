@@ -18,7 +18,7 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+//! # let mut dev = Device::null().width(4).height(4).open().unwrap();
 //! dev.plot().x([1, 10, 100]).y([1, 2, 3]).xlab(Label::math("-log[10](italic(p))")).draw();
 //! ```
 //!
@@ -192,7 +192,7 @@ impl std::error::Error for ParseError {}
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+/// # let mut dev = Device::null().width(4).height(4).open().unwrap();
 /// dev.plot().x([1, 2, 3]).y([1, 4, 9]).xlab("x").ylab(Label::math("x^2")).draw();
 /// assert_eq!(Label::from("x"), Label::Text("x".into()));
 /// ```
@@ -276,7 +276,7 @@ impl From<Expression> for Label {
 /// # use rs_graphics::prelude::*;
 /// assert_eq!("a".into_labels(), vec![Some(Label::from("a"))]);
 /// assert_eq!([Some("a"), None].into_labels(), vec![Some(Label::from("a")), None]);
-/// # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+/// # let mut dev = Device::null().width(4).height(4).open().unwrap();
 /// # dev.plot().x([1, 2]).y([1, 2]).draw();
 /// dev.text().x([1, 2]).y([1, 2]).labels([Some("a"), None]).draw();
 /// ```

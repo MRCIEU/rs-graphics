@@ -89,6 +89,8 @@ A device's arguments mostly have R's defaults, so `Device::pdf("plot.pdf").open(
 As in R, opening the device creates the file, so a bad path fails
 before anything is drawn, and `dev.close()` (R's `dev.off()`) writes it.
 
+`Device::null()` is R's `pdf(NULL)`: a device that draws nothing and writes no file, but measures as a PDF device does. Use it to check that a figure fits a page before opening a file, or to measure text and legends.
+
 
 ### Several panels on a page
 

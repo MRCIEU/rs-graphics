@@ -42,7 +42,7 @@
 /// assert_eq!(LineType::try_from("dashed"), Ok(LineType::DASHED));
 /// assert_eq!(LineType::try_from(2), Ok(LineType::DASHED));
 /// assert_eq!(LineType::try_from("42"), Ok(LineType::Pattern(&[4, 2])));
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// # dev.plot_new();
 /// dev.abline().h(0.5).lty("dotted").draw();
 /// ```

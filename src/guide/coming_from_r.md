@@ -84,6 +84,7 @@ dev.close()?;
 # }
 ```
 
+`pdf(NULL)` (no file, to measure or check) is `Device::null().open()?`.
 `Device::svg(file)`, `Device::png(file)` likewise; PNG sizes are in
 inches unless `.units("px")` (then `.res()` is pixels per inch, as R's
 `png(res = )`). The format is the function's, never the file name's. A

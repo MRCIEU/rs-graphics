@@ -25,7 +25,7 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+//! # let mut dev = Device::null().width(4).height(4).open().unwrap();
 //! let y = vec![2.0, 3.5, 1.0];
 //! dev.plot().x(1..=3).y(&y).xlim(0, 4).draw();
 //! ```

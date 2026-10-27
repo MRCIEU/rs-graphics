@@ -267,7 +267,7 @@ crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
 /// assert_eq!("abc".into_pch(), [Some(97), Some(98), Some(99)]);
 /// assert_eq!([Some("x"), None].into_pch(), [Some(120), None]);
 /// assert_eq!('é'.into_pch(), [Some(-233)]);
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// # dev.plot().x(&[1, 2]).draw();
 /// dev.legend().pos("topleft").labels(["a", "b"]).pch([19, 1]).draw();
 /// ```

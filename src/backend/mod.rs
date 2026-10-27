@@ -30,6 +30,7 @@
 
 mod any;
 mod compress;
+pub mod null;
 mod numfmt;
 pub mod pdf;
 pub mod raster;

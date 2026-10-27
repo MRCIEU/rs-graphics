@@ -630,9 +630,15 @@ fn sections() -> (Vec<Section>, Vec<String>) {
     for dev in ["pdf", "svg", "png"] {
         let mut setters = vec![Setter {
             name: "file".into(),
-            doc: "The file to write (with a page number format, a file per page). \
-                  R's `file`, `filename`."
-                .into(),
+            doc: if dev == "pdf" {
+                "The file to write (with a page number format, a file per page); \
+                 `Device::null()` for R's `pdf(NULL)`. R's `file`."
+                    .into()
+            } else {
+                "The file to write (with a page number format, a file per page). \
+                 R's `file`, `filename`."
+                    .into()
+            },
             rust: Some(format!("`Device::{dev}(file)`")),
         }];
         setters.extend(device_fields.clone());

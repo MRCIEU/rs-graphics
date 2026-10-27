@@ -39,7 +39,7 @@ use super::backend::{LineEnd, LineJoin};
 /// # use rs_graphics::prelude::*;
 /// let mar: Sides<f64> = [5, 4, 4, 2].into();
 /// assert_eq!(mar, Sides::new(5.0, 4.0, 4.0, 2.0));
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.par().mar([5, 4, 1, 1]).draw();
 /// assert_eq!(dev.current_par().mar.top, 1.0);
 /// ```
@@ -101,7 +101,7 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.par().xaxs("i").draw();
 /// dev.plot_window().xlim(0, 10).ylim(0, 10).draw();
 /// let (x0, x1, y0, _) = dev.usr();
@@ -155,7 +155,7 @@ crate::error::from_r_string!(AxisStyle, "axis style", "\"r\" or \"i\"");
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 5), Par::default());
+/// # let mut dev = Device::null().width(7).height(5).open().unwrap();
 /// dev.par().pty("s").draw();
 /// dev.plot_new();
 /// let r = dev.plot_region();
@@ -204,7 +204,7 @@ crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.plot().x([1, 2, 3]).y([3, 1, 2]).bty("l").draw();
 /// dev.par().bty("n").draw();
 /// assert_eq!(dev.current_par().bty, Bty::N);
@@ -278,7 +278,7 @@ crate::error::from_r_string!(
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// # dev.plot_new();
 /// dev.par().xpd(true).draw();
 /// assert_eq!(dev.current_par().xpd, Xpd::Figure);
@@ -316,7 +316,7 @@ impl From<bool> for Xpd {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.plot().x([1, 2, 3]).y([3, 1, 2]).xaxt("n").draw();
 /// dev.axis().side(1).at([1, 2, 3]).labels(["a", "b", "c"]).draw();
 /// ```

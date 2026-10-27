@@ -45,7 +45,7 @@ use super::{InlineAxis, data_range};
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let y = [3, 1, 4, 1, 5];
 /// dev.plot().x(&y).type_(PlotType::Both).draw();
 /// dev.lines().x(&y).type_("s").draw();

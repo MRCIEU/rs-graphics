@@ -96,6 +96,7 @@ dev.plot().x(1..=10).draw();
 dev.close()?;
 ```
 
+`pdf(NULL)` (no file, to measure or check) is `Device::null().open()?`.
 `Device::svg(file)`, `Device::png(file)` likewise; PNG sizes are in
 inches unless `.units("px")` (then `.res()` is pixels per inch, as R's
 `png(res = )`). The format is the function's, never the file name's. A
@@ -972,7 +973,7 @@ R's arguments not available: `vfont`.
 
 | R | Rust | |
 |---|---|---|
-| `file` | `Device::pdf(file)` | The file to write (with a page number format, a file per page). |
+| `file` | `Device::pdf(file)` | The file to write (with a page number format, a file per page); `Device::null()` for R's `pdf(NULL)`. |
 | `width` | `.width()` | Page width in `units`. |
 | `height` | `.height()` | Page height in `units`. |
 | `onefile` | `.onefile()` | Puts all pages in one file, PDF only. |

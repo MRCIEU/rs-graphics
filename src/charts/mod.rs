@@ -59,7 +59,7 @@ fn blank<G: Graphics>(g: &mut G, xlim: (f64, f64), ylim: (f64, f64)) -> Result<(
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(8, 4.5), Par::default());
+/// # let mut dev = Device::null().width(8).height(4.5).open().unwrap();
 /// rs_graphics::charts::pch(&mut dev)?;
 /// # Ok::<(), rs_graphics::Error>(())
 /// ```
@@ -122,7 +122,7 @@ pub fn pch<G: Graphics>(g: &mut G) -> Result<(), Error> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 5), Par::default());
+/// # let mut dev = Device::null().width(7).height(5).open().unwrap();
 /// rs_graphics::charts::line_types(&mut dev)?;
 /// # Ok::<(), rs_graphics::Error>(())
 /// ```
@@ -175,7 +175,7 @@ pub fn line_types<G: Graphics>(g: &mut G) -> Result<(), Error> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 4), Par::default());
+/// # let mut dev = Device::null().width(7).height(4).open().unwrap();
 /// rs_graphics::charts::line_ends(&mut dev)?;
 /// # Ok::<(), rs_graphics::Error>(())
 /// ```
@@ -239,7 +239,7 @@ pub fn line_ends<G: Graphics>(g: &mut G) -> Result<(), Error> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 4), Par::default());
+/// # let mut dev = Device::null().width(7).height(4).open().unwrap();
 /// rs_graphics::charts::fonts(&mut dev)?;
 /// # Ok::<(), rs_graphics::Error>(())
 /// ```
@@ -314,7 +314,7 @@ pub fn color_names() -> impl Iterator<Item = &'static str> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(9, 12), Par::default());
+/// # let mut dev = Device::null().width(9).height(12).open().unwrap();
 /// rs_graphics::charts::colors(&mut dev)?;
 /// # Ok::<(), rs_graphics::Error>(())
 /// ```
@@ -381,7 +381,7 @@ pub fn colors<G: Graphics>(g: &mut G) -> Result<(), Error> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 3), Par::default());
+/// # let mut dev = Device::null().width(7).height(3).open().unwrap();
 /// rs_graphics::charts::palette(&mut dev)?;
 /// # Ok::<(), rs_graphics::Error>(())
 /// ```
@@ -434,7 +434,7 @@ pub fn palette<G: Graphics>(g: &mut G) -> Result<(), Error> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 6), Par::default());
+/// # let mut dev = Device::null().width(7).height(6).open().unwrap();
 /// rs_graphics::charts::regions(&mut dev)?;
 /// # Ok::<(), rs_graphics::Error>(())
 /// ```
