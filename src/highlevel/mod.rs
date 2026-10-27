@@ -41,6 +41,7 @@ pub use barplot::{BarHeights, BarplotOptions, OrderH};
 pub use boxplot::{BoxStats, BoxplotOptions, boxplot_stats};
 pub use hist::{HistBreaks, HistLabels, HistOptions, HistResult};
 pub use pie::PieOptions;
+pub(crate) use pie::check_pie;
 pub use plot::{PlotOptions, PlotType};
 
 /// Compute the finite min/max of a data slice, matching R's `range(x[is.finite(x)])`

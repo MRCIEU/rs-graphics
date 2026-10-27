@@ -75,7 +75,7 @@ fn with_keeps_the_grid() {
 }
 
 #[test]
-#[should_panic(expected = "at least one row and one column")]
+#[should_panic(expected = "invalid value specified for graphical parameter \"mfrow\"")]
 fn zero_rows_panic_at_draw() {
     let mut dev = Device::new(PdfBackend::new(8.0, 6.0), Par::default());
     dev.par().mfrow(0, 2).draw();

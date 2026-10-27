@@ -469,10 +469,10 @@ against a real R installation by shelling out to `Rscript`:
   solid line): cap, join, mitre and width at each stroke vs R `pdf()`,
   and that they don't outlast the call.
 - `tests/all/xy_lengths_matches_r.rs` - `plot()`/`points()`/`lines()`/
-  `polygon()` with `x` and `y` of different lengths panic with R's
-  `xy.coords()` message (on a device and in a `Figure`); `text()`
+  `polygon()` with `x` and `y` of different lengths return R's
+  `xy.coords()` error from `try_draw()` (on a device and in a `Figure`); `text()`
   recycles, as R.
-- `tests/all/region_errors_matches_r.rs` - `plot_new()`'s panics with R's
+- `tests/all/region_errors_matches_r.rs` - `try_plot_new()`'s errors with R's
   messages ("figure margins too large", "figure region too large", "plot
   region too large") for small pages, large `oma`/`mai`, many panels,
   `fin`, `pin`, `plt` and `lcm()` layouts, cases that just fit, and the
@@ -526,9 +526,9 @@ against a real R installation by shelling out to `Rscript`:
   mtext, abline, boxplot and legend: where R defines `NA`, R's drawing;
   otherwise R drawing the skipped element or the default.
 - `tests/all/required_args.rs` (no R needed) - every required argument left
-  out panics with R's message (`argument "x" is missing, with no
-  default`), on a device and in a `Figure`; arguments with R defaults can
-  be left out.
+  out is an error with R's message (`argument "x" is missing, with no
+  default`) and the call's name, on a device and in a `Figure`; `.draw()`
+  panics with it; arguments with R defaults can be left out.
 - `tests/all/primitives_matches_r.rs` - per-element recycling in `points()`,
   `segments()`, `arrows()`, `rect()`, `polygon()` and `text()`,
   `lines(type = )`, `par("fg")` defaults, polygons split at `NA`, default

@@ -24,7 +24,7 @@ use crate::color::{Color, ColorSpec};
 use crate::device::{
     AxisOptions, Device, PlotWindowOptions, RectOptions, TextOptions, TitleOptions,
 };
-use crate::error::from_r_string;
+use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::Num;
@@ -319,11 +319,11 @@ fn bin_counts(
     right: bool,
     include_lowest: bool,
     fuzz: f64,
-) -> Vec<f64> {
+) -> Result<Vec<f64>, Error> {
     let nb = breaks.len();
     let mut counts = vec![0.0; nb.saturating_sub(1)];
     if nb < 2 {
-        return counts;
+        return Ok(counts);
     }
     // `diddle <- fuzz * if (nB > 5) median(h) else if (nB <= 3)
     // diff(range(x)) else min(h[h > 0])`.
@@ -380,11 +380,12 @@ fn bin_counts(
             counted += 1;
         }
     }
-    assert!(
-        counted == data.len(),
-        "some 'x' not counted; maybe 'breaks' do not span range of 'x'"
-    );
-    counts
+    if counted != data.len() {
+        return Err(Error::invalid(
+            "some 'x' not counted; maybe 'breaks' do not span range of 'x'",
+        ));
+    }
+    Ok(counts)
 }
 
 /// What a histogram writes above each bar: nothing, each bar's count (or
@@ -645,7 +646,7 @@ pub struct HistResult {
 /// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
 /// mid-points. Needs no device, so a recorded figure can return the same
 /// result as [`Graphics::hist`](crate::graphics::Graphics::hist).
-pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
+pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> Result<HistResult, Error> {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let n = data.len();
 
@@ -665,7 +666,9 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
             (edges, true)
         }
         HistBreaks::Count(k) => {
-            assert!(k.is_finite() && k >= 1.0, "invalid number of 'breaks'");
+            if !(k.is_finite() && k >= 1.0) {
+                return Err(Error::invalid("invalid number of 'breaks'"));
+            }
             // R caps it (with a warning) so that pretty() gets an integer;
             // pretty() truncates it.
             let nclass = k.min(1e6) as i32;
@@ -699,7 +702,7 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
         opts.right.unwrap_or(true),
         include_lowest,
         opts.fuzz.unwrap_or(1e-7),
-    );
+    )?;
     let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
     let density: Vec<f64> = counts
         .iter()
@@ -722,20 +725,20 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
     let mean = widths.iter().sum::<f64>() / widths.len() as f64;
     let equidist = !use_br || hi - lo < 1e-7 * mean;
 
-    HistResult {
+    Ok(HistResult {
         breaks,
         counts,
         density,
         mids,
         equidist,
-    }
+    })
 }
 
 impl<B: Backend> Device<B> {
     /// Draws R's `hist()`; the public entry is
     /// [`Graphics::hist`](crate::graphics::Graphics::hist), whose docs
     /// describe it.
-    pub(crate) fn hist_impl(&mut self, x: &[f64], opts: &HistOptions) -> HistResult {
+    pub(crate) fn hist_impl(&mut self, x: &[f64], opts: &HistOptions) -> Result<HistResult, Error> {
         if !opts.plot.unwrap_or(true) {
             return hist_bins(x, opts);
         }
@@ -745,7 +748,7 @@ impl<B: Backend> Device<B> {
             density,
             mids,
             equidist,
-        } = hist_bins(x, opts);
+        } = hist_bins(x, opts)?;
         let nb = breaks.len();
 
         // R's `freq = NULL`: counts if the bins are equally wide.
@@ -760,7 +763,7 @@ impl<B: Backend> Device<B> {
         // `plot.histogram()`: window, title, axes (unless `add`), then the
         // bars.
         if !opts.add {
-            self.plot_new_impl();
+            self.plot_new_impl()?;
             let window = PlotWindowOptions {
                 xlog: opts.xlog,
                 ylog: opts.ylog,
@@ -806,7 +809,7 @@ impl<B: Backend> Device<B> {
                     lwd: opts.lwd,
                     ..InlineAxis::default()
                 };
-                self.axis_impl(1, &inline.apply(AxisOptions::default()));
+                self.axis_impl(1, &inline.apply(AxisOptions::default()))?;
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
                 let yticks = if freq {
                     self.ax_ticks(2)
@@ -820,7 +823,7 @@ impl<B: Backend> Device<B> {
                     at: Some(yticks),
                     ..AxisOptions::default()
                 };
-                self.axis_impl(2, &inline.apply(y_axis));
+                self.axis_impl(2, &inline.apply(y_axis))?;
             }
         }
 
@@ -846,7 +849,7 @@ impl<B: Backend> Device<B> {
             angle: opts.angle.clone(),
             ..RectOptions::default()
         };
-        self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
+        self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars)?;
         // `text(x$mids, y, labels, adj = c(0.5, -0.5))`: counts, or
         // densities rounded to 3 decimals, or the given labels.
         let labels: Vec<Label> = match &opts.labels {
@@ -871,16 +874,16 @@ impl<B: Backend> Device<B> {
                 ..TextOptions::default()
             };
             let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
-            self.text_impl(&mids, &heights, &labels, &at);
+            self.text_impl(&mids, &heights, &labels, &at)?;
         }
 
-        HistResult {
+        Ok(HistResult {
             breaks,
             counts,
             density,
             mids,
             equidist,
-        }
+        })
     }
 }
 

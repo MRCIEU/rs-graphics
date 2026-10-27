@@ -839,12 +839,58 @@ fn check_supported(e: &Expr) -> Result<(), ParseError> {
                 }
             }
         }
+        // R's `DelimCode` / `RenderDelim` errors, found when drawing in R.
+        if let Expr::Name(n) = f.as_ref() {
+            if n == "group" || n == "bgroup" {
+                for d in [&args[0], &args[2]] {
+                    let error = |message: &str| ParseError {
+                        message: message.to_string(),
+                        offset: 0,
+                    };
+                    match delim_code(d) {
+                        None => return Err(error("invalid group delimiter")),
+                        // `bgroup()` grows only these.
+                        Some(c) if n == "bgroup" && !"|()[]{}.".contains(c) => {
+                            return Err(error("group is incomplete"));
+                        }
+                        Some(_) => {}
+                    }
+                }
+            }
+        }
         check_supported(f)?;
         for a in args {
             check_supported(a)?;
         }
     }
     Ok(())
+}
+
+/// R's `DelimCode`: a `group()`/`bgroup()` delimiter, a string such as
+/// `"("`, `"["`, `"|"`, or `""`/`"."` for none, or a name such as
+/// `lfloor`; `None` if it isn't one.
+pub(crate) fn delim_code(e: &Expr) -> Option<char> {
+    let s = match e {
+        Expr::Str(s) => s.as_str(),
+        Expr::Name(n) => {
+            return match n.as_str() {
+                "lfloor" => Some('\u{EB}'),
+                "rfloor" => Some('\u{FB}'),
+                "lceil" => Some('\u{E9}'),
+                "rceil" => Some('\u{F9}'),
+                "langle" => Some('\u{E1}'),
+                "rangle" => Some('\u{F1}'),
+                _ => None,
+            };
+        }
+        _ => return None,
+    };
+    match s {
+        "|" | "||" => Some('|'),
+        "(" | ")" | "[" | "]" | "{" | "}" => s.chars().next(),
+        "" | "." => Some('.'),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

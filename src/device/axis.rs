@@ -22,6 +22,7 @@
 use crate::afm;
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::Point;
 use crate::lty::LineType;
@@ -180,9 +181,18 @@ impl<B: Backend> Device<B> {
     /// Draws R's `axis()`; the public entry is
     /// [`Graphics::axis`](crate::graphics::Graphics::axis), whose docs
     /// describe it.
-    pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) -> Vec<f64> {
-        let mut dev = self.line_pars(opts.lend, None, None);
-        dev.axis_draw(side.into(), opts)
+    pub(crate) fn axis_impl(
+        &mut self,
+        side: impl Into<Side>,
+        opts: &AxisOptions,
+    ) -> Result<Vec<f64>, Error> {
+        check_axis(opts)?;
+        let side = side.into();
+        if opts.at.is_none() {
+            self.check_axis_axp(side, opts.axp)?;
+        }
+        let mut dev = self.line_pars(opts.lend, None, None)?;
+        Ok(dev.axis_draw(side, opts))
     }
 
     fn axis_draw(&mut self, side: Side, opts: &AxisOptions) -> Vec<f64> {
@@ -211,22 +221,14 @@ impl<B: Backend> Device<B> {
             None => self.ax_ticks(side),
         });
         let labels = if opts.draw_labels {
-            let labels = match &opts.labels {
+            match &opts.labels {
                 None => format_axis_labels(&at)
                     .into_iter()
                     .map(|l| Some(Label::Text(l)))
                     .collect(),
-                Some(l) => {
-                    assert!(opts.at.is_some(), "axis: 'labels' is supplied and not 'at'");
-                    l.clone()
-                }
-            };
-            assert_eq!(
-                at.len(),
-                labels.len(),
-                "axis: 'at' and 'labels' lengths differ"
-            );
-            labels
+                // `check_axis` has made sure `at` is given, and as long.
+                Some(l) => l.clone(),
+            }
         } else {
             Vec::new()
         };
@@ -458,6 +460,24 @@ impl<B: Backend> Device<B> {
         }
         used
     }
+}
+
+/// R's checks of `axis()`'s `labels`: given only with `at`, and as many.
+pub(crate) fn check_axis(opts: &AxisOptions) -> Result<(), Error> {
+    if let (true, Some(labels)) = (opts.draw_labels, &opts.labels) {
+        match &opts.at {
+            None => return Err(Error::invalid("'labels' is supplied and not 'at'")),
+            Some(at) if at.len() != labels.len() => {
+                return Err(Error::invalid(format!(
+                    "'at' and 'labels' lengths differ, {} != {}",
+                    at.len(),
+                    labels.len()
+                )));
+            }
+            Some(_) => {}
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

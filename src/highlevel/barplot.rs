@@ -40,7 +40,7 @@ use crate::color::{Color, ColorSpec, gray_colors};
 use crate::device::{
     AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions, TitleOptions,
 };
-use crate::error::{from_r_string, from_str_via_parse};
+use crate::error::{Error, from_r_string, from_str_via_parse};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
@@ -410,7 +410,7 @@ fn recycle<T: Copy>(v: &[T], n: usize) -> Vec<T> {
 /// Everything `barplot()` works out before drawing: bar positions, the
 /// bars themselves, colours, axis limits and where the names go. Needs no
 /// device, so a recorded figure can return the same bar centres as
-/// [`Graphics::barplot`](crate::graphics::Graphics::barplot) (and panics on the same invalid input).
+/// [`Graphics::barplot`](crate::graphics::Graphics::barplot) (and fails on the same invalid input).
 pub(crate) struct BarLayout {
     beside: bool,
     w_l: Vec<f64>,
@@ -427,19 +427,24 @@ pub(crate) struct BarLayout {
 }
 
 /// See [`BarLayout`].
-pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayout {
+pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<BarLayout, Error> {
     let (columns, vector_input): (&[Vec<f64>], bool) = match heights {
         BarHeights::Vector(v) => {
-            assert!(!v.is_empty(), "barplot: 'height' must be non-empty");
+            if v.is_empty() {
+                return Err(Error::invalid("'height' must be non-empty"));
+            }
             (std::slice::from_ref(v), true)
         }
         BarHeights::Matrix(columns) => {
-            assert!(!columns.is_empty(), "barplot: 'height' must be non-empty");
+            if columns.is_empty() {
+                return Err(Error::invalid("'height' must be non-empty"));
+            }
             let nr = columns[0].len();
-            assert!(
-                nr > 0 && columns.iter().all(|c| c.len() == nr),
-                "barplot: matrix columns must be non-empty and of equal length"
-            );
+            if nr == 0 || columns.iter().any(|c| c.len() != nr) {
+                return Err(Error::invalid(
+                    "matrix columns must be non-empty and of equal length",
+                ));
+            }
             (columns, false)
         }
     };
@@ -504,10 +509,11 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
         offset[k % offset.len()]
     };
 
-    assert!(
-        !((opts.xlog || opts.ylog) && !opts.density.is_empty()),
-        "Cannot use shading lines in bars when log scale is used"
-    );
+    if (opts.xlog || opts.ylog) && !opts.density.is_empty() {
+        return Err(Error::invalid(
+            "Cannot use shading lines in bars when log scale is used",
+        ));
+    }
 
     // --- log scale in the data direction: where bars start ---
     let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
@@ -525,19 +531,19 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
             .map(|(i, j, h)| h + offset_of(i, j))
             .filter(|h| !h.is_nan())
             .fold(f64::INFINITY, f64::min);
-        assert!(
-            min_h_off > 0.0,
-            "barplot: log scale error: at least one 'height + offset' value <= 0"
-        );
+        if min_h_off <= 0.0 {
+            return Err(Error::invalid(
+                "log scale error: at least one 'height + offset' value <= 0",
+            ));
+        }
         for (log, lim, name) in [
             (opts.xlog, opts.xlim, "xlim"),
             (opts.ylog, opts.ylim, "ylim"),
         ] {
             if let (true, Some(l)) = (log, lim) {
-                assert!(
-                    l.0.min(l.1) > 0.0,
-                    "barplot: log scale error: '{name}' <= 0"
-                );
+                if l.0.min(l.1) <= 0.0 {
+                    return Err(Error::invalid(format!("log scale error: '{name}' <= 0")));
+                }
             }
         }
         match (horiz, opts.ylim, opts.xlim) {
@@ -620,20 +626,24 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
         (opts.xlim.unwrap_or(cat_lim), opts.ylim.unwrap_or(val_lim))
     };
 
-    let names_at = opts.names.as_ref().map(|names| {
-        if names.len() == w_m.len() {
-            w_m.clone()
-        } else if beside && names.len() == nc {
-            // colMeans(w.m): the centre of each group of bars.
-            (0..nc)
-                .map(|j| w_m[j * nr..(j + 1) * nr].iter().sum::<f64>() / nr as f64)
-                .collect()
-        } else {
-            panic!("barplot: incorrect number of names");
-        }
-    });
+    let names_at = opts
+        .names
+        .as_ref()
+        .map(|names| {
+            if names.len() == w_m.len() {
+                Ok(w_m.clone())
+            } else if beside && names.len() == nc {
+                // colMeans(w.m): the centre of each group of bars.
+                Ok((0..nc)
+                    .map(|j| w_m[j * nr..(j + 1) * nr].iter().sum::<f64>() / nr as f64)
+                    .collect())
+            } else {
+                Err(Error::invalid("incorrect number of names"))
+            }
+        })
+        .transpose()?;
 
-    BarLayout {
+    Ok(BarLayout {
         beside,
         w_l,
         w_r,
@@ -643,7 +653,7 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> BarLayo
         xlim,
         ylim,
         names_at,
-    }
+    })
 }
 
 impl<B: Backend> Device<B> {
@@ -654,10 +664,10 @@ impl<B: Backend> Device<B> {
         &mut self,
         heights: impl Into<BarHeights>,
         opts: &BarplotOptions,
-    ) -> Vec<f64> {
-        let layout = bar_layout(&heights.into(), opts);
+    ) -> Result<Vec<f64>, Error> {
+        let layout = bar_layout(&heights.into(), opts)?;
         if !opts.plot.unwrap_or(true) {
-            return layout.w_m;
+            return Ok(layout.w_m);
         }
         // R's `opar <- par(yaxs = "i")` (`xaxs` when `horiz`), then
         // `par(xpd = TRUE)`, restored `on.exit`.
@@ -670,7 +680,11 @@ impl<B: Backend> Device<B> {
     }
 
     /// Draws `layout`; returns its bar centres.
-    fn draw_barplot(&mut self, layout: BarLayout, opts: &BarplotOptions) -> Vec<f64> {
+    fn draw_barplot(
+        &mut self,
+        layout: BarLayout,
+        opts: &BarplotOptions,
+    ) -> Result<Vec<f64>, Error> {
         let BarLayout {
             beside,
             w_l,
@@ -693,7 +707,7 @@ impl<B: Backend> Device<B> {
             self.par.yaxs = AxisStyle::Exact;
         }
         if !opts.add {
-            self.plot_new_impl();
+            self.plot_new_impl()?;
             let window = PlotWindowOptions {
                 xlog: opts.xlog,
                 ylog: opts.ylog,
@@ -744,7 +758,7 @@ impl<B: Backend> Device<B> {
                 angle: per_bar(&opts.angle, group),
                 ..RectOptions::default()
             };
-            self.rect_impl(&x0, &y0, &x1, &y1, &style);
+            self.rect_impl(&x0, &y0, &x1, &y1, &style)?;
             start = end;
         }
 
@@ -775,7 +789,7 @@ impl<B: Backend> Device<B> {
                 cex_axis: opts.cex_names,
                 ..AxisOptions::default()
             };
-            self.axis_impl(if horiz { 2 } else { 1 }, &inline.apply(names));
+            self.axis_impl(if horiz { 2 } else { 1 }, &inline.apply(names))?;
         }
 
         if let Some(labels) = &opts.legend_text {
@@ -828,7 +842,7 @@ impl<B: Backend> Device<B> {
                 lopts.angle = angle;
             }
             let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
-            self.legend_impl(pos, &labels, &lopts);
+            self.legend_impl(pos, &labels, &lopts)?;
         }
 
         if opts.ann.unwrap_or(!opts.add && self.par.ann) {
@@ -859,10 +873,10 @@ impl<B: Backend> Device<B> {
             self.axis_impl(
                 if horiz { 1 } else { 2 },
                 &value_axis.apply(AxisOptions::default()),
-            );
+            )?;
         }
 
-        w_m
+        Ok(w_m)
     }
 }
 

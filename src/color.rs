@@ -246,8 +246,8 @@ pub enum ColorSpec {
     Color(Color),
     /// An index into the current palette, 1-based (R's small-integer
     /// colours). Indices above the palette length recycle, as in R; 0 is
-    /// the background colour; a negative index panics when resolved, as R
-    /// errors.
+    /// the background colour; a negative index is R's error when drawn
+    /// (and [`resolve`](ColorSpec::resolve) panics on it).
     Index(i32),
 }
 

@@ -42,6 +42,7 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
@@ -533,13 +534,20 @@ crate::setters::options! {
 }
 
 /// R's argument checks for `legend()`, so a [`Figure`](crate::recording::Figure)
-/// panics when recording, as the device does.
-pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) {
-    assert!(!labels.is_empty(), "'legend' is of length 0");
+/// fails when recording, as the device does.
+pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Result<(), Error> {
+    if labels.is_empty() {
+        return Err(Error::invalid("'legend' is of length 0"));
+    }
     let tw = &opts.text_width;
     let any_na = tw.iter().any(|v| v.is_nan());
     let bad = (tw.len() > 1 && any_na) || (!any_na && tw.iter().any(|&v| v < 0.0));
-    assert!(!bad, "'text.width' must be numeric, >= 0, or a scalar NA");
+    if bad {
+        return Err(Error::invalid(
+            "'text.width' must be numeric, >= 0, or a scalar NA",
+        ));
+    }
+    Ok(())
 }
 
 /// Where a legend was drawn: its box and each label's anchor, returned by
@@ -573,15 +581,15 @@ impl<B: Backend> Device<B> {
         pos: LegendPos,
         labels: &[Option<Label>],
         opts: &LegendOptions,
-    ) -> LegendLayout {
-        check_legend(labels, opts);
+    ) -> Result<LegendLayout, Error> {
+        check_legend(labels, opts)?;
         // R's `legend(xpd = )` sets `par(xpd)` for the call and restores it
         // `on.exit`.
         let mut dev = self.par_scope(|now, saved| now.xpd = saved.xpd);
         if let Some(xpd) = opts.xpd {
             dev.par.xpd = xpd;
         }
-        dev.draw_legend(pos, labels, opts)
+        Ok(dev.draw_legend(pos, labels, opts))
     }
 
     fn draw_legend(
@@ -1073,9 +1081,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "'legend' is of length 0")]
-    fn no_labels_panics() {
-        check_legend(&[], &LegendOptions::default());
+    fn no_labels_is_an_error() {
+        let e = check_legend(&[], &LegendOptions::default()).unwrap_err();
+        assert_eq!(e.message(), "'legend' is of length 0");
     }
 
     #[test]
@@ -1086,7 +1094,7 @@ mod tests {
                 text_width: tw,
                 ..LegendOptions::default()
             };
-            std::panic::catch_unwind(|| check_legend(&labels, &opts)).is_ok()
+            check_legend(&labels, &opts).is_ok()
         };
         assert!(check(vec![]));
         assert!(check(vec![f64::NAN]));

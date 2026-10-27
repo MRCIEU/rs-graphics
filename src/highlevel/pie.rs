@@ -18,6 +18,7 @@ use crate::color::{Color, ColorSpec};
 use crate::device::{
     Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
 };
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::par::Xpd;
@@ -121,12 +122,9 @@ impl<B: Backend> Device<B> {
     /// Draws R's `pie()`; the public entry is
     /// [`Graphics::pie`](crate::graphics::Graphics::pie), whose docs
     /// describe it.
-    pub(crate) fn pie_impl(&mut self, x: &[f64], opts: &PieOptions) {
+    pub(crate) fn pie_impl(&mut self, x: &[f64], opts: &PieOptions) -> Result<(), Error> {
+        check_pie(x)?;
         let nx = x.len();
-        assert!(
-            nx > 0 && x.iter().all(|&v| v.is_finite() && v >= 0.0),
-            "pie: 'x' values must be positive"
-        );
         let total: f64 = x.iter().sum();
 
         let labels: Vec<Label> = opts
@@ -134,7 +132,7 @@ impl<B: Backend> Device<B> {
             .clone()
             .unwrap_or_else(|| (1..=nx).map(|i| Label::from(i.to_string())).collect());
 
-        self.plot_new_impl();
+        self.plot_new_impl()?;
 
         // Pre-scale xlim/ylim by the plot region's aspect ratio, then
         // `plot.window(xlim, ylim, asp = 1)` (with the current `xaxs`/`yaxs`,
@@ -211,7 +209,7 @@ impl<B: Backend> Device<B> {
                 angle: each(&opts.angle, i),
                 ..PolygonOptions::default()
             };
-            self.polygon_impl(&xs, &ys, &slice);
+            self.polygon_impl(&xs, &ys, &slice)?;
 
             let mid = 0.5 * (cum[i] + cum[i + 1]);
             let (px, py) = t2xy(mid);
@@ -220,7 +218,7 @@ impl<B: Backend> Device<B> {
                 continue;
             };
             if !matches!(label, Label::Text(t) if t.is_empty()) {
-                self.lines_impl(&[px, 1.05 * px], &[py, 1.05 * py], &XyOptions::default());
+                self.lines_impl(&[px, 1.05 * px], &[py, 1.05 * py], &XyOptions::default())?;
                 // `text(1.1 * P$x, 1.1 * P$y, labels[i], xpd = TRUE, adj =
                 // ifelse(P$x < 0, 1, 0))`.
                 let at = TextOptions {
@@ -231,7 +229,7 @@ impl<B: Backend> Device<B> {
                     font: opts.font.into_iter().map(Some).collect(),
                     ..TextOptions::default()
                 };
-                self.text_impl(&[1.1 * px], &[1.1 * py], &[Some(label.clone())], &at);
+                self.text_impl(&[1.1 * px], &[1.1 * py], &[Some(label.clone())], &at)?;
             }
         }
 
@@ -244,7 +242,16 @@ impl<B: Backend> Device<B> {
                 ..TitleOptions::default()
             });
         }
+        Ok(())
     }
+}
+
+/// R's check of `pie()`'s `x`: values present, finite and not negative.
+pub(crate) fn check_pie(x: &[f64]) -> Result<(), Error> {
+    if x.is_empty() || !x.iter().all(|&v| v.is_finite() && v >= 0.0) {
+        return Err(Error::invalid("'x' values must be positive."));
+    }
+    Ok(())
 }
 
 /// `v[i]` (recycled) as a one-element vector; empty stays empty (R's

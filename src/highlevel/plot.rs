@@ -20,6 +20,7 @@
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
 use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions};
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::par::{AxisStyle, AxisType, Bty, Xpd};
@@ -327,7 +328,12 @@ impl<B: Backend> Device<B> {
     /// Draws R's `plot()`; the public entry is
     /// [`Graphics::plot`](crate::graphics::Graphics::plot), whose docs
     /// describe it.
-    pub(crate) fn plot_impl(&mut self, x: &[f64], y: &[f64], opts: &PlotOptions) {
+    pub(crate) fn plot_impl(
+        &mut self,
+        x: &[f64],
+        y: &[f64],
+        opts: &PlotOptions,
+    ) -> Result<(), Error> {
         // On a log axis, values <= 0 are dropped (R's `xy.coords()` makes
         // them `NA`); `points()`/`lines()` then skip them.
         let range = |v: &[f64], log: bool| {
@@ -341,7 +347,7 @@ impl<B: Backend> Device<B> {
         let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.xlog));
         let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
 
-        self.plot_new_impl();
+        self.plot_new_impl()?;
         // `localWindow(xlim, ylim, log, asp, ...)`.
         let window = PlotWindowOptions {
             xlog: opts.xlog,
@@ -353,7 +359,7 @@ impl<B: Backend> Device<B> {
         };
         self.plot_window_impl(xlim, ylim, &window);
         if let Some(panel) = &opts.panel_first {
-            self.add_figure(panel);
+            self.try_add_figure(panel)?;
         }
 
         // `plot.xy(xy, type, ...)`.
@@ -370,9 +376,9 @@ impl<B: Backend> Device<B> {
             xpd: opts.xpd,
             ..XyOptions::default()
         };
-        self.points_impl(x, y, &xy);
+        self.points_impl(x, y, &xy)?;
         if let Some(panel) = &opts.panel_last {
-            self.add_figure(panel);
+            self.try_add_figure(panel)?;
         }
 
         if opts.axes {
@@ -399,7 +405,7 @@ impl<B: Backend> Device<B> {
                     axp,
                     ..AxisOptions::default()
                 };
-                self.axis_impl(side, &inline.apply(o));
+                self.axis_impl(side, &inline.apply(o))?;
             }
         }
         // `if (frame.plot) localBox(...)`: `box()` with the inline `bty`.
@@ -409,7 +415,7 @@ impl<B: Backend> Device<B> {
                 fg: opts.fg,
                 lend: opts.lend,
                 ..BoxOptions::default()
-            });
+            })?;
         }
 
         if self.par.ann {
@@ -433,5 +439,6 @@ impl<B: Backend> Device<B> {
                 ..TitleOptions::default()
             });
         }
+        Ok(())
     }
 }

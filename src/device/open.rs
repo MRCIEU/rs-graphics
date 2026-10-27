@@ -114,8 +114,9 @@ impl DeviceBuilder {
     /// If the file can't be created (the error names the file); if `file` has
     /// any other `%`, or more than one page-number format, an
     /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid 'file'
-    /// argument"); and for [`units`](DeviceBuilder::units) of pixels on a PDF
-    /// or SVG device, an `InvalidInput` error, before the file is created.
+    /// argument"); for [`units`](DeviceBuilder::units) of pixels on a PDF
+    /// or SVG device, or a negative palette number as `bg`, an `InvalidInput`
+    /// error, before the file is created.
     pub fn open(self) -> std::io::Result<Device<AnyBackend>> {
         let units = self.units.unwrap_or(Units::In);
         if units == Units::Px && self.format != Format::Png {
@@ -123,6 +124,14 @@ impl DeviceBuilder {
                 std::io::ErrorKind::InvalidInput,
                 "units = \"px\" needs a PNG device",
             ));
+        }
+        if let Some(ColorSpec::Index(i)) = self.bg {
+            if i < 0 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("numerical color values must be >= 0, found {i}"),
+                ));
+            }
         }
         let name = FileName::parse(&self.file)?;
         let first = name.for_page(1);

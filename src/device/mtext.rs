@@ -20,6 +20,7 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::Point;
 
@@ -132,9 +133,14 @@ impl<B: Backend> Device<B> {
     /// Draws R's `mtext()`; the public entry is
     /// [`Graphics::mtext`](crate::graphics::Graphics::mtext), whose docs
     /// describe it.
-    pub(crate) fn mtext_impl(&mut self, texts: &[Option<Label>], side: Side, opts: &MtextOptions) {
+    pub(crate) fn mtext_impl(
+        &mut self,
+        texts: &[Option<Label>],
+        side: Side,
+        opts: &MtextOptions,
+    ) -> Result<(), Error> {
+        check_mtext(texts)?;
         // `C_mtext`: everything recycled over the longest argument.
-        assert!(!texts.is_empty(), "zero-length 'text' specified");
         let n = [
             texts.len(),
             opts.line.len(),
@@ -179,6 +185,7 @@ impl<B: Backend> Device<B> {
                 self.mtext_one(text.clone(), side, &one);
             }
         }
+        Ok(())
     }
 
     /// One label of `mtext()`, as `C_mtext`'s loop body.
@@ -275,6 +282,14 @@ impl<B: Backend> Device<B> {
             self.hold_figure = new;
         }
     }
+}
+
+/// R's check of `mtext()`'s `text`: at least one.
+pub(crate) fn check_mtext(texts: &[Option<Label>]) -> Result<(), Error> {
+    if texts.is_empty() {
+        return Err(Error::invalid("zero-length 'text' specified"));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

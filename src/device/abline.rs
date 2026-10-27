@@ -17,6 +17,7 @@
 
 use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::ColorSpec;
+use crate::error::Error;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::Xpd;
@@ -78,33 +79,30 @@ impl AblineOptions {
     /// The `a`/`b` lines' intercepts and slopes, `a` and `b` paired (a
     /// single value pairs with each of the other's).
     ///
-    /// # Panics
+    /// # Errors
     /// If only one of `a` and `b` is given (R: "invalid a=, b=
     /// specification"). R only errors for `a` alone and silently draws
     /// nothing for `b` alone; that looks like an oversight in `C_abline`,
     /// so both are errors here. If both have several values but not the
     /// same number ("'a' and 'b' lengths differ"), or a value isn't finite
     /// (R: "'a' and 'b' must be finite").
-    fn lines(&self) -> Vec<(f64, f64)> {
+    pub(crate) fn lines(&self) -> Result<Vec<(f64, f64)>, Error> {
         let (a, b) = (&self.a, &self.b);
         if a.is_empty() && b.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
-        assert!(
-            !a.is_empty() && !b.is_empty(),
-            "invalid a=, b= specification"
-        );
-        assert!(
-            a.len() == b.len() || a.len() == 1 || b.len() == 1,
-            "abline: 'a' and 'b' lengths differ"
-        );
+        if a.is_empty() || b.is_empty() {
+            return Err(Error::invalid("invalid a=, b= specification"));
+        }
+        if !(a.len() == b.len() || a.len() == 1 || b.len() == 1) {
+            return Err(Error::invalid("'a' and 'b' lengths differ"));
+        }
         let n = a.len().max(b.len());
         let lines: Vec<(f64, f64)> = (0..n).map(|i| (a[i % a.len()], b[i % b.len()])).collect();
-        assert!(
-            lines.iter().all(|(a, b)| a.is_finite() && b.is_finite()),
-            "abline: 'a' and 'b' must be finite"
-        );
-        lines
+        if !lines.iter().all(|(a, b)| a.is_finite() && b.is_finite()) {
+            return Err(Error::invalid("'a' and 'b' must be finite"));
+        }
+        Ok(lines)
     }
 }
 
@@ -112,13 +110,14 @@ impl<B: Backend> Device<B> {
     /// Draws R's `abline()`; the public entry is
     /// [`Graphics::abline`](crate::graphics::Graphics::abline), whose docs
     /// describe it.
-    pub(crate) fn abline_impl(&mut self, opts: &AblineOptions) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
-        dev.abline_draw(opts);
+    pub(crate) fn abline_impl(&mut self, opts: &AblineOptions) -> Result<(), Error> {
+        let lines = opts.lines()?;
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
+        dev.abline_draw(opts, lines);
+        Ok(())
     }
 
-    fn abline_draw(&mut self, opts: &AblineOptions) {
-        let lines = opts.lines();
+    fn abline_draw(&mut self, opts: &AblineOptions, lines: Vec<(f64, f64)>) {
         let mut nlines = 0;
         // The style of the `n`th line: `col`, `lty` and `lwd` recycled.
         let style = |dev: &Self, n: usize| {

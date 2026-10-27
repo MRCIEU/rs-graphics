@@ -39,8 +39,10 @@
 //! `Device` implements, named as in R (`box()` is `box_()`, as `box` is a
 //! Rust keyword). A method starts a call; the call's chainable setters
 //! take all of R's arguments, named as R's (data too: `.x(&x)`), and
-//! `.draw()` runs it. A required argument (one R gives no default) that is
-//! left out panics at `.draw()` with R's message. To reuse a set of arguments, build its options struct
+//! `.draw()` runs it. Where R would stop with an error (a required
+//! argument left out, an invalid value, margins too large for the page),
+//! `.draw()` panics with R's message, and `.try_draw()` returns it as an
+//! [`error::Error`] instead. To reuse a set of arguments, build its options struct
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
 //! [`prelude`] imports it all, including the trait. As in R, numbers may
 //! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (data

@@ -447,14 +447,17 @@ macro_rules! par_options {
 
         impl ParOptions {
             /// R's checks of `usr`, made when the call is drawn or recorded.
-            pub(crate) fn check(&self) {
+            pub(crate) fn check(&self) -> Result<(), $crate::error::Error> {
                 if let Some([x0, x1, y0, y1]) = self.usr {
                     let ok = ![x0, x1, y0, y1].iter().any(|v| v.is_nan()) && x0 != x1 && y0 != y1;
-                    assert!(
-                        ok,
-                        "invalid value specified for graphical parameter \"usr\""
-                    );
+                    if !ok {
+                        return Err($crate::error::Error::invalid(
+                            "invalid value specified for graphical parameter \"usr\"",
+                        ));
+                    }
                 }
+                $crate::device::check_lmitre(self.lmitre)?;
+                Ok(())
             }
         }
     };

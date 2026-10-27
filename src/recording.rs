@@ -93,6 +93,7 @@ use crate::device::{
     LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side,
     TextOptions, TitleOptions, XyOptions,
 };
+use crate::error::Error;
 use crate::graphics::{Graphics, ParPage};
 use crate::highlevel::barplot::bar_layout;
 use crate::highlevel::boxplot::boxplot_all_stats;
@@ -205,6 +206,35 @@ fn four(x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64]) -> [Vec<f64>; 4] {
     [x0.to_vec(), y0.to_vec(), x1.to_vec(), y1.to_vec()]
 }
 
+impl Call {
+    /// The R function a recorded call is, for its errors.
+    fn r_name(&self) -> &'static str {
+        match self {
+            Call::PlotNew => "plot.new",
+            Call::Par(_) => "par",
+            Call::Plot(..) => "plot",
+            Call::Hist(..) => "hist",
+            Call::Barplot(..) => "barplot",
+            Call::Boxplot(..) => "boxplot",
+            Call::Pie(..) => "pie",
+            Call::PlotWindow(..) => "plot.window",
+            Call::Points(..) => "points",
+            Call::Lines(..) => "lines",
+            Call::Segments(..) => "segments",
+            Call::Arrows(..) => "arrows",
+            Call::Rect(..) => "rect",
+            Call::Polygon(..) => "polygon",
+            Call::Text(..) => "text",
+            Call::Box(..) => "box",
+            Call::Axis(..) => "axis",
+            Call::Abline(..) => "abline",
+            Call::Legend(..) => "legend",
+            Call::Mtext(..) => "mtext",
+            Call::Title(..) => "title",
+        }
+    }
+}
+
 impl crate::graphics::sealed::Sealed for Figure {}
 
 /// Records each call. `legend()`'s and `axis()`'s `.draw()` return `()`:
@@ -213,39 +243,61 @@ impl Graphics for Figure {
     type LegendResult = ();
     type AxisResult = ();
 
-    fn plot_new(&mut self) {
+    fn try_plot_new(&mut self) -> Result<(), Error> {
         self.calls.push(Call::PlotNew);
+        Ok(())
     }
-    fn emit_plot(&mut self, x: &[f64], y: &[f64], opts: PlotOptions) {
+    fn emit_plot(&mut self, x: &[f64], y: &[f64], opts: PlotOptions) -> Result<(), Error> {
         self.calls.push(Call::Plot(x.to_vec(), y.to_vec(), opts));
+        Ok(())
     }
-    fn emit_hist(&mut self, x: &[f64], opts: HistOptions) -> HistResult {
-        let result = hist_bins(x, &opts);
+    fn emit_hist(&mut self, x: &[f64], opts: HistOptions) -> Result<HistResult, Error> {
+        let result = hist_bins(x, &opts)?;
         self.calls.push(Call::Hist(x.to_vec(), opts));
-        result
+        Ok(result)
     }
-    fn emit_barplot(&mut self, heights: BarHeights, opts: BarplotOptions) -> Vec<f64> {
-        let centres = bar_layout(&heights, &opts).w_m;
+    fn emit_barplot(
+        &mut self,
+        heights: BarHeights,
+        opts: BarplotOptions,
+    ) -> Result<Vec<f64>, Error> {
+        let centres = bar_layout(&heights, &opts)?.w_m;
         self.calls.push(Call::Barplot(heights, Box::new(opts)));
-        centres
+        Ok(centres)
     }
-    fn emit_boxplot(&mut self, groups: &[Vec<f64>], opts: BoxplotOptions) -> Vec<BoxStats> {
-        let stats = boxplot_all_stats(groups, &opts);
+    fn emit_boxplot(
+        &mut self,
+        groups: &[Vec<f64>],
+        opts: BoxplotOptions,
+    ) -> Result<Vec<BoxStats>, Error> {
+        let stats = boxplot_all_stats(groups, &opts)?;
         self.calls
             .push(Call::Boxplot(groups.to_vec(), Box::new(opts)));
-        stats
+        Ok(stats)
     }
-    fn emit_pie(&mut self, x: &[f64], opts: PieOptions) {
+    fn emit_pie(&mut self, x: &[f64], opts: PieOptions) -> Result<(), Error> {
+        crate::highlevel::check_pie(x)?;
         self.calls.push(Call::Pie(x.to_vec(), opts));
+        Ok(())
     }
-    fn emit_plot_window(&mut self, xlim: (f64, f64), ylim: (f64, f64), opts: PlotWindowOptions) {
+    fn emit_plot_window(
+        &mut self,
+        xlim: (f64, f64),
+        ylim: (f64, f64),
+        opts: PlotWindowOptions,
+    ) -> Result<(), Error> {
         self.calls.push(Call::PlotWindow(xlim, ylim, opts));
+        Ok(())
     }
-    fn emit_points(&mut self, x: &[f64], y: &[f64], opts: XyOptions) {
+    fn emit_points(&mut self, x: &[f64], y: &[f64], opts: XyOptions) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
         self.calls.push(Call::Points(x.to_vec(), y.to_vec(), opts));
+        Ok(())
     }
-    fn emit_lines(&mut self, x: &[f64], y: &[f64], opts: XyOptions) {
+    fn emit_lines(&mut self, x: &[f64], y: &[f64], opts: XyOptions) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
         self.calls.push(Call::Lines(x.to_vec(), y.to_vec(), opts));
+        Ok(())
     }
     fn emit_segments(
         &mut self,
@@ -254,45 +306,97 @@ impl Graphics for Figure {
         x1: &[f64],
         y1: &[f64],
         opts: SegmentsOptions,
-    ) {
+    ) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
         self.calls.push(Call::Segments(four(x0, y0, x1, y1), opts));
+        Ok(())
     }
-    fn emit_arrows(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: ArrowsOptions) {
+    fn emit_arrows(
+        &mut self,
+        x0: &[f64],
+        y0: &[f64],
+        x1: &[f64],
+        y1: &[f64],
+        opts: ArrowsOptions,
+    ) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
         self.calls.push(Call::Arrows(four(x0, y0, x1, y1), opts));
+        Ok(())
     }
-    fn emit_rect(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: RectOptions) {
+    fn emit_rect(
+        &mut self,
+        x0: &[f64],
+        y0: &[f64],
+        x1: &[f64],
+        y1: &[f64],
+        opts: RectOptions,
+    ) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
         self.calls.push(Call::Rect(four(x0, y0, x1, y1), opts));
+        Ok(())
     }
-    fn emit_polygon(&mut self, x: &[f64], y: &[f64], opts: PolygonOptions) {
+    fn emit_polygon(&mut self, x: &[f64], y: &[f64], opts: PolygonOptions) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
         self.calls.push(Call::Polygon(x.to_vec(), y.to_vec(), opts));
+        Ok(())
     }
-    fn emit_text(&mut self, x: &[f64], y: &[f64], labels: Vec<Option<Label>>, opts: TextOptions) {
+    fn emit_text(
+        &mut self,
+        x: &[f64],
+        y: &[f64],
+        labels: Vec<Option<Label>>,
+        opts: TextOptions,
+    ) -> Result<(), Error> {
+        crate::device::check_text(&opts)?;
         self.calls
             .push(Call::Text(x.to_vec(), y.to_vec(), labels, opts));
+        Ok(())
     }
-    fn emit_box(&mut self, opts: BoxOptions) {
+    fn emit_box(&mut self, opts: BoxOptions) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
         self.calls.push(Call::Box(opts));
+        Ok(())
     }
-    fn emit_axis(&mut self, side: Side, opts: AxisOptions) {
+    fn emit_axis(&mut self, side: Side, opts: AxisOptions) -> Result<(), Error> {
+        crate::device::check_axis(&opts)?;
         self.calls.push(Call::Axis(side, opts));
+        Ok(())
     }
-    fn emit_abline(&mut self, opts: AblineOptions) {
+    fn emit_abline(&mut self, opts: AblineOptions) -> Result<(), Error> {
+        crate::device::check_lmitre(opts.lmitre)?;
+        opts.lines()?;
         self.calls.push(Call::Abline(opts));
+        Ok(())
     }
-    fn emit_legend(&mut self, pos: LegendPos, labels: Vec<Option<Label>>, opts: LegendOptions) {
-        crate::device::check_legend(&labels, &opts);
+    fn emit_legend(
+        &mut self,
+        pos: LegendPos,
+        labels: Vec<Option<Label>>,
+        opts: LegendOptions,
+    ) -> Result<(), Error> {
+        crate::device::check_legend(&labels, &opts)?;
         self.calls.push(Call::Legend(pos, labels, opts));
+        Ok(())
     }
-    fn emit_mtext(&mut self, text: Vec<Option<Label>>, side: Side, opts: MtextOptions) {
+    fn emit_mtext(
+        &mut self,
+        text: Vec<Option<Label>>,
+        side: Side,
+        opts: MtextOptions,
+    ) -> Result<(), Error> {
+        crate::device::check_mtext(&text)?;
         self.calls.push(Call::Mtext(text, side, opts));
+        Ok(())
     }
-    fn emit_title(&mut self, opts: TitleOptions) {
+    fn emit_title(&mut self, opts: TitleOptions) -> Result<(), Error> {
         self.calls.push(Call::Title(opts));
+        Ok(())
     }
-    fn emit_par(&mut self, opts: ParOptions, page: ParPage) {
+    fn emit_par(&mut self, opts: ParOptions, page: ParPage) -> Result<(), Error> {
         // Only a device's `par()` call has page layout setters.
         debug_assert!(page.is_empty());
         self.calls.push(Call::Par(opts));
+        Ok(())
     }
 }
 
@@ -338,28 +442,38 @@ impl<B: Backend> Device<B> {
     ///
     /// # Panics
     ///
-    /// Where the recorded calls would panic on the device (for example
-    /// "figure margins too large" on a small page).
+    /// With the first R error a recorded call raises on the device, as
+    /// [`try_add_figure`](Device::try_add_figure) would return it (for
+    /// example `plot.new(): figure margins too large` on a small page).
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
-        // `par` comes back afterwards, also if a recorded call panics.
+        self.try_add_figure(fig).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Draws `fig` as [`add_figure`](Device::add_figure) does, returning the
+    /// first R error instead of panicking.
+    ///
+    /// Arguments are checked when the figure records its calls, so the
+    /// errors left here are those only a device can see, chiefly regions
+    /// that don't fit its page.
+    ///
+    /// # Errors
+    ///
+    /// The first R error a recorded call raises on the device. The calls
+    /// before it have been drawn, and `par` is restored, as in R.
+    pub fn try_add_figure(&mut self, fig: &Figure) -> Result<FigureResult, Error> {
+        // `par` comes back afterwards, also after an error or a panic.
         let mut dev = self.par_scope(|now, saved| *now = saved.clone());
         let mut out = FigureResult::default();
         // Each call goes through the same `emit_*` as a device's `.draw()`.
         for call in &fig.calls {
             let d = &mut *dev;
-            match call {
-                Call::PlotNew => d.plot_new(),
+            let r: Result<(), Error> = match call {
+                Call::PlotNew => d.try_plot_new(),
                 Call::Par(o) => d.emit_par(o.clone(), ParPage::default()),
                 Call::Plot(x, y, o) => d.emit_plot(x, y, o.clone()),
-                Call::Hist(x, o) => {
-                    d.emit_hist(x, o.clone());
-                }
-                Call::Barplot(h, o) => {
-                    d.emit_barplot(h.clone(), (**o).clone());
-                }
-                Call::Boxplot(g, o) => {
-                    d.emit_boxplot(g, (**o).clone());
-                }
+                Call::Hist(x, o) => d.emit_hist(x, o.clone()).map(|_| ()),
+                Call::Barplot(h, o) => d.emit_barplot(h.clone(), (**o).clone()).map(|_| ()),
+                Call::Boxplot(g, o) => d.emit_boxplot(g, (**o).clone()).map(|_| ()),
                 Call::Pie(x, o) => d.emit_pie(x, o.clone()),
                 Call::PlotWindow(xlim, ylim, o) => d.emit_plot_window(*xlim, *ylim, o.clone()),
                 Call::Points(x, y, o) => d.emit_points(x, y, o.clone()),
@@ -370,18 +484,18 @@ impl<B: Backend> Device<B> {
                 Call::Polygon(x, y, o) => d.emit_polygon(x, y, o.clone()),
                 Call::Text(x, y, labels, o) => d.emit_text(x, y, labels.clone(), o.clone()),
                 Call::Box(o) => d.emit_box(o.clone()),
-                Call::Axis(side, o) => out.axes.push(d.emit_axis(*side, o.clone())),
+                Call::Axis(side, o) => d.emit_axis(*side, o.clone()).map(|at| out.axes.push(at)),
                 Call::Abline(o) => d.emit_abline(o.clone()),
-                Call::Legend(pos, labels, o) => {
-                    out.legends
-                        .push(d.emit_legend(*pos, labels.clone(), o.clone()))
-                }
+                Call::Legend(pos, labels, o) => d
+                    .emit_legend(*pos, labels.clone(), o.clone())
+                    .map(|l| out.legends.push(l)),
                 Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), *side, o.clone()),
                 Call::Title(o) => d.emit_title(o.clone()),
-            }
+            };
+            r.map_err(|e| e.in_call(call.r_name()))?;
         }
         drop(dev);
-        out
+        Ok(out)
     }
 
     /// Draws `fig` in the panel at (`row`, `col`), counting from 1, of the
@@ -408,13 +522,31 @@ impl<B: Backend> Device<B> {
     ///
     /// # Panics
     ///
-    /// If `row` or `col` is outside the arrangement, or where the recorded
-    /// calls would panic on the device.
+    /// With R's error, as [`try_add_figure_at`](Device::try_add_figure_at)
+    /// would return it.
     pub fn add_figure_at(&mut self, row: usize, col: usize, fig: &Figure) -> FigureResult {
+        self.try_add_figure_at(row, col, fig)
+            .unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Draws `fig` in a chosen panel as
+    /// [`add_figure_at`](Device::add_figure_at) does, returning the first R
+    /// error instead of panicking.
+    ///
+    /// # Errors
+    ///
+    /// If `row` or `col` is outside the arrangement, or as
+    /// [`try_add_figure`](Device::try_add_figure).
+    pub fn try_add_figure_at(
+        &mut self,
+        row: usize,
+        col: usize,
+        fig: &Figure,
+    ) -> Result<FigureResult, Error> {
         if !self.is_used() {
-            self.plot_new_impl();
+            self.try_plot_new()?;
         }
-        self.par().mfg(row, col).draw();
-        self.add_figure(fig)
+        self.par().mfg(row, col).try_draw()?;
+        self.try_add_figure(fig)
     }
 }

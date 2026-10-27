@@ -37,6 +37,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
+use crate::error::Error;
 use crate::geometry::{Point, Rect};
 use crate::layout::{Arrangement, Layout, LayoutRespect, LayoutSize};
 use crate::lty::LineType;
@@ -55,10 +56,13 @@ mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
+pub(crate) use axis::check_axis;
 pub(crate) use legend::check_legend;
 pub use legend::{LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos};
 pub use mtext::MtextOptions;
+pub(crate) use mtext::check_mtext;
 pub use open::{DeviceBuilder, Units};
+pub(crate) use primitives::check_text;
 pub use primitives::{
     ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
     SegmentsOptions, TextOptions, XyOptions,
@@ -179,6 +183,9 @@ pub struct Device<B: Backend> {
     /// The file(s) of a device opened with [`DeviceBuilder::open`], which
     /// [`close`](Device::close) writes; `None` for [`Device::new`].
     output: Option<open::Output>,
+    /// An R error found while drawing (a negative colour number, ...),
+    /// returned by the call when it ends; see [`Device::run`].
+    pending_error: std::cell::RefCell<Option<Error>>,
 }
 
 /// A [`layout()`](Device::layout) call being built: it divides the page
@@ -243,29 +250,39 @@ impl<B: Backend> LayoutCall<'_, B> {
     ///
     /// # Panics
     ///
-    /// With R's message (`argument "mat" is missing, with no default`) if
-    /// `mat` wasn't set; if the grid is empty or not rectangular, has more
+    /// With R's error, as [`try_draw`](LayoutCall::try_draw) would return it.
+    pub fn draw(self) -> usize {
+        self.try_draw().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Applies the layout as [`draw`](LayoutCall::draw) does, returning R's
+    /// error instead of panicking.
+    ///
+    /// # Errors
+    ///
+    /// With R's message, if `mat` wasn't set (`argument "mat" is missing,
+    /// with no default`); if the grid is empty or not rectangular, has more
     /// than 50 rows, 50 columns or 500 cells, has no figure, or skips a
     /// figure number; if `respect`'s grid doesn't have `mat`'s dimensions;
     /// and, unlike R (which accepts them), if `mat` has a negative or
-    /// non-finite value.
-    pub fn draw(self) -> usize {
-        let mat = crate::graphics::required(self.mat, "mat");
-        let mat: Vec<Vec<usize>> = mat
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|&v| {
-                        assert!(
-                            v.is_finite() && v >= 0.0,
-                            "layout matrix values must be non-negative numbers"
-                        );
-                        v.trunc() as usize
-                    })
-                    .collect()
-            })
-            .collect();
-        let mut layout = Layout::new(&mat).unwrap_or_else(|e| panic!("{}", e.0));
+    /// non-finite value. The device is unchanged after an error.
+    pub fn try_draw(self) -> Result<usize, Error> {
+        let fail = |m: String| Error::invalid(m).in_call("layout");
+        let mat = crate::graphics::required(self.mat, "mat").map_err(|e| e.in_call("layout"))?;
+        let mut rows: Vec<Vec<usize>> = Vec::with_capacity(mat.len());
+        for row in &mat {
+            let mut r = Vec::with_capacity(row.len());
+            for &v in row {
+                if !(v.is_finite() && v >= 0.0) {
+                    return Err(fail(
+                        "layout matrix values must be non-negative numbers".into(),
+                    ));
+                }
+                r.push(v.trunc() as usize);
+            }
+            rows.push(r);
+        }
+        let mut layout = Layout::new(&rows).map_err(|e| fail(e.0))?;
         if !self.widths.is_empty() {
             layout = layout.widths(&self.widths);
         }
@@ -275,13 +292,13 @@ impl<B: Backend> LayoutCall<'_, B> {
         layout = match self.respect {
             LayoutRespect::No => layout,
             LayoutRespect::All => layout.respect(true),
-            LayoutRespect::Cells(cells) => layout
-                .respect_matrix(&cells)
-                .unwrap_or_else(|e| panic!("{}", e.0)),
+            LayoutRespect::Cells(cells) => layout.respect_matrix(&cells).map_err(|e| fail(e.0))?,
         };
         let n = layout.num_figures();
-        self.dev.set_arrangement(Arrangement::Layout(layout));
-        n
+        self.dev
+            .set_arrangement(Arrangement::Layout(layout))
+            .map_err(|e| e.in_call("layout"))?;
+        Ok(n)
     }
 }
 
@@ -339,7 +356,11 @@ impl StrUnits {
 }
 
 crate::error::from_str_via_parse!(StrUnits, "string units");
-crate::error::from_r_string!(StrUnits, "string units", "\"user\", \"inches\" or \"figure\"");
+crate::error::from_r_string!(
+    StrUnits,
+    "string units",
+    "\"user\", \"inches\" or \"figure\""
+);
 
 /// A [`strwidth()`](Device::strwidth) or [`strheight()`](Device::strheight)
 /// measurement being built.
@@ -399,9 +420,21 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
     ///
     /// # Panics
     ///
-    /// If `s` wasn't set (`argument "s" is missing, with no default`).
+    /// If `s` wasn't set, as [`try_get`](StrSizeCall::try_get) would
+    /// return it (`strwidth(): argument "s" is missing, with no default`).
     pub fn get(self) -> f64 {
-        let label = crate::graphics::required(self.s, "s");
+        self.try_get().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Returns the width or height as [`get`](StrSizeCall::get) does,
+    /// returning R's error instead of panicking.
+    ///
+    /// # Errors
+    ///
+    /// If `s` wasn't set (`argument "s" is missing, with no default`).
+    pub fn try_get(self) -> Result<f64, Error> {
+        let call = if self.height { "strheight" } else { "strwidth" };
+        let label = crate::graphics::required(self.s, "s").map_err(|e| e.in_call(call))?;
         let cex = self.cex.unwrap_or(1.0);
         let dev = self.dev;
         let face = self.font.unwrap_or(dev.par.font);
@@ -423,11 +456,11 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
         } else {
             (dev.plt.width(), dev.fig.width(), dev.usr.1 - dev.usr.0)
         };
-        match self.units {
+        Ok(match self.units {
             StrUnits::Inches => inches,
             StrUnits::User => inches / plot * range,
             StrUnits::Figure => inches / fig,
-        }
+        })
     }
 }
 
@@ -556,6 +589,7 @@ impl<B: Backend> Device<B> {
             used: false,
             start_ps: par_ps,
             output: None,
+            pending_error: std::cell::RefCell::new(None),
         };
         dev.recompute_layout();
         dev
@@ -816,12 +850,13 @@ impl<B: Backend> Device<B> {
     }
 
     /// `par(fig = )`; see [`ParCall::fig`](crate::graphics::ParCall::fig).
-    pub(crate) fn fig(&mut self, fig: [f64; 4]) {
+    pub(crate) fn fig(&mut self, fig: [f64; 4]) -> Result<(), Error> {
         let [x0, x1, y0, y1] = fig;
-        assert!(
-            0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0,
-            "invalid value specified for graphical parameter \"fig\""
-        );
+        if !(0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0) {
+            return Err(Error::invalid(
+                "invalid value specified for graphical parameter \"fig\"",
+            ));
+        }
         self.arrangement = Arrangement::Grid {
             nrow: 1,
             ncol: 1,
@@ -830,6 +865,7 @@ impl<B: Backend> Device<B> {
         self.current_figure = 1;
         self.fig_spec = Some(FigSpec::Nic(fig));
         self.recompute_layout();
+        Ok(())
     }
 
     /// R's `currentFigure = lastFigure`: the next `plot_new()` starts a
@@ -840,11 +876,12 @@ impl<B: Backend> Device<B> {
 
     /// `par(fin = )` (R's `fUnits = INCHES`); see
     /// [`ParCall::fin`](crate::graphics::ParCall::fin).
-    pub(crate) fn fin(&mut self, fin: [f64; 2]) {
-        assert!(
-            fin.iter().all(|&v| v > 0.0 && v.is_finite()),
-            "invalid value specified for graphical parameter \"fin\""
-        );
+    pub(crate) fn fin(&mut self, fin: [f64; 2]) -> Result<(), Error> {
+        if !(fin.iter().all(|&v| v > 0.0 && v.is_finite())) {
+            return Err(Error::invalid(
+                "invalid value specified for graphical parameter \"fin\"",
+            ));
+        }
         self.arrangement = Arrangement::Grid {
             nrow: 1,
             ncol: 1,
@@ -853,26 +890,29 @@ impl<B: Backend> Device<B> {
         self.current_figure = 1;
         self.fig_spec = Some(FigSpec::Inches(fin));
         self.recompute_layout();
+        Ok(())
     }
 
     /// `par(mfrow = )`; see
     /// [`ParCall::mfrow`](crate::graphics::ParCall::mfrow).
-    pub(crate) fn mfrow(&mut self, nrow: usize, ncol: usize) {
+    pub(crate) fn mfrow(&mut self, nrow: usize, ncol: usize) -> Result<(), Error> {
+        check_grid("mfrow", nrow, ncol)?;
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
             by_col: false,
-        });
+        })
     }
 
     /// `par(mfcol = )`; see
     /// [`ParCall::mfcol`](crate::graphics::ParCall::mfcol).
-    pub(crate) fn mfcol(&mut self, nrow: usize, ncol: usize) {
+    pub(crate) fn mfcol(&mut self, nrow: usize, ncol: usize) -> Result<(), Error> {
+        check_grid("mfcol", nrow, ncol)?;
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
             by_col: true,
-        });
+        })
     }
 
     /// Starts dividing the page into figures of different sizes: a grid in
@@ -914,11 +954,12 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    fn set_arrangement(&mut self, arrangement: Arrangement) {
-        assert!(
-            arrangement.nrow() > 0 && arrangement.ncol() > 0,
-            "a figure grid needs at least one row and one column"
-        );
+    fn set_arrangement(&mut self, arrangement: Arrangement) -> Result<(), Error> {
+        if !(arrangement.nrow() > 0 && arrangement.ncol() > 0) {
+            return Err(Error::invalid(
+                "a figure grid needs at least one row and one column",
+            ));
+        }
         self.par.cex = arrangement.cex_base();
         self.par.mex = 1.0;
         // R sets `currentFigure = lastFigure` so the next plot.new()
@@ -928,15 +969,18 @@ impl<B: Backend> Device<B> {
         self.fig_spec = None;
         self.hold_figure = false;
         self.recompute_layout();
+        Ok(())
     }
 
     /// `par(mfg = )`; see [`ParCall::mfg`](crate::graphics::ParCall::mfg).
-    pub(crate) fn mfg(&mut self, row: usize, col: usize) {
+    pub(crate) fn mfg(&mut self, row: usize, col: usize) -> Result<(), Error> {
         let (nrow, ncol) = (self.arrangement.nrow(), self.arrangement.ncol());
-        assert!(
-            (1..=nrow).contains(&row) && (1..=ncol).contains(&col),
-            "mfg out of range"
-        );
+        if !(1..=nrow).contains(&row) {
+            return Err(Error::invalid("parameter \"i\" in \"mfg\" is out of range"));
+        }
+        if !(1..=ncol).contains(&col) {
+            return Err(Error::invalid("parameter \"j\" in \"mfg\" is out of range"));
+        }
         let by_col = matches!(self.arrangement, Arrangement::Grid { by_col: true, .. });
         self.current_figure = if by_col {
             (col - 1) * nrow + row
@@ -945,6 +989,7 @@ impl<B: Backend> Device<B> {
         };
         self.hold_figure = true;
         self.recompute_layout();
+        Ok(())
     }
 
     /// `par(new = )`; see [`ParOptions::new`](crate::par::ParOptions::new).
@@ -1038,7 +1083,7 @@ impl<B: Backend> Device<B> {
     /// Draws R's `plot_new()`; the public entry is
     /// [`Graphics::plot_new`](crate::graphics::Graphics::plot_new), whose docs
     /// describe it.
-    pub(crate) fn plot_new_impl(&mut self) {
+    pub(crate) fn plot_new_impl(&mut self) -> Result<(), Error> {
         let mut new_page = false;
         let had_page = self.used;
         if !self.hold_figure || !self.used {
@@ -1070,10 +1115,39 @@ impl<B: Backend> Device<B> {
             if self.current_figure < 1 {
                 self.current_figure = self.arrangement.last_figure();
             }
-            panic!("{msg}");
+            return Err(Error::does_not_fit("plot.new", msg));
         }
         // `C_plot_new`: linear axes, `GScale(0, 1)` on both.
         self.set_window((0.0, 1.0), (0.0, 1.0), false, false);
+        Ok(())
+    }
+
+    /// Runs one call's drawing: its result, or the first R error found
+    /// while drawing (recorded by [`Device::record_error`]), which R would
+    /// have stopped at.
+    pub(crate) fn run<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        // A call made inside another (`plot(panel.first = )`) keeps the
+        // outer call's error for the outer call to return.
+        let outer = self.pending_error.borrow_mut().take();
+        let result = f(self);
+        let inner = self.pending_error.replace(outer);
+        match inner {
+            Some(e) => Err(e),
+            None => result,
+        }
+    }
+
+    /// Records an R error found while drawing, where returning it isn't
+    /// practical (deep in colour or text code); the call returns it when it
+    /// ends ([`Device::run`]). The first one counts.
+    pub(crate) fn record_error(&self, e: Error) {
+        let mut slot = self.pending_error.borrow_mut();
+        if slot.is_none() {
+            *slot = Some(e);
+        }
     }
 
     /// The user coordinates for limits `xlim`/`ylim` (data units) on
@@ -1213,6 +1287,24 @@ impl<B: Backend> Device<B> {
             self.par.yaxp
         };
         self.ticks_from_axp(side, axp)
+    }
+
+    /// R's error in `CreateAtVector()` for a log axis whose `axp[3]` (the
+    /// given one, else `par(xaxp/yaxp)`) isn't one of its codes 1 to 3.
+    pub(crate) fn check_axis_axp(&self, side: Side, axp: Option<[f64; 3]>) -> Result<(), Error> {
+        let (log, par_axp, xy) = if side.is_horizontal() {
+            (self.xlog, self.par.xaxp, "x")
+        } else {
+            (self.ylog, self.par.yaxp, "y")
+        };
+        let code = axp.unwrap_or(par_axp)[2];
+        // A negative code is a linear count; `create_at_vector` rounds.
+        if log && (code.is_nan() || code >= 0.0) && ![1, 2, 3].contains(&((code + 0.5) as i32)) {
+            return Err(Error::invalid(format!(
+                "log - axis(), 'at' creation: INVALID {xy}axp[3] = {code}"
+            )));
+        }
+        Ok(())
     }
 
     /// `CreateAtVector()` for `side`'s axis with the given `axp`.
@@ -1483,6 +1575,14 @@ impl<B: Backend> Device<B> {
     // ---------------------------------------------------------------
 
     fn resolve(&self, spec: ColorSpec) -> Option<Color> {
+        if let ColorSpec::Index(i) = spec {
+            if i < 0 {
+                self.record_error(Error::invalid(format!(
+                    "numerical color values must be >= 0, found {i}"
+                )));
+                return None;
+            }
+        }
         self.par.resolve_color(spec)
     }
 
@@ -2063,21 +2163,15 @@ impl<B: Backend> Device<B> {
     /// `par.font` is restored too, so callers may set an inline `font` in
     /// the scope (as `points()` does for character symbols).
     ///
-    /// # Panics
-    /// If `lmitre` is below 1 (R's "invalid value specified for graphical
-    /// parameter \"lmitre\"").
+    /// # Errors
+    /// If `lmitre` is below 1 ([`check_lmitre`]).
     pub(crate) fn line_pars(
         &mut self,
         lend: Option<LineEnd>,
         ljoin: Option<LineJoin>,
         lmitre: Option<f64>,
-    ) -> ParScope<'_, B> {
-        if let Some(m) = lmitre {
-            assert!(
-                m >= 1.0,
-                "invalid value specified for graphical parameter \"lmitre\""
-            );
-        }
+    ) -> Result<ParScope<'_, B>, Error> {
+        check_lmitre(lmitre)?;
         let mut dev = self.par_scope(|now, saved| {
             now.lend = saved.lend;
             now.ljoin = saved.ljoin;
@@ -2093,7 +2187,7 @@ impl<B: Backend> Device<B> {
         if let Some(m) = lmitre {
             dev.par.lmitre = m;
         }
-        dev
+        Ok(dev)
     }
 }
 
@@ -2136,6 +2230,39 @@ fn region_error(fig: [f64; 4], plt: [f64; 4]) -> Option<&'static str> {
         Some("plot region too large")
     } else {
         None
+    }
+}
+
+/// R's check of `par(mfrow/mfcol = )`: at least one row and column.
+fn check_grid(name: &str, nrow: usize, ncol: usize) -> Result<(), Error> {
+    if nrow == 0 || ncol == 0 {
+        return Err(Error::invalid(format!(
+            "invalid value specified for graphical parameter \"{name}\""
+        )));
+    }
+    Ok(())
+}
+
+/// R's check of `par(xaxp/yaxp = )` on a log axis (`logAxpCheck`): the
+/// code `axp[2]`, as an integer, is at most 4 and not 0 (negative is a
+/// linear count).
+pub(crate) fn check_log_axp(name: &str, axp: [f64; 3]) -> Result<(), Error> {
+    let code = axp[2].trunc();
+    if !code.is_finite() || code == 0.0 || code > 4.0 {
+        return Err(Error::invalid(format!(
+            "invalid value specified for graphical parameter \"{name}\""
+        )));
+    }
+    Ok(())
+}
+
+/// R's check of `lmitre` (in `par()` or inline): at least 1.
+pub(crate) fn check_lmitre(lmitre: Option<f64>) -> Result<(), Error> {
+    match lmitre {
+        Some(m) if m.is_nan() || m < 1.0 => Err(Error::invalid(
+            "invalid value specified for graphical parameter \"lmitre\"",
+        )),
+        _ => Ok(()),
     }
 }
 
@@ -2199,7 +2326,7 @@ mod tests {
         use super::{Device, Par, PlotWindowOptions, Side};
         use crate::backend::pdf::PdfBackend;
         let mut dev = Device::new(PdfBackend::new(7.0, 5.0), Par::default());
-        dev.plot_new_impl();
+        dev.plot_new_impl().unwrap();
         assert!(!dev.xlog() && !dev.ylog());
         let log_x = PlotWindowOptions {
             xlog: true,

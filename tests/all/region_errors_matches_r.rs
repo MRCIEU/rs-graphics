@@ -6,17 +6,17 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! `plot_new()` panics with R's message when the regions don't fit
-//! ("figure margins too large", "figure region too large", "plot region
-//! too large"), in the same cases as R's `plot.new()` errors, and leaves
-//! the figure counter where R's `invalidError()` does, so a retry reuses
-//! the figure.
+//! `try_plot_new()` returns R's error (and `plot_new()` panics with it)
+//! when the regions don't fit ("figure margins too large", "figure region
+//! too large", "plot region too large"), in the same cases as R's
+//! `plot.new()` errors, and leaves the figure counter where R's
+//! `invalidError()` does, so a retry reuses the figure.
 
 use crate::common;
 
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::process::Command;
 
+use rs_graphics::error::ErrorKind;
 use rs_graphics::prelude::*;
 
 /// One case: R code after `pdf(file, w, h)` that ends in `plot.new()`, and
@@ -129,15 +129,14 @@ fn device(w: f64, h: f64) -> Device<PdfBackend> {
     Device::new(PdfBackend::new(w, h), Par::default())
 }
 
-/// The panic message of `f`, or `"ok"`.
-fn outcome(f: impl FnOnce()) -> String {
-    match catch_unwind(AssertUnwindSafe(f)) {
+/// `try_plot_new()`'s error message, or `"ok"`.
+fn outcome(dev: &mut Device<PdfBackend>) -> String {
+    match dev.try_plot_new() {
         Ok(()) => "ok".to_string(),
-        Err(e) => e
-            .downcast_ref::<&str>()
-            .map(|s| s.to_string())
-            .or_else(|| e.downcast_ref::<String>().cloned())
-            .unwrap_or_default(),
+        Err(e) => {
+            assert_eq!((e.call(), e.kind()), ("plot.new", ErrorKind::DoesNotFit));
+            e.message().to_string()
+        }
     }
 }
 
@@ -180,20 +179,14 @@ fn region_errors_match_r() {
     ] {
         assert!(expected.iter().any(|e| e == msg), "no case gives {msg:?}");
     }
-    // Keep the panic messages of the expected failures out of the output.
-    let hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
     let got: Vec<String> = cases
         .iter()
         .map(|c| {
             let mut dev = device(c.size.0, c.size.1);
-            outcome(|| {
-                (c.rust)(&mut dev);
-                dev.plot_new();
-            })
+            (c.rust)(&mut dev);
+            outcome(&mut dev)
         })
         .collect();
-    std::panic::set_hook(hook);
     for ((c, e), g) in cases.iter().zip(&expected).zip(&got) {
         assert_eq!(g, e, "case {}", c.name);
     }
@@ -216,13 +209,11 @@ fn failed_figure_is_retried_like_r() {
          par(mar = c(5, 4, 4, 2) + 0.1); plot.new(); e <- par('mfg')[2]; \
          invisible(dev.off()); cat(m, m2, a, b, c, d, e, sep = '|')",
     );
-    let hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
     let mut dev = device(7.0, 7.0);
     dev.par().mfrow(1, 3).draw();
     dev.plot_new();
     dev.par().mar([60, 1, 1, 1]).draw();
-    let err = outcome(|| dev.plot_new());
+    let err = outcome(&mut dev);
     let a = dev.current_figure();
     dev.par().mar([5.1, 4.1, 4.1, 2.1]).draw();
     dev.plot_new();
@@ -232,12 +223,11 @@ fn failed_figure_is_retried_like_r() {
     // An error on the very first plot.
     let mut dev = device(7.0, 7.0);
     dev.par().mar([40, 1, 1, 1]).draw();
-    let err2 = outcome(|| dev.plot_new());
+    let err2 = outcome(&mut dev);
     let d = dev.current_figure();
     dev.par().mar([5.1, 4.1, 4.1, 2.1]).draw();
     dev.plot_new();
     let e = dev.current_figure();
-    std::panic::set_hook(hook);
     assert_eq!(format!("{err}|{err2}|{a}|{b}|{c}|{d}|{e}"), r.trim());
     assert!(r.starts_with("figure margins too large|figure margins too large|"));
 }

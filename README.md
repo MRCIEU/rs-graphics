@@ -45,7 +45,7 @@ A `Device` is an open graphics device, like the one R's `pdf()`, `png()` or `svg
 
 Other R functions and arguments are represented by methods, which can be chained, and must be finished with `.draw()`. Calls without `.draw()` draw nothing (which the compiler warns you about).
 
-If you leave out an argument R requires, `.draw()` panics with R's message (`dev.plot().draw()` gives `argument "x" is missing, with no default`). If you leave out one that has a default, you get R's default, which is often the current `par()` value (no `.col()` means `par("col")`).
+If you leave out an argument R requires, `.draw()` panics with R's message (`dev.plot().draw()` gives `plot(): argument "x" is missing, with no default`), as it does for R's other errors; `.try_draw()` returns the error instead, so you can handle it. If you leave out one that has a default, you get R's default, which is often the current `par()` value (no `.col()` means `par("col")`).
 
 As in R, numbers may be integers or floats (a vector's elements must all be the same type):
 

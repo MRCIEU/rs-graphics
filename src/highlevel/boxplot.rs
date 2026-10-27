@@ -24,6 +24,7 @@ use crate::device::{
     AxisOptions, BoxOptions, Device, PlotWindowOptions, PolygonOptions, SegmentsOptions,
     TitleOptions, XyOptions,
 };
+use crate::error::Error;
 use crate::lty::LineType;
 use crate::numbers::Numbers;
 use crate::par::AxisType;
@@ -445,26 +446,27 @@ impl Default for BoxplotOptions {
 
 /// Each group's statistics, as [`Graphics::boxplot`](crate::graphics::Graphics::boxplot) returns them. Needs no
 /// device, so a recorded figure can return the same result. Checks the
-/// arguments as R does, so recording panics where drawing would.
-pub(crate) fn boxplot_all_stats(groups: &[Vec<f64>], opts: &BoxplotOptions) -> Vec<BoxStats> {
+/// arguments as R does, so recording fails where drawing would.
+pub(crate) fn boxplot_all_stats(
+    groups: &[Vec<f64>],
+    opts: &BoxplotOptions,
+) -> Result<Vec<BoxStats>, Error> {
     let n = groups.len();
-    assert!(n > 0, "boxplot: need at least one group");
-    if let Some(at) = &opts.at {
-        assert!(
-            at.len() == n,
-            "boxplot: 'at' must have the same length as the number of groups, i.e. {n}"
-        );
+    if n == 0 {
+        return Err(Error::invalid("need at least one group"));
     }
-    if let Some(w) = &opts.width {
-        assert!(
-            w.len() == n && w.iter().all(|&v| v > 0.0),
-            "boxplot: invalid boxplot widths"
-        );
+    if opts.at.as_ref().is_some_and(|at| at.len() != n) {
+        return Err(Error::invalid(format!(
+            "'at' must have same length as 'z$n', i.e. {n}"
+        )));
     }
-    groups
+    if (opts.width.as_ref()).is_some_and(|w| w.len() != n || w.iter().any(|&v| v.is_nan() || v <= 0.0)) {
+        return Err(Error::invalid("invalid boxplot widths"));
+    }
+    Ok(groups
         .iter()
         .map(|g| boxplot_stats(g, opts.range.unwrap_or(1.5)))
-        .collect()
+        .collect())
 }
 
 /// R's `pcycle()`: `v`'s `i`-th value, recycled, or `None` if `v` is empty.
@@ -480,9 +482,9 @@ impl<B: Backend> Device<B> {
         &mut self,
         groups: &[Vec<f64>],
         opts: &BoxplotOptions,
-    ) -> Vec<BoxStats> {
+    ) -> Result<Vec<BoxStats>, Error> {
         let n = groups.len();
-        let stats = boxplot_all_stats(groups, opts);
+        let stats = boxplot_all_stats(groups, opts)?;
         let at: Vec<f64> = opts
             .at
             .clone()
@@ -516,7 +518,7 @@ impl<B: Backend> Device<B> {
                 let hi = finite.fold(f64::NEG_INFINITY, f64::max);
                 (lo - 0.5, hi + 0.5)
             });
-            self.plot_new_impl();
+            self.plot_new_impl()?;
             let window = PlotWindowOptions {
                 xlog: opts.xlog,
                 ylog: opts.ylog,
@@ -621,7 +623,7 @@ impl<B: Backend> Device<B> {
                 lty: vec![Some(LineType::BLANK)],
                 ..PolygonOptions::default()
             };
-            self.polygon_impl(&bx, &by, &box_fill);
+            self.polygon_impl(&bx, &by, &box_fill)?;
 
             // The median, with `lend = 1` (butt), "to avoid overlap": round
             // ends would reach past the box sides. With a notch it spans
@@ -637,7 +639,7 @@ impl<B: Backend> Device<B> {
                     cycle(&opts.medlwd, i).unwrap_or(lwd(i).map(|l| 3.0 * l)),
                 )
             };
-            self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median);
+            self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median)?;
             if let Some(pch) = cycle(&opts.medpch, i) {
                 let (px, py) = xy(&[x], &[s.median]);
                 let symbol = XyOptions {
@@ -647,7 +649,7 @@ impl<B: Backend> Device<B> {
                     bg: vec![cycle(&opts.medbg, i).unwrap_or(bg(i))],
                     ..XyOptions::default()
                 };
-                self.points_impl(&px, &py, &symbol);
+                self.points_impl(&px, &py, &symbol)?;
             }
 
             // Whiskers run from their ends to the hinges (which matters for
@@ -662,7 +664,7 @@ impl<B: Backend> Device<B> {
             );
             for &(w, h) in &ends {
                 let (sx, sy) = xy(&[x, x], &[w, h]);
-                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &whisker);
+                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &whisker)?;
             }
             let cap = wid * cycle(&opts.staplewex, i).unwrap_or(0.5);
             let staple = line(
@@ -674,7 +676,7 @@ impl<B: Backend> Device<B> {
             );
             for &(w, _) in &ends {
                 let (sx, sy) = xy(&[xp(x, -cap), xp(x, cap)], &[w, w]);
-                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &staple);
+                self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &staple)?;
             }
             if let Some(boxlwd) = cycle(&opts.boxlwd, i).unwrap_or(lwd(i)) {
                 let box_border = PolygonOptions {
@@ -684,7 +686,7 @@ impl<B: Backend> Device<B> {
                     lwd: Some(boxlwd),
                     ..PolygonOptions::default()
                 };
-                self.polygon_impl(&bx, &by, &box_border);
+                self.polygon_impl(&bx, &by, &box_border)?;
             }
 
             if opts.outline && !s.outliers.is_empty() {
@@ -699,7 +701,7 @@ impl<B: Backend> Device<B> {
                     let k = s.outliers.len();
                     let (x0, y0) = xy(&vec![xp(x, -half); k], &s.outliers);
                     let (x1, y1) = xy(&vec![xp(x, half); k], &s.outliers);
-                    self.segments_impl(&x0, &y0, &x1, &y1, &line(outcol, Some(outlty), outlwd));
+                    self.segments_impl(&x0, &y0, &x1, &y1, &line(outcol, Some(outlty), outlwd))?;
                 }
                 let pos: Vec<f64> = s.outliers.iter().map(|_| x).collect();
                 let (ox, oy) = xy(&pos, &s.outliers);
@@ -718,7 +720,7 @@ impl<B: Backend> Device<B> {
                     lwd: vec![outlwd],
                     ..XyOptions::default()
                 };
-                self.points_impl(&ox, &oy, &outliers);
+                self.points_impl(&ox, &oy, &outliers)?;
             }
         }
 
@@ -757,9 +759,9 @@ impl<B: Backend> Device<B> {
                     labels: Some(labels.into_iter().map(Some).collect()),
                     ..side_pars(name_side)
                 };
-                self.axis_impl(name_side, &inline.apply(names));
+                self.axis_impl(name_side, &inline.apply(names))?;
             }
-            self.axis_impl(value_side, &inline.apply(side_pars(value_side)));
+            self.axis_impl(value_side, &inline.apply(side_pars(value_side)))?;
         }
 
         if opts.ann.unwrap_or(!opts.add) {
@@ -779,9 +781,9 @@ impl<B: Backend> Device<B> {
         }
 
         if opts.frame_plot.unwrap_or(opts.axes) {
-            self.box_impl(&BoxOptions::default());
+            self.box_impl(&BoxOptions::default())?;
         }
 
-        stats
+        Ok(stats)
     }
 }

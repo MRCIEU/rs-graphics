@@ -6,42 +6,40 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! `plot()`, `points()`, `lines()` and `polygon()` panic with R's
-//! `xy.coords()` message when `x` and `y` differ in length (on a device
-//! and in a `Figure`), as R errors, while `text()` recycles them, as R
-//! does. Skipped if `Rscript` isn't available.
+//! `plot()`, `points()`, `lines()` and `polygon()` return R's
+//! `xy.coords()` error from `try_draw()` when `x` and `y` differ in length
+//! (on a device and in a `Figure`), as R errors, while `text()` recycles
+//! them, as R does. Skipped if `Rscript` isn't available.
 
 use crate::common;
 
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::process::Command;
 
 use rs_graphics::prelude::*;
 
-fn outcome(f: impl FnOnce()) -> String {
-    match catch_unwind(AssertUnwindSafe(f)) {
-        Ok(()) => "ok".to_string(),
-        Err(e) => e
-            .downcast_ref::<&str>()
-            .map(|s| s.to_string())
-            .or_else(|| e.downcast_ref::<String>().cloned())
-            .unwrap_or_default(),
-    }
-}
-
 /// The calls, generic over the target so a device and a `Figure` run the
-/// same code.
-fn call<G: Graphics>(g: &mut G, i: usize) {
-    match i {
-        0 => g.plot().x([1, 2, 3]).y([1, 2]).draw(),
-        1 => g.points().x([1, 2, 3]).y([1, 2]).draw(),
-        2 => g.points().x([1]).y([1, 2, 3]).draw(),
-        3 => g.lines().x([1, 2, 3, 4]).y([1, 2]).draw(),
-        4 => g.polygon().x([1, 2, 3]).y([1, 2]).draw(),
-        5 => g.text().x([1, 2, 3]).y([1, 2]).labels(["a"]).draw(),
-        6 => g.points().x([0.0; 0]).y([0.0; 0]).draw(),
-        7 => g.lines().x([1, 2, 3]).y([3, 1, 2]).draw(),
+/// same code: `"ok"`, or the error's message (its call checked too).
+fn call<G: Graphics>(g: &mut G, i: usize) -> String {
+    let (name, result) = match i {
+        0 => ("plot", g.plot().x([1, 2, 3]).y([1, 2]).try_draw()),
+        1 => ("points", g.points().x([1, 2, 3]).y([1, 2]).try_draw()),
+        2 => ("points", g.points().x([1]).y([1, 2, 3]).try_draw()),
+        3 => ("lines", g.lines().x([1, 2, 3, 4]).y([1, 2]).try_draw()),
+        4 => ("polygon", g.polygon().x([1, 2, 3]).y([1, 2]).try_draw()),
+        5 => (
+            "text",
+            g.text().x([1, 2, 3]).y([1, 2]).labels(["a"]).try_draw(),
+        ),
+        6 => ("points", g.points().x([0.0; 0]).y([0.0; 0]).try_draw()),
+        7 => ("lines", g.lines().x([1, 2, 3]).y([3, 1, 2]).try_draw()),
         _ => unreachable!(),
+    };
+    match result {
+        Ok(()) => "ok".to_string(),
+        Err(e) => {
+            assert_eq!(e.call(), name);
+            e.message().to_string()
+        }
     }
 }
 
@@ -90,18 +88,15 @@ fn unequal_xy_lengths_fail_like_r() {
     assert!(expected.iter().any(|e| e == "ok"));
     assert!(expected.iter().any(|e| e == "'x' and 'y' lengths differ"));
 
-    let hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
     for (i, (r, e)) in R_CALLS.iter().zip(&expected).enumerate() {
         let mut dev = Device::new(PdfBackend::new(6, 6), Par::default());
         dev.plot().x(1..=10).y(1..=10).draw();
-        let on_device = outcome(|| call(&mut dev, i));
-        // A `Figure` panics at the call, not only when it is added.
+        let on_device = call(&mut dev, i);
+        // A `Figure` fails at the call, not only when it is added.
         let mut fig = Figure::new();
         fig.plot_new();
-        let in_figure = outcome(|| call(&mut fig, i));
+        let in_figure = call(&mut fig, i);
         assert_eq!(&on_device, e, "device: {r}");
         assert_eq!(&in_figure, e, "figure: {r}");
     }
-    std::panic::set_hook(hook);
 }

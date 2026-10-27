@@ -21,6 +21,7 @@ use super::hatch::{ShapeStyle, shading};
 use super::{Device, Xpd};
 use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::{Color, ColorSpec};
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
@@ -432,26 +433,38 @@ impl<B: Backend> Device<B> {
     /// Draws R's `points()`; the public entry is
     /// [`Graphics::points`](crate::graphics::Graphics::points), whose docs
     /// describe it.
-    pub(crate) fn points_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
-        let mut dev = self.xy_pars(opts);
+    pub(crate) fn points_impl(
+        &mut self,
+        x: &[f64],
+        y: &[f64],
+        opts: &XyOptions,
+    ) -> Result<(), Error> {
+        let mut dev = self.xy_pars(opts)?;
         dev.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Points), opts);
+        Ok(())
     }
 
     /// `points()`/`lines()`'s inline `lend`/`ljoin`/`lmitre` and `font`.
-    fn xy_pars(&mut self, opts: &XyOptions) -> super::ParScope<'_, B> {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+    fn xy_pars(&mut self, opts: &XyOptions) -> Result<super::ParScope<'_, B>, Error> {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
         if let Some(f) = opts.font {
             dev.par.font = f;
         }
-        dev
+        Ok(dev)
     }
 
     /// Draws R's `lines()`; the public entry is
     /// [`Graphics::lines`](crate::graphics::Graphics::lines), whose docs
     /// describe it.
-    pub(crate) fn lines_impl(&mut self, x: &[f64], y: &[f64], opts: &XyOptions) {
-        let mut dev = self.xy_pars(opts);
+    pub(crate) fn lines_impl(
+        &mut self,
+        x: &[f64],
+        y: &[f64],
+        opts: &XyOptions,
+    ) -> Result<(), Error> {
+        let mut dev = self.xy_pars(opts)?;
         dev.plot_xy(x, y, opts.type_.unwrap_or(PlotType::Lines), opts);
+        Ok(())
     }
 
     /// `C_plotXY`: the lines for `type`, then the points for `"p"`, `"b"`
@@ -548,9 +561,10 @@ impl<B: Backend> Device<B> {
         x1: &[f64],
         y1: &[f64],
         opts: &SegmentsOptions,
-    ) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+    ) -> Result<(), Error> {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
         dev.segments_draw(x0, y0, x1, y1, opts);
+        Ok(())
     }
 
     fn segments_draw(
@@ -595,9 +609,10 @@ impl<B: Backend> Device<B> {
         x1: &[f64],
         y1: &[f64],
         opts: &ArrowsOptions,
-    ) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+    ) -> Result<(), Error> {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
         dev.arrows_draw(x0, y0, x1, y1, opts);
+        Ok(())
     }
 
     fn arrows_draw(
@@ -672,9 +687,10 @@ impl<B: Backend> Device<B> {
         x1: &[f64],
         y1: &[f64],
         opts: &RectOptions,
-    ) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+    ) -> Result<(), Error> {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
         dev.rect_draw(x0, y0, x1, y1, opts);
+        Ok(())
     }
 
     fn rect_draw(&mut self, x0: &[f64], y0: &[f64], x1: &[f64], y1: &[f64], opts: &RectOptions) {
@@ -739,9 +755,15 @@ impl<B: Backend> Device<B> {
     /// Draws R's `polygon()`; the public entry is
     /// [`Graphics::polygon`](crate::graphics::Graphics::polygon), whose docs
     /// describe it.
-    pub(crate) fn polygon_impl(&mut self, x: &[f64], y: &[f64], opts: &PolygonOptions) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+    pub(crate) fn polygon_impl(
+        &mut self,
+        x: &[f64],
+        y: &[f64],
+        opts: &PolygonOptions,
+    ) -> Result<(), Error> {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
         dev.polygon_draw(x, y, opts);
+        Ok(())
     }
 
     fn polygon_draw(&mut self, x: &[f64], y: &[f64], opts: &PolygonOptions) {
@@ -769,14 +791,11 @@ impl<B: Backend> Device<B> {
         y: &[f64],
         labels: &[Option<Label>],
         opts: &TextOptions,
-    ) {
+    ) -> Result<(), Error> {
+        check_text(opts)?;
         let n = recycled_len(&[x.len(), y.len()]);
         let clip = self.clip_for(opts.xpd);
         let hadj = opts.adj.unwrap_or(self.par.adj);
-        assert!(
-            opts.pos.iter().all(|p| (1..=4).contains(p)),
-            "invalid 'pos' value"
-        );
         // `offset` characters, as `GConvertXUnits(offset, CHARS, INCHES)`
         // before any label's own `cex`: the character height (R's
         // `cra[1]`) times `par(cex)` as of the last layout (see
@@ -823,14 +842,16 @@ impl<B: Backend> Device<B> {
                 pick_na(&opts.font, i, font).unwrap_or(font),
             );
         }
+        Ok(())
     }
 
     /// Draws R's `box()`; the public entry is
     /// [`Graphics::box_`](crate::graphics::Graphics::box_), whose docs
     /// describe it.
-    pub(crate) fn box_impl(&mut self, opts: &BoxOptions) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
+    pub(crate) fn box_impl(&mut self, opts: &BoxOptions) -> Result<(), Error> {
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
         dev.box_draw(opts);
+        Ok(())
     }
 
     fn box_draw(&mut self, opts: &BoxOptions) {
@@ -887,4 +908,12 @@ impl<B: Backend> Device<B> {
         };
         self.backend.draw_polyline(run, &stroke);
     }
+}
+
+/// R's check of `text()`'s `pos`: each value 1 to 4.
+pub(crate) fn check_text(opts: &TextOptions) -> Result<(), Error> {
+    if !opts.pos.iter().all(|p| (1..=4).contains(p)) {
+        return Err(Error::invalid("invalid 'pos' value"));
+    }
+    Ok(())
 }
