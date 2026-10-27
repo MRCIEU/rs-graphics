@@ -25,8 +25,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .main(Label::math("y == beta[0] + beta[1] * x"))
         .xlab("x")
         .ylab("y")
-        .draw();
-    dev.abline().h(6.0).col("grey").lty("dashed").draw();
+        .try_draw()?;
+    dev.abline().h(6.0).col("grey").lty("dashed").try_draw()?;
     // R: legend("topleft", legend = c("observed", "threshold"),
     //           col = c("steelblue", "grey"), pch = c(19, NA), lty = c(NA, 2))
     dev.legend()
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .col(["steelblue", "grey"])
         .pch([Some(19), None])
         .lty([None, Some(2)])
-        .draw();
+        .try_draw()?;
     dev.close()?;
     Ok(())
 }
@@ -43,9 +43,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 A `Device` is an open graphics device, like the one R's `pdf()`, `png()` or `svg()` opens. It holds the page being drawn, the `par()` settings, and the file it writes when you call `close()`.
 
-Other R functions and arguments are represented by methods, which can be chained, and must be finished with `.draw()`. Calls without `.draw()` draw nothing (which the compiler warns you about).
+Other R functions and arguments are represented by methods, which can be chained, and must be finished with `.try_draw()` or `.draw()`. Both run the call; where R would stop with an error, `.try_draw()` returns it (as above, with `?`) and `.draw()` panics with it (see [Errors](#errors)). Calls without either draw nothing (which the compiler warns you about).
 
-If you leave out an argument R requires, `.draw()` panics with R's message (`dev.plot().draw()` gives `plot(): argument "x" is missing, with no default`), as it does for R's other errors; `.try_draw()` returns the error instead, so you can handle it. If you leave out one that has a default, you get R's default, which is often the current `par()` value (no `.col()` means `par("col")`).
+If you leave out an argument R requires, that's R's error (`dev.plot().try_draw()` returns `plot(): argument "x" is missing, with no default`). If you leave out one that has a default, you get R's default, which is often the current `par()` value (no `.col()` means `par("col")`).
 
 As in R, numbers may be integers or floats (a vector's elements must all be the same type):
 
@@ -58,6 +58,28 @@ Use `None` where R uses `NA`:
 `pch = c(19, NA)` is `.pch([Some(19), None])` 
 
 (but `.pch([19, 20])` is fine when you intend no missing values).
+
+### Errors
+
+Where R would stop with an error, so does the call: `.try_draw()` returns the error, and `.draw()` panics with it. The errors are R's, with R's messages:
+
+- an argument R requires is missing (`plot(): argument "x" is missing, with no default`);
+- a value isn't valid: `.lty("wavy")`, `.col("notacolour")`, `.side(5)`, or data that can't be drawn as given (`plot(): 'x' and 'y' lengths differ`). A setter doesn't fail on its own: it keeps the error, which the call returns;
+- the plot doesn't fit the page: margins too large for the page or the panel (`plot.new(): figure margins too large`).
+
+The error is an `rs_graphics::Error`: `call()` is the R function's name, `message()` R's message, and `kind()` one of `ErrorKind::MissingArgument`, `InvalidArgument` or `DoesNotFit`. It works with `?` in functions returning `Box<dyn Error>` or `anyhow::Result`, or can be matched:
+
+```rust
+match dev.plot().x(&x).y(&y).try_draw() {
+    Ok(()) => {}
+    Err(e) if e.kind() == ErrorKind::DoesNotFit => {
+        eprintln!("{e}: use a bigger page or fewer panels");
+    }
+    Err(e) => return Err(e.into()),
+}
+```
+
+Use `.try_draw()` in programs that draw what users ask for, and `.draw()` in scripts, where a mistake should stop everything, as it does in R. The calls that aren't builders have the same pair: `dev.try_plot_new()`, `dev.try_add_figure(&fig)` and `dev.try_add_figure_at(row, col, &fig)`; `dev.strwidth()`/`strheight()` end in `.try_get()` or `.get()`. Opening and closing a device (`.open()`, `.close()`) return `std::io::Result`, as file operations do. The one exception is `Label::math("...")`, which panics on an expression it can't parse; use `Expression::parse("...")`, which returns a `Result`, for text from users.
 
 ### R side by side
 
@@ -180,6 +202,32 @@ for format in ["pdf", "png"] {
     dev.close()?;
 }
 ```
+
+A whole plot, with its panels, is recorded the same way. Here the calls use `.try_draw()`, which returns R's error instead of panicking (in a figure, mistakes in the arguments are found as the calls are recorded), and a null device checks that the plot fits the page before any file is written:
+
+```rust
+let mut summary = Figure::new();
+summary.par().mfrow(1, 2).oma([0, 0, 2, 0]).try_draw()?;
+summary.hist().x(&response).main("Histogram").try_draw()?;
+summary.boxplot().x(&response).main("Box plot").try_draw()?;
+summary.mtext().text("Response").outer(true).line(0.5).font(2).try_draw()?;
+
+// Does it fit a 6 x 3 inch page? (On a 2 x 2 inch page this returns
+// "plot.new(): figure margins too large".)
+let mut check = Device::null().width(6).height(3).open()?;
+check.try_add_figure(&summary)?;
+
+for format in ["pdf", "svg", "png"] {
+    let mut dev = Device::format(format, format!("summary.{format}"))
+        .width(6)
+        .height(3)
+        .open()?;
+    dev.add_figure(&summary);
+    dev.close()?;
+}
+```
+
+Adding a figure with a page layout sets that layout up on the device and leaves the device as the figure left it, as R's `replayPlot()` does; a figure without one leaves the device's `par()` as it was. A whole plot can't be put into one panel with `add_figure_at`.
 
 ### Your own plots
 
