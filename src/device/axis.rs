@@ -22,6 +22,7 @@
 use crate::afm;
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::Point;
 use crate::lty::LineType;
@@ -33,131 +34,109 @@ use super::{Device, Side, Xpd, format_axis_labels};
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
 
-/// The arguments of R's `axis()` other than `side`, plus the inline
-/// graphical parameters it uses, with R's defaults. `None` is R's `NA` (or
-/// `NULL`), which falls back to the matching `par()` value unless the
-/// field says otherwise.
-#[derive(Clone, Debug)]
-pub struct AxisOptions {
-    /// Tick positions, in user coordinates (data units, also on a log
-    /// axis).
-    /// `None`: the default ticks from `axp` (else `par(xaxp/yaxp)`), as
-    /// [`Device::default_ticks`].
-    pub at: Option<Vec<f64>>,
-    /// Labels for `at` (requires `at`): text or plotmath expressions
-    /// (`Some("a".into())`, `Some(Label::math("10^5"))`). `None`: `at`
-    /// formatted like R's `formatReal()`. An inner `None` is a character
-    /// `NA`: its tick is drawn but not its label, which also doesn't count
-    /// for `gap_axis`.
-    pub labels: Option<Vec<Option<Label>>>,
-    /// `labels = FALSE` when false: no labels at all. Default `true`.
-    pub draw_labels: bool,
-    /// `tick`: draw the axis line and tick marks. Default `true`.
-    pub tick: bool,
-    /// Margin lines from the plot region (inner region for `outer`) to the
-    /// axis line. Labels then sit `mgp[1]` lines beyond it. `None` (R's
-    /// `NA`): the axis line at `mgp[2]` and the labels at `mgp[1]` lines.
-    pub line: Option<f64>,
-    /// User coordinate (on the other axis) at which to draw the axis line;
-    /// overrides `line`. Labels sit `mgp[1]` lines beyond it. `None` (R's
-    /// `NA`): use `line`.
-    pub pos: Option<f64>,
-    /// Measure `line` from the inner region (inside `par(oma)`) rather
-    /// than the plot region. Default `false`.
-    pub outer: bool,
-    /// Label font; `None`: `par(font.axis)`.
-    pub font: Option<FontFace>,
-    /// Line type of the axis line and ticks; `None`: solid (R's default,
-    /// not `par(lty)`).
-    pub lty: Option<LineType>,
-    /// Width of the axis line; `None`: 1 (R's default, not `par(lwd)`). 0
-    /// or less draws no axis line.
-    pub lwd: Option<f64>,
-    /// Width of the tick marks; `None`: `lwd`. 0 or less draws no ticks.
-    pub lwd_ticks: Option<f64>,
-    /// Colour of the axis line; `None`: `par(fg)`.
-    pub col: Option<ColorSpec>,
-    /// Colour of the ticks; `None`: `col`.
-    pub col_ticks: Option<ColorSpec>,
-    /// Justification of every label along its reading direction; `None`:
-    /// centred for labels parallel to the axis, otherwise right-justified
-    /// on sides 1 and 2 and left-justified on 3 and 4.
-    pub hadj: Option<f64>,
-    /// Justification across each label, recycled over the ticks in
-    /// increasing order of `at`; `NaN` entries and an empty vector are R's
-    /// `NA`, which depends on `side` and `las` (0, i.e. baseline on the
-    /// line, for `las = 0`).
-    pub padj: Vec<f64>,
-    /// Minimum gap between labels, in "m" widths (labels parallel to the
-    /// axis) or "M" heights (perpendicular); a label closer than that to
-    /// the previous one is dropped. `None`: 1 or 0.25.
-    pub gap_axis: Option<f64>,
-    /// Label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
-    pub cex_axis: Option<f64>,
-    /// Label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
-    pub col_axis: Option<ColorSpec>,
-    /// Label orientation (R's inline `las`); `None`: `par(las)`.
-    pub las: Option<i32>,
-    /// Range and number of the default ticks when `at` is `None` (R's
-    /// inline `xaxp`/`yaxp`); `None`: `par(xaxp)` (sides 1, 3) or
-    /// `par(yaxp)` (sides 2, 4).
-    pub axp: Option<[f64; 3]>,
-    /// Margin lines for the axis title, labels and line (R's inline `mgp`;
-    /// only the labels and line are used here); `None`: `par(mgp)`.
-    pub mgp: Option<[f64; 3]>,
-    /// `AxisType::None` draws nothing (R's inline `xaxt`/`yaxt`); `None`:
-    /// `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4).
-    pub axt: Option<AxisType>,
-    /// Tick length as a fraction of the plot region (of its height for an
-    /// x axis if above 0.5, else of its smaller side); positive points
-    /// inwards. Overrides `tcl`. `None`: `par(tck)`, which is `NA` by
-    /// default, meaning `tcl` is used.
-    pub tck: Option<f64>,
-    /// Tick length in margin lines; negative points outwards. `None`:
-    /// `par(tcl)`.
-    pub tcl: Option<f64>,
-    /// R's inline `xpd`: how far ticks and labels may reach along the
-    /// axis (the plot region, figure region or device, as for
-    /// `par(xpd)`); the axis is always clipped to the device, as R does.
-    /// `None`: `par(xpd)`.
-    pub xpd: Option<Xpd>,
-    /// R's inline `lend`: the ends of the axis line and ticks (`"round"`,
-    /// `"butt"`, `"square"`); `None`: `par(lend)`.
-    pub lend: Option<LineEnd>,
+crate::setters::options! {
+    /// The arguments of R's `axis()` other than `side`, plus the inline
+    /// graphical parameters it uses, with R's defaults. `None` is R's `NA` (or
+    /// `NULL`), which falls back to the matching `par()` value unless the
+    /// field says otherwise.
+    #[derive(Clone, Debug)]
+    pub struct AxisOptions => [AxisCall] {
+        /// Tick positions, in user coordinates (data units, also on a log
+        /// axis). `None`: the default ticks from `axp` (else
+        /// `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
+        pub at: Option<Vec<f64>> => option_values f64,
+        /// Labels for the ticks in `at` (requires `at`): text or plotmath
+        /// expressions (`Some("a".into())`, `Some(Label::math("10^5"))`).
+        /// `None`: `at` formatted like R's `formatReal()`. An inner `None` (a
+        /// character `NA`) draws the tick but not its label, and doesn't count
+        /// for `gap_axis`.
+        pub labels: Option<Vec<Option<Label>>> => labels Label,
+        /// Whether to draw the tick labels. Default `true`. `false` is R's
+        /// `labels = FALSE`.
+        pub draw_labels: bool => value bool,
+        /// Whether to draw the axis line and tick marks. Default `true`.
+        pub tick: bool => value bool,
+        /// Distance of the axis line from the plot region (inner region for
+        /// `outer`), in margin lines; the labels sit `mgp[1]` lines beyond it.
+        /// `None`: the axis line at `mgp[2]` and the labels at `mgp[1]` lines.
+        pub line: Option<f64> => option f64,
+        /// Where to draw the axis line, as a user coordinate on the other
+        /// axis; overrides `line`. The labels sit `mgp[1]` lines beyond it.
+        /// `None`: use `line`.
+        pub pos: Option<f64> => option f64,
+        /// Whether to measure `line` from the inner region (inside
+        /// `par(oma)`) rather than the plot region. Default `false`.
+        pub outer: bool => value bool,
+        /// Font of the labels. `None`: `par(font.axis)`.
+        pub font: Option<FontFace> => option FontFace,
+        /// Line type of the axis line and ticks. `None`: solid (R's default,
+        /// not `par(lty)`).
+        pub lty: Option<LineType> => option LineType,
+        /// Width of the axis line; 0 or less draws no axis line. `None`: 1
+        /// (R's default, not `par(lwd)`).
+        pub lwd: Option<f64> => option f64,
+        /// Width of the tick marks; 0 or less draws no ticks. `None`: `lwd`.
+        /// R's `lwd.ticks`.
+        pub lwd_ticks: Option<f64> => option f64,
+        /// Colour of the axis line. `None`: `par(fg)`.
+        pub col: Option<ColorSpec> => option ColorSpec,
+        /// Colour of the tick marks. `None`: `col`. R's `col.ticks`.
+        pub col_ticks: Option<ColorSpec> => option ColorSpec,
+        /// Justification of every label along its reading direction. `None`:
+        /// centred for labels parallel to the axis, otherwise right-justified
+        /// on sides 1 and 2 and left-justified on 3 and 4.
+        pub hadj: Option<f64> => option f64,
+        /// Justification across each label, recycled over the ticks in
+        /// increasing order of `at`. `NaN` entries and an empty vector mean
+        /// the default, which depends on `side` and `las` (0, i.e. baseline
+        /// on the line, for `las = 0`).
+        pub padj: Vec<f64> => values f64,
+        /// Minimum gap between labels, in "m" widths (labels parallel to the
+        /// axis) or "M" heights (perpendicular); a label closer than that to
+        /// the previous one is dropped. `None`: 1 or 0.25. R's `gap.axis`.
+        pub gap_axis: Option<f64> => option f64,
+        /// Size of the labels. `None`: `par(cex.axis)`; overrides it for this
+        /// call only.
+        pub cex_axis: Option<f64> => option f64,
+        /// Colour of the labels. `None`: `par(col.axis)`; overrides it for
+        /// this call only.
+        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        /// Orientation of the labels. `None`: `par(las)`; overrides it for
+        /// this call only.
+        pub las: Option<i32> => option i32,
+        /// Range and number of the default ticks, used when `at` is `None`.
+        /// `None`: `par(xaxp)` (sides 1, 3) or `par(yaxp)` (sides 2, 4);
+        /// overrides it for this call only.
+        pub axp: Option<[f64; 3]> => array [f64; 3],
+        /// Margin lines for the axis title, labels and line (only the labels
+        /// and line are used here). `None`: `par(mgp)`; overrides it for this
+        /// call only.
+        pub mgp: Option<[f64; 3]> => array [f64; 3],
+        /// Whether to draw the axis at all: `AxisType::None` draws nothing.
+        /// `None`: `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4).
+        pub axt: Option<AxisType> => option AxisType,
+        /// Tick length as a fraction of the plot region (of its height for an
+        /// x axis if above 0.5, else of its smaller side); positive points
+        /// inwards. Overrides `tcl`. `None`: `par(tck)`, which is `NA` by
+        /// default, meaning `tcl` is used.
+        pub tck: Option<f64> => option f64,
+        /// Tick length in margin lines; negative points outwards. `None`:
+        /// `par(tcl)`.
+        pub tcl: Option<f64> => option f64,
+        /// How far ticks and labels may reach along the axis: the plot
+        /// region, figure region or device, as for `par(xpd)`. The axis is
+        /// always clipped to the device, as R does. `None`: `par(xpd)`.
+        pub xpd: Option<Xpd> => option Xpd,
+        /// Ends of the axis line and ticks (`"round"`, `"butt"`,
+        /// `"square"`). `None`: `par(lend)`.
+        pub lend: Option<LineEnd> => option LineEnd,
+    }
 }
-
-crate::setters::setters!(AxisOptions => [AxisCall] {
-    at: option_values f64,
-    labels: labels Label,
-    draw_labels: value bool,
-    tick: value bool,
-    line: option f64,
-    pos: option f64,
-    outer: value bool,
-    font: option FontFace,
-    lty: option LineType,
-    lwd: option f64,
-    lwd_ticks: option f64,
-    col: option ColorSpec,
-    col_ticks: option ColorSpec,
-    hadj: option f64,
-    padj: values f64,
-    gap_axis: option f64,
-    cex_axis: option f64,
-    col_axis: option ColorSpec,
-    las: option i32,
-    axp: array [f64; 3],
-    mgp: array [f64; 3],
-    axt: option AxisType,
-    tck: option f64,
-    tcl: option f64,
-    xpd: option Xpd,
-    lend: option LineEnd,
-});
 
 impl Default for AxisOptions {
     fn default() -> Self {
         AxisOptions {
+            deferred_error: None,
             at: None,
             labels: None,
             draw_labels: true,
@@ -203,9 +182,18 @@ impl<B: Backend> Device<B> {
     /// Draws R's `axis()`; the public entry is
     /// [`Graphics::axis`](crate::graphics::Graphics::axis), whose docs
     /// describe it.
-    pub(crate) fn axis_impl(&mut self, side: impl Into<Side>, opts: &AxisOptions) -> Vec<f64> {
-        let mut dev = self.line_pars(opts.lend, None, None);
-        dev.axis_draw(side.into(), opts)
+    pub(crate) fn axis_impl(
+        &mut self,
+        side: impl crate::setters::IntoArg<Side>,
+        opts: &AxisOptions,
+    ) -> Result<Vec<f64>, Error> {
+        check_axis(opts)?;
+        let side = side.into_arg()?;
+        if opts.at.is_none() {
+            self.check_axis_axp(side, opts.axp)?;
+        }
+        let mut dev = self.line_pars(opts.lend, None, None)?;
+        Ok(dev.axis_draw(side, opts))
     }
 
     fn axis_draw(&mut self, side: Side, opts: &AxisOptions) -> Vec<f64> {
@@ -231,25 +219,17 @@ impl<B: Backend> Device<B> {
 
         let at = opts.at.clone().unwrap_or_else(|| match opts.axp {
             Some(axp) => self.ticks_from_axp(side, axp),
-            None => self.default_ticks(side),
+            None => self.ax_ticks(side),
         });
         let labels = if opts.draw_labels {
-            let labels = match &opts.labels {
+            match &opts.labels {
                 None => format_axis_labels(&at)
                     .into_iter()
                     .map(|l| Some(Label::Text(l)))
                     .collect(),
-                Some(l) => {
-                    assert!(opts.at.is_some(), "axis: 'labels' is supplied and not 'at'");
-                    l.clone()
-                }
-            };
-            assert_eq!(
-                at.len(),
-                labels.len(),
-                "axis: 'at' and 'labels' lengths differ"
-            );
-            labels
+                // `check_axis` has made sure `at` is given, and as long.
+                Some(l) => l.clone(),
+            }
         } else {
             Vec::new()
         };
@@ -323,9 +303,9 @@ impl<B: Backend> Device<B> {
         let axis_base = match pos {
             Some(p) => {
                 if x_axis {
-                    self.user_to_inches(1.0, p).y
+                    self.data_to_inches(1.0, p).y
                 } else {
-                    self.user_to_inches(p, 1.0).x
+                    self.data_to_inches(p, 1.0).x
                 }
             }
             None => {
@@ -481,6 +461,24 @@ impl<B: Backend> Device<B> {
         }
         used
     }
+}
+
+/// R's checks of `axis()`'s `labels`: given only with `at`, and as many.
+pub(crate) fn check_axis(opts: &AxisOptions) -> Result<(), Error> {
+    if let (true, Some(labels)) = (opts.draw_labels, &opts.labels) {
+        match &opts.at {
+            None => return Err(Error::invalid("'labels' is supplied and not 'at'")),
+            Some(at) if at.len() != labels.len() => {
+                return Err(Error::invalid(format!(
+                    "'at' and 'labels' lengths differ, {} != {}",
+                    at.len(),
+                    labels.len()
+                )));
+            }
+            Some(_) => {}
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

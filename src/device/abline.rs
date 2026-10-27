@@ -17,6 +17,7 @@
 
 use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::ColorSpec;
+use crate::error::Error;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::Xpd;
@@ -24,97 +25,84 @@ use crate::setters::pick_na;
 
 use super::Device;
 
-/// The arguments of R's `abline()`, with R's defaults. Empty
-/// `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/`par("lwd")`;
-/// otherwise they are recycled over the lines in drawing order: each
-/// `a`/`b` line, then each `h`, then each `v`.
-///
-/// Unlike R, `a` and `b` take several values (one line per pair), so every
-/// kind of line can be given several times. R's `coef = c(a, b)` (and
-/// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
-#[derive(Clone, Debug, Default)]
-pub struct AblineOptions {
-    /// Intercepts of the `a`/`b` lines `y = a + b * x`, paired with `b`
-    /// (one of them may have a single value, used for every line); empty
-    /// (with `b`): no such lines.
-    pub a: Vec<f64>,
-    /// Slopes of the `a`/`b` lines, paired with `a`.
-    pub b: Vec<f64>,
-    /// `untf = TRUE`: on log axes, draw each `y = a + b * x` in data units
-    /// (a curve) rather than a straight line in log units. Default `false`.
-    pub untf: bool,
-    /// Horizontal lines at these y values; empty: none.
-    pub h: Vec<f64>,
-    /// Vertical lines at these x values; empty: none.
-    pub v: Vec<f64>,
-    /// Colours, recycled over the lines; empty: `par(col)`.
-    pub col: Vec<ColorSpec>,
-    /// Line types, recycled over the lines; empty: `par(lty)`.
-    pub lty: Vec<Option<LineType>>,
-    /// Line widths, recycled over the lines; empty: `par(lwd)`.
-    pub lwd: Vec<Option<f64>>,
-    /// R's inline `xpd`: how far the lines run and where they are clipped
-    /// (the plot region for [`Xpd::Plot`], the figure region for
-    /// [`Xpd::Figure`], the whole device for [`Xpd::Device`]; the setter
-    /// also takes `false`/`true`); `None`: `par(xpd)`.
-    pub xpd: Option<Xpd>,
-    /// R's inline `lend`: line ends (`"round"`, `"butt"`, `"square"`);
-    /// `None`: `par(lend)`.
-    pub lend: Option<LineEnd>,
-    /// R's inline `ljoin`: line joins (`"round"`, `"mitre"`, `"bevel"`);
-    /// `None`: `par(ljoin)`.
-    pub ljoin: Option<LineJoin>,
-    /// R's inline `lmitre`: the mitre limit (at least 1); `None`:
-    /// `par(lmitre)`.
-    pub lmitre: Option<f64>,
+crate::setters::options! {
+    /// The arguments of R's `abline()`, with R's defaults. Empty
+    /// `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/`par("lwd")`;
+    /// otherwise they are recycled over the lines in drawing order: each
+    /// `a`/`b` line, then each `h`, then each `v`.
+    ///
+    /// Unlike R, `a` and `b` take several values (one line per pair), so every
+    /// kind of line can be given several times. R's `coef = c(a, b)` (and
+    /// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
+    #[derive(Clone, Debug, Default)]
+    pub struct AblineOptions => [AblineCall] {
+        /// Intercepts of the lines `y = a + b * x`, paired with `b` (either
+        /// may have a single value, used for every line). Empty (with `b`):
+        /// no such lines.
+        pub a: Vec<f64> => values f64,
+        /// Slopes of the lines `y = a + b * x`, paired with `a`.
+        pub b: Vec<f64> => values f64,
+        /// On log axes, draws each `y = a + b * x` in data units (a curve)
+        /// rather than as a straight line in log units. Default `false`.
+        pub untf: bool => value bool,
+        /// Horizontal lines at these y values. Empty: none.
+        pub h: Vec<f64> => values f64,
+        /// Vertical lines at these x values. Empty: none.
+        pub v: Vec<f64> => values f64,
+        /// Line colours, recycled over the lines. Empty: `par(col)`.
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Line types, recycled over the lines. Empty: `par(lty)`; `None`:
+        /// no line.
+        pub lty: Vec<Option<LineType>> => na_values LineType,
+        /// Line widths, recycled over the lines. Empty: `par(lwd)`; `None`:
+        /// no line.
+        pub lwd: Vec<Option<f64>> => na_values f64,
+        /// How far the lines run and where they are clipped: the plot region
+        /// for [`Xpd::Plot`], the figure region for [`Xpd::Figure`], the
+        /// whole device for [`Xpd::Device`] (the setter also takes
+        /// `false`/`true`). `None`: `par(xpd)`; overrides it for this call
+        /// only.
+        pub xpd: Option<Xpd> => option Xpd,
+        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
+        /// `None`: `par(lend)`; overrides it for this call only.
+        pub lend: Option<LineEnd> => option LineEnd,
+        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
+        /// `None`: `par(ljoin)`; overrides it for this call only.
+        pub ljoin: Option<LineJoin> => option LineJoin,
+        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// overrides it for this call only.
+        pub lmitre: Option<f64> => option f64,
+    }
 }
-
-crate::setters::setters!(AblineOptions => [AblineCall] {
-    a: values f64,
-    b: values f64,
-    untf: value bool,
-    h: values f64,
-    v: values f64,
-    col: values ColorSpec,
-    lty: na_values LineType,
-    lwd: na_values f64,
-    xpd: option Xpd,
-    lend: option LineEnd,
-    ljoin: option LineJoin,
-    lmitre: option f64,
-});
 
 impl AblineOptions {
     /// The `a`/`b` lines' intercepts and slopes, `a` and `b` paired (a
     /// single value pairs with each of the other's).
     ///
-    /// # Panics
+    /// # Errors
     /// If only one of `a` and `b` is given (R: "invalid a=, b=
     /// specification"). R only errors for `a` alone and silently draws
     /// nothing for `b` alone; that looks like an oversight in `C_abline`,
     /// so both are errors here. If both have several values but not the
     /// same number ("'a' and 'b' lengths differ"), or a value isn't finite
     /// (R: "'a' and 'b' must be finite").
-    fn lines(&self) -> Vec<(f64, f64)> {
+    pub(crate) fn lines(&self) -> Result<Vec<(f64, f64)>, Error> {
         let (a, b) = (&self.a, &self.b);
         if a.is_empty() && b.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
-        assert!(
-            !a.is_empty() && !b.is_empty(),
-            "invalid a=, b= specification"
-        );
-        assert!(
-            a.len() == b.len() || a.len() == 1 || b.len() == 1,
-            "abline: 'a' and 'b' lengths differ"
-        );
+        if a.is_empty() || b.is_empty() {
+            return Err(Error::invalid("invalid a=, b= specification"));
+        }
+        if !(a.len() == b.len() || a.len() == 1 || b.len() == 1) {
+            return Err(Error::invalid("'a' and 'b' lengths differ"));
+        }
         let n = a.len().max(b.len());
         let lines: Vec<(f64, f64)> = (0..n).map(|i| (a[i % a.len()], b[i % b.len()])).collect();
-        assert!(
-            lines.iter().all(|(a, b)| a.is_finite() && b.is_finite()),
-            "abline: 'a' and 'b' must be finite"
-        );
-        lines
+        if !lines.iter().all(|(a, b)| a.is_finite() && b.is_finite()) {
+            return Err(Error::invalid("'a' and 'b' must be finite"));
+        }
+        Ok(lines)
     }
 }
 
@@ -122,13 +110,14 @@ impl<B: Backend> Device<B> {
     /// Draws R's `abline()`; the public entry is
     /// [`Graphics::abline`](crate::graphics::Graphics::abline), whose docs
     /// describe it.
-    pub(crate) fn abline_impl(&mut self, opts: &AblineOptions) {
-        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre);
-        dev.abline_draw(opts);
+    pub(crate) fn abline_impl(&mut self, opts: &AblineOptions) -> Result<(), Error> {
+        let lines = opts.lines()?;
+        let mut dev = self.line_pars(opts.lend, opts.ljoin, opts.lmitre)?;
+        dev.abline_draw(opts, lines);
+        Ok(())
     }
 
-    fn abline_draw(&mut self, opts: &AblineOptions) {
-        let lines = opts.lines();
+    fn abline_draw(&mut self, opts: &AblineOptions, lines: Vec<(f64, f64)>) {
         let mut nlines = 0;
         // The style of the `n`th line: `col`, `lty` and `lwd` recycled.
         let style = |dev: &Self, n: usize| {
@@ -218,7 +207,7 @@ impl<B: Backend> Device<B> {
             return None;
         }
         let pts: Vec<Point> = (start..=stop)
-            .map(|i| self.user_to_inches(xx[i], yy[i]))
+            .map(|i| self.data_to_inches(xx[i], yy[i]))
             .collect();
         pts.iter()
             .all(|p| p.x.is_finite() && p.y.is_finite())

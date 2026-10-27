@@ -18,7 +18,8 @@ use std::process::Command;
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::{BarplotOptions, PlotOptions, PlotType};
-use rs_graphics::layout::{Layout, LayoutSize};
+use rs_graphics::backend::svg::SvgBackend;
+use rs_graphics::layout::{LayoutRespect, LayoutSize};
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::graphics::Graphics;
 
@@ -173,10 +174,10 @@ fn cases() -> Vec<Case> {
             r: "layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE), heights = c(1, 2))\n\
                 bp(c(3, 5, 2), 'wide'); bp(c(4, 1), 'left'); bp(c(2, 6, 1), 'right')",
             run: |d| {
-                let l = Layout::new(&[vec![1, 1], vec![2, 3]])
-                    .unwrap()
-                    .heights(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)]);
-                d.layout(l);
+                d.layout()
+                    .mat(&[[1, 1], [2, 3]])
+                    .heights([LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
+                    .draw();
                 bp(d, &[3.0, 5.0, 2.0], "wide");
                 bp(d, &[4.0, 1.0], "left");
                 bp(d, &[2.0, 6.0, 1.0], "right");
@@ -188,10 +189,10 @@ fn cases() -> Vec<Case> {
             r: "layout(matrix(1:2, 1), widths = c(lcm(4), 1))\n\
                 bp(c(3, 5), 'narrow'); bp(c(4, 1, 6), 'wide')",
             run: |d| {
-                let l = Layout::new(&[vec![1, 2]])
-                    .unwrap()
-                    .widths(&[LayoutSize::Cm(4.0), LayoutSize::Relative(1.0)]);
-                d.layout(l);
+                d.layout()
+                    .mat(&[[1, 2]])
+                    .widths([LayoutSize::Cm(4.0), LayoutSize::Relative(1.0)])
+                    .draw();
                 bp(d, &[3.0, 5.0], "narrow");
                 bp(d, &[4.0, 1.0, 6.0], "wide");
             },
@@ -202,11 +203,11 @@ fn cases() -> Vec<Case> {
             r: "layout(matrix(c(1, 2, 3, 3), 2, byrow = TRUE), widths = c(1, 2), heights = c(lcm(5), 1))\n\
                 bp(c(3, 5), 'a'); bp(c(4, 1, 6), 'b'); bp(c(2, 2, 7), 'c')",
             run: |d| {
-                let l = Layout::new(&[vec![1, 2], vec![3, 3]])
-                    .unwrap()
-                    .widths(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
-                    .heights(&[LayoutSize::Cm(5.0), LayoutSize::Relative(1.0)]);
-                d.layout(l);
+                d.layout()
+                    .mat(&[[1, 2], [3, 3]])
+                    .widths([LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
+                    .heights([LayoutSize::Cm(5.0), LayoutSize::Relative(1.0)])
+                    .draw();
                 bp(d, &[3.0, 5.0], "a");
                 bp(d, &[4.0, 1.0, 6.0], "b");
                 bp(d, &[2.0, 2.0, 7.0], "c");
@@ -218,10 +219,7 @@ fn cases() -> Vec<Case> {
             r: "layout(matrix(1:4, 2, byrow = TRUE), respect = TRUE)\n\
                 for (k in 1:4) bp(c(k, 2), paste('r', k))",
             run: |d| {
-                let l = Layout::new(&[vec![1, 2], vec![3, 4]])
-                    .unwrap()
-                    .respect(true);
-                d.layout(l);
+                d.layout().mat(&[[1, 2], [3, 4]]).respect(true).draw();
                 for k in 1..=4 {
                     bp(d, &[k as f64, 2.0], &format!("r {k}"));
                 }
@@ -233,12 +231,11 @@ fn cases() -> Vec<Case> {
             r: "layout(matrix(1:2, 1), widths = c(1, 2), respect = matrix(c(TRUE, FALSE), 1))\n\
                 bp(c(3, 5), 'sq'); bp(c(4, 1, 6), 'free')",
             run: |d| {
-                let l = Layout::new(&[vec![1, 2]])
-                    .unwrap()
-                    .widths(&[LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
-                    .respect_matrix(&[vec![true, false]])
-                    .unwrap();
-                d.layout(l);
+                d.layout()
+                    .mat(&[[1, 2]])
+                    .widths([LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
+                    .respect(&[[true, false]])
+                    .draw();
                 bp(d, &[3.0, 5.0], "sq");
                 bp(d, &[4.0, 1.0, 6.0], "free");
             },
@@ -349,4 +346,57 @@ fn layout_matches_r() {
             }
         }
     }
+}
+
+fn svg_device() -> Device<SvgBackend> {
+    Device::new(SvgBackend::new(8.0, 6.0), Par::default())
+}
+
+/// `.draw()` returns the number of figures, as R's `layout()` does
+/// (`layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))` gives 3; fractions
+/// are truncated, so `c(1.7, 2.2)` is `c(1, 2)` and gives 2).
+#[test]
+fn layout_returns_the_number_of_figures() {
+    let mut d = svg_device();
+    assert_eq!(d.layout().mat(&[[1, 1], [2, 3]]).draw(), 3);
+    assert_eq!(d.layout().mat(&[[1.7, 2.2]]).draw(), 2);
+    assert_eq!(d.layout().mat(&[[1, 0], [2, 2]]).draw(), 2);
+}
+
+#[test]
+#[should_panic(expected = "argument \"mat\" is missing, with no default")]
+fn layout_without_mat_panics() {
+    svg_device().layout().widths([1, 2]).draw();
+}
+
+#[test]
+#[should_panic(expected = "layout matrix must contain at least one reference")]
+fn layout_skipping_a_figure_panics_like_r() {
+    svg_device().layout().mat(&[[1, 3]]).draw();
+}
+
+#[test]
+#[should_panic(expected = "'respect' must be logical or matrix with same dimension as 'mat'")]
+fn layout_respect_of_another_shape_panics_like_r() {
+    svg_device()
+        .layout()
+        .mat(&[[1, 2]])
+        .respect(&[[true], [false]])
+        .draw();
+}
+
+#[test]
+#[should_panic(expected = "layout matrix values must be non-negative numbers")]
+fn layout_with_a_negative_value_panics() {
+    svg_device().layout().mat(&[[-1, 1]]).draw();
+}
+
+/// `respect` takes R's two forms: a logical or a grid of cells.
+#[test]
+fn layout_respect_takes_a_bool_or_cells() {
+    assert_eq!(LayoutRespect::from(true), LayoutRespect::All);
+    assert_eq!(
+        LayoutRespect::from(&[[true, false]]),
+        LayoutRespect::Cells(vec![vec![true, false]])
+    );
 }

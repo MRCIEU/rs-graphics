@@ -6,11 +6,12 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Font faces: R's `font` numbers as a named type.
+//! Font faces: plain, bold, italic, bold italic and Symbol, as the type
+//! [`FontFace`].
 //!
-//! Every font argument (`par(font)`, `font.main`, `font.axis`, ...,
-//! `text(font = )`, `legend(text.font = )`) is a [`FontFace`]. Setters take
-//! R's number, the name, or the enum:
+//! Every font argument (`par()`'s `font`, `font_main`, `font_axis`, ...,
+//! `text()`'s `font`, `legend()`'s `text_font`) is a [`FontFace`]. Setters
+//! take R's number, the name, or the enum:
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
@@ -20,32 +21,57 @@
 //! dev.text().x(&[0.5]).y(&[0.4]).labels("b").font("bold").draw();
 //! dev.text().x(&[0.5]).y(&[0.3]).labels("c").font(FontFace::Bold).draw();
 //! ```
+//!
+//! These are R's `font` numbers 1 to 5.
 
-/// One of R's font faces, `par(font = )`'s numbers 1 to 5: plain, bold,
-/// italic, bold italic and the Symbol font. The names are grid's
-/// `fontface` names (`"plain"`, `"bold"`, `"italic"`, `"bold.italic"`),
-/// plus `"symbol"`.
+/// A font face: plain, bold, italic, bold italic or the Symbol font.
+///
+/// Convert from a number 1 to 5 ([`FontFace::from_code`], `TryFrom<i32>`)
+/// or a name ([`FontFace::parse`], `TryFrom<&str>`): grid's `fontface` names
+/// (`"plain"`, `"bold"`, `"italic"`, `"bold.italic"`), plus `"symbol"`.
+/// The default is [`FontFace::Plain`].
 ///
 /// Text in [`FontFace::Symbol`] is in Adobe Symbol encoding, one `char`
 /// per code (e.g. `'a'` is alpha, `'\u{B1}'` plus-minus), as R's
 /// `pdf()` writes it; devices that need Unicode map it.
+///
+/// These are R's `font` numbers 1 to 5 (`par(font = )`).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!(FontFace::try_from(2), Ok(FontFace::Bold));
+/// assert_eq!(FontFace::try_from("bold.italic").unwrap().code(), 4);
+/// assert_eq!(FontFace::default(), FontFace::Plain);
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum FontFace {
-    /// 1, `"plain"` (the default).
+    /// Plain (the default); 1, `"plain"`.
     #[default]
     Plain,
-    /// 2, `"bold"`.
+    /// Bold; 2, `"bold"`.
     Bold,
-    /// 3, `"italic"`.
+    /// Italic; 3, `"italic"`.
     Italic,
-    /// 4, `"bold.italic"`.
+    /// Bold italic; 4, `"bold.italic"`.
     BoldItalic,
-    /// 5, `"symbol"`: the Symbol font.
+    /// The Symbol font; 5, `"symbol"`.
     Symbol,
 }
 
 impl FontFace {
-    /// The face for R's font number (1 to 5), or `None` for any other.
+    /// Returns the face for a font number 1 to 5, or `None` for any other.
+    ///
+    /// The numbers are R's `font` values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(FontFace::from_code(3), Some(FontFace::Italic));
+    /// assert_eq!(FontFace::from_code(0), None);
+    /// ```
     pub fn from_code(code: i32) -> Option<FontFace> {
         match code {
             1 => Some(FontFace::Plain),
@@ -57,7 +83,17 @@ impl FontFace {
         }
     }
 
-    /// R's font number, 1 to 5.
+    /// Returns the face's number, 1 to 5 (the inverse of
+    /// [`FontFace::from_code`]).
+    ///
+    /// The numbers are R's `font` values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(FontFace::Bold.code(), 2);
+    /// ```
     pub fn code(self) -> i32 {
         match self {
             FontFace::Plain => 1,
@@ -68,8 +104,20 @@ impl FontFace {
         }
     }
 
-    /// grid's name (`"plain"`, `"bold"`, `"italic"`, `"bold.italic"`) or
-    /// `"symbol"`, or R's number as a string (`"2"`).
+    /// Parses a face name or number, or returns `None` if `s` is neither.
+    ///
+    /// Takes grid's names (`"plain"`, `"bold"`, `"italic"`,
+    /// `"bold.italic"`), `"symbol"`, or a number 1 to 5 as a string
+    /// (`"2"`). Names are case-sensitive.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(FontFace::parse("italic"), Some(FontFace::Italic));
+    /// assert_eq!(FontFace::parse("3"), Some(FontFace::Italic));
+    /// assert_eq!(FontFace::parse("heavy"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<FontFace> {
         match s {
             "plain" => Some(FontFace::Plain),
@@ -82,14 +130,20 @@ impl FontFace {
     }
 }
 
-impl From<i32> for FontFace {
-    /// R's font number.
+impl TryFrom<i32> for FontFace {
+    type Error = crate::error::Error;
+
+    /// The face for a font number 1 to 5, as [`FontFace::from_code`].
     ///
-    /// # Panics
+    /// # Errors
+    ///
     /// If `code` isn't 1 to 5 (R errors on an invalid `par(font)`).
-    fn from(code: i32) -> Self {
-        FontFace::from_code(code)
-            .unwrap_or_else(|| panic!("invalid font {code}: R's fonts are 1 (plain) to 5 (symbol)"))
+    fn try_from(code: i32) -> Result<Self, Self::Error> {
+        FontFace::from_code(code).ok_or_else(|| {
+            crate::error::Error::invalid(format!(
+                "invalid font {code}: R's fonts are 1 (plain) to 5 (symbol)"
+            ))
+        })
     }
 }
 
@@ -107,10 +161,10 @@ mod tests {
     #[test]
     fn faces_convert_like_r() {
         for code in 1..=5 {
-            assert_eq!(FontFace::from(code).code(), code);
+            assert_eq!(FontFace::try_from(code).unwrap().code(), code);
         }
         assert_eq!(FontFace::default(), FontFace::Plain);
-        assert_eq!(FontFace::from("bold.italic"), FontFace::BoldItalic);
+        assert_eq!(FontFace::try_from("bold.italic"), Ok(FontFace::BoldItalic));
         assert_eq!(FontFace::parse("3"), Some(FontFace::Italic));
         assert_eq!("symbol".parse::<FontFace>().ok(), Some(FontFace::Symbol));
         assert_eq!(FontFace::parse("heavy"), None);
@@ -118,14 +172,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "invalid font 7")]
-    fn invalid_numbers_panic() {
-        let _ = FontFace::from(7);
-    }
-
-    #[test]
-    #[should_panic(expected = "\"heavy\" is not a valid font")]
-    fn invalid_names_panic() {
-        let _ = FontFace::from("heavy");
+    fn invalid_numbers_and_names_are_errors() {
+        let e = FontFace::try_from(7).unwrap_err();
+        assert!(e.message().starts_with("invalid font 7"), "{e}");
+        let e = FontFace::try_from("heavy").unwrap_err();
+        assert!(
+            e.message().starts_with("\"heavy\" is not a valid font"),
+            "{e}"
+        );
     }
 }

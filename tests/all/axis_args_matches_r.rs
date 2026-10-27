@@ -267,7 +267,7 @@ fn cases() -> Vec<Case> {
                 };
                 d.axis().side(1).with(&o).draw();
                 let o = AxisOptions {
-                    lty: Some(LineType::from_code(2)),
+                    lty: Some(LineType::from_code(2).unwrap()),
                     draw_labels: false,
                     ..Default::default()
                 };

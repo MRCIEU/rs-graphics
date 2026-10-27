@@ -54,7 +54,11 @@ const CASES: [Case; 6] = [
                 .x(X)
                 .y(Y)
                 .with(&opts)
-                .col(["red".into(), ColorSpec::None, "blue".into()])
+                .col([
+                    ColorSpec::try_from("red").unwrap(),
+                    ColorSpec::None,
+                    ColorSpec::try_from("blue").unwrap(),
+                ])
                 .lwd(3.0)
                 .draw();
         },

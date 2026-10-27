@@ -6,12 +6,21 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Mathematical annotation (R's plotmath, `?plotmath`): expressions
-//! written in R syntax, such as `"10^5"`, `"alpha[i]"` or
-//! `"-log[10](italic(p))"`, parsed into the call tree R's parser would
-//! build. [`Label`] is a text or expression label; `axis()`, `title()`,
-//! `mtext()`, `text()` and `legend()` draw expression labels with the
-//! layout rules of `plotmath.c` (`src/device/plotmath.rs`).
+//! Labels: plain text or mathematical expressions ([`Label`]), and the
+//! traits that let label arguments take one label or several.
+//!
+//! An [`Expression`] is written in R syntax, such as `"10^5"`,
+//! `"alpha[i]"` or `"-log[10](italic(p))"`, and parsed into the call tree
+//! R's parser would build. `axis()`, `title()`, `mtext()`, `text()` and
+//! `legend()` draw expression labels, laid out as R does (a port of R's
+//! `plotmath.c`, in `src/device/plotmath.rs`). This is R's plotmath (see
+//! R's `?plotmath`).
+//!
+//! ```
+//! # use rs_graphics::prelude::*;
+//! # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+//! dev.plot().x([1, 10, 100]).y([1, 2, 3]).xlab(Label::math("-log[10](italic(p))")).draw();
+//! ```
 //!
 //! Supported: numbers, names (Greek letters such as `alpha`/`Omega` and
 //! `infinity`, `degree`, `minute`, `second`, `partialdiff`, `nabla`,
@@ -37,10 +46,23 @@
 
 use std::fmt;
 
-/// A node of the parsed expression, as R's parser represents it: every
-/// operator, subscript, parenthesis and function call is a call whose
-/// function is usually a name (`x^2` is `` `^`(x, 2) ``, `x[i]` is
-/// `` `[`(x, i) ``, `(x)` is `` `(`(x) ``).
+/// A node of a parsed [`Expression`]'s call tree.
+///
+/// The tree is the one R's parser builds: every operator, subscript,
+/// parenthesis and function call is a call whose function is usually a
+/// name (`x^2` is `` `^`(x, 2) ``, `x[i]` is `` `[`(x, i) ``, `(x)` is
+/// `` `(`(x) ``).
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::plotmath::Expr;
+/// # use rs_graphics::prelude::*;
+/// let e = Expression::parse("x^2").unwrap();
+/// let Expr::Call(f, args) = e.root() else { panic!() };
+/// assert_eq!(**f, Expr::Name("^".into()));
+/// assert_eq!(args, &[Expr::Name("x".into()), Expr::Num("2".into())]);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     /// A number, as R prints it in plotmath (7 significant digits:
@@ -67,15 +89,42 @@ impl Expr {
     }
 }
 
-/// A parsed plotmath expression (one element of R's `expression()`).
+/// A parsed mathematical expression, drawn as a formula.
+///
+/// Make one with [`Expression::parse`] (or `str::parse`), or a [`Label`]
+/// holding one with [`Label::math`]. The [module docs](self) list what is
+/// supported.
+///
+/// This is one element of R's `expression()`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let e: Expression = "alpha[i]^2".parse().unwrap();
+/// let label = Label::from(e);
+/// assert!(matches!(label, Label::Math(_)));
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expression {
     pub(crate) root: Expr,
 }
 
 impl Expression {
-    /// Parses R syntax, e.g. `"10^5"`, `"alpha[i]^2"`, `"x == 0.05"` or
-    /// `"frac(1, sqrt(n))"`. Fails on a syntax error, a construct the
+    /// Parses an expression written in R syntax, e.g. `"10^5"`,
+    /// `"alpha[i]^2"`, `"x == 0.05"` or `"frac(1, sqrt(n))"`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert!(Expression::parse("frac(1, sqrt(n))").is_ok());
+    /// assert!(Expression::parse("frac(a)").is_err());
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// A [`ParseError`] on a syntax error, a construct the
     /// [module docs](self) list as unsupported, or a construct with the
     /// wrong number of arguments (`frac(a)`).
     pub fn parse(source: &str) -> Result<Expression, ParseError> {
@@ -89,7 +138,7 @@ impl Expression {
         Ok(Expression { root })
     }
 
-    /// The root of the call tree.
+    /// The root of the expression's call tree.
     pub fn root(&self) -> &Expr {
         &self.root
     }
@@ -104,9 +153,20 @@ impl std::str::FromStr for Expression {
     }
 }
 
-/// Why [`Expression::parse`] failed.
+/// The error [`Expression::parse`] returns: what went wrong, and where.
+///
+/// It displays as the message followed by the byte offset.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let err = Expression::parse("x ? y").unwrap_err();
+/// assert_eq!(err.offset, 2);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParseError {
+    /// What went wrong.
     pub message: String,
     /// Byte offset in the source; 0 when not known (for a construct with
     /// the wrong number of arguments).
@@ -121,18 +181,43 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-/// A label: plain text or a plotmath expression (R's character or
-/// `expression()` labels).
+/// A label: plain text or a mathematical expression.
+///
+/// Text labels convert from `&str` and `String`; expression labels come
+/// from [`Label::math`] or an [`Expression`].
+///
+/// These are R's character and `expression()` labels.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+/// dev.plot().x([1, 2, 3]).y([1, 4, 9]).xlab("x").ylab(Label::math("x^2")).draw();
+/// assert_eq!(Label::from("x"), Label::Text("x".into()));
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub enum Label {
+    /// Plain text.
     Text(String),
+    /// A mathematical expression.
     Math(Expression),
 }
 
 impl Label {
-    /// An expression label from R syntax. Panics if `source` doesn't parse
-    /// (see [`Expression::parse`] for a `Result`), as R errors on an
-    /// invalid expression.
+    /// An expression label parsed from R syntax.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert!(matches!(Label::math("alpha[i]"), Label::Math(_)));
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// If `source` doesn't parse, as R errors on an invalid expression;
+    /// use [`Expression::parse`] for a `Result`.
     pub fn math(source: &str) -> Label {
         match Expression::parse(source) {
             Ok(e) => Label::Math(e),
@@ -171,21 +256,48 @@ impl From<Expression> for Label {
     }
 }
 
-/// One label (`&str`, `String`, [`Label`], an [`Expression`]) or several
-/// (a slice, array or `Vec` of them, or of `Option`s of them): the labels
-/// of [`text()`](crate::graphics::Graphics::text), the text of
-/// [`mtext()`](crate::graphics::Graphics::mtext), recycled with its other
-/// arguments, and the labels of
-/// [`legend()`](crate::graphics::Graphics::legend), one per key. A `None`
-/// element is R's `NA`: no text there (`text()` and `mtext()` skip it; in
-/// `legend()` the key is drawn and the label takes no room), as in R.
+/// One label or several, where an element may be missing (`None`).
+///
+/// Takes one label (`&str`, `String`, [`Label`], an [`Expression`]) or
+/// several (a slice, array or `Vec` of them, or of `Option`s of them).
+/// Used for the labels of [`text()`](crate::graphics::Graphics::text),
+/// the text of [`mtext()`](crate::graphics::Graphics::mtext) (recycled
+/// with its other arguments), the labels of
+/// [`legend()`](crate::graphics::Graphics::legend) (one per key), and
+/// [`axis()`](crate::graphics::Graphics::axis)'s `labels`.
+///
+/// A `None` element is R's `NA`: no text there. `text()` and `mtext()`
+/// skip it; in `legend()` the key is drawn and the label takes no room; in
+/// `axis()` the tick is drawn without a label; all as in R.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("a".into_labels(), vec![Some(Label::from("a"))]);
+/// assert_eq!([Some("a"), None].into_labels(), vec![Some(Label::from("a")), None]);
+/// # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+/// # dev.plot().x([1, 2]).y([1, 2]).draw();
+/// dev.text().x([1, 2]).y([1, 2]).labels([Some("a"), None]).draw();
+/// ```
 pub trait Labels {
     /// The labels, in order (`None`: R's `NA`).
     fn into_labels(self) -> Vec<Option<Label>>;
 }
 
-/// One element of [`Labels`]: a label, or an `Option` of one (`None` is
-/// R's `NA`).
+/// One element of a [`Labels`] list: a label, or an `Option` of one.
+///
+/// `None` is R's `NA`. Implemented for `&str`, `&&str`, `String`,
+/// `&String`, [`Label`] and [`Expression`], and `Option`s of each.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::plotmath::LabelElement;
+/// # use rs_graphics::prelude::*;
+/// assert_eq!(Some("a").into_label(), Some(Label::from("a")));
+/// assert_eq!(None::<&str>.into_label(), None);
+/// ```
 pub trait LabelElement {
     /// The label, or `None` for R's `NA`.
     fn into_label(self) -> Option<Label>;
@@ -241,6 +353,70 @@ impl<L: Clone + LabelElement> Labels for Vec<L> {
 impl<L: Clone + LabelElement> Labels for &Vec<L> {
     fn into_labels(self) -> Vec<Option<Label>> {
         self.iter().cloned().map(LabelElement::into_label).collect()
+    }
+}
+
+/// One label or several, with no missing elements.
+///
+/// Takes one label (`&str`, `String`, [`Label`], an [`Expression`]) or
+/// several (a slice, array or `Vec` of them). Used for the label lists
+/// that have no `NA`: `barplot()`'s `names` and `legend_text`,
+/// `boxplot()`'s `names` and `pie()`'s `labels`. As in R, one label is a
+/// list of one (`.names("A")`).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("A".into_label_values(), vec![Label::from("A")]);
+/// let opts = BarplotOptions::default().names(["A", "B"]);
+/// assert_eq!(opts.names.unwrap().len(), 2);
+/// ```
+pub trait LabelValues {
+    /// The labels, in order.
+    fn into_label_values(self) -> Vec<Label>;
+}
+
+macro_rules! one_label_value {
+    ($($t:ty),*) => {
+        $(
+            impl LabelValues for $t {
+                fn into_label_values(self) -> Vec<Label> {
+                    vec![self.into()]
+                }
+            }
+        )*
+    };
+}
+one_label_value!(&str, &&str, String, &String, Label, Expression);
+
+impl<L: Clone + Into<Label>> LabelValues for &[L] {
+    fn into_label_values(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Into<Label>, const N: usize> LabelValues for [L; N] {
+    fn into_label_values(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>, const N: usize> LabelValues for &[L; N] {
+    fn into_label_values(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
+    }
+}
+
+impl<L: Into<Label>> LabelValues for Vec<L> {
+    fn into_label_values(self) -> Vec<Label> {
+        self.into_iter().map(Into::into).collect()
+    }
+}
+
+impl<L: Clone + Into<Label>> LabelValues for &Vec<L> {
+    fn into_label_values(self) -> Vec<Label> {
+        self.iter().cloned().map(Into::into).collect()
     }
 }
 
@@ -663,12 +839,58 @@ fn check_supported(e: &Expr) -> Result<(), ParseError> {
                 }
             }
         }
+        // R's `DelimCode` / `RenderDelim` errors, found when drawing in R.
+        if let Expr::Name(n) = f.as_ref() {
+            if n == "group" || n == "bgroup" {
+                for d in [&args[0], &args[2]] {
+                    let error = |message: &str| ParseError {
+                        message: message.to_string(),
+                        offset: 0,
+                    };
+                    match delim_code(d) {
+                        None => return Err(error("invalid group delimiter")),
+                        // `bgroup()` grows only these.
+                        Some(c) if n == "bgroup" && !"|()[]{}.".contains(c) => {
+                            return Err(error("group is incomplete"));
+                        }
+                        Some(_) => {}
+                    }
+                }
+            }
+        }
         check_supported(f)?;
         for a in args {
             check_supported(a)?;
         }
     }
     Ok(())
+}
+
+/// R's `DelimCode`: a `group()`/`bgroup()` delimiter, a string such as
+/// `"("`, `"["`, `"|"`, or `""`/`"."` for none, or a name such as
+/// `lfloor`; `None` if it isn't one.
+pub(crate) fn delim_code(e: &Expr) -> Option<char> {
+    let s = match e {
+        Expr::Str(s) => s.as_str(),
+        Expr::Name(n) => {
+            return match n.as_str() {
+                "lfloor" => Some('\u{EB}'),
+                "rfloor" => Some('\u{FB}'),
+                "lceil" => Some('\u{E9}'),
+                "rceil" => Some('\u{F9}'),
+                "langle" => Some('\u{E1}'),
+                "rangle" => Some('\u{F1}'),
+                _ => None,
+            };
+        }
+        _ => return None,
+    };
+    match s {
+        "|" | "||" => Some('|'),
+        "(" | ")" | "[" | "]" | "{" | "}" => s.chars().next(),
+        "" | "." => Some('.'),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

@@ -86,8 +86,8 @@ usage, see [README.md](README.md).
   `Device::xlog()`/`ylog()` tell which axes are logarithmic, and
   `user_to_inches`/`inches_to_user` convert between data units and
   device inches.
-- Multi-panel layouts (`src/layout.rs`, `Device::{mfrow, mfcol, layout,
-  mfg}`, and `mfrow`/`mfcol` on a device's `par()` call):
+- Multi-panel layouts (`src/layout.rs`, the `Device::layout()` builder,
+  and `mfrow`/`mfcol`/`mfg` on a device's `par()` call):
   `par(mfrow=)`/`par(mfcol=)` (incl. R's automatic `cex` of
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
   `layout()` with spanning figures, relative / `lcm()` widths and
@@ -337,8 +337,9 @@ against a real R installation by shelling out to `Rscript`:
   `radius`, `par(xaxs = "i")`) vs. an uncompressed R `pdf()`.
 - `tests/all/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
-- `tests/all/text_metrics_matches_r.rs` - `Device::text_metrics` vs. R's
-  `strwidth()`/`strheight()`: `cex`, `font`, multi-line text, `par(ps)`,
+- `tests/all/strwidth_matches_r.rs` - `Device::strwidth`/`strheight` vs.
+  R's `strwidth()`/`strheight()` in inches, user (incl. a reversed axis)
+  and figure units: `cex`, `font`, multi-line text, `par(ps)`,
   `par(lheight)` and a 2x2 `mfrow`.
 - `tests/all/colour_zero_matches_r.rs` - colour 0 is `par("bg")` (with
   `pdf(bg = )`, the transparent default, and after `par(bg = )`): every
@@ -437,7 +438,7 @@ against a real R installation by shelling out to `Rscript`:
   font, size and colour vs. R `pdf()`.
 - `tests/all/integer_args.rs` (no R needed) - integers wherever R takes
   numbers (data vectors, ranges, recycled and single setters, limits,
-  arrays, pairs, `Layout` sizes, `fig()`, backend constructors) draw byte
+  arrays, pairs, `layout()` sizes, `fig()`, backend constructors) draw byte
   for byte what the same `f64`s do, on a device and in a `Figure`.
 - `tests/all/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
   and `DeviceBuilder`: every option byte-identical to `Device::new` with
@@ -468,10 +469,10 @@ against a real R installation by shelling out to `Rscript`:
   solid line): cap, join, mitre and width at each stroke vs R `pdf()`,
   and that they don't outlast the call.
 - `tests/all/xy_lengths_matches_r.rs` - `plot()`/`points()`/`lines()`/
-  `polygon()` with `x` and `y` of different lengths panic with R's
-  `xy.coords()` message (on a device and in a `Figure`); `text()`
+  `polygon()` with `x` and `y` of different lengths return R's
+  `xy.coords()` error from `try_draw()` (on a device and in a `Figure`); `text()`
   recycles, as R.
-- `tests/all/region_errors_matches_r.rs` - `plot_new()`'s panics with R's
+- `tests/all/region_errors_matches_r.rs` - `try_plot_new()`'s errors with R's
   messages ("figure margins too large", "figure region too large", "plot
   region too large") for small pages, large `oma`/`mai`, many panels,
   `fin`, `pin`, `plt` and `lcm()` layouts, cases that just fit, and the
@@ -525,9 +526,9 @@ against a real R installation by shelling out to `Rscript`:
   mtext, abline, boxplot and legend: where R defines `NA`, R's drawing;
   otherwise R drawing the skipped element or the default.
 - `tests/all/required_args.rs` (no R needed) - every required argument left
-  out panics with R's message (`argument "x" is missing, with no
-  default`), on a device and in a `Figure`; arguments with R defaults can
-  be left out.
+  out is an error with R's message (`argument "x" is missing, with no
+  default`) and the call's name, on a device and in a `Figure`; `.draw()`
+  panics with it; arguments with R defaults can be left out.
 - `tests/all/primitives_matches_r.rs` - per-element recycling in `points()`,
   `segments()`, `arrows()`, `rect()`, `polygon()` and `text()`,
   `lines(type = )`, `par("fg")` defaults, polygons split at `NA`, default

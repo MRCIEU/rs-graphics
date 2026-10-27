@@ -6,12 +6,13 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! A required argument (one R gives no default) left out of a call panics
-//! at `.draw()` with R's message, on a device and when a `Figure` records
-//! the call. (No R needed.)
+//! A required argument (one R gives no default) left out of a call is an
+//! error with R's message (`try_draw()`; `.draw()` panics with it), on a
+//! device and when a `Figure` records the call. (No R needed.)
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
+use rs_graphics::Error;
 use rs_graphics::prelude::*;
 
 fn device() -> Device<SvgBackend> {
@@ -28,66 +29,85 @@ fn panic_message(f: impl FnOnce()) -> Option<String> {
         .or_else(|| err.downcast_ref::<&str>().map(|s| s.to_string()))
 }
 
-/// A call on a device or a `Figure`.
-type Call<G> = fn(&mut G);
+/// A call on a device or a `Figure`, through `try_draw()`.
+type Call<G> = fn(&mut G) -> Result<(), Error>;
 
-/// Each call with one required argument left out, and that argument.
-fn calls<G: Graphics>() -> Vec<(&'static str, Call<G>)> {
+/// Each call with one required argument left out: R's name for the call,
+/// the argument, and the call.
+fn calls<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> {
     vec![
-        ("x", |g| g.plot().y([1.0, 2.0]).draw()),
-        ("x", |g| {
-            g.hist().draw();
+        ("plot", "x", |g| g.plot().y([1.0, 2.0]).try_draw()),
+        ("hist", "x", |g| g.hist().try_draw().map(drop)),
+        ("barplot", "height", |g| g.barplot().try_draw().map(drop)),
+        ("boxplot", "x", |g| g.boxplot().try_draw().map(drop)),
+        ("pie", "x", |g| g.pie().try_draw()),
+        ("plot.window", "xlim", |g| {
+            g.plot_window().ylim(0, 1).try_draw()
         }),
-        ("height", |g| {
-            g.barplot().draw();
+        ("plot.window", "ylim", |g| {
+            g.plot_window().xlim(0, 1).try_draw()
         }),
-        ("x", |g| {
-            g.boxplot().draw();
+        ("points", "x", |g| g.points().y([1.0]).try_draw()),
+        ("lines", "x", |g| g.lines().try_draw()),
+        ("polygon", "x", |g| g.polygon().try_draw()),
+        ("segments", "x0", |g| g.segments().y0([1.0]).try_draw()),
+        ("segments", "y0", |g| g.segments().x0([1.0]).try_draw()),
+        ("arrows", "x0", |g| g.arrows().y0([1.0]).try_draw()),
+        ("rect", "ytop", |g| {
+            g.rect()
+                .xleft([0.0])
+                .ybottom([0.0])
+                .xright([1.0])
+                .try_draw()
         }),
-        ("x", |g| g.pie().draw()),
-        ("xlim", |g| g.plot_window().ylim(0, 1).draw()),
-        ("ylim", |g| g.plot_window().xlim(0, 1).draw()),
-        ("x", |g| g.points().y([1.0]).draw()),
-        ("x", |g| g.lines().draw()),
-        ("x", |g| g.polygon().draw()),
-        ("x0", |g| g.segments().y0([1.0]).draw()),
-        ("y0", |g| g.segments().x0([1.0]).draw()),
-        ("x0", |g| g.arrows().y0([1.0]).draw()),
-        ("ytop", |g| {
-            g.rect().xleft([0.0]).ybottom([0.0]).xright([1.0]).draw()
+        ("text", "x", |g| g.text().labels("a").try_draw()),
+        ("axis", "side", |g| g.axis().try_draw().map(drop)),
+        ("legend", "pos", |g| {
+            g.legend().labels("a").try_draw().map(drop)
         }),
-        ("x", |g| g.text().labels("a").draw()),
-        ("side", |g| {
-            g.axis().draw();
+        ("legend", "labels", |g| {
+            g.legend().pos("topleft").try_draw().map(drop)
         }),
-        ("pos", |g| {
-            g.legend().labels("a").draw();
-        }),
-        ("labels", |g| {
-            g.legend().pos("topleft").draw();
-        }),
-        ("text", |g| g.mtext().side(1).draw()),
+        ("mtext", "text", |g| g.mtext().side(1).try_draw()),
     ]
 }
 
+/// Checks `calls()` on a fresh `G` from `new`.
+fn check<G: Graphics>(what: &str, new: impl Fn() -> G) {
+    for (name, arg, call) in calls::<G>() {
+        let e = call(&mut new()).unwrap_err();
+        let message = format!("argument \"{arg}\" is missing, with no default");
+        assert_eq!(
+            (e.call(), e.kind(), e.message()),
+            (name, ErrorKind::MissingArgument, message.as_str()),
+            "{what}, `{arg}`"
+        );
+        assert_eq!(e.to_string(), format!("{name}(): {message}"));
+    }
+}
+
 #[test]
-fn missing_required_arguments_panic_like_r() {
-    for (arg, call) in calls::<Device<SvgBackend>>() {
-        let msg = panic_message(|| call(&mut device()));
-        assert_eq!(
-            msg.as_deref(),
-            Some(format!("argument \"{arg}\" is missing, with no default").as_str()),
-            "device, `{arg}`"
-        );
-    }
-    for (arg, call) in calls::<Figure>() {
-        let msg = panic_message(|| call(&mut Figure::new()));
-        assert_eq!(
-            msg.as_deref(),
-            Some(format!("argument \"{arg}\" is missing, with no default").as_str()),
-            "figure, `{arg}`"
-        );
-    }
+fn missing_required_arguments_are_errors_like_r() {
+    check("device", device);
+    check("figure", Figure::new);
+}
+
+#[test]
+fn draw_panics_with_the_error() {
+    let msg = panic_message(|| {
+        device().plot().y([1.0, 2.0]).draw();
+    });
+    assert_eq!(
+        msg.as_deref(),
+        Some("plot(): argument \"x\" is missing, with no default")
+    );
+    let msg = panic_message(|| {
+        Figure::new().legend().pos("topleft").draw();
+    });
+    assert_eq!(
+        msg.as_deref(),
+        Some("legend(): argument \"labels\" is missing, with no default")
+    );
 }
 
 #[test]

@@ -1241,7 +1241,7 @@ impl<'d, B: Backend> Math<'d, B> {
             ']' => codes(249, 250, 251, 0),
             '{' => codes(236, 239, 238, 237),
             '}' => codes(252, 239, 254, 253),
-            _ => panic!("group is incomplete"),
+            _ => unreachable!("bgroup() delimiters are checked by Expression::parse"),
         };
         let brace = which == '{' || which == '}';
         let top_bbox = self.glyph_bbox(top);
@@ -1588,26 +1588,8 @@ fn is_op(name: &str) -> bool {
     )
 }
 
-/// `DelimCode`: a `group()`/`bgroup()` delimiter, a string such as `"("`,
-/// `"["`, `"|"`, or `""`/`"."` for none, or a name such as `lfloor`.
+/// A delimiter `Expression::parse` has checked (see
+/// [`crate::plotmath::delim_code`]).
 fn delim_code(e: &Expr) -> char {
-    let s = match e {
-        Expr::Str(s) => s.as_str(),
-        Expr::Name(n) => match n.as_str() {
-            "lfloor" => return '\u{EB}',
-            "rfloor" => return '\u{FB}',
-            "lceil" => return '\u{E9}',
-            "rceil" => return '\u{F9}',
-            "langle" => return '\u{E1}',
-            "rangle" => return '\u{F1}',
-            _ => panic!("invalid group delimiter `{n}`"),
-        },
-        _ => panic!("invalid group delimiter"),
-    };
-    match s {
-        "|" | "||" => '|',
-        "(" | ")" | "[" | "]" | "{" | "}" => s.chars().next().unwrap(),
-        "" | "." => '.',
-        _ => panic!("invalid group delimiter {s:?}"),
-    }
+    crate::plotmath::delim_code(e).expect("checked by Expression::parse")
 }

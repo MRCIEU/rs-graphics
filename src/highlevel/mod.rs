@@ -6,21 +6,28 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! R's high-level plots, `plot()`, `hist()`, `barplot()`, `boxplot()` and
-//! `pie()`, as methods of [`crate::device::Device`] ([`Device::plot`](crate::graphics::Graphics::plot),
-//! ...), with their options and result types.
+//! The options and result types of the high-level plots: scatter and line
+//! plots, histograms, bar plots, box plots and pie charts.
 //!
-//! Each function here is a fairly direct port of the corresponding
-//! `*.default` R function in `r-source/src/library/graphics/R/`, reduced to
-//! the common/core use cases: there are no formula interfaces or
-//! S3-style dispatch on input type, and each module's docs (and the
-//! "Out of scope" section of DEVELOPER.md) say what else isn't implemented.
-//!
+//! The plots themselves are methods of [`Graphics`](crate::graphics::Graphics)
+//! ([`plot`](crate::graphics::Graphics::plot),
+//! [`hist`](crate::graphics::Graphics::hist),
+//! [`barplot`](crate::graphics::Graphics::barplot),
+//! [`boxplot`](crate::graphics::Graphics::boxplot),
+//! [`pie`](crate::graphics::Graphics::pie)), on a
+//! [`Device`](crate::device::Device) or a [`Figure`](crate::recording::Figure).
 //! Each starts a new plot (moving to the next panel of a multi-panel
 //! page), unless `add` is set (`hist`, `barplot`, `boxplot`). They are
 //! built from the same drawing calls as the public API (`plot_new`,
 //! `rect`, `axis`, `title`, ...), as plots written outside the crate are
 //! (see the crate docs).
+//!
+//! These are R's `plot()`, `hist()`, `barplot()`, `boxplot()` and `pie()`.
+//! Each is a fairly direct port of the corresponding `*.default` R
+//! function in `r-source/src/library/graphics/R/`, reduced to the
+//! common/core use cases: there are no formula interfaces or S3-style
+//! dispatch on input type, and each module's docs (and the "Out of scope"
+//! section of DEVELOPER.md) say what else isn't implemented.
 
 pub mod barplot;
 pub mod boxplot;
@@ -34,6 +41,7 @@ pub use barplot::{BarHeights, BarplotOptions, OrderH};
 pub use boxplot::{BoxStats, BoxplotOptions, boxplot_stats};
 pub use hist::{HistBreaks, HistLabels, HistOptions, HistResult};
 pub use pie::PieOptions;
+pub(crate) use pie::check_pie;
 pub use plot::{PlotOptions, PlotType};
 
 /// Compute the finite min/max of a data slice, matching R's `range(x[is.finite(x)])`

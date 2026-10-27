@@ -6,27 +6,30 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The stateful graphics device: coordinate transforms (`plot.new()`/
-//! `plot.window()`), clipping, and the primitive drawing operations
-//! (`points`, `lines`, `segments`, `rect`, `polygon`, `text`, `box`,
-//! `abline`, `axis`, `title`, `mtext`, `legend`, `arrows`).
+//! The graphics device, [`Device`]: the page (or pages) being drawn, the
+//! graphical parameters (`par()`), the page layout, coordinates and
+//! clipping, and the code behind every drawing function.
 //!
 //! Devices are opened for a file with [`Device::pdf`], [`Device::svg`],
-//! [`Device::png`] or [`Device::format`] (a [`DeviceBuilder`], in
-//! `open.rs`) and written by [`Device::close`]; [`Device::new`] with
-//! [`Device::finish`] keeps the output in memory.
-//!
-//! The public entry to each R function is a [`Graphics`](crate::graphics::Graphics)
-//! method; the drawing code is here, in crate-private `*_impl` methods
-//! taking the data and an options struct, whose unset fields are R's
-//! defaults, mostly the `par()` values. `points()`, `lines()`,
-//! `segments()`, `arrows()`, `rect()`, `polygon()`, `text()`, `box()` and
-//! `plot.window()` are in `primitives.rs`; `axis()`, `abline()`,
-//! `legend()` and `mtext()` in their own child modules; the page,
-//! layout, coordinate and clipping state, `plot.new()` and `title()` here. Nearly every high-level plot (`plot()`,
-//! `hist()`, `barplot()`, ...) is built purely out of these primitives,
-//! mirroring how R's own `graphics.c` centers everything around a handful
-//! of `GE*` engine calls.
+//! [`Device::png`] or [`Device::format`] (a [`DeviceBuilder`]) and written
+//! by [`Device::close`]; [`Device::new`] with [`Device::finish`] keeps the
+//! output in memory. Draw on a device with the
+//! [`Graphics`](crate::graphics::Graphics) methods. The module also holds
+//! the options structs of the low-level functions ([`XyOptions`],
+//! [`AxisOptions`], [`LegendOptions`], ...) and the types they use
+//! ([`Side`], [`LegendPos`], ...).
+
+// For contributors: the public entry to each R function is a `Graphics`
+// method; the drawing code is here, in crate-private `*_impl` methods
+// taking the data and an options struct, whose unset fields are R's
+// defaults, mostly the `par()` values. `points()`, `lines()`,
+// `segments()`, `arrows()`, `rect()`, `polygon()`, `text()`, `box()` and
+// `plot.window()` are in `primitives.rs`; `axis()`, `abline()`,
+// `legend()` and `mtext()` in their own child modules; the page, layout,
+// coordinate and clipping state, `plot.new()` and `title()` here. Nearly
+// every high-level plot (`plot()`, `hist()`, `barplot()`, ...) is built
+// purely out of these primitives, mirroring how R's own `graphics.c`
+// centres everything around a handful of `GE*` engine calls.
 
 use crate::afm::{self};
 use crate::font::FontFace;
@@ -34,8 +37,10 @@ use std::ops::{Deref, DerefMut};
 
 use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
+use crate::error::Error;
+use crate::setters::IntoArg;
 use crate::geometry::{Point, Rect};
-use crate::layout::{Arrangement, Layout};
+use crate::layout::{Arrangement, Layout, LayoutRespect, LayoutSize};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par, Pty, Sides, Xpd};
 use crate::pch;
@@ -52,19 +57,23 @@ mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
 pub use axis::AxisOptions;
+pub(crate) use axis::check_axis;
 pub(crate) use legend::check_legend;
 pub use legend::{LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos};
 pub use mtext::MtextOptions;
-pub use open::DeviceBuilder;
+pub(crate) use mtext::check_mtext;
+pub use open::{DeviceBuilder, Units};
+pub(crate) use primitives::check_text;
 pub use primitives::{
     ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
     SegmentsOptions, TextOptions, XyOptions,
 };
 
-/// A side of the plot, figure or page, as R's `side` argument. Functions
-/// take `impl Into<Side>`, so R's numbers work too: `1` = bottom, `2` =
-/// left, `3` = top, `4` = right (`dev.axis().side(1)` is
-/// `dev.axis().side(Side::Bottom)`).
+/// A side of the plot, figure or page.
+///
+/// Setters also take R's side numbers (`TryFrom<i32>`): `1` bottom, `2`
+/// left, `3` top, `4` right (`.side(1)` is `.side(Side::Bottom)`); any
+/// other number is an error of the call ("invalid axis number").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     Bottom = 1,
@@ -88,27 +97,44 @@ impl Side {
     }
 }
 
-impl From<i32> for Side {
+impl TryFrom<i32> for Side {
+    type Error = crate::error::Error;
+
     /// R's side numbers.
     ///
-    /// # Panics
+    /// # Errors
+    ///
     /// If `n` isn't 1 to 4 (R: "invalid axis number").
-    fn from(n: i32) -> Side {
+    fn try_from(n: i32) -> Result<Side, Self::Error> {
         match n {
-            1 => Side::Bottom,
-            2 => Side::Left,
-            3 => Side::Top,
-            4 => Side::Right,
-            _ => panic!("invalid side {n}: must be 1 (bottom), 2 (left), 3 (top) or 4 (right)"),
+            1 => Ok(Side::Bottom),
+            2 => Ok(Side::Left),
+            3 => Ok(Side::Top),
+            4 => Ok(Side::Right),
+            _ => Err(crate::error::Error::invalid(format!("invalid axis number {n}"))),
         }
     }
 }
 
-/// A graphics device: a page (or several, for PDF) drawn onto a
-/// [`Backend`], plus R's `par()` state and the page layout. Open one for
-/// a file with [`Device::pdf`], [`Device::svg`], [`Device::png`] or
-/// [`Device::format`], or wrap a backend with [`Device::new`]; draw with
-/// the [`Graphics`](crate::graphics::Graphics) methods.
+/// A graphics device: one or more pages drawn onto a [`Backend`], with the
+/// graphical parameters (`par()`) and the page layout.
+///
+/// Open one for a file with [`Device::pdf`], [`Device::svg`],
+/// [`Device::png`] or [`Device::format`], or wrap a backend kept in memory
+/// with [`Device::new`]; draw on it with the
+/// [`Graphics`](crate::graphics::Graphics) methods.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use rs_graphics::prelude::*;
+/// # fn main() -> std::io::Result<()> {
+/// let mut dev = Device::pdf("plot.pdf").width(6).height(4).open()?;
+/// dev.plot().x([1, 2, 3]).y([2, 4, 3]).draw();
+/// dev.close()?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct Device<B: Backend> {
     backend: B,
     /// R's `par()` state: changed by
@@ -161,6 +187,318 @@ pub struct Device<B: Backend> {
     /// The file(s) of a device opened with [`DeviceBuilder::open`], which
     /// [`close`](Device::close) writes; `None` for [`Device::new`].
     output: Option<open::Output>,
+    /// An R error found while drawing (a negative colour number, ...),
+    /// returned by the call when it ends; see [`Device::run`].
+    pending_error: std::cell::RefCell<Option<Error>>,
+}
+
+/// A [`layout()`](Device::layout) call being built: it divides the page
+/// into figures of different sizes.
+///
+/// Set its arguments with the setters below, then apply it with
+/// [`draw`](LayoutCall::draw), which returns the number of figures.
+/// Without `.draw()`, nothing happens (the compiler warns).
+///
+/// See [`Device::layout`] for an example.
+#[must_use = "nothing is changed until `.draw()`"]
+pub struct LayoutCall<'a, B: Backend> {
+    dev: &'a mut Device<B>,
+    mat: Option<Vec<Vec<f64>>>,
+    widths: Vec<LayoutSize>,
+    heights: Vec<LayoutSize>,
+    respect: LayoutRespect,
+    /// The first value a setter couldn't convert.
+    error: Option<Error>,
+}
+
+impl<B: Backend> LayoutCall<'_, B> {
+    /// The grid of figure numbers, as rows, top to bottom (as the matrix
+    /// reads on screen). Every figure number from 1 to the largest must
+    /// appear; `0` marks an empty cell, and a number in several cells
+    /// makes that figure span them. Fractions are truncated, as R does.
+    /// Required. R's `mat`.
+    pub fn mat<R: AsRef<[T]>, T: crate::numbers::Num>(mut self, mat: &[R]) -> Self {
+        self.mat = Some(
+            mat.iter()
+                .map(|row| row.as_ref().iter().map(|v| v.to_f64()).collect())
+                .collect(),
+        );
+        self
+    }
+
+    /// Column widths: numbers are relative sizes (`[2, 1]`), or give
+    /// [`LayoutSize`]s to mix in absolute ones (`LayoutSize::Cm`, R's
+    /// `lcm()`). A shorter list is padded with relative `1`s; extra
+    /// entries are ignored. Default: equal relative widths.
+    pub fn widths(mut self, widths: impl crate::setters::Values<LayoutSize>) -> Self {
+        match widths.into_values() {
+            Ok(v) => self.widths = v,
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
+        self
+    }
+
+    /// Row heights; as [`widths`](LayoutCall::widths). Default: equal
+    /// relative heights.
+    pub fn heights(mut self, heights: impl crate::setters::Values<LayoutSize>) -> Self {
+        match heights.into_values() {
+            Ok(v) => self.heights = v,
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
+        self
+    }
+
+    /// Whether one unit of width equals one unit of height: `true` in every
+    /// relative-size cell, or a grid of cells as rows (see
+    /// [`LayoutRespect`]). Default: `false`.
+    pub fn respect(mut self, respect: impl Into<LayoutRespect>) -> Self {
+        self.respect = respect.into();
+        self
+    }
+
+    /// Applies the layout and returns its number of figures.
+    ///
+    /// This is R's (invisible) return value of `layout()`.
+    ///
+    /// # Panics
+    ///
+    /// With R's error, as [`try_draw`](LayoutCall::try_draw) would return it.
+    pub fn draw(self) -> usize {
+        self.try_draw().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Applies the layout as [`draw`](LayoutCall::draw) does, returning R's
+    /// error instead of panicking.
+    ///
+    /// # Errors
+    ///
+    /// With R's message, if `mat` wasn't set (`argument "mat" is missing,
+    /// with no default`); if the grid is empty or not rectangular, has more
+    /// than 50 rows, 50 columns or 500 cells, has no figure, or skips a
+    /// figure number; if `respect`'s grid doesn't have `mat`'s dimensions;
+    /// and, unlike R (which accepts them), if `mat` has a negative or
+    /// non-finite value. The device is unchanged after an error.
+    pub fn try_draw(self) -> Result<usize, Error> {
+        if let Some(e) = self.error {
+            return Err(e.in_call("layout"));
+        }
+        let fail = |m: String| Error::invalid(m).in_call("layout");
+        let mat = crate::graphics::required(self.mat, "mat").map_err(|e| e.in_call("layout"))?;
+        let mut rows: Vec<Vec<usize>> = Vec::with_capacity(mat.len());
+        for row in &mat {
+            let mut r = Vec::with_capacity(row.len());
+            for &v in row {
+                if !(v.is_finite() && v >= 0.0) {
+                    return Err(fail(
+                        "layout matrix values must be non-negative numbers".into(),
+                    ));
+                }
+                r.push(v.trunc() as usize);
+            }
+            rows.push(r);
+        }
+        let mut layout = Layout::new(&rows).map_err(|e| fail(e.0))?;
+        if !self.widths.is_empty() {
+            layout = layout.widths(&self.widths);
+        }
+        if !self.heights.is_empty() {
+            layout = layout.heights(&self.heights);
+        }
+        layout = match self.respect {
+            LayoutRespect::No => layout,
+            LayoutRespect::All => layout.respect(true),
+            LayoutRespect::Cells(cells) => layout.respect_matrix(&cells).map_err(|e| fail(e.0))?,
+        };
+        let n = layout.num_figures();
+        self.dev
+            .set_arrangement(Arrangement::Layout(layout))
+            .map_err(|e| e.in_call("layout"))?;
+        Ok(n)
+    }
+}
+
+/// The units [`strwidth`](Device::strwidth) and
+/// [`strheight`](Device::strheight) measure in.
+///
+/// Setters take R's strings (`"user"`, `"inches"`, `"figure"`, or a
+/// unique prefix); any other is an error of the call.
+///
+/// This is R's `strwidth(units = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!(StrUnits::parse("in"), Some(StrUnits::Inches));
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum StrUnits {
+    /// Data units along the axis (the default): x for a width, y for a
+    /// height; log10 values on a log axis, as [`Device::usr`] is.
+    #[default]
+    User,
+    /// Inches.
+    Inches,
+    /// Fractions of the figure region's width or height.
+    Figure,
+}
+
+impl StrUnits {
+    /// Reads `"user"`, `"inches"` or `"figure"`, or a unique prefix of one
+    /// (R's `match.arg()`); `None` for anything else.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(StrUnits::parse("figure"), Some(StrUnits::Figure));
+    /// assert_eq!(StrUnits::parse("cm"), None);
+    /// ```
+    pub fn parse(s: &str) -> Option<StrUnits> {
+        let all = [
+            ("user", StrUnits::User),
+            ("inches", StrUnits::Inches),
+            ("figure", StrUnits::Figure),
+        ];
+        let mut hits = all
+            .iter()
+            .filter(|(name, _)| !s.is_empty() && name.starts_with(s));
+        match (hits.next(), hits.next()) {
+            (Some(&(_, u)), None) => Some(u),
+            _ => None,
+        }
+    }
+}
+
+crate::error::from_str_via_parse!(StrUnits, "string units");
+crate::error::from_r_string!(
+    StrUnits,
+    "string units",
+    "\"user\", \"inches\" or \"figure\""
+);
+
+/// A [`strwidth()`](Device::strwidth) or [`strheight()`](Device::strheight)
+/// measurement being built.
+///
+/// Set its arguments with the setters below, then get the size with
+/// [`get`](StrSizeCall::get). See [`Device::strwidth`] for an example.
+#[must_use = "nothing is measured until `.get()`"]
+pub struct StrSizeCall<'a, B: Backend> {
+    dev: &'a mut Device<B>,
+    height: bool,
+    s: Option<Label>,
+    cex: Option<f64>,
+    font: Option<FontFace>,
+    units: StrUnits,
+    /// The first value a setter couldn't convert.
+    error: Option<Error>,
+}
+
+impl<'a, B: Backend> StrSizeCall<'a, B> {
+    fn start(dev: &'a mut Device<B>, height: bool) -> Self {
+        StrSizeCall {
+            dev,
+            height,
+            s: None,
+            cex: None,
+            font: None,
+            units: StrUnits::User,
+            error: None,
+        }
+    }
+
+    /// The text (lines separated by `\n`) or plotmath expression
+    /// (`Label::math("x^2")`) to measure. Required.
+    pub fn s(mut self, s: impl Into<Label>) -> Self {
+        self.s = Some(s.into());
+        self
+    }
+
+    /// Size, relative to `par(cex)`. `None`: 1, so `par(cex)`.
+    pub fn cex(mut self, cex: impl Into<f64>) -> Self {
+        self.cex = Some(cex.into());
+        self
+    }
+
+    /// Font face of text ([`FontFace`]; R's number, a name or the enum).
+    /// `None`: `par(font)`. Expressions use their own fonts.
+    pub fn font(mut self, font: impl IntoArg<FontFace>) -> Self {
+        match font.into_arg() {
+            Ok(f) => self.font = Some(f),
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
+        self
+    }
+
+    /// The units of the result: data units (the default), inches, or
+    /// fractions of the figure region (see [`StrUnits`]).
+    pub fn units(mut self, units: impl IntoArg<StrUnits>) -> Self {
+        match units.into_arg() {
+            Ok(u) => self.units = u,
+            Err(e) => {
+                self.error.get_or_insert(e);
+            }
+        }
+        self
+    }
+
+    /// Returns the width or height in the chosen units.
+    ///
+    /// # Panics
+    ///
+    /// If `s` wasn't set or a setter's value was invalid, as
+    /// [`try_get`](StrSizeCall::try_get) would return it
+    /// (`strwidth(): argument "s" is missing, with no default`).
+    pub fn get(self) -> f64 {
+        self.try_get().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Returns the width or height as [`get`](StrSizeCall::get) does,
+    /// returning R's error instead of panicking.
+    ///
+    /// # Errors
+    ///
+    /// If `s` wasn't set (`argument "s" is missing, with no default`), or
+    /// `font` or `units` was given a value that isn't one.
+    pub fn try_get(self) -> Result<f64, Error> {
+        let call = if self.height { "strheight" } else { "strwidth" };
+        if let Some(e) = self.error {
+            return Err(e.in_call(call));
+        }
+        let label = crate::graphics::required(self.s, "s").map_err(|e| e.in_call(call))?;
+        let cex = self.cex.unwrap_or(1.0);
+        let dev = self.dev;
+        let face = self.font.unwrap_or(dev.par.font);
+        let inches = match &label {
+            Label::Text(t) => {
+                let (w, h) = dev.text_size_inches(t, face, cex);
+                if self.height { h } else { w }
+            }
+            Label::Math(_) => {
+                if self.height {
+                    dev.label_height(&label, face, cex)
+                } else {
+                    dev.label_width(&label, face, cex)
+                }
+            }
+        };
+        let (plot, fig, range) = if self.height {
+            (dev.plt.height(), dev.fig.height(), dev.usr.3 - dev.usr.2)
+        } else {
+            (dev.plt.width(), dev.fig.width(), dev.usr.1 - dev.usr.0)
+        };
+        Ok(match self.units {
+            StrUnits::Inches => inches,
+            StrUnits::User => inches / plot * range,
+            StrUnits::Figure => inches / fig,
+        })
+    }
 }
 
 /// A figure region set with `fig()` or `fin()`.
@@ -172,99 +510,91 @@ enum FigSpec {
     Inches([f64; 2]),
 }
 
-/// The labels of [`Graphics::title`](crate::graphics::Graphics::title) (`None` draws
-/// nothing) and R's inline `cex.main`/`col.main`/`font.main` and the
-/// `sub` and `lab` ones (`None`: the `par()` value).
-#[derive(Clone, Debug, Default)]
-pub struct TitleOptions {
-    /// Main title, above the plot.
-    pub main: Option<Label>,
-    /// Subtitle, below the x axis label.
-    pub sub: Option<Label>,
-    /// x axis label.
-    pub xlab: Option<Label>,
-    /// y axis label.
-    pub ylab: Option<Label>,
-    /// Size of `main`, relative to `par(cex)` (R's inline `cex.main`);
-    /// `None`: `par(cex.main)`.
-    pub cex_main: Option<f64>,
-    /// Colour of `main` (R's inline `col.main`); `None`:
-    /// `par(col.main)`.
-    pub col_main: Option<ColorSpec>,
-    /// Font of `main` (a [`FontFace`]; R's
-    /// inline `font.main`); `None`: `par(font.main)`.
-    pub font_main: Option<FontFace>,
-    /// Size of `sub`, relative to `par(cex)` (R's inline `cex.sub`);
-    /// `None`: `par(cex.sub)`.
-    pub cex_sub: Option<f64>,
-    /// Colour of `sub` (R's inline `col.sub`); `None`:
-    /// `par(col.sub)`.
-    pub col_sub: Option<ColorSpec>,
-    /// Font of `sub` (a [`FontFace`]; R's
-    /// inline `font.sub`); `None`: `par(font.sub)`.
-    pub font_sub: Option<FontFace>,
-    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's inline `cex.lab`);
-    /// `None`: `par(cex.lab)`.
-    pub cex_lab: Option<f64>,
-    /// Colour of `xlab` and `ylab` (R's inline `col.lab`); `None`:
-    /// `par(col.lab)`.
-    pub col_lab: Option<ColorSpec>,
-    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
-    /// inline `font.lab`); `None`: `par(font.lab)`.
-    pub font_lab: Option<FontFace>,
-    /// Where each title sits along its side of the plot region, and how
-    /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
-    /// right (top) (R's inline `adj`); `None`: `par(adj)`.
-    pub adj: Option<f64>,
-    /// Margin lines for `xlab`/`ylab` (`mgp[0]`) and `sub` (`mgp[0] + 1`)
-    /// (R's inline `mgp`); `None`: `par(mgp)`.
-    pub mgp: Option<[f64; 3]>,
-    /// Margin line for every title given (R's `line`), instead of their
-    /// defaults (half the top margin for `main`, `mgp[0]` for `xlab`/`ylab`,
-    /// `mgp[0] + 1` for `sub`); `main` then sits with its baseline on it.
-    /// `None` (or non-finite): the defaults.
-    pub line: Option<f64>,
-    /// Draw in the outer margins (`par(oma)`) instead, positioned along the
-    /// inner region (R's `outer = TRUE`); `main` defaults to half the top
-    /// outer margin. Default `false`.
-    pub outer: bool,
-    /// R's inline `xpd`: where the titles clip, at least the figure region
-    /// (`false` is `true` here, as in R; [`Xpd::Device`] for the whole
-    /// device); `None`: `par(xpd)`. `outer` titles clip to the device.
-    pub xpd: Option<Xpd>,
+crate::setters::options! {
+    /// The labels of [`Graphics::title`](crate::graphics::Graphics::title) (`None` draws
+    /// nothing) and R's inline `cex.main`/`col.main`/`font.main` and the
+    /// `sub` and `lab` ones (`None`: the `par()` value).
+    #[derive(Clone, Debug, Default)]
+    pub struct TitleOptions => [TitleCall] {
+        /// Main title, above the plot.
+        pub main: Option<Label> => option Label,
+        /// Subtitle, below the x axis label.
+        pub sub: Option<Label> => option Label,
+        /// x axis label.
+        pub xlab: Option<Label> => option Label,
+        /// y axis label.
+        pub ylab: Option<Label> => option Label,
+        /// Size of the main title, relative to `par(cex)`. `None`:
+        /// `par(cex.main)`. R's `cex.main`.
+        pub cex_main: Option<f64> => option f64,
+        /// Colour of the main title. `None`: `par(col.main)`. R's `col.main`.
+        pub col_main: Option<ColorSpec> => option ColorSpec,
+        /// Font face of the main title ([`FontFace`]). `None`:
+        /// `par(font.main)`. R's `font.main`.
+        pub font_main: Option<FontFace> => option FontFace,
+        /// Size of the subtitle, relative to `par(cex)`. `None`:
+        /// `par(cex.sub)`. R's `cex.sub`.
+        pub cex_sub: Option<f64> => option f64,
+        /// Colour of the subtitle. `None`: `par(col.sub)`. R's `col.sub`.
+        pub col_sub: Option<ColorSpec> => option ColorSpec,
+        /// Font face of the subtitle ([`FontFace`]). `None`: `par(font.sub)`.
+        /// R's `font.sub`.
+        pub font_sub: Option<FontFace> => option FontFace,
+        /// Size of the axis labels (`xlab`, `ylab`), relative to `par(cex)`.
+        /// `None`: `par(cex.lab)`. R's `cex.lab`.
+        pub cex_lab: Option<f64> => option f64,
+        /// Colour of the axis labels (`xlab`, `ylab`). `None`: `par(col.lab)`.
+        /// R's `col.lab`.
+        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        /// Font face of the axis labels (`xlab`, `ylab`; [`FontFace`]).
+        /// `None`: `par(font.lab)`. R's `font.lab`.
+        pub font_lab: Option<FontFace> => option FontFace,
+        /// Where each title sits along its side of the plot region, and how
+        /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
+        /// right (top). `None`: `par(adj)`.
+        pub adj: Option<f64> => option f64,
+        /// Margin lines for the axis labels (`mgp[0]`) and the subtitle
+        /// (`mgp[0] + 1`). `None`: `par(mgp)`.
+        pub mgp: Option<[f64; 3]> => array [f64; 3],
+        /// Margin line for every title given, instead of their defaults (half
+        /// the top margin for `main`, `mgp[0]` for `xlab`/`ylab`, `mgp[0] + 1`
+        /// for `sub`); `main` then sits with its baseline on it. `None` (or
+        /// non-finite): the defaults.
+        pub line: Option<f64> => option f64,
+        /// Draws in the outer margins (`par(oma)`) instead, positioned along
+        /// the inner region; `main` defaults to half the top outer margin.
+        /// Default `false`.
+        pub outer: bool => value bool,
+        /// Where the titles are clipped: at least the figure region
+        /// ([`Xpd::Plot`] acts as [`Xpd::Figure`], as in R), or
+        /// [`Xpd::Device`] for the whole device. `None`: `par(xpd)`. `outer`
+        /// titles clip to the device.
+        pub xpd: Option<Xpd> => option Xpd,
+    }
 }
 
-crate::setters::setters!(TitleOptions => [TitleCall] {
-    main: option Label,
-    sub: option Label,
-    xlab: option Label,
-    ylab: option Label,
-    cex_main: option f64,
-    col_main: option ColorSpec,
-    font_main: option FontFace,
-    cex_sub: option f64,
-    col_sub: option ColorSpec,
-    font_sub: option FontFace,
-    cex_lab: option f64,
-    col_lab: option ColorSpec,
-    font_lab: option FontFace,
-    adj: option f64,
-    mgp: array [f64; 3],
-    line: option f64,
-    outer: value bool,
-    xpd: option Xpd,
-});
-
 impl<B: Backend> Device<B> {
-    /// A device drawing onto `backend` with graphical parameters `par`: the
-    /// general route, for any [`Backend`] and backend options that
-    /// [`DeviceBuilder`] doesn't cover (e.g. PNG
-    /// [`with_threads`](crate::backend::raster::RasterBackend::with_threads)). If `par.bg` is left
-    /// at its default (white), it starts as the backend's background
-    /// instead, as R's `par("bg")` does - transparent for PDF. The device
-    /// has no file: get its output with [`finish`](Device::finish). To open
-    /// a device for a file, use [`Device::pdf`], [`Device::svg`],
-    /// [`Device::png`] or [`Device::format`].
+    /// Creates a device drawing onto `backend`, starting with the graphical
+    /// parameters `par`.
+    ///
+    /// This is the general route: for any [`Backend`], for output kept in
+    /// memory (get it with [`finish`](Device::finish)), and for backend options
+    /// that [`DeviceBuilder`] doesn't cover, such as PNG
+    /// [`with_threads`](crate::backend::raster::RasterBackend::with_threads).
+    /// The device has no file; to open one for a file, use [`Device::pdf`],
+    /// [`Device::svg`], [`Device::png`] or [`Device::format`]. If `par.bg` is
+    /// left at its default (white), the device starts with the backend's own
+    /// background instead: transparent for PDF.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::new(SvgBackend::new(5, 4), Par::default());
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// let svg = String::from_utf8(dev.finish()).unwrap();
+    /// assert!(svg.starts_with("<svg") || svg.starts_with("<?xml"));
+    /// ```
     pub fn new(backend: B, mut par: Par) -> Self {
         if par.bg == Par::default().bg {
             par.bg = backend.default_bg();
@@ -296,41 +626,70 @@ impl<B: Backend> Device<B> {
             used: false,
             start_ps: par_ps,
             output: None,
+            pending_error: std::cell::RefCell::new(None),
         };
         dev.recompute_layout();
         dev
     }
 
-    /// The backend, to finish it with its own `finish()` or set options.
-    /// On a device opened for a file this doesn't write the file (the
-    /// current page's file stays empty; with one file per page, earlier
-    /// pages' files are already written and the backend holds only the
-    /// last page); use [`close`](Device::close) for that.
+    /// Returns the backend, to finish it yourself or set its options.
+    ///
+    /// On a device opened for a file this doesn't write the file: the current
+    /// page's file stays empty (with one file per page, earlier pages' files
+    /// are already written and the backend holds only the last page). Use
+    /// [`close`](Device::close) for that.
     pub fn into_backend(self) -> B {
         self.backend
     }
 
-    /// The finished output's bytes (PDF, PNG, or SVG as UTF-8). On a device
-    /// opened for a file this doesn't write the file (the current page's
-    /// file stays empty; with one file per page, earlier pages' files are
-    /// already written and these are the last page's bytes); use
+    /// Finishes the output and returns its bytes: PDF, PNG, or SVG as UTF-8.
+    ///
+    /// On a device opened for a file this doesn't write the file: the current
+    /// page's file stays empty (with one file per page, earlier pages' files
+    /// are already written and these are the last page's bytes). Use
     /// [`close`](Device::close) for that.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::new(PdfBackend::new(5, 4), Par::default());
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// let pdf: Vec<u8> = dev.finish();
+    /// assert!(pdf.starts_with(b"%PDF"));
+    /// ```
     pub fn finish(self) -> Vec<u8> {
         self.backend.into_bytes()
     }
 
-    /// Closes the device (R's `dev.off()`): finishes the output and writes
-    /// it to the file created when the device was opened
-    /// ([`DeviceBuilder::open`]); with one file per page (a PNG or SVG
-    /// file name with a page number such as `%03d`, or a PDF with
-    /// [`onefile(false)`](DeviceBuilder::onefile)), the last page's file.
-    /// A device dropped
-    /// without `close()` leaves that file empty. Also returns the first
-    /// error from writing an earlier page's file.
+    /// Closes the device: finishes the output and writes it to the file
+    /// created when the device was opened ([`DeviceBuilder::open`]).
     ///
-    /// A device made with [`Device::new`] has no file: this returns an
-    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error; use
-    /// [`finish`](Device::finish) for its bytes.
+    /// With one file per page (a PNG or SVG file name with a page number such
+    /// as `%03d`, or a PDF with [`onefile(false)`](DeviceBuilder::onefile)),
+    /// this writes the last page's file. A device dropped without `close()`
+    /// leaves that file empty.
+    ///
+    /// This is R's `dev.off()`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> std::io::Result<()> {
+    /// let mut dev = Device::png("plot.png").res(150).open()?;
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// dev.close()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// If writing the file fails, or writing an earlier page's file failed
+    /// (the first such error). A device made with [`Device::new`] has no file:
+    /// closing it is an [`InvalidInput`](std::io::ErrorKind::InvalidInput)
+    /// error; use [`finish`](Device::finish) for its bytes.
     pub fn close(mut self) -> std::io::Result<()> {
         let Some(output) = self.output.take() else {
             return Err(std::io::Error::new(
@@ -342,41 +701,94 @@ impl<B: Backend> Device<B> {
         output.close(&self.finish())
     }
 
-    /// Page width in inches (R's `par("din")[1]`).
-    pub fn width_in(&self) -> f64 {
-        self.width_in
+    /// Returns the page size in inches, `(width, height)`.
+    ///
+    /// This is R's `par("din")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let dev = Device::new(SvgBackend::new(7, 5), Par::default());
+    /// assert_eq!(dev.din(), (7.0, 5.0));
+    /// ```
+    pub fn din(&self) -> (f64, f64) {
+        (self.width_in, self.height_in)
     }
 
-    /// Page height in inches (R's `par("din")[2]`).
-    pub fn height_in(&self) -> f64 {
-        self.height_in
-    }
-
-    /// The current plot region, in device inches from the bottom-left
-    /// corner of the page (R's `par("plt")`, but in inches).
+    /// Returns the current plot region, in inches from the page's bottom-left
+    /// corner.
+    ///
+    /// This is R's `par("plt")`, in inches rather than fractions of the figure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let r = dev.plot_region();
+    /// assert!(r.x0 > 0.0 && r.x1 < dev.din().0);
+    /// ```
     pub fn plot_region(&self) -> Rect {
         self.plt
     }
 
-    /// R's `par("usr")`: the user coordinate limits `(x0, x1, y0, y1)` of
-    /// the plot region. As in R, a log axis's limits are log10 values
-    /// (`par("usr")` of `plot(1:100, log = "x")` starts at about 0, not
-    /// 1); everything that takes coordinates (`points()`, `axis(at = )`,
-    /// [`Device::user_to_inches`], ...) takes data units instead. Set by
-    /// `plot_window()` or `par(usr = )`.
+    /// Returns the coordinate limits of the plot region, `(x0, x1, y0, y1)`.
+    ///
+    /// On a log axis the limits are log10 values (for data from 1 to 100 the x
+    /// limits start near 0, not 1), while everything that takes coordinates
+    /// (`points()`, `axis(at = )`, [`Device::user_to_inches`], ...) takes data
+    /// units. Set by `plot_window()` (which high-level plots call) or
+    /// `par(usr = )`.
+    ///
+    /// This is R's `par("usr")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot_new();
+    /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
+    /// let (x0, x1, ..) = dev.usr();
+    /// assert!((x0 + 0.4).abs() < 1e-9 && (x1 - 10.4).abs() < 1e-9); // 4% added at each end
+    /// ```
     pub fn usr(&self) -> (f64, f64, f64, f64) {
         self.usr
     }
 
-    /// Whether the x axis is logarithmic (R's `par("xlog")`), as set by
-    /// the last `plot_window()` or `par(xlog = )` (`plot_new()` resets
-    /// it).
+    /// Returns whether the x axis is logarithmic.
+    ///
+    /// Set by the last `plot_window()` or `par(xlog = )`; `plot_new()` resets
+    /// it.
+    ///
+    /// This is R's `par("xlog")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot().x([1, 10, 100]).xlog(true).draw();
+    /// assert!(dev.xlog());
+    /// ```
     pub fn xlog(&self) -> bool {
         self.xlog
     }
 
-    /// Whether the y axis is logarithmic (R's `par("ylog")`); see
-    /// [`Device::xlog`].
+    /// Returns whether the y axis is logarithmic; see [`Device::xlog`].
+    ///
+    /// This is R's `par("ylog")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot().x([1, 10, 100]).ylog(true).draw();
+    /// assert!(dev.ylog());
+    /// ```
     pub fn ylog(&self) -> bool {
         self.ylog
     }
@@ -475,12 +887,13 @@ impl<B: Backend> Device<B> {
     }
 
     /// `par(fig = )`; see [`ParCall::fig`](crate::graphics::ParCall::fig).
-    pub(crate) fn fig(&mut self, fig: [f64; 4]) {
+    pub(crate) fn fig(&mut self, fig: [f64; 4]) -> Result<(), Error> {
         let [x0, x1, y0, y1] = fig;
-        assert!(
-            0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0,
-            "invalid value specified for graphical parameter \"fig\""
-        );
+        if !(0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0) {
+            return Err(Error::invalid(
+                "invalid value specified for graphical parameter \"fig\"",
+            ));
+        }
         self.arrangement = Arrangement::Grid {
             nrow: 1,
             ncol: 1,
@@ -489,6 +902,7 @@ impl<B: Backend> Device<B> {
         self.current_figure = 1;
         self.fig_spec = Some(FigSpec::Nic(fig));
         self.recompute_layout();
+        Ok(())
     }
 
     /// R's `currentFigure = lastFigure`: the next `plot_new()` starts a
@@ -499,11 +913,12 @@ impl<B: Backend> Device<B> {
 
     /// `par(fin = )` (R's `fUnits = INCHES`); see
     /// [`ParCall::fin`](crate::graphics::ParCall::fin).
-    pub(crate) fn fin(&mut self, fin: [f64; 2]) {
-        assert!(
-            fin.iter().all(|&v| v > 0.0 && v.is_finite()),
-            "invalid value specified for graphical parameter \"fin\""
-        );
+    pub(crate) fn fin(&mut self, fin: [f64; 2]) -> Result<(), Error> {
+        if !(fin.iter().all(|&v| v > 0.0 && v.is_finite())) {
+            return Err(Error::invalid(
+                "invalid value specified for graphical parameter \"fin\"",
+            ));
+        }
         self.arrangement = Arrangement::Grid {
             nrow: 1,
             ncol: 1,
@@ -512,42 +927,77 @@ impl<B: Backend> Device<B> {
         self.current_figure = 1;
         self.fig_spec = Some(FigSpec::Inches(fin));
         self.recompute_layout();
+        Ok(())
     }
 
     /// `par(mfrow = )`; see
     /// [`ParCall::mfrow`](crate::graphics::ParCall::mfrow).
-    pub(crate) fn mfrow(&mut self, nrow: usize, ncol: usize) {
+    pub(crate) fn mfrow(&mut self, nrow: usize, ncol: usize) -> Result<(), Error> {
+        check_grid("mfrow", nrow, ncol)?;
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
             by_col: false,
-        });
+        })
     }
 
     /// `par(mfcol = )`; see
     /// [`ParCall::mfcol`](crate::graphics::ParCall::mfcol).
-    pub(crate) fn mfcol(&mut self, nrow: usize, ncol: usize) {
+    pub(crate) fn mfcol(&mut self, nrow: usize, ncol: usize) -> Result<(), Error> {
+        check_grid("mfcol", nrow, ncol)?;
         self.set_arrangement(Arrangement::Grid {
             nrow,
             ncol,
             by_col: true,
-        });
+        })
     }
 
-    /// `layout(mat, widths, heights, respect)`: see [`Layout`]. Sets
-    /// `par(cex)`/`mex` like `par(mfrow = )`
-    /// ([`ParCall::mfrow`](crate::graphics::ParCall::mfrow)) does, based on
-    /// the layout matrix's dimensions, and replaces `mfrow`/`mfcol` and
-    /// `fig`/`fin`.
-    pub fn layout(&mut self, layout: Layout) {
-        self.set_arrangement(Arrangement::Layout(layout));
+    /// Starts dividing the page into figures of different sizes: a grid in
+    /// which each figure takes one or more cells.
+    ///
+    /// Set the grid with [`mat`](LayoutCall::mat) (required) and,
+    /// optionally, [`widths`](LayoutCall::widths),
+    /// [`heights`](LayoutCall::heights) and
+    /// [`respect`](LayoutCall::respect), then apply it with
+    /// [`draw`](LayoutCall::draw). Like `par()`'s
+    /// [`mfrow`](crate::graphics::ParCall::mfrow), it sets `par(cex)` and
+    /// `mex` from the grid's size, and the next `plot_new()` starts a new
+    /// page at the first figure. It replaces `mfrow`/`mfcol` and `fig`/`fin`.
+    /// A [`Figure`](crate::recording::Figure) is one panel, so only a
+    /// device has it.
+    ///
+    /// This is R's `layout()`.
+    ///
+    /// # Examples
+    ///
+    /// A wide panel on top and two below, the top one twice as tall:
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// let n = dev.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
+    /// assert_eq!(n, 3);
+    /// dev.plot().x([1, 2, 3]).draw(); // top
+    /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
+    /// dev.pie().x([1, 2]).draw(); // bottom right
+    /// ```
+    pub fn layout(&mut self) -> LayoutCall<'_, B> {
+        LayoutCall {
+            dev: self,
+            mat: None,
+            widths: Vec::new(),
+            heights: Vec::new(),
+            respect: LayoutRespect::No,
+            error: None,
+        }
     }
 
-    fn set_arrangement(&mut self, arrangement: Arrangement) {
-        assert!(
-            arrangement.nrow() > 0 && arrangement.ncol() > 0,
-            "a figure grid needs at least one row and one column"
-        );
+    fn set_arrangement(&mut self, arrangement: Arrangement) -> Result<(), Error> {
+        if !(arrangement.nrow() > 0 && arrangement.ncol() > 0) {
+            return Err(Error::invalid(
+                "a figure grid needs at least one row and one column",
+            ));
+        }
         self.par.cex = arrangement.cex_base();
         self.par.mex = 1.0;
         // R sets `currentFigure = lastFigure` so the next plot.new()
@@ -557,15 +1007,18 @@ impl<B: Backend> Device<B> {
         self.fig_spec = None;
         self.hold_figure = false;
         self.recompute_layout();
+        Ok(())
     }
 
     /// `par(mfg = )`; see [`ParCall::mfg`](crate::graphics::ParCall::mfg).
-    pub(crate) fn mfg(&mut self, row: usize, col: usize) {
+    pub(crate) fn mfg(&mut self, row: usize, col: usize) -> Result<(), Error> {
         let (nrow, ncol) = (self.arrangement.nrow(), self.arrangement.ncol());
-        assert!(
-            (1..=nrow).contains(&row) && (1..=ncol).contains(&col),
-            "mfg out of range"
-        );
+        if !(1..=nrow).contains(&row) {
+            return Err(Error::invalid("parameter \"i\" in \"mfg\" is out of range"));
+        }
+        if !(1..=ncol).contains(&col) {
+            return Err(Error::invalid("parameter \"j\" in \"mfg\" is out of range"));
+        }
         let by_col = matches!(self.arrangement, Arrangement::Grid { by_col: true, .. });
         self.current_figure = if by_col {
             (col - 1) * nrow + row
@@ -574,6 +1027,7 @@ impl<B: Backend> Device<B> {
         };
         self.hold_figure = true;
         self.recompute_layout();
+        Ok(())
     }
 
     /// `par(new = )`; see [`ParOptions::new`](crate::par::ParOptions::new).
@@ -588,24 +1042,78 @@ impl<B: Backend> Device<B> {
         self.used
     }
 
-    /// R's `par()` values as they are now (R's `par("cex")` is
-    /// `dev.current_par().cex`). Change them with
-    /// [`par()`](crate::graphics::Graphics::par).
+    /// Returns the graphical parameters as they are now.
+    ///
+    /// Change them with [`par()`](crate::graphics::Graphics::par).
+    ///
+    /// This is R's `par()` read form: R's `par("cex")` is
+    /// `dev.current_par().cex`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mfrow(2, 2).draw();
+    /// assert_eq!(dev.current_par().cex, 0.83);
+    /// ```
     pub fn current_par(&self) -> &Par {
         &self.par
     }
 
-    /// `par("new")`.
+    /// Returns whether the next plot will be drawn over the current one
+    /// instead of starting a new figure.
+    ///
+    /// Set with `dev.par().new(true)`; any drawing clears it.
+    ///
+    /// This is R's `par("new")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// dev.par().new(true).draw();
+    /// assert!(dev.is_new());
+    /// ```
     pub fn is_new(&self) -> bool {
         self.hold_figure
     }
 
-    /// The current figure number (`par("mfg")`'s position, 1-based).
+    /// Returns the number of the current figure (panel), counting from 1.
+    ///
+    /// This is the position in R's `par("mfg")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mfrow(1, 2).draw();
+    /// dev.plot().x([1, 2]).draw();
+    /// dev.plot().x([2, 1]).draw();
+    /// assert_eq!(dev.current_figure(), 2);
+    /// ```
     pub fn current_figure(&self) -> usize {
         self.current_figure
     }
 
-    /// The current figure region in device inches.
+    /// Returns the current figure region, in inches from the page's
+    /// bottom-left corner.
+    ///
+    /// This is R's `par("fig")`, in inches rather than fractions of the inner
+    /// region.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mfrow(1, 2).draw();
+    /// dev.plot().x([1, 2]).draw();
+    /// assert_eq!(dev.figure_region().x1, dev.din().0 / 2.0);
+    /// ```
     pub fn figure_region(&self) -> Rect {
         self.fig
     }
@@ -613,7 +1121,7 @@ impl<B: Backend> Device<B> {
     /// Draws R's `plot_new()`; the public entry is
     /// [`Graphics::plot_new`](crate::graphics::Graphics::plot_new), whose docs
     /// describe it.
-    pub(crate) fn plot_new_impl(&mut self) {
+    pub(crate) fn plot_new_impl(&mut self) -> Result<(), Error> {
         let mut new_page = false;
         let had_page = self.used;
         if !self.hold_figure || !self.used {
@@ -645,10 +1153,39 @@ impl<B: Backend> Device<B> {
             if self.current_figure < 1 {
                 self.current_figure = self.arrangement.last_figure();
             }
-            panic!("{msg}");
+            return Err(Error::does_not_fit("plot.new", msg));
         }
         // `C_plot_new`: linear axes, `GScale(0, 1)` on both.
         self.set_window((0.0, 1.0), (0.0, 1.0), false, false);
+        Ok(())
+    }
+
+    /// Runs one call's drawing: its result, or the first R error found
+    /// while drawing (recorded by [`Device::record_error`]), which R would
+    /// have stopped at.
+    pub(crate) fn run<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        // A call made inside another (`plot(panel.first = )`) keeps the
+        // outer call's error for the outer call to return.
+        let outer = self.pending_error.borrow_mut().take();
+        let result = f(self);
+        let inner = self.pending_error.replace(outer);
+        match inner {
+            Some(e) => Err(e),
+            None => result,
+        }
+    }
+
+    /// Records an R error found while drawing, where returning it isn't
+    /// practical (deep in colour or text code); the call returns it when it
+    /// ends ([`Device::run`]). The first one counts.
+    pub(crate) fn record_error(&self, e: Error) {
+        let mut slot = self.pending_error.borrow_mut();
+        if slot.is_none() {
+            *slot = Some(e);
+        }
     }
 
     /// The user coordinates for limits `xlim`/`ylim` (data units) on
@@ -762,19 +1299,54 @@ impl<B: Backend> Device<B> {
         (min, max)
     }
 
-    /// Default tick locations R's `axis()` would pick for `side` when no
-    /// `at=` is given (R's `axTicks(side)`), in data units: from
-    /// `par("xaxp")` (sides 1, 3) or `par("yaxp")` (sides 2, 4), which
-    /// `plot_new()` and `plot_window()` set with `pretty()` (or R's
-    /// log-axis rules) and `par("lab")`.
-    pub fn default_ticks(&self, side: impl Into<Side>) -> Vec<f64> {
-        let side = side.into();
+    /// Returns the tick positions [`axis()`](crate::graphics::Graphics::axis)
+    /// would use on `side` without `at`, in data units.
+    ///
+    /// They come from `par("xaxp")` (sides 1 and 3) or `par("yaxp")` (sides 2
+    /// and 4), which `plot_new()` and `plot_window()` set from the axis range
+    /// and `par("lab")`.
+    ///
+    /// This is R's `axTicks()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.plot_new();
+    /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
+    /// assert_eq!(dev.ax_ticks(1), [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// If `side` isn't 1 to 4 (R: "invalid axis number").
+    pub fn ax_ticks(&self, side: impl IntoArg<Side>) -> Vec<f64> {
+        let side = side.into_arg().unwrap_or_else(|e| panic!("axTicks(): {}", e.message()));
         let axp = if side.is_horizontal() {
             self.par.xaxp
         } else {
             self.par.yaxp
         };
         self.ticks_from_axp(side, axp)
+    }
+
+    /// R's error in `CreateAtVector()` for a log axis whose `axp[3]` (the
+    /// given one, else `par(xaxp/yaxp)`) isn't one of its codes 1 to 3.
+    pub(crate) fn check_axis_axp(&self, side: Side, axp: Option<[f64; 3]>) -> Result<(), Error> {
+        let (log, par_axp, xy) = if side.is_horizontal() {
+            (self.xlog, self.par.xaxp, "x")
+        } else {
+            (self.ylog, self.par.yaxp, "y")
+        };
+        let code = axp.unwrap_or(par_axp)[2];
+        // A negative code is a linear count; `create_at_vector` rounds.
+        if log && (code.is_nan() || code >= 0.0) && ![1, 2, 3].contains(&((code + 0.5) as i32)) {
+            return Err(Error::invalid(format!(
+                "log - axis(), 'at' creation: INVALID {xy}axp[3] = {code}"
+            )));
+        }
+        Ok(())
     }
 
     /// `CreateAtVector()` for `side`'s axis with the given `axp`.
@@ -792,20 +1364,61 @@ impl<B: Backend> Device<B> {
     // Coordinate transforms
     // ---------------------------------------------------------------
 
-    /// Map a point in data units (not log10 on a log axis) to device
-    /// inches.
-    pub fn user_to_inches(&self, x: impl Into<f64>, y: impl Into<f64>) -> Point {
+    /// Converts a point in data units to inches from the page's bottom-left
+    /// corner.
+    ///
+    /// Data units are not log10 values on a log axis.
+    ///
+    /// This is R's `grconvertX()`/`grconvertY()` from `"user"` to `"inches"`,
+    /// measured from the page's bottom-left corner.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let p = dev.user_to_inches(Point::new(5.0, 5.0));
+    /// let q = dev.inches_to_user(p);
+    /// assert!((q.x - 5.0).abs() < 1e-9 && (q.y - 5.0).abs() < 1e-9);
+    /// ```
+    pub fn user_to_inches(&self, p: Point) -> Point {
+        self.data_to_inches(p.x, p.y)
+    }
+
+    /// Converts a point in inches from the page's bottom-left corner to data
+    /// units: the inverse of [`Device::user_to_inches`].
+    ///
+    /// Data units are not log10 values on a log axis.
+    ///
+    /// This is R's `grconvertX()`/`grconvertY()` from `"inches"` to `"user"`,
+    /// measured from the page's bottom-left corner.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let r = dev.plot_region();
+    /// let corner = dev.inches_to_user(Point::new(r.x0, r.y0));
+    /// assert!((corner.x - dev.usr().0).abs() < 1e-9);
+    /// ```
+    pub fn inches_to_user(&self, p: Point) -> Point {
+        let (x, y) = self.inches_to_data(p);
+        Point::new(x, y)
+    }
+
+    /// [`Device::user_to_inches`] for a data point given as two numbers.
+    pub(crate) fn data_to_inches(&self, x: impl Into<f64>, y: impl Into<f64>) -> Point {
         let (x, y) = (x.into(), y.into());
         let ux = if self.xlog { x.log10() } else { x };
         let uy = if self.ylog { y.log10() } else { y };
         self.usr_to_inches(ux, uy)
     }
 
-    /// Map a point in device inches to data units (not log10 on a log
-    /// axis): the inverse of [`Device::user_to_inches`] (R's
-    /// `grconvertX(x, "inches", "user")`, but measured from the page's
-    /// bottom-left corner, and in data units on log axes).
-    pub fn inches_to_user(&self, p: Point) -> (f64, f64) {
+    /// [`Device::inches_to_user`] as a pair of data values.
+    pub(crate) fn inches_to_data(&self, p: Point) -> (f64, f64) {
         let (ux, uy) = self.inches_to_usr(p);
         let x = if self.xlog { 10f64.powf(ux) } else { ux };
         let y = if self.ylog { 10f64.powf(uy) } else { uy };
@@ -863,24 +1476,58 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// The device's starting point size (R's `startps`): the
-    /// [`pointsize`](DeviceBuilder::pointsize) it was opened with, or
-    /// `par.ps` as passed to [`Device::new`]. Margin lines, plotting symbols and
-    /// `par("cin")` are sized from it, as from R's `cra`; changing
-    /// `par.ps` later only changes text size.
+    /// Returns the device's starting point size.
+    ///
+    /// It is the [`pointsize`](DeviceBuilder::pointsize) the device was opened
+    /// with, or `par.ps` as passed to [`Device::new`]. Margin lines and
+    /// plotting symbols are sized from it; changing `par(ps)` later only
+    /// changes the text size.
+    ///
+    /// This is R's `startps`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> std::io::Result<()> {
+    /// let dev = Device::svg("plot.svg").pointsize(10).open()?;
+    /// assert_eq!(dev.start_ps(), 10.0);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn start_ps(&self) -> f64 {
         self.start_ps
     }
 
-    /// The height in inches of one margin line, the unit of `mar`, `oma`,
-    /// `mgp` and `tcl`: `mex * cex * 1.2 * startps / 72` (R's
-    /// `yNDCPerLine`, from `cra[1]`, in `mapNDC2Dev()`).
+    /// Returns the height in inches of one margin line, the unit of `mar`,
+    /// `oma`, `mgp` and `tcl`.
+    ///
+    /// It is `mex * cex * 1.2 * startps / 72` (see [`start_ps`](Device::start_ps)).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// assert_eq!(dev.line_height_inches(), 1.2 * 12.0 / 72.0);
+    /// ```
     pub fn line_height_inches(&self) -> f64 {
         self.par.mex * self.par.cex * 1.2 * self.start_ps / 72.0
     }
 
-    /// `par("mai")`: the margins in inches (bottom, left, top, right):
-    /// `par.mai` if set, else `par.mar` converted.
+    /// Returns the margins in inches (bottom, left, top, right): `par(mai)` if
+    /// set, else `par(mar)` converted.
+    ///
+    /// This is R's `par("mai")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().mar([5, 4, 4, 2]).draw();
+    /// assert_eq!(dev.mai().bottom, 5.0 * dev.line_height_inches());
+    /// ```
     pub fn mai(&self) -> Sides<f64> {
         if let Some(mai) = self.par.mai {
             return mai;
@@ -890,8 +1537,19 @@ impl<B: Backend> Device<B> {
         Sides::new(m.bottom * lh, m.left * lh, m.top * lh, m.right * lh)
     }
 
-    /// `par("omi")`: the outer margins in inches (bottom, left, top,
-    /// right), from `par.omd`, else `par.omi`, else `par.oma`.
+    /// Returns the outer margins in inches (bottom, left, top, right), from
+    /// `par(omd)`, else `par(omi)`, else `par(oma)`.
+    ///
+    /// This is R's `par("omi")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// dev.par().omi([0, 0, 1, 0]).draw();
+    /// assert_eq!(dev.omi().top, 1.0);
+    /// ```
     pub fn omi(&self) -> Sides<f64> {
         if let Some([x0, x1, y0, y1]) = self.par.omd {
             let (w, h) = (self.width_in, self.height_in);
@@ -959,6 +1617,14 @@ impl<B: Backend> Device<B> {
     // ---------------------------------------------------------------
 
     fn resolve(&self, spec: ColorSpec) -> Option<Color> {
+        if let ColorSpec::Index(i) = spec {
+            if i < 0 {
+                self.record_error(Error::invalid(format!(
+                    "numerical color values must be >= 0, found {i}"
+                )));
+                return None;
+            }
+        }
         self.par.resolve_color(spec)
     }
 
@@ -1060,7 +1726,7 @@ impl<B: Backend> Device<B> {
         self.push_clip_region(clip);
         let mut run: Vec<Point> = Vec::new();
         for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             if p.x.is_finite() && p.y.is_finite() {
                 run.push(p);
             } else if run.len() >= 2 {
@@ -1098,7 +1764,7 @@ impl<B: Backend> Device<B> {
         self.push_clip_region(clip);
         let mut old: Option<Point> = None;
         for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
             if let (Some(a), Some(b)) = (old, p) {
                 let len = (b.x - a.x).hypot(b.y - a.y);
@@ -1139,7 +1805,7 @@ impl<B: Backend> Device<B> {
         };
         self.push_clip_region(clip);
         for (i, (&x, &y)) in xs.iter().zip(ys).enumerate() {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             if !p.x.is_finite() || !p.y.is_finite() {
                 continue;
             }
@@ -1175,7 +1841,7 @@ impl<B: Backend> Device<B> {
         let mut run: Vec<Point> = Vec::new();
         let mut old: Option<Point> = None;
         for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.user_to_inches(x, y);
+            let p = self.data_to_inches(x, y);
             let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
             match (old, p) {
                 (Some(a), Some(b)) => {
@@ -1224,19 +1890,58 @@ impl<B: Backend> Device<B> {
     // Text
     // ---------------------------------------------------------------
 
-    /// `(strwidth(text, "inches", cex, font), strheight(...))`: R's
-    /// `GEStrWidth`/`GEStrHeight` at `par(ps) * par(cex) * cex` points
-    /// (after the backend's font-size rounding). The width is that of the
-    /// widest line; the height is the ascent of "M" plus one line height
-    /// (`par(lheight) * 1.2 * ps / 72` inches, times the cex) per `\n`.
-    pub fn text_metrics(
-        &self,
-        text: &str,
-        font: impl Into<FontFace>,
-        cex: impl Into<f64>,
-    ) -> (f64, f64) {
-        let cex = cex.into();
-        let face = font.into();
+    /// Starts measuring how wide a string or plotmath expression is when
+    /// drawn: set it with [`s`](StrSizeCall::s), then get the width with
+    /// [`get`](StrSizeCall::get).
+    ///
+    /// The width is in data units along the x axis by default (see
+    /// [`units`](StrSizeCall::units)), at the size `text()` would draw it
+    /// (`par(ps) * par(cex) * cex` points, after the backend's font-size
+    /// rounding). For text with several lines, the widest line counts.
+    ///
+    /// This is R's `strwidth()`, for one string at a time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let w = dev.strwidth().s("Title").cex(1.2).get(); // in x data units
+    /// let w_in = dev.strwidth().s("Title").cex(1.2).units("inches").get();
+    /// assert!(w > 0.0 && w_in > 0.0);
+    /// ```
+    pub fn strwidth(&mut self) -> StrSizeCall<'_, B> {
+        StrSizeCall::start(self, false)
+    }
+
+    /// Starts measuring how tall a string or plotmath expression is when
+    /// drawn; as [`strwidth`](Device::strwidth).
+    ///
+    /// For text, the height is that of "M", plus one line height
+    /// (`par(lheight) * 1.2 * ps / 72` inches, times the size factors) per
+    /// `\n`; for an expression, its height above and depth below the
+    /// baseline. In data units along the y axis by default.
+    ///
+    /// This is R's `strheight()`, for one string at a time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # dev.plot().x([1, 10]).y([1, 10]).draw();
+    /// let one = dev.strheight().s("a").units("inches").get();
+    /// let two = dev.strheight().s("a\nb").units("inches").get();
+    /// assert!(two > one);
+    /// ```
+    pub fn strheight(&mut self) -> StrSizeCall<'_, B> {
+        StrSizeCall::start(self, true)
+    }
+
+    /// Width and height in inches of text in `face` at `cex` (times
+    /// `par(cex)`): R's `GEStrWidth`/`GEStrHeight`.
+    fn text_size_inches(&self, text: &str, face: FontFace, cex: f64) -> (f64, f64) {
         let size = self.font_size_pt(cex);
         let width = text
             .split('\n')
@@ -1500,21 +2205,15 @@ impl<B: Backend> Device<B> {
     /// `par.font` is restored too, so callers may set an inline `font` in
     /// the scope (as `points()` does for character symbols).
     ///
-    /// # Panics
-    /// If `lmitre` is below 1 (R's "invalid value specified for graphical
-    /// parameter \"lmitre\"").
+    /// # Errors
+    /// If `lmitre` is below 1 ([`check_lmitre`]).
     pub(crate) fn line_pars(
         &mut self,
         lend: Option<LineEnd>,
         ljoin: Option<LineJoin>,
         lmitre: Option<f64>,
-    ) -> ParScope<'_, B> {
-        if let Some(m) = lmitre {
-            assert!(
-                m >= 1.0,
-                "invalid value specified for graphical parameter \"lmitre\""
-            );
-        }
+    ) -> Result<ParScope<'_, B>, Error> {
+        check_lmitre(lmitre)?;
         let mut dev = self.par_scope(|now, saved| {
             now.lend = saved.lend;
             now.ljoin = saved.ljoin;
@@ -1530,7 +2229,7 @@ impl<B: Backend> Device<B> {
         if let Some(m) = lmitre {
             dev.par.lmitre = m;
         }
-        dev
+        Ok(dev)
     }
 }
 
@@ -1573,6 +2272,39 @@ fn region_error(fig: [f64; 4], plt: [f64; 4]) -> Option<&'static str> {
         Some("plot region too large")
     } else {
         None
+    }
+}
+
+/// R's check of `par(mfrow/mfcol = )`: at least one row and column.
+fn check_grid(name: &str, nrow: usize, ncol: usize) -> Result<(), Error> {
+    if nrow == 0 || ncol == 0 {
+        return Err(Error::invalid(format!(
+            "invalid value specified for graphical parameter \"{name}\""
+        )));
+    }
+    Ok(())
+}
+
+/// R's check of `par(xaxp/yaxp = )` on a log axis (`logAxpCheck`): the
+/// code `axp[2]`, as an integer, is at most 4 and not 0 (negative is a
+/// linear count).
+pub(crate) fn check_log_axp(name: &str, axp: [f64; 3]) -> Result<(), Error> {
+    let code = axp[2].trunc();
+    if !code.is_finite() || code == 0.0 || code > 4.0 {
+        return Err(Error::invalid(format!(
+            "invalid value specified for graphical parameter \"{name}\""
+        )));
+    }
+    Ok(())
+}
+
+/// R's check of `lmitre` (in `par()` or inline): at least 1.
+pub(crate) fn check_lmitre(lmitre: Option<f64>) -> Result<(), Error> {
+    match lmitre {
+        Some(m) if m.is_nan() || m < 1.0 => Err(Error::invalid(
+            "invalid value specified for graphical parameter \"lmitre\"",
+        )),
+        _ => Ok(()),
     }
 }
 
@@ -1636,7 +2368,7 @@ mod tests {
         use super::{Device, Par, PlotWindowOptions, Side};
         use crate::backend::pdf::PdfBackend;
         let mut dev = Device::new(PdfBackend::new(7.0, 5.0), Par::default());
-        dev.plot_new_impl();
+        dev.plot_new_impl().unwrap();
         assert!(!dev.xlog() && !dev.ylog());
         let log_x = PlotWindowOptions {
             xlog: true,
@@ -1645,19 +2377,19 @@ mod tests {
         dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x);
         assert!(dev.xlog() && !dev.ylog());
         for (x, y) in [(1.0, -2.0), (31.6, 0.25), (1000.0, 3.0)] {
-            let (x2, y2) = dev.inches_to_user(dev.user_to_inches(x, y));
+            let (x2, y2) = dev.inches_to_data(dev.data_to_inches(x, y));
             assert!(
                 (x2 - x).abs() < 1e-9 * x && (y2 - y).abs() < 1e-9,
                 "{x}, {y}"
             );
         }
-        assert_eq!(Side::from(3), Side::Top);
+        assert_eq!(Side::try_from(3), Ok(Side::Top));
         assert_eq!(Side::Right.number(), 4);
     }
 
     #[test]
-    #[should_panic(expected = "invalid side 5")]
-    fn side_numbers_outside_1_to_4_panic() {
-        let _ = super::Side::from(5);
+    fn side_numbers_outside_1_to_4_are_errors() {
+        let e = super::Side::try_from(5).unwrap_err();
+        assert_eq!(e.message(), "invalid axis number 5");
     }
 }

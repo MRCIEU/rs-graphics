@@ -56,7 +56,9 @@ fn cases() -> Vec<Case> {
                         h: vec![2.0, 5.0, 8.0],
                         v: vec![3.0, 7.0],
                         col: col(&["red", "blue"]),
-                        lty: (1..=3).map(|c| Some(LineType::from_code(c))).collect(),
+                        lty: (1..=3)
+                            .map(|c| Some(LineType::from_code(c).unwrap()))
+                            .collect(),
                         lwd: vec![Some(1.0), Some(2.0)],
                         ..Default::default()
                     })
@@ -121,7 +123,10 @@ fn cases() -> Vec<Case> {
                 d.abline()
                     .with(&AblineOptions {
                         h: vec![2.0, 4.0],
-                        lty: vec![Some(LineType::from_code(2)), Some(LineType::from_code(3))],
+                        lty: vec![
+                            Some(LineType::from_code(2).unwrap()),
+                            Some(LineType::from_code(3).unwrap()),
+                        ],
                         lwd: vec![Some(1.0), Some(3.0)],
                         ..Default::default()
                     })
@@ -131,7 +136,7 @@ fn cases() -> Vec<Case> {
                     .with(&AblineOptions {
                         h: vec![6.0, 8.0],
                         lty: vec![
-                            Some(LineType::from_code(4)),
+                            Some(LineType::from_code(4).unwrap()),
                             Some(LineType::parse("42").unwrap()),
                         ],
                         lwd: vec![Some(2.0)],
@@ -184,7 +189,7 @@ fn cases() -> Vec<Case> {
             lims: ((1.0, 100.0), (0.5, 500.0)),
             draw: |d| {
                 d.par().col(Color::parse("grey40").unwrap()).draw();
-                d.par().lty(LineType::from_code(2)).draw();
+                d.par().lty(LineType::from_code(2).unwrap()).draw();
                 d.par().lwd(2.0).draw();
                 d.abline()
                     .with(&AblineOptions {

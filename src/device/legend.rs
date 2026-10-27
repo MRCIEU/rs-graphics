@@ -42,6 +42,7 @@
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
@@ -53,7 +54,7 @@ use crate::setters::{char_pch, pick_na};
 use super::hatch::ShapeStyle;
 use super::{Device, Xpd};
 
-/// Where to put a legend: R's `legend(x, y)` forms.
+/// Where to put a legend: a keyword, a point or two corners.
 ///
 /// [`legend()`](crate::graphics::Graphics::legend) takes anything that
 /// converts into one, so positions can be written as in R:
@@ -82,38 +83,43 @@ impl From<LegendKeyword> for LegendPos {
     }
 }
 
-impl From<&str> for LegendPos {
+impl TryFrom<&str> for LegendPos {
+    type Error = crate::error::Error;
+
     /// One of R's keywords, matched like R's `match.arg()`
     /// ([`LegendKeyword::parse`]: the full name, or a unique prefix such
     /// as `"topr"`).
     ///
-    /// # Panics
-    /// If `s` is not a keyword or is an ambiguous prefix (R errors too);
-    /// use [`LegendKeyword::parse`] or `str::parse` to handle that
-    /// yourself.
-    fn from(s: &str) -> Self {
+    /// # Errors
+    ///
+    /// If `s` is not a keyword or is an ambiguous prefix (R errors too).
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         match LegendKeyword::parse(s) {
-            Some(k) => LegendPos::Keyword(k),
-            None => panic!(
-                "legend: {s:?} is not a legend position; use one of \
+            Some(k) => Ok(LegendPos::Keyword(k)),
+            None => Err(crate::error::Error::invalid(format!(
+                "{s:?} is not a legend position; use one of \
                  \"bottomright\", \"bottom\", \"bottomleft\", \"left\", \
                  \"topleft\", \"top\", \"topright\", \"right\" or \"center\""
-            ),
+            ))),
         }
     }
 }
 
-impl From<String> for LegendPos {
-    /// As `From<&str>`.
-    fn from(s: String) -> Self {
-        LegendPos::from(s.as_str())
+impl TryFrom<String> for LegendPos {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        LegendPos::try_from(s.as_str())
     }
 }
 
-impl From<&String> for LegendPos {
-    /// As `From<&str>`.
-    fn from(s: &String) -> Self {
-        LegendPos::from(s.as_str())
+impl TryFrom<&String> for LegendPos {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: &String) -> Result<Self, Self::Error> {
+        LegendPos::try_from(s.as_str())
     }
 }
 
@@ -160,7 +166,11 @@ corners!(
     (i32, i32, i32, i32)
 );
 
-/// R's `"bottomright"`, `"bottom"`, ... keyword positions.
+/// A legend position by keyword: a corner, an edge or the centre of the
+/// plot region.
+///
+/// Strings work too, as R's keywords (`"bottomright"`, `"top"`, ...; see
+/// [`LegendKeyword::parse`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LegendKeyword {
     BottomRight,
@@ -205,7 +215,9 @@ impl LegendKeyword {
 
 crate::error::from_str_via_parse!(LegendKeyword, "legend position");
 
-/// R's `legend(bty = )`: whether the legend has a box around it.
+/// Whether a legend has a box around it.
+///
+/// This is R's `legend(bty = )`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LegendBty {
     /// `"o"` (the default): draw the box.
@@ -229,18 +241,47 @@ impl LegendBty {
 crate::error::from_str_via_parse!(LegendBty, "legend box type");
 crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
 
-/// `legend()`'s `pch`: one or several numbers (`19`, `[1, 2]`, `&pch`),
-/// characters (`'a'`, `['a', 'b']`) or strings (`["a", "b"]`), recycled
-/// over the keys; `None` elements are R's `NA`, a key without a point
-/// (`[Some(19), None]`, `[Some("x"), None]`).
+/// Values the legend's `pch` setter takes: plotting symbols for the keys,
+/// as numbers, characters or strings.
+///
+/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
+/// `['a', 'b']`) or strings (`["a", "b"]`), recycled over the keys;
+/// `None` elements are R's `NA`, a key without a point (`[Some(19), None]`,
+/// `[Some("x"), None]`).
 ///
 /// As in R: a string's first character is its symbol (`""` draws none),
 /// except that when the first string has several characters, it alone is
 /// used, one character per key (`"abc"` gives keys `a`, `b`, `c`, as R's
-/// `legend(pch = "abc")`). Characters other than ASCII are stored as minus
-/// their Unicode code point (R's negative `pch`), so `'é'` is `-233`.
+/// `legend(pch = "abc")`). ASCII characters are their character codes;
+/// other characters are stored as minus their Unicode code point (R's
+/// negative `pch`), so `'é'` is `-233`.
+///
+/// This is R's `legend(pch = )`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// assert_eq!([19, 1].into_pch(), [Some(19), Some(1)]);
+/// assert_eq!("abc".into_pch(), [Some(97), Some(98), Some(99)]);
+/// assert_eq!([Some("x"), None].into_pch(), [Some(120), None]);
+/// assert_eq!('é'.into_pch(), [Some(-233)]);
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # dev.plot().x(&[1, 2]).draw();
+/// dev.legend().pos("topleft").labels(["a", "b"]).pch([19, 1]).draw();
+/// ```
 pub trait LegendPch {
-    /// The `pch` codes, in order; `None` for no point.
+    /// Converts the value into `pch` codes, one per key in order; `None`
+    /// for a key without a point.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// assert_eq!(vec![Some(19), None].into_pch(), [Some(19), None]);
+    /// ```
     fn into_pch(self) -> Vec<Option<i32>>;
 }
 
@@ -360,196 +401,168 @@ macro_rules! legend_pch_impls {
 legend_pch_impls!(numbers: i32, i16, u8, u16; strings: &str, String, &String);
 legend_pch_impls!(@each char, |c: char| Some(char_pch(c)), |c: Option<char>| c.map(char_pch));
 
-/// The arguments of R's `legend()` other than its position and labels.
-/// Empty `Vec`s and `None` are R's defaults, given for each field.
-///
-/// The per-key arguments (`col`, `pch`, `lty`, `lwd`, `fill`, `border`,
-/// `density`, `angle`, `pt_bg`, `pt_cex`, `pt_lwd`, `cex`, `x_intersp`,
-/// `seg_len`, `text_col`, `text_font`) are recycled over the keys, as in
-/// R. A `None`
-/// element is R's `NA` for that key (`.pch([Some(19), None])`): the
-/// field says what it does. Which parts a key has follows R's rules:
-/// - a box, if `fill` or `density` is given (every key gets one; without
-///   `density` a `None` fill is an empty box, with it `None` is `par(fg)`),
-///   shaded with lines if `density` is;
-/// - a line, if `lty` has a line type other than blank, or `lwd` is given
-///   (R: "one of these two must be specified for line drawing"; `lty` is
-///   then solid); keys whose `lty` or `lwd` is `None`, or whose `lty` is
-///   blank, have none;
-/// - a point, if `pch` is given, drawn through the middle of the line
-///   unless `merge` is `false`; keys whose `pch` is `None` (or negative and
-///   above -32, as in R) have none.
-///
-#[derive(Clone, Debug, Default)]
-pub struct LegendOptions {
-    /// Colours of the lines and points; empty: `par("col")`.
-    pub col: Vec<ColorSpec>,
-    /// Plotting symbols (see [`LegendPch`] for characters); empty: no
-    /// points.
-    /// `None` (R's `NA`): no point on that key.
-    pub pch: Vec<Option<i32>>,
-    /// Line types of the lines; empty: solid, if `lwd` asks for lines.
-    /// `None` (R's `NA`): no line on that key.
-    pub lty: Vec<Option<LineType>>,
-    /// Line widths of the lines (giving any draws lines); empty:
-    /// `par("lwd")`.
-    /// `None` (R's `NA`): no line on that key (its point, if any, uses `par(lwd)`).
-    pub lwd: Vec<Option<f64>>,
-    /// Fill colours of box keys (giving any draws boxes); empty: no fill,
-    /// and no boxes unless `density` is given. With shading, the colour of
-    /// the lines (empty or `None`: `par(fg)`).
-    pub fill: Vec<ColorSpec>,
-    /// Border colours of box keys; empty: black (R's default).
-    pub border: Vec<ColorSpec>,
-    /// Shading lines per inch in the box keys (R's `density`; giving any
-    /// draws boxes), as for [`rect()`](crate::graphics::Graphics::rect):
-    /// the lines take the `fill` colour (empty: `par(fg)`); `None` (R's
-    /// `NA`) or negative fills the box instead, 0 leaves it empty. Empty:
-    /// no shading.
-    pub density: Vec<Option<f64>>,
-    /// Angle of the shading lines in degrees (R's `angle`), recycled over
-    /// the keys; empty: 45.
-    pub angle: Vec<f64>,
-    /// `pt.bg`: fill of `pch` 21 to 25; empty: none (R's `NA`).
-    pub pt_bg: Vec<ColorSpec>,
-    /// `pt.cex`: size of the points; empty: `cex`.
-    /// `None` (R's `NA`): no point on that key.
-    pub pt_cex: Vec<Option<f64>>,
-    /// `pt.lwd`: line width of the points; empty: `lwd`.
-    /// `None` (R's `NA`): no point on that key.
-    pub pt_lwd: Vec<Option<f64>>,
-    /// `bty`: whether to draw the surrounding box; `None`: a box (R's
-    /// `"o"`).
-    pub bty: Option<LegendBty>,
-    /// Box fill (`bg=`); `None` = `par("bg")` (transparent, so unfilled,
-    /// on PDF by default: see [`Backend::default_bg`]).
-    pub bg: Option<ColorSpec>,
-    /// Size of each key's text and symbol, times `par(cex)`; empty: 1.
-    /// `None` (R's `NA`): 1.
-    pub cex: Vec<Option<f64>>,
-    /// Horizontal justification of the box relative to `x`; `None`: R's
-    /// default (0, or 0.5 for [`LegendPos::Corners`]).
-    pub xjust: Option<f64>,
-    /// Vertical justification of the box relative to `y`; `None`: R's
-    /// default (1, or 0.5 for [`LegendPos::Corners`]).
-    pub yjust: Option<f64>,
-    /// Space between each key and its label, in character widths (a
-    /// column is as wide as its widest); empty: 1.
-    /// `None` (R's `NA`): 1.
-    pub x_intersp: Vec<Option<f64>>,
-    /// Space between rows, in character heights, recycled over the rows;
-    /// empty: 1.
-    /// `None` (R's `NA`): 1.
-    pub y_intersp: Vec<Option<f64>>,
-    /// Length of each key's line, in character widths; empty: 2.
-    /// `None` (R's `NA`): 2.
-    pub seg_len: Vec<Option<f64>>,
-    /// `text.width`, in x *user* units: one width for every column, or
-    /// one per column; `f64::NAN` (R's `NA`) makes each column as wide as
-    /// its own widest label; empty: every column as wide as the widest
-    /// label.
-    pub text_width: Vec<f64>,
-    /// `adj[1]`: horizontal adjustment of the labels; `None`: 0 (left).
-    pub adj: Option<f64>,
-    /// `adj[2]`: vertical adjustment of the labels; `None`: 0.5.
-    /// `Some(None)` (the setter's `f64::NAN`) is R's `NA`, centring each
-    /// label's ink, as R's one-value `adj = x` does.
-    pub vadj: Option<Option<f64>>,
-    /// `merge`; `None` = R's default (lines and points both drawn).
-    pub merge: Option<bool>,
-    /// Number of columns; `None`: 1.
-    pub ncol: Option<usize>,
-    /// Lay the entries out in one row. Default `false`.
-    pub horiz: bool,
-    /// Text or a plotmath expression above the entries; `None`: no title.
-    pub title: Option<Label>,
-    /// `title.cex`; `None` = the first `cex`.
-    pub title_cex: Option<f64>,
-    /// `title.col`; `None` = the first `text_col`.
-    pub title_col: Option<ColorSpec>,
-    /// `title.adj`: where the title sits across the box (0 left, 1
-    /// right) and its justification there; `None`: 0.5 (centred).
-    pub title_adj: Option<f64>,
-    /// `title.font`; `None` = the first `text_font`.
-    pub title_font: Option<FontFace>,
-    /// `inset` as fractions of the plot region, `(x, y)`, for keyword
-    /// positions; `None`: `(0, 0)`.
-    pub inset: Option<(f64, f64)>,
-    /// `text.col`: label colours; empty: `par("col")`.
-    pub text_col: Vec<ColorSpec>,
-    /// `text.font`: label fonts (also for measuring them); empty:
-    /// `par("font")`.
-    /// `None` (R's `NA`): `par("font")`.
-    pub text_font: Vec<Option<FontFace>>,
-    /// `box.lwd`: line width of the legend box; `None`: `par("lwd")`.
-    pub box_lwd: Option<f64>,
-    /// `box.lty`: line type of the legend box; `None`: `par("lty")`.
-    pub box_lty: Option<LineType>,
-    /// `box.col`: colour of the legend box's border (`ColorSpec::None`:
-    /// no border); `None`: `par("fg")`.
-    pub box_col: Option<ColorSpec>,
-    /// R's inline `xpd` while drawing ([`Xpd`]; the setter also takes
-    /// `false`/`true`); `None`: `par(xpd)`.
-    pub xpd: Option<Xpd>,
-    /// R's `plot`: `false` works out the layout (returned as usual) but
-    /// draws nothing; `None`: `true`.
-    pub plot: Option<bool>,
+crate::setters::options! {
+    /// The arguments of R's `legend()` other than its position and labels.
+    /// Empty `Vec`s and `None` are R's defaults, given for each field.
+    ///
+    /// The per-key arguments (`col`, `pch`, `lty`, `lwd`, `fill`, `border`,
+    /// `density`, `angle`, `pt_bg`, `pt_cex`, `pt_lwd`, `cex`, `x_intersp`,
+    /// `seg_len`, `text_col`, `text_font`) are recycled over the keys, as in
+    /// R. A `None`
+    /// element is R's `NA` for that key (`.pch([Some(19), None])`): the
+    /// field says what it does. Which parts a key has follows R's rules:
+    /// - a box, if `fill` or `density` is given (every key gets one; without
+    ///   `density` a `None` fill is an empty box, with it `None` is `par(fg)`),
+    ///   shaded with lines if `density` is;
+    /// - a line, if `lty` has a line type other than blank, or `lwd` is given
+    ///   (R: "one of these two must be specified for line drawing"; `lty` is
+    ///   then solid); keys whose `lty` or `lwd` is `None`, or whose `lty` is
+    ///   blank, have none;
+    /// - a point, if `pch` is given, drawn through the middle of the line
+    ///   unless `merge` is `false`; keys whose `pch` is `None` (or negative and
+    ///   above -32, as in R) have none.
+    ///
+    #[derive(Clone, Debug, Default)]
+    pub struct LegendOptions => [LegendCall] {
+        /// Colours of the lines and points. Empty: `par("col")`.
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Plotting symbols (see [`LegendPch`] for characters). Empty: no
+        /// points; `None`: no point on that key.
+        pub pch: Vec<Option<i32>> => legend_pch Option<i32>,
+        /// Line types of the lines. Empty: solid, if `lwd` asks for lines;
+        /// `None`: no line on that key.
+        pub lty: Vec<Option<LineType>> => na_values LineType,
+        /// Line widths of the lines; giving any draws lines. Empty:
+        /// `par("lwd")`; `None`: no line on that key (its point, if any, uses
+        /// `par(lwd)`).
+        pub lwd: Vec<Option<f64>> => na_values f64,
+        /// Fill colours of box keys; giving any draws boxes. Empty: no fill,
+        /// and no boxes unless `density` is given. With shading, the colour of
+        /// the lines (empty or `None`: `par(fg)`).
+        pub fill: Vec<ColorSpec> => values ColorSpec,
+        /// Border colours of box keys. Empty: black (R's default).
+        pub border: Vec<ColorSpec> => values ColorSpec,
+        /// Shading lines per inch in the box keys; giving any draws boxes.
+        /// As for [`rect()`](crate::graphics::Graphics::rect): the lines take
+        /// the `fill` colour (empty: `par(fg)`); `None` or negative fills the
+        /// box instead, 0 leaves it empty. Empty: no shading.
+        pub density: Vec<Option<f64>> => na_values f64,
+        /// Angle of the shading lines in degrees, recycled over the keys.
+        /// Empty: 45.
+        pub angle: Vec<f64> => values f64,
+        /// Fill colour of `pch` 21 to 25. Empty: none. R's `pt.bg`.
+        pub pt_bg: Vec<ColorSpec> => values ColorSpec,
+        /// Size of the points. Empty: `cex`; `None`: no point on that key.
+        /// R's `pt.cex`.
+        pub pt_cex: Vec<Option<f64>> => na_values f64,
+        /// Line width of the points. Empty: `lwd`; `None`: no point on that
+        /// key. R's `pt.lwd`.
+        pub pt_lwd: Vec<Option<f64>> => na_values f64,
+        /// Whether to draw the surrounding box. `None`: a box (R's `"o"`).
+        pub bty: Option<LegendBty> => option LegendBty,
+        /// Fill colour of the legend box. `None`: `par("bg")` (transparent, so
+        /// unfilled, on PDF by default: see [`Backend::default_bg`]).
+        pub bg: Option<ColorSpec> => option ColorSpec,
+        /// Size of each key's text and symbol, times `par(cex)`. Empty and
+        /// `None`: 1.
+        pub cex: Vec<Option<f64>> => na_values f64,
+        /// Horizontal justification of the box relative to its `x` position.
+        /// `None`: 0, or 0.5 for [`LegendPos::Corners`] (R's defaults).
+        pub xjust: Option<f64> => option f64,
+        /// Vertical justification of the box relative to its `y` position.
+        /// `None`: 1, or 0.5 for [`LegendPos::Corners`] (R's defaults).
+        pub yjust: Option<f64> => option f64,
+        /// Space between each key and its label, in character widths (a
+        /// column is as wide as its widest). Empty and `None`: 1. R's
+        /// `x.intersp`.
+        pub x_intersp: Vec<Option<f64>> => na_values f64,
+        /// Space between rows, in character heights, recycled over the rows.
+        /// Empty and `None`: 1. R's `y.intersp`.
+        pub y_intersp: Vec<Option<f64>> => na_values f64,
+        /// Length of each key's line, in character widths. Empty and `None`:
+        /// 2. R's `seg.len`.
+        pub seg_len: Vec<Option<f64>> => na_values f64,
+        /// Width of the label text, in x *user* units: one width for every
+        /// column, or one per column; `f64::NAN` (R's `NA`) makes each column
+        /// as wide as its own widest label. Empty: every column as wide as the
+        /// widest label. R's `text.width`.
+        pub text_width: Vec<f64> => values f64,
+        /// Horizontal adjustment of the labels. `None`: 0 (left). R's
+        /// `adj[1]`.
+        pub adj: Option<f64> => option f64,
+        /// Vertical adjustment of the labels. `None`: 0.5. `Some(None)` (the
+        /// setter's `f64::NAN`, R's `NA`) centres each label's ink, as R's
+        /// one-value `adj = x` does. R's `adj[2]`.
+        pub vadj: Option<Option<f64>> => na f64,
+        /// Whether to draw each point in the middle of its line. `None`: R's
+        /// default, `true` when the keys have both lines and points.
+        pub merge: Option<bool> => option bool,
+        /// Number of columns. `None`: 1.
+        pub ncol: Option<usize> => count usize,
+        /// Whether to lay the entries out in one row. Default `false`.
+        pub horiz: bool => value bool,
+        /// Text or a plotmath expression above the entries. `None`: no title.
+        pub title: Option<Label> => option Label,
+        /// Size of the title. `None`: the first `cex`. R's `title.cex`.
+        pub title_cex: Option<f64> => option f64,
+        /// Colour of the title. `None`: the first `text_col`. R's `title.col`.
+        pub title_col: Option<ColorSpec> => option ColorSpec,
+        /// Where the title sits across the box (0 left, 1 right) and its
+        /// justification there. `None`: 0.5 (centred). R's `title.adj`.
+        pub title_adj: Option<f64> => option f64,
+        /// Font of the title. `None`: the first `text_font`. R's
+        /// `title.font`.
+        pub title_font: Option<FontFace> => option FontFace,
+        /// Inset from the plot region's edges for keyword positions, as
+        /// fractions of the plot region, `(x, y)`. `None`: `(0, 0)`.
+        pub inset: Option<(f64, f64)> => option_pair (f64, f64),
+        /// Colours of the labels. Empty: `par("col")`. R's `text.col`.
+        pub text_col: Vec<ColorSpec> => values ColorSpec,
+        /// Fonts of the labels (also for measuring them). Empty and `None`:
+        /// `par("font")`. R's `text.font`.
+        pub text_font: Vec<Option<FontFace>> => na_values FontFace,
+        /// Line width of the legend box. `None`: `par("lwd")`. R's `box.lwd`.
+        pub box_lwd: Option<f64> => option f64,
+        /// Line type of the legend box. `None`: `par("lty")`. R's `box.lty`.
+        pub box_lty: Option<LineType> => option LineType,
+        /// Colour of the legend box's border (`ColorSpec::None`: no border).
+        /// `None`: `par("fg")`. R's `box.col`.
+        pub box_col: Option<ColorSpec> => option ColorSpec,
+        /// How far drawing may reach ([`Xpd`]; the setter also takes
+        /// `false`/`true`). `None`: `par(xpd)`; overrides it for this call
+        /// only.
+        pub xpd: Option<Xpd> => option Xpd,
+        /// Whether to draw: `false` works out the layout (returned as usual)
+        /// but draws nothing. `None`: `true`.
+        pub plot: Option<bool> => option bool,
+    }
 }
 
-crate::setters::setters!(LegendOptions => [LegendCall] {
-    col: values ColorSpec,
-    pch: legend_pch Option<i32>,
-    lty: na_values LineType,
-    lwd: na_values f64,
-    fill: values ColorSpec,
-    border: values ColorSpec,
-    density: na_values f64,
-    angle: values f64,
-    pt_bg: values ColorSpec,
-    pt_cex: na_values f64,
-    pt_lwd: na_values f64,
-    bty: option LegendBty,
-    bg: option ColorSpec,
-    cex: na_values f64,
-    xjust: option f64,
-    yjust: option f64,
-    x_intersp: na_values f64,
-    y_intersp: na_values f64,
-    seg_len: na_values f64,
-    text_width: values f64,
-    adj: option f64,
-    vadj: na f64,
-    merge: option bool,
-    ncol: count usize,
-    horiz: value bool,
-    title: option Label,
-    title_cex: option f64,
-    title_col: option ColorSpec,
-    title_adj: option f64,
-    title_font: option FontFace,
-    inset: option_pair (f64, f64),
-    text_col: values ColorSpec,
-    text_font: na_values FontFace,
-    box_lwd: option f64,
-    box_lty: option LineType,
-    box_col: option ColorSpec,
-    xpd: option Xpd,
-    plot: option bool,
-});
-
 /// R's argument checks for `legend()`, so a [`Figure`](crate::recording::Figure)
-/// panics when recording, as the device does.
-pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) {
-    assert!(!labels.is_empty(), "'legend' is of length 0");
+/// fails when recording, as the device does.
+pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Result<(), Error> {
+    if labels.is_empty() {
+        return Err(Error::invalid("'legend' is of length 0"));
+    }
     let tw = &opts.text_width;
     let any_na = tw.iter().any(|v| v.is_nan());
     let bad = (tw.len() > 1 && any_na) || (!any_na && tw.iter().any(|&v| v < 0.0));
-    assert!(!bad, "'text.width' must be numeric, >= 0, or a scalar NA");
+    if bad {
+        return Err(Error::invalid(
+            "'text.width' must be numeric, >= 0, or a scalar NA",
+        ));
+    }
+    Ok(())
 }
 
-/// Where `legend()` drew, as R's (invisible) return value `list(rect =
-/// list(w, h, left, top), text = list(x, y))`. All in `usr` units, as in
-/// R: log10 values on a log axis (see [`Device::usr`]).
+/// Where a legend was drawn: its box and each label's anchor, returned by
+/// `legend()` on a [`Device`].
+///
+/// All values are in `usr` units, so log10 values on a log axis (see
+/// [`Device::usr`]).
+///
+/// This is R's (invisible) return value of `legend()`, `list(rect =
+/// list(w, h, left, top), text = list(x, y))`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LegendLayout {
     /// `rect$left`, `rect$top`: the box's top-left corner.
@@ -573,15 +586,15 @@ impl<B: Backend> Device<B> {
         pos: LegendPos,
         labels: &[Option<Label>],
         opts: &LegendOptions,
-    ) -> LegendLayout {
-        check_legend(labels, opts);
+    ) -> Result<LegendLayout, Error> {
+        check_legend(labels, opts)?;
         // R's `legend(xpd = )` sets `par(xpd)` for the call and restores it
         // `on.exit`.
         let mut dev = self.par_scope(|now, saved| now.xpd = saved.xpd);
         if let Some(xpd) = opts.xpd {
             dev.par.xpd = xpd;
         }
-        dev.draw_legend(pos, labels, opts)
+        Ok(dev.draw_legend(pos, labels, opts))
     }
 
     fn draw_legend(
@@ -735,8 +748,8 @@ impl<B: Backend> Device<B> {
         let (left, top, w, h, xextra);
         match pos {
             LegendPos::Corners(xa, ya, xb, yb) => {
-                let pa = self.user_to_inches(xa, ya);
-                let pb = self.user_to_inches(xb, yb);
+                let pa = self.data_to_inches(xa, ya);
+                let pb = self.data_to_inches(xb, yb);
                 left = pa.x.min(pb.x);
                 top = pa.y.max(pb.y);
                 w = (pa.x - pb.x).abs();
@@ -775,7 +788,7 @@ impl<B: Backend> Device<B> {
 
                 let (l, t) = match pos {
                     LegendPos::Xy(x, y) => {
-                        let p = self.user_to_inches(x, y);
+                        let p = self.data_to_inches(x, y);
                         let xjust = opts.xjust.unwrap_or(0.0);
                         let yjust = opts.yjust.unwrap_or(1.0);
                         (p.x - xjust * w_, p.y + (1.0 - yjust) * h_)
@@ -859,8 +872,8 @@ impl<B: Backend> Device<B> {
                     .map(|i| {
                         let top = yt[i] + ybox[i] / 2.0;
                         (
-                            self.inches_to_user(Point::new(xt[i], top)),
-                            self.inches_to_user(Point::new(xt[i] + xbox[i], top - ybox[i])),
+                            self.inches_to_data(Point::new(xt[i], top)),
+                            self.inches_to_data(Point::new(xt[i] + xbox[i], top - ybox[i])),
                         )
                     })
                     .collect();
@@ -1018,17 +1031,12 @@ mod tests {
     #[test]
     fn positions_convert_like_r() {
         let p = |p: LegendPos| p;
+        let s = |s: &str| LegendPos::try_from(s).unwrap();
+        assert_eq!(s("topright"), LegendPos::Keyword(LegendKeyword::TopRight));
+        assert_eq!(s("topr"), LegendPos::Keyword(LegendKeyword::TopRight));
         assert_eq!(
-            p("topright".into()),
-            LegendPos::Keyword(LegendKeyword::TopRight)
-        );
-        assert_eq!(
-            p("topr".into()),
-            LegendPos::Keyword(LegendKeyword::TopRight)
-        );
-        assert_eq!(
-            p(String::from("center").into()),
-            LegendPos::Keyword(LegendKeyword::Center)
+            LegendPos::try_from(String::from("center")),
+            Ok(LegendPos::Keyword(LegendKeyword::Center))
         );
         assert_eq!(
             p(LegendKeyword::Left.into()),
@@ -1042,15 +1050,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "\"middle\" is not a legend position")]
-    fn unknown_keyword_panics() {
-        let _ = LegendPos::from("middle");
-    }
-
-    #[test]
-    #[should_panic(expected = "\"to\" is not a legend position")]
-    fn ambiguous_prefix_panics() {
-        let _ = LegendPos::from("to");
+    fn unknown_or_ambiguous_keywords_are_errors() {
+        for s in ["middle", "to"] {
+            let e = LegendPos::try_from(s).unwrap_err();
+            assert!(
+                e.message()
+                    .starts_with(&format!("{s:?} is not a legend position")),
+                "{e}"
+            );
+        }
     }
 
     #[test]
@@ -1073,9 +1081,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "'legend' is of length 0")]
-    fn no_labels_panics() {
-        check_legend(&[], &LegendOptions::default());
+    fn no_labels_is_an_error() {
+        let e = check_legend(&[], &LegendOptions::default()).unwrap_err();
+        assert_eq!(e.message(), "'legend' is of length 0");
     }
 
     #[test]
@@ -1086,7 +1094,7 @@ mod tests {
                 text_width: tw,
                 ..LegendOptions::default()
             };
-            std::panic::catch_unwind(|| check_legend(&labels, &opts)).is_ok()
+            check_legend(&labels, &opts).is_ok()
         };
         assert!(check(vec![]));
         assert!(check(vec![f64::NAN]));

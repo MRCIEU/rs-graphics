@@ -32,7 +32,10 @@ const PAGE_H: f64 = 6.0;
 type Dev = Device<PdfBackend>;
 
 fn cols(names: &[&str]) -> Vec<ColorSpec> {
-    names.iter().map(|&n| ColorSpec::from(n)).collect()
+    names
+        .iter()
+        .map(|&n| ColorSpec::try_from(n).unwrap())
+        .collect()
 }
 
 /// `plot.new(); plot.window(c(0, 10), c(0, 10))`.
@@ -147,7 +150,7 @@ fn cases() -> Vec<Case> {
                     code: Some(3),
                     angle: Some(90.0),
                     length: Some(0.1),
-                    col: vec!["red".into(), ColorSpec::None],
+                    col: vec![ColorSpec::try_from("red").unwrap(), ColorSpec::None],
                     ..ArrowsOptions::default()
                 };
                 d.arrows()
@@ -171,8 +174,12 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.par().fg(Color::parse("darkgreen").unwrap()).draw();
                 let three = RectOptions {
-                    col: vec!["grey".into(), ColorSpec::None],
-                    border: vec!["red".into(), "blue".into(), ColorSpec::None],
+                    col: vec![ColorSpec::try_from("grey").unwrap(), ColorSpec::None],
+                    border: vec![
+                        ColorSpec::try_from("red").unwrap(),
+                        ColorSpec::try_from("blue").unwrap(),
+                        ColorSpec::None,
+                    ],
                     lwd: vec![Some(2.0)],
                     ..RectOptions::default()
                 };
@@ -196,7 +203,11 @@ fn cases() -> Vec<Case> {
                     .draw();
                 let na = f64::NAN;
                 let polys = PolygonOptions {
-                    col: vec!["orange".into(), ColorSpec::None, "cyan".into()],
+                    col: vec![
+                        ColorSpec::try_from("orange").unwrap(),
+                        ColorSpec::None,
+                        ColorSpec::try_from("cyan").unwrap(),
+                    ],
                     border: vec![ColorSpec::Index(1), ColorSpec::Index(2)],
                     lty: vec![
                         Some(LineType::SOLID),
@@ -272,7 +283,7 @@ fn cases() -> Vec<Case> {
                 d.box_()
                     .with(&BoxOptions {
                         which: Some(BoxWhich::Figure),
-                        col: Some("red".into()),
+                        col: Some(ColorSpec::try_from("red").unwrap()),
                         ..BoxOptions::default()
                     })
                     .draw();
@@ -287,7 +298,7 @@ fn cases() -> Vec<Case> {
                 d.box_()
                     .with(&BoxOptions {
                         which: Some(BoxWhich::Outer),
-                        col: Some("blue".into()),
+                        col: Some(ColorSpec::try_from("blue").unwrap()),
                         ..BoxOptions::default()
                     })
                     .draw();

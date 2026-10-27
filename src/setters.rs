@@ -6,16 +6,20 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Chainable setters for the options structs, so that
+//! Chainable setters for the options structs, and the traits ([`Values`],
+//! [`NaValues`]) that let them take one value or several.
+//!
+//! Setting fields through the setters is the same as filling them in:
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
 //! let opts = XyOptions::default().pch(19).col(["red", "blue"]).cex(1.5);
-//! # let _ = opts;
+//! assert_eq!(opts.pch, vec![Some(19)]);
+//! assert_eq!(opts.col.len(), 2);
 //! ```
 //!
-//! is the same as filling in the fields. Each setter is named after its
-//! field and documented there. `Option` fields take the value itself
+//! Each setter is named after its
+//! field and carries the field's doc. `Option` fields take the value itself
 //! (`.las(1)`, `.main("Title")`); fields R recycles per element take one
 //! value or several (see [`Values`]), and in style vectors (symbols, line
 //! types and widths, sizes, fonts, colours) an element may be `None`,
@@ -24,46 +28,121 @@
 //! (`.xlim(0.0, 10.0)`). As in R, numbers may be integers or floats
 //! (`.cex(2)`, `.xlim(0, 10)`, `.mar([5, 4, 4, 2])`). Fields holding one of R's string-valued choices
 //! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
-//! `.order_h("decr")`); an invalid string panics, as R errors.
+//! `.order_h("decr")`).
+//!
+//! A value that can't be converted (`.lty("wavy")`, `.side(5)`,
+//! `.col("notacolour")`) doesn't panic: the setter keeps the error, and
+//! the call's `try_draw()` returns it (`.draw()` panics with it), as R
+//! errors when the function runs. On an options struct used with
+//! `.with(&opts)`, the error goes with it.
+//!
+//! ```
+//! # use rs_graphics::prelude::*;
+//! # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+//! # dev.plot().x([1, 2, 3]).draw();
+//! let e = dev.lines().x([1, 2]).y([1, 2]).lty("wavy").try_draw().unwrap_err();
+//! assert_eq!(e.call(), "lines");
+//! ```
 
 use crate::color::{Color, ColorSpec};
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
 
-/// One value or several, for a field R recycles per element: `"red"`,
-/// `["red", "blue"]`, `vec![1.0, 2.0]`, `&cex[..]`, `2`, `[1, 2]`, ...
-/// (numeric fields take `f64`, `f32`, `i32` or `u32` values).
+/// A value a setter can take for a `T`: anything that converts to it,
+/// possibly failing (`"dashed"` for a [`LineType`], `5` for a
+/// [`Side`](crate::device::Side)).
+///
+/// Implemented for every type with `TryInto<T>` (so also `Into<T>`) whose
+/// error is an [`Error`]. A failed conversion doesn't panic in the
+/// setter: the error is kept and returned by the call's `try_draw()`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::IntoArg;
+/// # use rs_graphics::prelude::*;
+/// let lty: LineType = "dashed".into_arg().unwrap();
+/// assert_eq!(lty, LineType::DASHED);
+/// assert!(IntoArg::<LineType>::into_arg("wavy").is_err());
+/// ```
+pub trait IntoArg<T> {
+    /// The value, or why it isn't one.
+    ///
+    /// # Errors
+    ///
+    /// If the conversion fails, with R's message where R has one.
+    fn into_arg(self) -> Result<T, Error>;
+}
+
+impl<T, U> IntoArg<T> for U
+where
+    U: TryInto<T>,
+    Error: From<U::Error>,
+{
+    fn into_arg(self) -> Result<T, Error> {
+        self.try_into().map_err(Error::from)
+    }
+}
+
+/// One value or several, for a field R recycles per element.
+///
+/// Takes a single value or a `Vec`, array or slice of them, by value or
+/// by reference: `"red"`, `["red", "blue"]`, `vec![1.0, 2.0]`,
+/// `&cex[..]`, `2`, `[1, 2]`, ... Numeric fields take `f64`, `f32`, `i32`
+/// or `u32` values; colours take anything that converts to a
+/// [`ColorSpec`] (one palette index as an `i32`); line types take a
+/// [`LineType`], R's string or code; a character `pch` is its ASCII code,
+/// or minus its Unicode code point for other characters (`'é'` is -233),
+/// as in R.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::Values;
+/// # use rs_graphics::prelude::*;
+/// let one: Vec<f64> = 2_i32.into_values().unwrap();
+/// assert_eq!(one, [2.0]);
+/// let cols: Vec<ColorSpec> = ["red", "blue"].into_values().unwrap();
+/// assert_eq!(cols[1], ColorSpec::Color(Color::parse("blue").unwrap()));
+/// ```
 pub trait Values<T> {
-    fn into_values(self) -> Vec<T>;
+    /// The values, in order.
+    ///
+    /// # Errors
+    ///
+    /// If a value doesn't convert (an unknown colour name, ...); see
+    /// [`IntoArg`].
+    fn into_values(self) -> Result<Vec<T>, Error>;
 }
 
-impl<T, U: Into<T>> Values<T> for Vec<U> {
-    fn into_values(self) -> Vec<T> {
-        self.into_iter().map(Into::into).collect()
+impl<T, U: IntoArg<T>> Values<T> for Vec<U> {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.into_iter().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T>, const N: usize> Values<T> for [U; N] {
-    fn into_values(self) -> Vec<T> {
-        self.into_iter().map(Into::into).collect()
+impl<T, U: IntoArg<T>, const N: usize> Values<T> for [U; N] {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.into_iter().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T> + Clone> Values<T> for &[U] {
-    fn into_values(self) -> Vec<T> {
-        self.iter().cloned().map(Into::into).collect()
+impl<T, U: IntoArg<T> + Clone> Values<T> for &[U] {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.iter().cloned().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T> + Clone, const N: usize> Values<T> for &[U; N] {
-    fn into_values(self) -> Vec<T> {
-        self.iter().cloned().map(Into::into).collect()
+impl<T, U: IntoArg<T> + Clone, const N: usize> Values<T> for &[U; N] {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.iter().cloned().map(IntoArg::into_arg).collect()
     }
 }
 
-impl<T, U: Into<T> + Clone> Values<T> for &Vec<U> {
-    fn into_values(self) -> Vec<T> {
-        self.iter().cloned().map(Into::into).collect()
+impl<T, U: IntoArg<T> + Clone> Values<T> for &Vec<U> {
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.iter().cloned().map(IntoArg::into_arg).collect()
     }
 }
 
@@ -72,8 +151,8 @@ macro_rules! single_values {
     ($t:ty: $($single:ty),*) => {
         $(
             impl Values<$t> for $single {
-                fn into_values(self) -> Vec<$t> {
-                    vec![self.into()]
+                fn into_values(self) -> Result<Vec<$t>, Error> {
+                    Ok(vec![self.into_arg()?])
                 }
             }
         )*
@@ -88,103 +167,100 @@ single_values!(LineType: LineType, &str, String, &String, i32);
 /// A character `pch`, e.g. `'.'` or `'+'`: its ASCII code, or minus its
 /// Unicode code point for other characters (`'é'` is -233), as in R.
 impl Values<i32> for char {
-    fn into_values(self) -> Vec<i32> {
-        vec![char_pch(self)]
+    fn into_values(self) -> Result<Vec<i32>, Error> {
+        Ok(vec![char_pch(self)])
     }
 }
 
 /// One value or several for a recycled style vector whose elements may be
-/// R's `NA`, written `None`: `19`, `[1, 2]`, `[Some(19), None]`,
-/// `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`, ...
+/// missing (`None`, R's `NA`).
+///
+/// Takes a single value, an `Option` of one, or an array, `Vec` or slice
+/// of either, by value or by reference: `19`, `[1, 2]`,
+/// `[Some(19), None]`, `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`,
+/// ... Rust arrays hold one element type, so once one element is `None`
+/// the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
 /// (for text sizes and fonts, and `legend()`'s spacing, it means the
-/// default instead; each field says which). Rust arrays hold one element
-/// type, so once one element is `None` the others are written `Some(..)`.
+/// default instead; each field says which).
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::NaValues;
+/// # use rs_graphics::prelude::*;
+/// let pch: Vec<Option<i32>> = [Some(19_i32), None].into_na_values().unwrap();
+/// assert_eq!(pch, [Some(19), None]);
+/// let opts = XyOptions::default().pch([Some(19), None]);
+/// assert_eq!(opts.pch, pch);
+/// ```
 pub trait NaValues<T> {
-    fn into_na_values(self) -> Vec<Option<T>>;
+    /// The values, in order (`None`: R's `NA`).
+    ///
+    /// # Errors
+    ///
+    /// If a value doesn't convert (an unknown line type, ...); see
+    /// [`IntoArg`].
+    fn into_na_values(self) -> Result<Vec<Option<T>>, Error>;
 }
 
 /// `NaValues<$t>` for each element type, one value or a collection of them,
-/// also as `Option`s.
+/// also as `Option`s. `$conv` converts one element to a `Result<$t, Error>`.
 macro_rules! na_values {
     ($t:ty: $conv:expr; $($e:ty),*) => {
         $(
             impl NaValues<$t> for $e {
-                fn into_na_values(self) -> Vec<Option<$t>> {
-                    vec![Some($conv(self))]
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    Ok(vec![Some($conv(self)?)])
                 }
             }
             impl NaValues<$t> for Option<$e> {
-                fn into_na_values(self) -> Vec<Option<$t>> {
-                    vec![self.map($conv)]
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    Ok(vec![self.map($conv).transpose()?])
                 }
             }
             na_values!(@many $t: $conv; $e);
-            na_values!(@many_opt $t: $conv; $e);
         )*
     };
     (@many $t:ty: $conv:expr; $e:ty) => {
+        na_values!(@impls $t; $e; |v: $e| $conv(v).map(Some));
+        na_values!(@impls $t; Option<$e>; |v: Option<$e>| v.map($conv).transpose());
+    };
+    (@impls $t:ty; $e:ty; $one:expr) => {
         impl<const N: usize> NaValues<$t> for [$e; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.into_iter().map($one).collect()
             }
         }
         impl NaValues<$t> for Vec<$e> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.into_iter().map($one).collect()
             }
         }
         impl NaValues<$t> for &[$e] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.iter().cloned().map($one).collect()
             }
         }
         impl<const N: usize> NaValues<$t> for &[$e; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| Some($conv(v))).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.iter().cloned().map($one).collect()
             }
         }
         impl NaValues<$t> for &Vec<$e> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| Some($conv(v))).collect()
-            }
-        }
-    };
-    (@many_opt $t:ty: $conv:expr; $e:ty) => {
-        impl<const N: usize> NaValues<$t> for [Option<$e>; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl NaValues<$t> for Vec<Option<$e>> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.into_iter().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl NaValues<$t> for &[Option<$e>] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl<const N: usize> NaValues<$t> for &[Option<$e>; N] {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| v.map($conv)).collect()
-            }
-        }
-        impl NaValues<$t> for &Vec<Option<$e>> {
-            fn into_na_values(self) -> Vec<Option<$t>> {
-                self.iter().cloned().map(|v| v.map($conv)).collect()
+            fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                self.iter().cloned().map($one).collect()
             }
         }
     };
 }
 
-na_values!(f64: f64::from; f64, f32, i32, u32);
-na_values!(i32: i32::from; i32, i16, u8, u16);
-na_values!(i32: char_pch; char);
-na_values!(LineType: LineType::from; LineType, &str, String, &String, i32);
-na_values!(FontFace: FontFace::from; FontFace, i32, &str, String, &String);
+na_values!(f64: IntoArg::<f64>::into_arg; f64, f32, i32, u32);
+na_values!(i32: IntoArg::<i32>::into_arg; i32, i16, u8, u16);
+na_values!(i32: |c: char| Ok::<i32, Error>(char_pch(c)); char);
+na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
+na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
 
 /// Element `i` of a recycled [`NaValues`] vector: `Some(default)` when
 /// the vector is empty (R's default), `None` for an `NA` element.
@@ -203,51 +279,87 @@ pub(crate) fn char_pch(c: char) -> i32 {
     if c.is_ascii() { c as i32 } else { -(c as i32) }
 }
 
-/// `setters!(Struct { field: kind Type, ... })` adds a chainable setter for
-/// each field. Kinds: `value` (plain field), `option` (`Option<T>`, set to
+/// Declares an options struct and its chainable setters from one list, so
+/// each field's doc is written once:
+///
+/// ```text
+/// options! {
+///     /// Arguments of `segments()`.
+///     #[derive(Clone, Debug, Default)]
+///     pub struct SegmentsOptions => [SegmentsCall] {
+///         /// Recycled per segment; empty: `par(fg)` (R's default).
+///         pub col: Vec<ColorSpec> => values ColorSpec,
+///     }
+/// }
+/// ```
+///
+/// gives the struct, a setter per field on it, and the same setters on
+/// each listed builder in [`crate::graphics`] (writing to its `opts`),
+/// plus `with(&Struct)` there. Each setter's doc is the field's own doc,
+/// then (for kinds that take several forms) a line on what it takes.
+/// Field docs should therefore have no headings (`# Panics`): that line
+/// would land under them. Every field
+/// needs its `=> kind Type`, so a field can't be added without a setter
+/// by mistake; one set by a constructor is marked `=> no_setter`. The
+/// builder list `=> [..]` may be left out.
+///
+/// Setter kinds: `value` (plain field), `option` (`Option<T>`, set to
 /// `Some`), `values` (`Vec<T>` recycled by R), `na_values`
 /// (`Vec<Option<T>>` recycled by R, `None` = `NA`), `option_values`
-/// (`Option<Vec<T>>`), `list` (`Option<Vec<T>>` from any iterator of
-/// `Into<T>`, e.g. strings for `Label`s), `labels`
-/// (`Option<Vec<Option<Label>>>`), `pair` (`Option<(f64, f64)>` from two
+/// (`Option<Vec<T>>`), `list` (`Option<Vec<Label>>` from one label or
+/// several, [`LabelValues`](crate::plotmath::LabelValues)), `labels`
+/// (`Option<Vec<Option<Label>>>` from [`Labels`](crate::plotmath::Labels),
+/// `None` = `NA`), `pair` (`Option<(f64, f64)>` from two
 /// numbers), `option_pair` (`Option<(f64, f64)>` from one
 /// [`Pair`](crate::numbers::Pair) tuple), `array` (`Option<[f64; N]>`
 /// from an array of any numbers), `na` (`Option<Option<f64>>`, R's
 /// `NA`-able number, from one number; `f64::NAN` is `NA`), `count`
 /// (`Option<usize>` from any integer) and `legend_pch` (`legend()`'s `pch`, a `Vec<i32>` from
 /// [`LegendPch`](crate::device::LegendPch)).
-///
-/// `setters!(Struct => [CallA, CallB] { ... })` also gives each listed
-/// builder in [`crate::graphics`] the same setters (writing to its
-/// `opts`), plus `with(&Struct)`.
-///
-/// Every field of the struct needs a line: a field without one is a
-/// compile error at the `setters!` call. A field that deliberately has no
-/// setter (set by a constructor) is named after the braces:
-/// `setters!(Struct { ... }; no_setter: a, b)`.
-macro_rules! setters {
-    ($ty:ident $body:tt $(; no_setter: $($skip:ident),+ $(,)?)?) => {
-        $crate::setters::setters!(@opts $ty $body [$($($skip),+)?]);
+macro_rules! options {
+    (
+        $(#[$sattr:meta])*
+        $svis:vis struct $ty:ident $(=> [$($call:ident),+ $(,)?])? { $($body:tt)* }
+    ) => {
+        $crate::setters::options!(@struct [$(#[$sattr])*] [$svis] $ty { $($body)* });
+        $crate::setters::options!(@opts $ty { $($body)* });
+        $crate::setters::options!(@calls $ty [$($($call)+)?] { $($body)* });
     };
-    ($ty:ident => [$($call:ident),+ $(,)?] $body:tt) => {
-        $crate::setters::setters!(@opts $ty $body []);
-        $( $crate::setters::setters!(@call $ty $call $body); )+
+    (@calls $ty:ident [$($call:ident)*] $body:tt) => {
+        $( $crate::setters::options!(@call $ty $call $body); )*
     };
-    (@opts $ty:ident { $($field:ident : $kind:ident $t:ty),* $(,)? } [$($skip:ident),*]) => {
-        // Every field has a setter line (or is listed after `no_setter:`):
-        // this pattern names them all, with no `..`, so a field added to the
-        // struct without one is a compile error here.
-        const _: fn(&$ty) = |s| {
-            let $ty { $($field: _,)* $($skip: _,)* } = s;
-        };
+    (@struct [$($sattr:tt)*] [$($svis:tt)*] $ty:ident {
+        $( $(#[$fattr:meta])* $fvis:vis $field:ident : $fty:ty => $kind:ident $($t:ty)? ),* $(,)?
+    }) => {
+        $($sattr)*
+        $($svis)* struct $ty {
+            $( $(#[$fattr])* $fvis $field: $fty, )*
+            /// The first value a setter couldn't convert, returned by the
+            /// call's `try_draw()`.
+            #[doc(hidden)]
+            pub deferred_error: Option<$crate::error::Error>,
+        }
+    };
+    (@opts $ty:ident {
+        $( $(#[$fattr:meta])* $fvis:vis $field:ident : $fty:ty => $kind:ident $($t:ty)? ),* $(,)?
+    }) => {
         // R's argument names, such as `sub` (a subtitle) and `add`, win over
         // clippy's wish to keep `std::ops` method names free.
         #[allow(clippy::should_implement_trait)]
         impl $ty {
-            $( $crate::setters::setters!(@one [] $ty $field $kind $t); )*
+            $( $crate::setters::options!(@field [] [$(#[$fattr])*] $ty $field $kind $($t)?); )*
+
+            /// Keeps `e` for `try_draw()`, unless an earlier error is kept.
+            pub(crate) fn defer(&mut self, e: $crate::error::Error) {
+                if self.deferred_error.is_none() {
+                    self.deferred_error = Some(e);
+                }
+            }
         }
     };
-    (@call $ty:ident $call:ident { $($field:ident : $kind:ident $t:ty),* $(,)? }) => {
+    (@call $ty:ident $call:ident {
+        $( $(#[$fattr:meta])* $fvis:vis $field:ident : $fty:ty => $kind:ident $($t:ty)? ),* $(,)?
+    }) => {
         #[allow(clippy::should_implement_trait)]
         impl<'a, G: $crate::graphics::Graphics> $crate::graphics::$call<'a, G> {
             #[doc = concat!("Uses a copy of `opts` (a reusable [`", stringify!($ty),
@@ -257,111 +369,141 @@ macro_rules! setters {
                 self.opts = opts.clone();
                 self
             }
-            $( $crate::setters::setters!(@one [opts] $ty $field $kind $t); )*
+            $( $crate::setters::options!(@field [opts] [$(#[$fattr])*] $ty $field $kind $($t)?); )*
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident value $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        pub fn $field(mut self, value: impl Into<$t>) -> Self {
-            self$(.$p)?.$field = value.into();
+    // A field without a setter.
+    (@field [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident no_setter) => {};
+    (@field [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident $kind:ident $t:ty) => {
+        $crate::setters::options!(@one [$($p)?] [$($a)*] $ty $field $kind $t);
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident value $t:ty) => {
+        $($a)*
+        pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
+            match value.into_arg() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident option $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        pub fn $field(mut self, value: impl Into<$t>) -> Self {
-            self$(.$p)?.$field = Some(value.into());
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option $t:ty) => {
+        $($a)*
+        pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
+            match value.into_arg() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident values $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one value or several.")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident values $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one value or several (see [`Values`](crate::setters::Values))."]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
-            self$(.$p)?.$field = values.into_values();
+            match values.into_values() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident count $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] from any integer.\n\n# Panics\nIf the value is negative.")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident count $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes any integer; a negative one is an error of the call."]
         pub fn $field<N>(mut self, value: N) -> Self
         where
             N: TryInto<$t> + Copy + std::fmt::Display,
         {
-            let v = value.try_into().unwrap_or_else(|_| {
-                panic!(concat!("'", stringify!($field), "' must be a count, not {}"), value)
-            });
-            self$(.$p)?.$field = Some(v);
+            match value.try_into() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
+                Err(_) => self$(.$p)?.defer($crate::error::Error::invalid(format!(
+                    concat!("'", stringify!($field), "' must be a count, not {}"),
+                    value
+                ))),
+            }
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident legend_pch $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`]: numbers, characters or strings (see [`LegendPch`](crate::device::LegendPch)).")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident legend_pch $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes numbers, characters or strings (see [`LegendPch`](crate::device::LegendPch))."]
         pub fn $field(mut self, values: impl $crate::device::LegendPch) -> Self {
             self$(.$p)?.$field = values.into_pch();
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident na_values $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one value or several; `None` is R's `NA` (see [`NaValues`](crate::setters::NaValues)).")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident na_values $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one value or several; `None` is R's `NA` (see [`NaValues`](crate::setters::NaValues))."]
         pub fn $field(mut self, values: impl $crate::setters::NaValues<$t>) -> Self {
-            self$(.$p)?.$field = values.into_na_values();
+            match values.into_na_values() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident option_values $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`] to one value or several.")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_values $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one value or several (see [`Values`](crate::setters::Values))."]
         pub fn $field(mut self, values: impl $crate::setters::Values<$t>) -> Self {
-            self$(.$p)?.$field = Some(values.into_values());
+            match values.into_values() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident list $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
-        pub fn $field<S: Into<$t>>(mut self, values: impl IntoIterator<Item = S>) -> Self {
-            self$(.$p)?.$field = Some(values.into_iter().map(Into::into).collect());
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident list $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one label or several (see [`LabelValues`](crate::plotmath::LabelValues))."]
+        pub fn $field(mut self, values: impl $crate::plotmath::LabelValues) -> Self {
+            self$(.$p)?.$field = Some(values.into_label_values());
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident labels $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field),
-            "`], all present (set the field directly for `NA` labels).")]
-        pub fn $field<L: Into<$crate::plotmath::Label>>(
-            mut self,
-            values: impl IntoIterator<Item = L>,
-        ) -> Self {
-            self$(.$p)?.$field = Some(values.into_iter().map(|l| Some(l.into())).collect());
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident labels $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one label or several; `None` is R's `NA` (see [`Labels`](crate::plotmath::Labels))."]
+        pub fn $field(mut self, values: impl $crate::plotmath::Labels) -> Self {
+            self$(.$p)?.$field = Some(values.into_labels());
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident pair $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pair $t:ty) => {
+        $($a)*
         pub fn $field(mut self, a: impl Into<f64>, b: impl Into<f64>) -> Self {
             self$(.$p)?.$field = Some((a.into(), b.into()));
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident option_pair $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_pair $t:ty) => {
+        $($a)*
         pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
             self$(.$p)?.$field = Some(value.into_pair());
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident na $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`]; `f64::NAN` is R's `NA`.")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident na $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "`f64::NAN` is R's `NA`."]
         pub fn $field(mut self, value: impl Into<f64>) -> Self {
             let v: f64 = value.into();
             self$(.$p)?.$field = Some(v.is_finite().then_some(v));
             self
         }
     };
-    (@one [$($p:ident)?] $ty:ident $field:ident array $t:ty) => {
-        #[doc = concat!("Sets [`", stringify!($ty), "::", stringify!($field), "`].")]
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident array $t:ty) => {
+        $($a)*
         pub fn $field<U: Into<f64>, const N: usize>(mut self, values: [U; N]) -> Self
         where
             [f64; N]: Into<$t>,
@@ -372,19 +514,19 @@ macro_rules! setters {
         }
     };
 }
-pub(crate) use setters;
+pub(crate) use options;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn values<T>(v: impl Values<T>) -> Vec<T> {
-        v.into_values()
+        v.into_values().unwrap()
     }
 
     #[test]
     fn one_value_or_several() {
-        let red = ColorSpec::from("red");
+        let red = ColorSpec::try_from("red").unwrap();
         assert_eq!(values::<ColorSpec>("red"), vec![red]);
         assert_eq!(values::<ColorSpec>(2), vec![ColorSpec::Index(2)]);
         assert_eq!(values::<ColorSpec>(["red", "blue"]).len(), 2);
@@ -392,7 +534,10 @@ mod tests {
         assert_eq!(values::<f64>(1.5), vec![1.5]);
         assert_eq!(values::<f64>(&[1.0, 2.0][..]), vec![1.0, 2.0]);
         assert_eq!(values::<i32>('.'), vec![46]);
-        assert_eq!(values::<LineType>([LineType::SOLID, 2.into()]).len(), 2);
+        assert_eq!(values::<LineType>([1, 2]).len(), 2);
+        // A value that doesn't convert is an error, not a panic.
+        assert!(Values::<ColorSpec>::into_values(["red", "notacolour"]).is_err());
+        assert!(Values::<LineType>::into_values(-1).is_err());
     }
 
     #[test]
@@ -403,7 +548,10 @@ mod tests {
         assert_eq!(ab.h, vec![1.0, 2.0]);
         assert_eq!(
             ab.col,
-            vec![ColorSpec::from("red"), ColorSpec::from("blue")]
+            vec![
+                ColorSpec::try_from("red").unwrap(),
+                ColorSpec::try_from("blue").unwrap()
+            ]
         );
         let xy = XyOptions::default().pch(&[1, 2]).lwd(&[Some(1.0), None]);
         assert_eq!(xy.pch, vec![Some(1), Some(2)]);
@@ -429,7 +577,10 @@ mod tests {
             .col([Some("red"), None]);
         assert_eq!(seg.lty, vec![None, Some(LineType::DASHED)]);
         assert_eq!(seg.lwd, vec![Some(2.0), None]);
-        assert_eq!(seg.col, vec![ColorSpec::from("red"), ColorSpec::None]);
+        assert_eq!(
+            seg.col,
+            vec![ColorSpec::try_from("red").unwrap(), ColorSpec::None]
+        );
         // `None` survives recycling; an empty vector gives the default.
         let v = [Some(1.0), None];
         assert_eq!(
@@ -437,6 +588,30 @@ mod tests {
             vec![Some(1.0), None, Some(1.0), None]
         );
         assert_eq!(pick_na(&[], 3, 9.0), Some(9.0));
+    }
+
+    #[test]
+    fn label_setters_take_one_label_or_several() {
+        use crate::device::AxisOptions;
+        use crate::highlevel::{BarplotOptions, BoxplotOptions, PieOptions};
+        use crate::plotmath::Label;
+
+        let a = Label::from("A");
+        let bars = BarplotOptions::default()
+            .names("A")
+            .legend_text(String::from("A"));
+        assert_eq!(bars.names, Some(vec![a.clone()]));
+        assert_eq!(bars.legend_text, Some(vec![a.clone()]));
+        let names = vec!["A".to_string(), "B".to_string()];
+        let boxes = BoxplotOptions::default().names(&names);
+        assert_eq!(boxes.names, Some(vec![a.clone(), Label::from("B")]));
+        let pie = PieOptions::default().labels(Label::math("x^2"));
+        assert_eq!(pie.labels, Some(vec![Label::math("x^2")]));
+        // Axis labels may hold R's `NA`.
+        let axis = AxisOptions::default().labels("A");
+        assert_eq!(axis.labels, Some(vec![Some(a.clone())]));
+        let axis = AxisOptions::default().labels([Some("A"), None]);
+        assert_eq!(axis.labels, Some(vec![Some(a), None]));
     }
 
     #[test]
@@ -452,7 +627,10 @@ mod tests {
         assert_eq!(xy.pch, vec![Some(46)]);
         assert_eq!(
             xy.col,
-            vec![ColorSpec::from("red"), ColorSpec::from("blue")]
+            vec![
+                ColorSpec::try_from("red").unwrap(),
+                ColorSpec::try_from("blue").unwrap()
+            ]
         );
         assert_eq!(xy.lty, Some(LineType::DASHED));
 
@@ -480,7 +658,7 @@ mod tests {
 
         let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
         assert_eq!(bars.names, Some(vec![Label::from("a"), Label::from("b")]));
-        assert_eq!(bars.col, vec![ColorSpec::from("grey")]);
+        assert_eq!(bars.col, vec![ColorSpec::try_from("grey").unwrap()]);
 
         assert_eq!(TextOptions::default().srt(45.0).srt, Some(45.0));
     }
@@ -585,14 +763,33 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "\"z\" is not a valid plot type")]
-    fn invalid_r_string_panics() {
-        let _ = crate::device::XyOptions::default().type_("z");
-    }
-
-    #[test]
-    #[should_panic(expected = "\"0x\" is not a valid line type")]
-    fn invalid_lty_string_panics() {
-        let _ = crate::device::XyOptions::default().lty("0x");
+    fn invalid_values_are_kept_not_panicked_on() {
+        use crate::device::{AxisOptions, XyOptions};
+        let xy = XyOptions::default().type_("z").lty("0x");
+        // The first error is kept; the fields keep their defaults.
+        let e = xy.deferred_error.clone().unwrap();
+        assert!(
+            e.message().starts_with("\"z\" is not a valid plot type"),
+            "{e}"
+        );
+        assert_eq!((xy.type_, xy.lty), (None, None));
+        let e = XyOptions::default().lty("0x").deferred_error.unwrap();
+        assert!(
+            e.message().starts_with("\"0x\" is not a valid line type"),
+            "{e}"
+        );
+        let e = XyOptions::default()
+            .col(["red", "notacolour"])
+            .deferred_error
+            .unwrap();
+        assert_eq!(e.message(), "invalid color name 'notacolour'");
+        let e = AxisOptions::default().font(9).deferred_error.unwrap();
+        assert!(e.message().starts_with("invalid font 9"), "{e}");
+        let e = crate::device::LegendOptions::default()
+            .ncol(-1)
+            .deferred_error
+            .unwrap();
+        assert_eq!(e.message(), "'ncol' must be a count, not -1");
+        assert!(XyOptions::default().lty("dashed").deferred_error.is_none());
     }
 }

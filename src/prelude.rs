@@ -15,7 +15,9 @@
 //! The device, the `Graphics` trait (R's graphics functions) and their
 //! options types, recorded `Figure`s, `par()`, points and rectangles in
 //! device inches, colours, line types, labels, layouts, the high-level
-//! plots' options and results, and the backends.
+//! plots' options and results, the backends, and [`ErrorKind`] (the
+//! error type itself is [`rs_graphics::Error`](crate::Error), kept out of
+//! the glob import so it doesn't clash with other `Error`s).
 
 pub use crate::backend::pdf::PdfBackend;
 pub use crate::backend::raster::RasterBackend;
@@ -26,8 +28,9 @@ pub use crate::device::{
     AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, DeviceBuilder,
     LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos, MtextOptions,
     PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
-    TitleOptions, XyOptions,
+    StrUnits, TitleOptions, Units, XyOptions,
 };
+pub use crate::error::ErrorKind;
 pub use crate::font::FontFace;
 pub use crate::geometry::{Point, Rect};
 pub use crate::graphics::Graphics;
@@ -35,9 +38,9 @@ pub use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistBreaks, HistLabels, HistOptions,
     HistResult, OrderH, PieOptions, PlotOptions, PlotType, boxplot_stats,
 };
-pub use crate::layout::{Layout, LayoutSize};
+pub use crate::layout::{LayoutRespect, LayoutSize};
 pub use crate::lty::LineType;
 pub use crate::numbers::{Groups, Numbers, Pair};
 pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};
-pub use crate::plotmath::{Expression, Label, Labels};
+pub use crate::plotmath::{Expression, Label, LabelValues, Labels};
 pub use crate::recording::{Figure, FigureResult};

@@ -421,16 +421,27 @@ fn legend_shorthand_draws_the_same() {
     assert_eq!(draw(true, true), long, "in a figure");
 }
 
-/// `par` comes back after `add_figure` even when a recorded call panics
-/// (here `abline()` with a non-finite `a`) and the panic is caught.
+/// `par` comes back after `add_figure` even when a recorded call fails
+/// (here `points()` with a negative colour number, an error R finds only
+/// when drawing): returned by `try_add_figure`, or a caught panic from
+/// `add_figure`.
 #[test]
-fn add_figure_restores_par_after_a_panic() {
+fn add_figure_restores_par_after_an_error() {
     let mut fig = Figure::new();
     fig.par().cex(2).las(1).draw();
     fig.plot().x([1, 2]).y([1, 2]).draw();
-    fig.abline().a(f64::NAN).b(1).draw();
+    fig.points().x(1).y(1).col(-1).draw();
+    fig.abline().h(1.5).draw();
+
     let mut dev = device(Format::Pdf);
     let before = format!("{:?}", dev.current_par());
+    let e = dev.try_add_figure(&fig).unwrap_err();
+    assert_eq!(
+        e.to_string(),
+        "points(): numerical color values must be >= 0, found -1"
+    );
+    assert_eq!(format!("{:?}", dev.current_par()), before);
+
     let hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

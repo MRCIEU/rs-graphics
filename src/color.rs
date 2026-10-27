@@ -6,47 +6,105 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Color parsing and the R color model.
+//! Colours: RGBA values ([`Color`]), colour arguments ([`ColorSpec`]),
+//! the default palette and grey ramps.
 //!
-//! R identifies colors via strings (`"red"`, `"#FF0000"`, `"#FF000080"`),
-//! small integers that index the current palette ([`ColorSpec::Index`];
-//! R's default is [`DEFAULT_PALETTE`]), or `NA`
-//! (meaning "don't draw"). This module mirrors that model closely enough
-//! that [`Color::parse`] accepts the same strings R's `col2rgb()`/graphics
-//! code would accept, except numeric strings such as `"2"` (R's palette
-//! indices; use [`ColorSpec::Index`]).
+//! A colour argument is a string (`"red"`, `"#FF0000"`, `"#FF000080"`), a
+//! small integer indexing the current palette ([`ColorSpec::Index`]; the
+//! default palette is [`DEFAULT_PALETTE`]), or nothing (`None`, R's
+//! `NA`: don't draw). [`Color::parse`] accepts the strings R's
+//! `col2rgb()` and graphics functions accept, except numeric strings such
+//! as `"2"` (R's palette indices; use [`ColorSpec::Index`]).
 
 use crate::named_colors::NAMED_COLORS;
 
-/// An RGBA color, 8 bits per channel - the same representation R uses
-/// internally (`rcolor` is a packed `AABBGGRR` `u32`).
+/// An RGBA colour with 8 bits per channel.
+///
+/// This is the same representation R uses internally (a packed
+/// `AABBGGRR` `u32`). Alpha 255 is opaque, 0 fully transparent. A
+/// `Color` converts into a [`ColorSpec`], so it can be passed wherever a
+/// colour argument is taken; so can a string, via [`Color::parse`]
+/// (`TryFrom<&str>`; an invalid string is an error of the call, as R
+/// errors).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let c = Color::parse("steelblue").unwrap();
+/// assert_eq!(c, Color::rgb(0x46, 0x82, 0xB4));
+/// assert_eq!(c.with_alpha(128).to_hex(), "#4682b480");
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Color {
+    /// Red, 0-255.
     pub r: u8,
+    /// Green, 0-255.
     pub g: u8,
+    /// Blue, 0-255.
     pub b: u8,
+    /// Alpha (opacity), 0 (transparent) to 255 (opaque).
     pub a: u8,
 }
 
 impl Color {
+    /// An opaque colour from its red, green and blue channels.
+    ///
+    /// This is R's `rgb(r, g, b, maxColorValue = 255)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Color::rgb(255, 0, 0).to_hex(), "#ff0000");
+    /// ```
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Color { r, g, b, a: 255 }
     }
 
+    /// A colour from its red, green, blue and alpha channels.
+    ///
+    /// This is R's `rgb(r, g, b, alpha, maxColorValue = 255)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Color::rgba(255, 0, 0, 128).to_hex(), "#ff000080");
+    /// ```
     pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Color { r, g, b, a }
     }
 
+    /// Fully transparent black (alpha 0); nothing is drawn with it.
     pub const TRANSPARENT: Color = Color::rgba(0, 0, 0, 0);
+    /// Opaque black.
     pub const BLACK: Color = Color::rgb(0, 0, 0);
+    /// Opaque white.
     pub const WHITE: Color = Color::rgb(255, 255, 255);
 
-    /// Parse a color specification the way R's graphics code would:
-    /// `"NA"`/empty => `None`; `"transparent"` => white with alpha 0 (R's
-    /// `#FFFFFF00`); `"#rgb"`, `"#rgba"`, `"#rrggbb"`,
-    /// `"#rrggbbaa"` hex forms; or one of R's 657 built-in named colors
-    /// (case-insensitive and ignoring spaces, as R's `StrMatch()`:
-    /// `"Light Blue"` is `"lightblue"`).
+    /// Parses a colour string, or returns `None` for `"NA"`, an empty
+    /// string or an unknown name.
+    ///
+    /// Accepted: the hex forms `"#rgb"`, `"#rgba"`, `"#rrggbb"` and
+    /// `"#rrggbbaa"`; `"transparent"`, which is white with alpha 0
+    /// (`#FFFFFF00`); and R's 657 built-in colour names, matched ignoring
+    /// case and spaces (`"Light Blue"` is `"lightblue"`). Surrounding
+    /// whitespace is ignored. Numeric strings such as `"2"` are not palette
+    /// indices here; use [`ColorSpec::Index`].
+    ///
+    /// This is how R's `col2rgb()` and graphics functions read colour
+    /// strings.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Color::parse("#f00"), Some(Color::rgb(255, 0, 0)));
+    /// assert_eq!(Color::parse("Dark Red"), Some(Color::rgb(139, 0, 0)));
+    /// assert_eq!(Color::parse("transparent"), Some(Color::rgba(255, 255, 255, 0)));
+    /// assert_eq!(Color::parse("NA"), None);
+    /// ```
     pub fn parse(spec: &str) -> Option<Color> {
         let s = spec.trim();
         if s.is_empty() || s.eq_ignore_ascii_case("NA") {
@@ -107,7 +165,16 @@ impl Color {
         }
     }
 
-    /// Render as `#rrggbb` (or `#rrggbbaa` if not fully opaque).
+    /// The colour as a lower-case hex string: `#rrggbb`, or `#rrggbbaa`
+    /// when not fully opaque.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Color::rgb(70, 130, 180).to_hex(), "#4682b4");
+    /// assert_eq!(Color::rgba(0, 0, 0, 0x80).to_hex(), "#00000080");
+    /// ```
     pub fn to_hex(self) -> String {
         if self.a == 255 {
             format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
@@ -116,14 +183,34 @@ impl Color {
         }
     }
 
+    /// The same colour with its alpha (opacity) replaced by `a`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Color::BLACK.with_alpha(0x80), Color::rgba(0, 0, 0, 0x80));
+    /// ```
     pub fn with_alpha(self, a: u8) -> Color {
         Color { a, ..self }
     }
 }
 
-/// R's default `palette()` since R 4.0.0 (the "R4" palette). `col = 1` is
-/// the first entry (black), `col = 2` the second, etc. - R's small-integer
-/// colors are 1-indexed.
+/// The default palette: the eight colours that `col = 1` to `col = 8`
+/// stand for.
+///
+/// Palette indices are 1-based: `col = 1` is the first entry (black),
+/// `col = 2` the second, and so on (see [`ColorSpec::Index`]).
+///
+/// This is R's default `palette()` since R 4.0.0 (the "R4" palette).
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::color::DEFAULT_PALETTE;
+/// # use rs_graphics::prelude::*;
+/// assert_eq!(ColorSpec::Index(2).resolve(&DEFAULT_PALETTE), Some(DEFAULT_PALETTE[1]));
+/// ```
 pub const DEFAULT_PALETTE: [Color; 8] = [
     Color::rgb(0x00, 0x00, 0x00), // black
     Color::rgb(0xDF, 0x53, 0x6B), // red-ish
@@ -135,24 +222,59 @@ pub const DEFAULT_PALETTE: [Color; 8] = [
     Color::rgb(0x9E, 0x9E, 0x9E), // gray
 ];
 
-/// A resolvable color specification: either an explicit color, a palette
-/// index (R's small-integer colors, 1-based; indices above the palette
-/// length recycle as in R, and a negative one panics when resolved, as R
-/// errors), or "no color" (R's `NA`).
+/// A colour argument: an explicit colour, a palette index, or no colour.
+///
+/// Every `col`/`bg`/`border`-style argument takes one. It converts from a
+/// [`Color`] or a palette index (`i32`), from an `Option` of either
+/// (`None` is [`ColorSpec::None`]), and, with `TryFrom`, from a colour
+/// string (as [`Color::parse`]; a whole number is a palette index, `"NA"`
+/// is [`ColorSpec::None`], anything else an error) or an `Option` of one.
+/// So recycled colour vectors can mix colours and `NA`s:
+/// `.col([Some("red"), None])`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!(ColorSpec::try_from("red").unwrap(), ColorSpec::Color(Color::rgb(255, 0, 0)));
+/// assert_eq!(ColorSpec::from(2), ColorSpec::Index(2));
+/// assert_eq!(ColorSpec::try_from(None::<&str>).unwrap(), ColorSpec::None);
+/// assert!(ColorSpec::try_from("notacolour").is_err());
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ColorSpec {
+    /// No colour: nothing is drawn. R's `NA`.
     None,
+    /// An explicit colour.
     Color(Color),
+    /// An index into the current palette, 1-based (R's small-integer
+    /// colours). Indices above the palette length recycle, as in R; 0 is
+    /// the background colour; a negative index is R's error when drawn
+    /// (and [`resolve`](ColorSpec::resolve) panics on it).
     Index(i32),
 }
 
 impl ColorSpec {
-    /// The colour to draw with, or `None` for nothing: `NA`, index 0, and
-    /// fully transparent colours (R's devices skip those). Index 0 is the
-    /// background colour in R, which this doesn't know; use
+    /// The colour to draw with, or `None` for nothing.
+    ///
+    /// Nothing is drawn for [`ColorSpec::None`], index 0, and fully
+    /// transparent colours (R's devices skip those), nor for an index into
+    /// an empty palette. Index 0 is the background colour in R, which this
+    /// doesn't know; use
     /// [`Par::resolve_color`](crate::par::Par::resolve_color) for that.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::color::DEFAULT_PALETTE;
+    /// # use rs_graphics::prelude::*;
+    /// // Index 9 recycles to the first palette entry.
+    /// assert_eq!(ColorSpec::Index(9).resolve(&DEFAULT_PALETTE), Some(Color::BLACK));
+    /// assert_eq!(ColorSpec::try_from("#FF000000").unwrap().resolve(&DEFAULT_PALETTE), None);
+    /// ```
+    ///
     /// # Panics
+    ///
     /// For a negative index (R: "numerical color values must be >= 0").
     pub fn resolve(self, palette: &[Color]) -> Option<Color> {
         let c = match self {
@@ -187,27 +309,49 @@ impl From<i32> for ColorSpec {
     }
 }
 
-impl From<&str> for ColorSpec {
-    fn from(s: &str) -> Self {
-        match Color::parse(s) {
-            Some(c) => ColorSpec::Color(c),
-            None => ColorSpec::None,
+/// R's error for a colour string that isn't a colour.
+fn invalid_color(s: &str) -> crate::error::Error {
+    crate::error::Error::invalid(format!("invalid color name '{s}'"))
+}
+
+impl TryFrom<&str> for ColorSpec {
+    type Error = crate::error::Error;
+
+    /// A colour name or hex string, as [`Color::parse`]; a whole number is
+    /// a palette index (`"2"`, as R); `"NA"` (any case) gives
+    /// `ColorSpec::None` (draw nothing), as R's `NA`.
+    ///
+    /// # Errors
+    ///
+    /// If `s` is none of these (R: "invalid color name").
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        if s.trim().eq_ignore_ascii_case("na") {
+            return Ok(ColorSpec::None);
         }
+        if let Ok(i) = s.trim().parse::<i32>() {
+            return Ok(ColorSpec::Index(i));
+        }
+        Color::parse(s)
+            .map(ColorSpec::Color)
+            .ok_or_else(|| invalid_color(s))
     }
 }
 
-impl From<String> for ColorSpec {
-    /// As `From<&str>`: a colour name or hex string; unparseable input
-    /// gives `ColorSpec::None` (draw nothing).
-    fn from(s: String) -> Self {
-        ColorSpec::from(s.as_str())
+impl TryFrom<String> for ColorSpec {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        ColorSpec::try_from(s.as_str())
     }
 }
 
-impl From<&String> for ColorSpec {
-    /// As `From<&str>`.
-    fn from(s: &String) -> Self {
-        ColorSpec::from(s.as_str())
+impl TryFrom<&String> for ColorSpec {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: &String) -> Result<Self, Self::Error> {
+        ColorSpec::try_from(s.as_str())
     }
 }
 
@@ -224,16 +368,72 @@ macro_rules! from_option {
         )*
     };
 }
-from_option!(Color, ColorSpec, i32, &str, String, &String);
+from_option!(Color, ColorSpec, i32);
+
+/// As [`from_option`], for strings, which may not be colours.
+macro_rules! try_from_option {
+    ($($t:ty),*) => {
+        $(
+            impl TryFrom<Option<$t>> for ColorSpec {
+                type Error = crate::error::Error;
+
+                fn try_from(c: Option<$t>) -> Result<Self, Self::Error> {
+                    c.map_or(Ok(ColorSpec::None), ColorSpec::try_from)
+                }
+            }
+        )*
+    };
+}
+try_from_option!(&str, String, &String);
 
 crate::error::from_str_via_parse!(Color, "colour");
-crate::error::from_r_string!(
-    Color,
-    "colour",
-    "a colour name, \"#RRGGBB\", \"#RRGGBBAA\" or \"transparent\""
-);
 
-/// R's `gray.colors(n)` (`start = 0.3`, `end = 0.9`, `gamma = 2.2`).
+impl TryFrom<&str> for Color {
+    type Error = crate::error::Error;
+
+    /// A colour name or hex string, as [`Color::parse`].
+    ///
+    /// # Errors
+    ///
+    /// If `s` isn't one (R: "invalid color name").
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Color::parse(s).ok_or_else(|| invalid_color(s))
+    }
+}
+
+impl TryFrom<String> for Color {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Color::try_from(s.as_str())
+    }
+}
+
+impl TryFrom<&String> for Color {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: &String) -> Result<Self, Self::Error> {
+        Color::try_from(s.as_str())
+    }
+}
+
+/// `n` grey levels from dark (0.3) to light (0.9), gamma-corrected (2.2).
+///
+/// These are the default colours of a matrix `barplot()`.
+///
+/// This is R's `gray.colors(n)` (`start = 0.3`, `end = 0.9`, `gamma =
+/// 2.2`).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let greys = gray_colors(3);
+/// assert_eq!(greys[0], ColorSpec::Color(Color::parse("#4D4D4D").unwrap()));
+/// assert_eq!(greys[2], ColorSpec::Color(Color::parse("#E6E6E6").unwrap()));
+/// ```
 pub fn gray_colors(n: usize) -> Vec<ColorSpec> {
     let (gamma, a, b) = (2.2_f64, 0.3_f64.powf(2.2), 0.9_f64.powf(2.2));
     (0..n)
@@ -281,13 +481,14 @@ mod tests {
         // Neither draws anything.
         for spec in ["NA", "transparent", "#FF000000"] {
             assert_eq!(
-                ColorSpec::from(spec).resolve(&DEFAULT_PALETTE),
+                ColorSpec::try_from(spec).unwrap().resolve(&DEFAULT_PALETTE),
                 None,
                 "{spec}"
             );
         }
         assert!(
-            ColorSpec::from("#FF000001")
+            ColorSpec::try_from("#FF000001")
+                .unwrap()
                 .resolve(&DEFAULT_PALETTE)
                 .is_some()
         );
@@ -305,8 +506,14 @@ mod tests {
         assert!("notacolour".parse::<Color>().is_err());
         let name = String::from("blue");
         let blue = ColorSpec::Color(Color::rgb(0, 0, 255));
-        assert_eq!(ColorSpec::from(&name), blue);
-        assert_eq!(ColorSpec::from(name), blue);
+        assert_eq!(ColorSpec::try_from(&name), Ok(blue));
+        assert_eq!(ColorSpec::try_from(name), Ok(blue));
+        // A whole number is a palette index, as R's `col = "2"`.
+        assert_eq!(ColorSpec::try_from("2"), Ok(ColorSpec::Index(2)));
+        assert_eq!(ColorSpec::try_from("NA"), Ok(ColorSpec::None));
+        let e = ColorSpec::try_from("notacolour").unwrap_err();
+        assert_eq!(e.message(), "invalid color name 'notacolour'");
+        assert_eq!(Color::try_from("notacolour"), Err(e));
     }
 
     #[test]

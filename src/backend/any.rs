@@ -18,17 +18,31 @@ use super::{Backend, Stroke, TextStyle};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 
-/// An output format.
+/// An output format: PDF, SVG or PNG.
+///
+/// Strings work too (`"pdf"`, `"svg"`, `"png"`, ignoring case), so
+/// `Device::format("png", file)` works.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Format {
+    /// PDF, a vector format.
     Pdf,
+    /// SVG, a vector format for the web.
     Svg,
+    /// PNG, a raster (pixel) format.
     Png,
 }
 
 impl Format {
-    /// The format named `"pdf"`, `"svg"` or `"png"`, ignoring case;
-    /// `None` for anything else.
+    /// Reads `"pdf"`, `"svg"` or `"png"`, ignoring case; `None` for anything
+    /// else.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(Format::parse("PNG"), Some(Format::Png));
+    /// assert_eq!(Format::parse("jpeg"), None);
+    /// ```
     pub fn parse(name: &str) -> Option<Format> {
         match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
@@ -42,25 +56,48 @@ impl Format {
 crate::error::from_str_via_parse!(Format, "output format");
 crate::error::from_r_string!(Format, "output format", "\"pdf\", \"svg\" or \"png\"");
 
-/// A [`PdfBackend`], [`SvgBackend`] or [`RasterBackend`] (PNG) behind one
-/// type. Every [`Backend`] method is forwarded, so output is byte for
-/// byte that of the wrapped backend. R's device options (size, `bg`,
-/// `res`, `compress`) are set when opening a device with
+/// A PDF, SVG or PNG backend behind one type, for a format chosen at run
+/// time.
+///
+/// Every [`Backend`] method is forwarded, so the output is byte for byte
+/// that of the wrapped backend. Devices opened with
 /// [`Device::format`](crate::device::Device::format) or
-/// [`Device::pdf`](crate::device::Device::pdf) & co. For others (PNG
-/// threads, ...), build the backend, convert it with `AnyBackend::from`,
-/// and wrap it with [`Device::new`](crate::device::Device::new), which
-/// has no file: take its output with
-/// [`Device::finish`](crate::device::Device::finish).
+/// [`Device::pdf`](crate::device::Device::pdf) & co. use it. For options
+/// those don't cover (PNG threads, ...), build the backend, convert it
+/// with `AnyBackend::from` and pass it to
+/// [`Device::new`](crate::device::Device::new).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let png = RasterBackend::new(5, 5, 150, Color::WHITE).with_threads(2);
+/// let mut dev = Device::new(AnyBackend::from(png), Par::default());
+/// dev.plot().x([1, 2, 3]).draw();
+/// let bytes = dev.finish();
+/// ```
 pub enum AnyBackend {
+    /// A PDF backend.
     Pdf(PdfBackend),
+    /// An SVG backend.
     Svg(SvgBackend),
+    /// A PNG backend.
     Png(RasterBackend),
 }
 
 impl AnyBackend {
-    /// A `width_in` x `height_in` inch page in `format`. `dpi` is used
-    /// only for PNG, which gets a white background (R's `png()` default).
+    /// Creates a backend for a `width_in` x `height_in` inch page in `format`.
+    ///
+    /// `dpi` is used only for PNG, which gets a white background (R's `png()`
+    /// default).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let backend = AnyBackend::new(Format::Svg, 6, 4, 72);
+    /// assert_eq!(backend.format(), Format::Svg);
+    /// ```
     pub fn new(
         format: Format,
         width_in: impl Into<f64>,
@@ -77,7 +114,7 @@ impl AnyBackend {
         }
     }
 
-    /// The wrapped backend's format.
+    /// Returns the wrapped backend's format.
     pub fn format(&self) -> Format {
         match self {
             AnyBackend::Pdf(_) => Format::Pdf,

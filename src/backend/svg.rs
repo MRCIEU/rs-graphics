@@ -30,6 +30,23 @@ use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
 
+/// A backend writing SVG, with real `<text>` elements that the viewer
+/// renders in its own fonts.
+///
+/// It holds one page: a new page discards the previous one (use a page
+/// number in the file name to keep one file per page). Consecutive shapes
+/// of the same style share one group, which keeps big scatter plots small.
+/// See the [module docs](self).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let mut dev = Device::new(SvgBackend::new(6, 4), Par::default());
+/// dev.plot().x([1, 2, 3]).draw();
+/// let svg = String::from_utf8(dev.finish()).unwrap();
+/// assert!(svg.contains("<svg"));
+/// ```
 pub struct SvgBackend {
     width_in: f64,
     height_in: f64,
@@ -48,6 +65,7 @@ pub struct SvgBackend {
 }
 
 impl SvgBackend {
+    /// Creates an SVG backend for a `width_in` x `height_in` inch page.
     pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
         let (width_in, height_in) = (width_in.into(), height_in.into());
         SvgBackend {
@@ -122,16 +140,19 @@ impl SvgBackend {
         self.height_in * 72.0
     }
 
-    /// The SVG document, gzip-compressed as for a `.svgz` file: several
-    /// times smaller (about 4-6x for big scatter plots) and compressed on
-    /// all cores. Inkscape, Illustrator and the like open `.svgz` files, but
-    /// browsers only display them when served with `Content-Encoding: gzip`,
-    /// so [`SvgBackend::finish`]'s plain SVG is the default.
+    /// Finishes the SVG document and returns it gzip-compressed, as for a
+    /// `.svgz` file.
+    ///
+    /// That's several times smaller (about 4-6 times for big scatter plots)
+    /// and compressed on all cores. Inkscape, Illustrator and the like open
+    /// `.svgz` files, but browsers only display them when served with
+    /// `Content-Encoding: gzip`, so [`SvgBackend::finish`]'s plain SVG is the
+    /// default.
     pub fn finish_svgz(self) -> Vec<u8> {
         gzip_compress(self.finish().as_bytes(), DEFLATE_LEVEL)
     }
 
-    /// Full SVG document as a `String`.
+    /// Finishes the SVG document and returns it.
     pub fn finish(mut self) -> String {
         self.flush_shapes();
         let mut out = String::new();

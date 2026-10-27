@@ -140,7 +140,7 @@ fn cases() -> Vec<Case> {
                         untf: true,
                         col: vec![black],
                         lwd: vec![Some(1.0)],
-                        lty: vec![Some(LineType::from_code(2))],
+                        lty: vec![Some(LineType::from_code(2).unwrap())],
                         ..AblineOptions::default()
                     })
                     .draw();

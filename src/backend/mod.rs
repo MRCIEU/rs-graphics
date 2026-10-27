@@ -41,18 +41,33 @@ use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
 
-/// Cap style for strokes (`par(lend=)`).
+/// How the ends of a line are drawn: round, butt (flat at the end) or
+/// square (flat, extended by half the line width).
+///
+/// This is R's `par(lend = )`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineEnd {
+    /// Rounded ends (the default).
     Round,
+    /// Flat ends, at the end points.
     Butt,
+    /// Flat ends, extended by half the line width.
     Square,
 }
 
 impl LineEnd {
-    /// R's `par(lend=)` names `"round"`, `"butt"` and `"square"`, or their
-    /// numeric codes as strings `"0"`, `"1"`, `"2"` (which R accepts only
-    /// as numbers); `None` otherwise.
+    /// Reads `"round"`, `"butt"` or `"square"`, or their numeric codes as
+    /// strings `"0"`, `"1"`, `"2"`; `None` for anything else.
+    ///
+    /// These are R's `lend` names; R accepts the codes only as numbers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineEnd::parse("butt"), Some(LineEnd::Butt));
+    /// assert_eq!(LineEnd::parse("flat"), None);
+    /// ```
     pub fn parse(spec: &str) -> Option<LineEnd> {
         match spec {
             "round" | "0" => Some(LineEnd::Round),
@@ -66,18 +81,32 @@ impl LineEnd {
 crate::error::from_str_via_parse!(LineEnd, "line end");
 crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"square\"");
 
-/// Join style for strokes (`par(ljoin=)`).
+/// How the corners of a line are drawn: round, mitred (pointed) or
+/// bevelled (cut off).
+///
+/// This is R's `par(ljoin = )`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineJoin {
+    /// Rounded corners (the default).
     Round,
+    /// Pointed corners, bevelled where longer than the mitre limit.
     Mitre,
+    /// Corners cut off.
     Bevel,
 }
 
 impl LineJoin {
-    /// R's `par(ljoin=)` names `"round"`, `"mitre"` and `"bevel"`, or
-    /// their numeric codes as strings `"0"`, `"1"`, `"2"` (which R accepts
-    /// only as numbers); `None` otherwise.
+    /// Reads `"round"`, `"mitre"` or `"bevel"`, or their numeric codes as
+    /// strings `"0"`, `"1"`, `"2"`; `None` for anything else.
+    ///
+    /// These are R's `ljoin` names; R accepts the codes only as numbers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineJoin::parse("mitre"), Some(LineJoin::Mitre));
+    /// ```
     pub fn parse(spec: &str) -> Option<LineJoin> {
         match spec {
             "round" | "0" => Some(LineJoin::Round),
@@ -91,21 +120,37 @@ impl LineJoin {
 crate::error::from_str_via_parse!(LineJoin, "line join");
 crate::error::from_r_string!(LineJoin, "line join", "\"round\", \"mitre\" or \"bevel\"");
 
-/// Everything needed to stroke a path, mirroring R's graphics context
-/// (`R_GE_gcontext`) stroke-relevant fields.
+/// Everything a [`Backend`] needs to draw a line: colour, width, line type,
+/// ends, corners and mitre limit.
 #[derive(Clone, Debug)]
 pub struct Stroke {
+    /// Line colour.
     pub color: Color,
-    /// R's `lwd`, in R's native line-width units (`1 lwd == 0.75 pt`, see
-    /// `PostScriptSetLineWidth`/`PDF_SetLineStyle` in `devPS.c`).
+    /// Line width in R's units: 1 is 1/96 inch, 0.75 points (see
+    /// [`width_pt`](Stroke::width_pt)).
     pub lwd: f64,
+    /// Line type: solid, dashed, ....
     pub lty: LineType,
+    /// How the line ends are drawn.
     pub lend: LineEnd,
+    /// How the corners are drawn.
     pub ljoin: LineJoin,
+    /// Mitre limit for mitred corners (at least 1).
     pub lmitre: f64,
 }
 
 impl Stroke {
+    /// Creates a solid stroke of width `lwd` (R's units) with round ends and
+    /// corners and a mitre limit of 10: R's defaults.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// use rs_graphics::backend::Stroke;
+    /// let s = Stroke::simple(Color::BLACK, 2);
+    /// assert_eq!(s.width_pt(), 1.5);
+    /// ```
     pub fn simple(color: Color, lwd: impl Into<f64>) -> Self {
         Stroke {
             color,
@@ -117,7 +162,7 @@ impl Stroke {
         }
     }
 
-    /// Stroke width in points (`lwd * 0.75`, R's convention).
+    /// Returns the line width in points: `lwd * 0.75`, at least 0.01.
     pub fn width_pt(&self) -> f64 {
         (self.lwd * 0.75).max(0.01)
     }
@@ -127,17 +172,19 @@ impl Stroke {
 /// and Symbol (font 5).
 pub use crate::font::FontFace;
 
-/// Text-painting parameters. Note there is deliberately no
-/// horizontal/vertical justification field here: the `crate::device`
-/// layer always resolves R's `adj`/`hadj`/`vadj`/`pos` justification
-/// itself (using `crate::afm` metrics, the same tables used for layout
-/// everywhere else) and passes [`Backend::draw_text`] the already-
-/// resolved baseline-left origin. That keeps *all* text-layout math
-/// backend-independent; a `Backend` only ever paints a left-anchored,
-/// baseline-anchored run of text, optionally rotated about that anchor.
+/// How a [`Backend`] paints a run of text: colour, font face, size and
+/// rotation.
+///
+/// There is deliberately no justification here: the device works out where
+/// each string starts, using the same font metrics for every backend, and
+/// passes [`Backend::draw_text`] the left end of its baseline. A backend
+/// only paints a run of text from that point, optionally rotated about it,
+/// which keeps text placement identical across PDF, SVG and PNG.
 #[derive(Clone, Debug)]
 pub struct TextStyle {
+    /// Text colour.
     pub color: Color,
+    /// Font face: plain, bold, italic, bold italic or Symbol.
     pub face: FontFace,
     /// Point size to paint at: `par(ps) * cex` after
     /// [`Backend::effective_font_size`] (so whole points on PDF).
@@ -148,6 +195,16 @@ pub struct TextStyle {
 }
 
 impl TextStyle {
+    /// Creates an unrotated text style.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// use rs_graphics::backend::TextStyle;
+    /// let style = TextStyle::new(Color::BLACK, FontFace::Bold, 12);
+    /// assert_eq!(style.rotation_deg, 0.0);
+    /// ```
     pub fn new(color: Color, face: FontFace, size_pt: impl Into<f64>) -> Self {
         let size_pt = size_pt.into();
         TextStyle {
@@ -159,23 +216,51 @@ impl TextStyle {
     }
 }
 
-/// A minimal 2D vector drawing surface, in inches with a bottom-left
-/// origin. See the module docs for the coordinate convention.
+/// A drawing surface for a [`Device`](crate::device::Device): PDF, SVG or
+/// PNG output.
+///
+/// Coordinates are in inches from the page's bottom-left corner, y
+/// upwards (see the [module docs](self)). The crate's backends are
+/// [`PdfBackend`](pdf::PdfBackend), [`SvgBackend`](svg::SvgBackend),
+/// [`RasterBackend`](raster::RasterBackend) and [`AnyBackend`]; code that
+/// works with any of them takes a `B: Backend`.
+///
+/// # Examples
+///
+/// A function drawing on any device:
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// fn draw<B: Backend>(dev: &mut Device<B>) {
+///     dev.plot().x([1, 2, 3]).draw();
+/// }
+/// let mut pdf = Device::new(PdfBackend::new(5, 5), Par::default());
+/// draw(&mut pdf);
+/// let mut svg = Device::new(SvgBackend::new(5, 5), Par::default());
+/// draw(&mut svg);
+/// ```
 pub trait Backend {
-    /// Page/canvas size in inches.
+    /// Returns the page size in inches, `(width, height)`.
     fn size_inches(&self) -> (f64, f64);
 
-    /// Push a clip rectangle (intersected with any currently active
-    /// clip). Must be paired with [`Backend::pop_clip`].
+    /// Starts clipping drawing to `rect`, intersected with any clip already
+    /// active. Must be paired with [`Backend::pop_clip`].
     fn push_clip(&mut self, rect: Rect);
+    /// Ends the clip started by the last [`Backend::push_clip`].
     fn pop_clip(&mut self);
 
+    /// Draws a straight line from `p0` to `p1`.
     fn draw_line(&mut self, p0: Point, p1: Point, stroke: &Stroke);
+    /// Draws an open line through `points`, in order.
     fn draw_polyline(&mut self, points: &[Point], stroke: &Stroke);
-    /// Draw a closed polygon. `fill = None` means no fill; `stroke =
-    /// None` means no border.
+    /// Draws a closed polygon through `points`. `fill = None`: no fill;
+    /// `stroke = None`: no border.
     fn draw_polygon(&mut self, points: &[Point], fill: Option<Color>, stroke: Option<&Stroke>);
+    /// Draws a rectangle. `fill = None`: no fill; `stroke = None`: no
+    /// border.
     fn draw_rect(&mut self, rect: Rect, fill: Option<Color>, stroke: Option<&Stroke>);
+    /// Draws a circle of `radius` inches around `center`. `fill = None`: no
+    /// fill; `stroke = None`: no border.
     fn draw_circle(
         &mut self,
         center: Point,
@@ -184,53 +269,57 @@ pub trait Backend {
         stroke: Option<&Stroke>,
     );
 
-    /// Draw `text` with its baseline starting at `origin` (i.e. `origin`
-    /// is where the left edge of the first glyph sits on the text
-    /// baseline), then rotated `rotation_deg` counterclockwise about
-    /// `origin`. Callers (the `crate::device` layer) have already
-    /// resolved justification/`adj` using `crate::afm` metrics, so
-    /// backends only need to paint glyphs starting exactly here.
+    /// Paints `text` with the left end of its baseline at `origin`, rotated
+    /// by `style.rotation_deg` anticlockwise about `origin`.
+    ///
+    /// The device has already worked out justification, so a backend only
+    /// paints glyphs from this point.
     fn draw_text(&mut self, origin: Point, text: &str, style: &TextStyle);
 
-    /// Size of one device unit in inches (R's `pch = "."` is at least one
-    /// unit across). `1/72` for vector devices (R's `pdf()`/`svg()` use
-    /// big points); a pixel for raster devices.
+    /// Returns the size of one device unit in inches: 1/72 for PDF and SVG
+    /// (points), one pixel for PNG.
+    ///
+    /// A `pch = "."` symbol is at least one unit across, as in R.
     fn device_unit_inches(&self) -> f64;
 
-    /// The point size this device actually sets text at, given the size
-    /// R would request (`par(ps) * cex`). The `crate::device` layer routes
-    /// *every* text size through this - for both layout (string widths,
-    /// ascent/"M" height) and drawing - mirroring how R's own devices
-    /// apply their quirks inside `strWidth`/`metricInfo`/`text`.
+    /// Returns the point size this device actually sets text at, given the
+    /// requested size (`par(ps) * cex`).
     ///
-    /// The identity for R's cairo and Quartz devices (`svg()`, `png()`).
-    /// R's `pdf()`/`postscript()` devices round to a whole number of
-    /// points, see [`pdf::PdfBackend`].
+    /// The device sends every text size through this, for measuring as well
+    /// as drawing. It's the requested size for SVG and PNG, and rounded to a
+    /// whole number of points for PDF.
+    ///
+    /// R's `pdf()` device rounds this way; its cairo and Quartz devices
+    /// (`svg()`, `png()`) don't.
     fn effective_font_size(&self, requested_pt: f64) -> f64;
 
-    /// The device's background colour, which `par("bg")` starts as: white
-    /// (R's `svg()`), the canvas colour for [`raster::RasterBackend`]
-    /// (R's `png(bg = )`), or transparent for [`pdf::PdfBackend`] unless
-    /// set with its `with_background` (R's `pdf(bg = )`). New pages and
-    /// default `legend()` boxes are filled with `par("bg")`.
+    /// Returns the background colour `par(bg)` starts as: white for SVG, the
+    /// canvas colour for PNG, and transparent for PDF unless set with
+    /// [`with_background`](pdf::PdfBackend::with_background).
+    ///
+    /// New pages and default `legend()` boxes are filled with `par(bg)`.
     fn default_bg(&self) -> Color;
 
-    /// Start a new page. The PDF backend keeps the finished page and starts
-    /// another (one PDF page per R page); SVG and the raster backend, which
-    /// hold a single page, discard what was drawn (the raster canvas goes
-    /// back to its background colour).
+    /// Starts a new page.
+    ///
+    /// PDF keeps the finished page and starts another; SVG and PNG, which hold
+    /// one page, discard what was drawn (the PNG canvas goes back to its
+    /// background colour).
     fn new_page(&mut self);
 
-    /// The output so far as a finished file (what [`into_bytes`] would
-    /// give), leaving the backend as newly made with the same options:
-    /// how a device writes one file per page (R's `png("Rplot%03d.png")`).
+    /// Returns the output so far as a finished file (what [`into_bytes`]
+    /// would give), leaving the backend as newly made with the same options.
+    ///
+    /// This is how a device writes one file per page.
     ///
     /// [`into_bytes`]: Backend::into_bytes
     fn take_page(&mut self) -> Vec<u8>;
 
-    /// The finished file: PDF or PNG bytes, or the SVG document as UTF-8.
-    /// The same as each backend's own `finish()`, but available to code
-    /// generic over `B: Backend`.
+    /// Finishes the output and returns it: PDF or PNG bytes, or the SVG
+    /// document as UTF-8.
+    ///
+    /// The same as each backend's own `finish()`, for code generic over
+    /// `B: Backend`.
     fn into_bytes(self) -> Vec<u8>
     where
         Self: Sized;

@@ -68,7 +68,7 @@ fn draw_ours(c: &Case) -> String {
             ..XyOptions::default()
         })
         .draw();
-    let solid = LineType::from_code(1);
+    let solid = LineType::from_code(1).unwrap();
     d.rect()
         .xleft([0.1])
         .ybottom([0.1])

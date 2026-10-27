@@ -845,6 +845,24 @@ struct Prepainted {
     pixmap: Pixmap,
 }
 
+/// A backend drawing PNG images.
+///
+/// Text is laid out with the same Helvetica metrics as the other backends
+/// and drawn with the bundled Liberation Sans fonts, which have the same
+/// widths, so text sits where it does in PDF and SVG. Drawing is spread
+/// over all CPU cores by default (see
+/// [`with_threads`](RasterBackend::with_threads)). See the
+/// [module docs](self).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let png = RasterBackend::new(6, 4, 300, Color::WHITE);
+/// let mut dev = Device::new(png, Par::default());
+/// dev.plot().x([1, 2, 3]).draw();
+/// assert!(dev.finish().starts_with(b"\x89PNG"));
+/// ```
 pub struct RasterBackend {
     width_in: f64,
     height_in: f64,
@@ -869,9 +887,11 @@ pub struct RasterBackend {
 }
 
 impl RasterBackend {
-    /// `dpi` is pixels-per-inch (R's `png()` default is `72` for its
-    /// pixel-dimension convention, i.e. `width_px = width_in * 72` unless
-    /// `res=` is overridden; pass a higher `dpi` for sharper output).
+    /// Creates a PNG backend for a `width_in` x `height_in` inch image at
+    /// `dpi` pixels per inch, filled with `background`.
+    ///
+    /// A higher `dpi` gives a sharper image with more pixels; R's `png()`
+    /// default is 72.
     pub fn new(
         width_in: impl Into<f64>,
         height_in: impl Into<f64>,
@@ -906,11 +926,12 @@ impl RasterBackend {
         backend
     }
 
-    /// Paint with at most `threads` threads (default: the number of CPUs).
+    /// Sets the most threads to draw with; the default is the number of
+    /// CPUs.
+    ///
     /// With one thread the output is exactly that of drawing onto a single
-    /// canvas; with more, edge pixels of some shapes can differ from it by
-    /// up to a few dozen levels (see `PAD`), but not between thread counts
-    /// above one.
+    /// canvas. With more, edge pixels of some shapes can differ from that by up
+    /// to a few dozen levels, but not between thread counts above one.
     pub fn with_threads(mut self, threads: usize) -> Self {
         self.flush();
         let canvas = self.canvas();
@@ -1225,7 +1246,8 @@ impl RasterBackend {
         canvas
     }
 
-    /// Encode the current canvas as PNG bytes.
+    /// Finishes the image and returns it as PNG bytes, with its resolution
+    /// recorded in the file.
     pub fn finish(mut self) -> Vec<u8> {
         self.flush();
         let png = self.canvas().encode_png().expect("PNG encoding failed");

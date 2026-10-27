@@ -6,20 +6,25 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! `hist(x, ...)`, ported from `hist.default`/`plot.histogram` in
-//! `r-source/src/library/graphics/R/hist.R`, with every form of `breaks`
-//! (edges, a number of classes, the `"Sturges"`/`"Scott"`/`"FD"` rules, a
-//! function; see [`HistBreaks`]), `xlim`/`ylim`, R's binning with
-//! `right`/`include.lowest`/`fuzz`, `labels` and per-bar `col`/`border`/
-//! `lty`, shading lines (`density`/`angle`), and `plot = FALSE`. Not
-//! supported: `panel.first`.
+//! Histograms: the options of [`Graphics::hist`](crate::graphics::Graphics::hist),
+//! how its bins are chosen ([`HistBreaks`]), the labels above its bars
+//! ([`HistLabels`]) and the bins it returns ([`HistResult`]).
+//!
+//! Supported: every form of `breaks` (edges, a number of classes, the
+//! `"Sturges"`/`"Scott"`/`"FD"` rules, a function), `xlim`/`ylim`, R's
+//! binning with `right`/`include.lowest`/`fuzz`, `labels` and per-bar
+//! `col`/`border`/`lty`, shading lines (`density`/`angle`), and `plot =
+//! FALSE`. Not supported: `panel.first`.
+//!
+//! This is R's `hist(x, ...)`, ported from `hist.default`/`plot.histogram`
+//! in `r-source/src/library/graphics/R/hist.R`.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::device::{
     AxisOptions, Device, PlotWindowOptions, RectOptions, TextOptions, TitleOptions,
 };
-use crate::error::from_r_string;
+use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::Num;
@@ -136,7 +141,30 @@ fn nclass_fd(x: &[f64]) -> f64 {
 /// A function of the data giving edges or a number of classes.
 type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 
-/// R's `hist(breaks = )`.
+/// How a histogram's bins are chosen: a rule, a suggested number of
+/// classes, the bin edges, or a function of the data.
+///
+/// A rule or a number of classes `k` gives the edges `pretty(range(x), n =
+/// k, min.n = 1)`; edges are used as given (after sorting). Setters take
+/// a rule's name (`.breaks("FD")`, see [`HistBreaks::parse`]; an unknown
+/// name is an error of the call), a number (`.breaks(20)`) or several numbers as edges
+/// (`.breaks([0, 2, 5, 10])`; one value in an array, `Vec` or slice is a
+/// number of classes, as R's length rule).
+///
+/// This is R's `hist(breaks = )`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let x = [1, 2, 2, 3, 3, 3];
+/// let h = dev.hist().x(&x).breaks([0, 1, 2, 3]).draw();
+/// assert_eq!(h.counts, [1.0, 2.0, 3.0]);
+/// let h = dev.hist().x(&x).breaks(HistBreaks::Scott).draw();
+/// assert!(h.equidist);
+/// ```
 #[derive(Clone)]
 pub enum HistBreaks {
     /// `"Sturges"` (R's default): `ceiling(log2(n) + 1)` classes.
@@ -157,14 +185,45 @@ pub enum HistBreaks {
 }
 
 impl HistBreaks {
-    /// R's `breaks` as a function of the data: `.breaks(HistBreaks::function(|x| ..))`.
+    /// Bins chosen by a function of the finite data, which returns the
+    /// edges, or one value, a number of classes.
+    ///
+    /// This is R's `breaks = function(x) ...`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// // Edges at the data's minimum, middle and maximum.
+    /// let edges = HistBreaks::function(|x| {
+    ///     let lo = x.iter().copied().fold(f64::INFINITY, f64::min);
+    ///     let hi = x.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    ///     vec![lo, (lo + hi) / 2.0, hi]
+    /// });
+    /// let h = dev.hist().x(&[5, 2, 3, 1, 4]).breaks(edges).draw();
+    /// assert_eq!(h.breaks, [1.0, 3.0, 5.0]);
+    /// ```
     pub fn function(f: impl Fn(&[f64]) -> Vec<f64> + Send + Sync + 'static) -> Self {
         HistBreaks::Function(std::sync::Arc::new(f))
     }
 
-    /// A rule's name, as R's `match.arg(tolower(breaks), ..)`: `"Sturges"`,
-    /// `"Scott"`, `"FD"` or `"Freedman-Diaconis"` in any case, or a unique
-    /// prefix.
+    /// Reads a rule from its name: `"Sturges"`, `"Scott"`, `"FD"` or
+    /// `"Freedman-Diaconis"` in any case, or a unique prefix; `None` for
+    /// anything else.
+    ///
+    /// This is R's `match.arg(tolower(breaks), ..)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rs_graphics::prelude::*;
+    ///
+    /// assert!(matches!(HistBreaks::parse("fd"), Some(HistBreaks::FreedmanDiaconis)));
+    /// assert!(matches!(HistBreaks::parse("Sc"), Some(HistBreaks::Scott)));
+    /// assert!(HistBreaks::parse("F").is_none()); // "fd" or "freedman-diaconis"
+    /// ```
     pub fn parse(s: &str) -> Option<HistBreaks> {
         const ALL: [&str; 4] = ["sturges", "fd", "freedman-diaconis", "scott"];
         let s = s.to_lowercase();
@@ -251,7 +310,7 @@ impl<T: Num> From<&[T]> for HistBreaks {
 /// `include_lowest` (the first bin closed on the left, or with `right =
 /// false` the last closed on the right).
 ///
-/// # Panics
+/// # Errors
 /// If some values fall outside the edges (R: "some 'x' not counted; maybe
 /// 'breaks' do not span range of 'x'").
 fn bin_counts(
@@ -260,11 +319,11 @@ fn bin_counts(
     right: bool,
     include_lowest: bool,
     fuzz: f64,
-) -> Vec<f64> {
+) -> Result<Vec<f64>, Error> {
     let nb = breaks.len();
     let mut counts = vec![0.0; nb.saturating_sub(1)];
     if nb < 2 {
-        return counts;
+        return Ok(counts);
     }
     // `diddle <- fuzz * if (nB > 5) median(h) else if (nB <= 3)
     // diff(range(x)) else min(h[h > 0])`.
@@ -321,14 +380,32 @@ fn bin_counts(
             counted += 1;
         }
     }
-    assert!(
-        counted == data.len(),
-        "some 'x' not counted; maybe 'breaks' do not span range of 'x'"
-    );
-    counts
+    if counted != data.len() {
+        return Err(Error::invalid(
+            "some 'x' not counted; maybe 'breaks' do not span range of 'x'",
+        ));
+    }
+    Ok(counts)
 }
 
-/// R's `hist(labels = )`: what to write above each bar.
+/// What a histogram writes above each bar: nothing, each bar's count (or
+/// density), or given labels.
+///
+/// Setters take `true`/`false` ([`Values`](HistLabels::Values) / none) or
+/// an array or `Vec` of labels.
+///
+/// This is R's `hist(labels = )`.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let x = [1, 2, 2, 3, 3, 3];
+/// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(true).draw();
+/// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(["low", "mid", "high"]).draw();
+/// ```
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum HistLabels {
     /// Nothing (R's `labels = FALSE`, the default).
@@ -365,172 +442,132 @@ impl<L: Into<Label>> From<Vec<L>> for HistLabels {
     }
 }
 
-/// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
-/// and `plot.histogram`'s arguments this crate implements. Unset fields
-/// are R's defaults, given for each.
-#[derive(Clone, Debug)]
-pub struct HistOptions {
-    /// R's `breaks`: edges (`.breaks([0, 2, 5, 10])`, sorted as R does), a
-    /// suggested number of classes (`.breaks(20)`), a rule (`.breaks("FD")`,
-    /// `"Scott"`, `"Sturges"`) or a function of the data
-    /// ([`HistBreaks::function`]); a number of classes gives the edges
-    /// `pretty(range(x), n = classes, min.n = 1)`. `None`: `"Sturges"`, R's
-    /// default.
-    ///
-    /// # Panics
-    /// When drawn (or recorded), if a number of classes isn't finite or is
-    /// less than 1 (R: "invalid number of 'breaks'"); for an unknown rule
-    /// name, at the setter.
-    pub breaks: Option<HistBreaks>,
-    /// `true`: plot counts; `false`: plot densities (`count / (n * bin
-    /// width)`). `None`: counts if the bins are equally wide, as R.
-    pub freq: Option<bool>,
-    /// x axis limits (R's `xlim`); `None`: the range of the breaks.
-    pub xlim: Option<(f64, f64)>,
-    /// y axis limits (R's `ylim`); `None`: 0 to the tallest bar.
-    pub ylim: Option<(f64, f64)>,
-    /// Bar fills, recycled over the bars; empty: `"lightgray"` (R's
-    /// default).
-    pub col: Vec<ColorSpec>,
-    /// Bar borders, recycled; empty: `par(fg)`, or with shading the bar's
-    /// `col` (R's `border = NULL`).
-    pub border: Vec<ColorSpec>,
-    /// Bar border line types, recycled; empty: `par(lty)`.
-    /// `None` (R's `NA`): that bar has no border.
-    pub lty: Vec<Option<LineType>>,
-    /// Shading lines per inch in the bars (R's `density`), recycled per bar;
-    /// the lines take the bar's `col`; see [`RectOptions::density`]. Empty:
-    /// no shading.
-    pub density: Vec<Option<f64>>,
-    /// Angle of the shading lines in degrees (R's `angle`), recycled as
-    /// `density`; empty: 45.
-    pub angle: Vec<f64>,
-    /// R's `labels`: [`HistLabels::Values`] writes each bar's count (or,
-    /// with densities, its density to 3 decimals) above it, `Text` the
-    /// given labels; default none.
-    pub labels: HistLabels,
-    /// Bins are `(a, b]` (R's `right = TRUE`, the default), else `[a, b)`.
-    /// `None`: `true`.
-    pub right: Option<bool>,
-    /// The first bin is also closed on the left (the last on the right
-    /// when not `right`) (R's `include.lowest`); `None`: `true`. Always
-    /// `true` for computed breaks, as R (which warns).
-    pub include_lowest: Option<bool>,
-    /// How far, as a fraction of a typical bin width, values on an edge may
-    /// stray and still count as on it (R's `fuzz`); `None`: `1e-7`.
-    pub fuzz: Option<f64>,
-    /// Main title, as for `plot()` (text or a plotmath expression);
-    /// `None`: "Histogram of x".
-    pub main: Option<Label>,
-    /// x axis label; `None`: "x".
-    pub xlab: Option<Label>,
-    /// y axis label; `None`: "Frequency" or "Density".
-    pub ylab: Option<Label>,
-    /// Size of `main`, relative to `par(cex)` (R's `cex.main`, passed
-    /// to `title()`); `None`: `par(cex.main)`.
-    pub cex_main: Option<f64>,
-    /// Colour of `main` (R's `col.main`, passed to `title()`);
-    /// `None`: `par(col.main)`.
-    pub col_main: Option<ColorSpec>,
-    /// Font of `main` (a [`FontFace`]; R's
-    /// `font.main`, passed to `title()`); `None`: `par(font.main)`.
-    pub font_main: Option<FontFace>,
-    /// Size of `xlab` and `ylab`, relative to `par(cex)` (R's `cex.lab`, passed
-    /// to `title()`); `None`: `par(cex.lab)`.
-    pub cex_lab: Option<f64>,
-    /// Colour of `xlab` and `ylab` (R's `col.lab`, passed to `title()`);
-    /// `None`: `par(col.lab)`.
-    pub col_lab: Option<ColorSpec>,
-    /// Font of `xlab` and `ylab` (a [`FontFace`]; R's
-    /// `font.lab`, passed to `title()`); `None`: `par(font.lab)`.
-    pub font_lab: Option<FontFace>,
-    /// Draw the titles (R's `ann`, which defaults to `TRUE`, not
-    /// `par(ann)`); default `true`.
-    pub ann: bool,
-    /// Draw the axes; default `true`.
-    pub axes: bool,
-    /// Log x axis (R's `log = "x"`); default `false`.
-    pub xlog: bool,
-    /// Log y axis (R's `log = "y"`); default `false`. As in R, it still
-    /// takes its range from 0, which R "corrects" to about 1e-307 (with a
-    /// warning).
-    pub ylog: bool,
-    /// `add = TRUE`: draw the bars on the current plot, without a new
-    /// plot, window, title or axes (so `main`/`xlab`/`ylab`/`axes`/`xlog`/
-    /// `ylog` are ignored). Default `false`.
-    pub add: bool,
-    /// Axis label orientation (R's inline `las`, passed to `axis()`): 0
-    /// parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical;
-    /// `None`: `par(las)`.
-    pub las: Option<i32>,
-    /// Axis label size (R's inline `cex.axis`); `None`: `par(cex.axis)`.
-    pub cex_axis: Option<f64>,
-    /// Axis label colour (R's inline `col.axis`); `None`: `par(col.axis)`.
-    pub col_axis: Option<ColorSpec>,
-    /// Axis label font (R's inline `font.axis`); `None`: `par(font.axis)`.
-    pub font_axis: Option<FontFace>,
-    /// Margin lines of the axis titles, labels and line (R's inline `mgp`,
-    /// passed to `axis()` and `title()`); `None`: `par(mgp)`.
-    pub mgp: Option<[f64; 3]>,
-    /// Tick length as a fraction of the plot region (R's inline `tck`);
-    /// `None`: `par(tck)`.
-    pub tck: Option<f64>,
-    /// Tick length in margin lines (R's inline `tcl`); `None`: `par(tcl)`.
-    pub tcl: Option<f64>,
-    /// Minimum gap between axis labels (R's inline `gap.axis`); `None`:
-    /// R's default.
-    pub gap_axis: Option<f64>,
-    /// Width of the axes' line and ticks (R's inline `lwd`, which `hist()` passes
-    /// only to `axis()`); `None`: 1, `axis()`'s default.
-    pub lwd: Option<f64>,
-    /// `false` returns the bins without drawing (R's `plot = FALSE`);
-    /// `None`: `true`.
-    pub plot: Option<bool>,
+crate::setters::options! {
+    /// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
+    /// and `plot.histogram`'s arguments this crate implements. Unset fields
+    /// are R's defaults, given for each.
+    #[derive(Clone, Debug)]
+    pub struct HistOptions => [HistCall] {
+        /// How to choose the bins: edges (`.breaks([0, 2, 5, 10])`, sorted
+        /// as R does), a suggested number of classes (`.breaks(20)`, giving
+        /// the edges `pretty(range(x), n = classes, min.n = 1)`), a rule
+        /// (`.breaks("FD")`, `"Scott"`, `"Sturges"`) or a function of the
+        /// data ([`HistBreaks::function`]). `None`: `"Sturges"`, R's
+        /// default. A number of classes that isn't finite or is less than 1
+        /// (R: "invalid number of 'breaks'") or an unknown rule name is an
+        /// error of the call.
+        pub breaks: Option<HistBreaks> => option HistBreaks,
+        /// Whether to plot counts (`true`) or densities (`false`:
+        /// `count / (n * bin width)`). `None`: counts if the bins are equally
+        /// wide, as R.
+        pub freq: Option<bool> => option bool,
+        /// x axis limits. `None`: the range of the breaks.
+        pub xlim: Option<(f64, f64)> => pair f64,
+        /// y axis limits. `None`: 0 to the tallest bar.
+        pub ylim: Option<(f64, f64)> => pair f64,
+        /// Bar fills, recycled over the bars. Empty: `"lightgray"` (R's
+        /// default).
+        pub col: Vec<ColorSpec> => values ColorSpec,
+        /// Bar borders, recycled over the bars. Empty: `par(fg)`, or with
+        /// shading the bar's `col` (R's `border = NULL`).
+        pub border: Vec<ColorSpec> => values ColorSpec,
+        /// Line types of the bar borders, recycled over the bars. Empty:
+        /// `par(lty)`; `None`: that bar has no border.
+        pub lty: Vec<Option<LineType>> => na_values LineType,
+        /// Shading lines per inch in the bars, recycled over the bars; the
+        /// lines take the bar's `col` (see [`RectOptions::density`]). Empty:
+        /// no shading.
+        pub density: Vec<Option<f64>> => na_values f64,
+        /// Angle of the shading lines in degrees, recycled as `density`.
+        /// Empty: 45.
+        pub angle: Vec<f64> => values f64,
+        /// Labels above the bars: [`HistLabels::Values`] writes each bar's
+        /// count (or, with densities, its density to 3 decimals), `Text` the
+        /// given labels. Default none.
+        pub labels: HistLabels => value HistLabels,
+        /// Whether bins are closed on the right, `(a, b]`, rather than `[a,
+        /// b)`. `None`: `true`.
+        pub right: Option<bool> => option bool,
+        /// Whether the first bin is also closed on the left (the last on the
+        /// right when not `right`). `None`: `true`; always `true` for
+        /// computed breaks, as R (which warns). R's `include.lowest`.
+        pub include_lowest: Option<bool> => option bool,
+        /// How far, as a fraction of a typical bin width, values on an edge
+        /// may stray and still count as on it. `None`: `1e-7`.
+        pub fuzz: Option<f64> => option f64,
+        /// Main title, as for `plot()` (text or a plotmath expression).
+        /// `None`: "Histogram of x".
+        pub main: Option<Label> => option Label,
+        /// x axis label. `None`: "x".
+        pub xlab: Option<Label> => option Label,
+        /// y axis label. `None`: "Frequency" or "Density".
+        pub ylab: Option<Label> => option Label,
+        /// Size of the main title, relative to `par(cex)`. `None`:
+        /// `par(cex.main)`. R's `cex.main`.
+        pub cex_main: Option<f64> => option f64,
+        /// Colour of the main title. `None`: `par(col.main)`. R's
+        /// `col.main`.
+        pub col_main: Option<ColorSpec> => option ColorSpec,
+        /// Font of the main title (a [`FontFace`]). `None`:
+        /// `par(font.main)`. R's `font.main`.
+        pub font_main: Option<FontFace> => option FontFace,
+        /// Size of the axis titles (`xlab` and `ylab`), relative to
+        /// `par(cex)`. `None`: `par(cex.lab)`. R's `cex.lab`.
+        pub cex_lab: Option<f64> => option f64,
+        /// Colour of the axis titles (`xlab` and `ylab`). `None`:
+        /// `par(col.lab)`. R's `col.lab`.
+        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        /// Font of the axis titles (`xlab` and `ylab`; a [`FontFace`]).
+        /// `None`: `par(font.lab)`. R's `font.lab`.
+        pub font_lab: Option<FontFace> => option FontFace,
+        /// Whether to draw the titles. Default `true`, whatever `par(ann)`
+        /// is, as R's `ann`.
+        pub ann: bool => value bool,
+        /// Whether to draw the axes. Default `true`.
+        pub axes: bool => value bool,
+        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
+        pub xlog: bool => value bool,
+        /// Makes the y axis logarithmic. Default `false`. As in R, the range
+        /// still starts from 0, which R "corrects" to about 1e-307 (with a
+        /// warning). R's `log = "y"`.
+        pub ylog: bool => value bool,
+        /// Draws the bars on the current plot, without a new plot, window,
+        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog` and
+        /// `ylog` are ignored). Default `false`.
+        pub add: bool => value bool,
+        /// Orientation of the axis labels: 0 parallel to the axis, 1
+        /// horizontal, 2 perpendicular, 3 vertical. `None`: `par(las)`.
+        pub las: Option<i32> => option i32,
+        /// Size of the axis labels. `None`: `par(cex.axis)`. R's `cex.axis`.
+        pub cex_axis: Option<f64> => option f64,
+        /// Colour of the axis labels. `None`: `par(col.axis)`. R's
+        /// `col.axis`.
+        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        /// Font of the axis labels. `None`: `par(font.axis)`. R's
+        /// `font.axis`.
+        pub font_axis: Option<FontFace> => option FontFace,
+        /// Margin lines of the axis titles, axis labels and axis line, for
+        /// the axes and titles. `None`: `par(mgp)`.
+        pub mgp: Option<[f64; 3]> => array [f64; 3],
+        /// Tick length as a fraction of the plot region. `None`: `par(tck)`.
+        pub tck: Option<f64> => option f64,
+        /// Tick length in margin lines. `None`: `par(tcl)`.
+        pub tcl: Option<f64> => option f64,
+        /// Minimum gap between axis labels. `None`: R's default. R's
+        /// `gap.axis`.
+        pub gap_axis: Option<f64> => option f64,
+        /// Width of the axes' line and ticks (only the axes: the bars are
+        /// unaffected). `None`: 1, `axis()`'s default.
+        pub lwd: Option<f64> => option f64,
+        /// Whether to draw: `false` only returns the bins. `None`: `true`.
+        pub plot: Option<bool> => option bool,
+    }
 }
-
-crate::setters::setters!(HistOptions => [HistCall] {
-    breaks: option HistBreaks,
-    freq: option bool,
-    xlim: pair f64,
-    ylim: pair f64,
-    col: values ColorSpec,
-    border: values ColorSpec,
-    lty: na_values LineType,
-    density: na_values f64,
-    angle: values f64,
-    labels: value HistLabels,
-    right: option bool,
-    include_lowest: option bool,
-    fuzz: option f64,
-    main: option Label,
-    xlab: option Label,
-    ylab: option Label,
-    cex_main: option f64,
-    col_main: option ColorSpec,
-    font_main: option FontFace,
-    cex_lab: option f64,
-    col_lab: option ColorSpec,
-    font_lab: option FontFace,
-    ann: value bool,
-    axes: value bool,
-    xlog: value bool,
-    ylog: value bool,
-    add: value bool,
-    las: option i32,
-    cex_axis: option f64,
-    col_axis: option ColorSpec,
-    font_axis: option FontFace,
-    mgp: array [f64; 3],
-    tck: option f64,
-    tcl: option f64,
-    gap_axis: option f64,
-    lwd: option f64,
-    plot: option bool,
-});
 
 impl Default for HistOptions {
     fn default() -> Self {
         HistOptions {
+            deferred_error: None,
             breaks: None,
             freq: None,
             xlim: None,
@@ -572,13 +609,34 @@ impl Default for HistOptions {
     }
 }
 
-/// The `"histogram"` object R's `hist()` returns: bin edges, counts,
-/// density, bin midpoints, and whether the bins are equally wide.
+/// The bins of a histogram: edges, counts, densities, mid-points, and
+/// whether the bins are equally wide.
+///
+/// Returned by [`Graphics::hist`](crate::graphics::Graphics::hist)'s
+/// `.draw()` (also with `.plot(false)`, which draws nothing).
+///
+/// This is the `"histogram"` object R's `hist()` returns.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// let h = dev.hist().x(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).plot(false).draw();
+/// assert_eq!(h.mids, [0.5, 1.5, 2.5]);
+/// assert_eq!(h.density, [1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0]);
+/// ```
 #[derive(Clone, Debug)]
 pub struct HistResult {
+    /// The bin edges, one more than the bins.
     pub breaks: Vec<f64>,
+    /// The number of finite values in each bin.
     pub counts: Vec<f64>,
+    /// Each bin's density: its count divided by the number of finite
+    /// values and the bin's width (0 for an empty input or zero width).
     pub density: Vec<f64>,
+    /// The mid-point of each bin.
     pub mids: Vec<f64>,
     /// R's `equidist`: the bins came from a number of classes or rule, or
     /// the given edges are equally spaced (to `1e-7` of the mean width);
@@ -589,7 +647,7 @@ pub struct HistResult {
 /// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
 /// mid-points. Needs no device, so a recorded figure can return the same
 /// result as [`Graphics::hist`](crate::graphics::Graphics::hist).
-pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
+pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> Result<HistResult, Error> {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let n = data.len();
 
@@ -609,13 +667,15 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
             (edges, true)
         }
         HistBreaks::Count(k) => {
-            assert!(k.is_finite() && k >= 1.0, "invalid number of 'breaks'");
+            if !(k.is_finite() && k >= 1.0) {
+                return Err(Error::invalid("invalid number of 'breaks'"));
+            }
             // R caps it (with a warning) so that pretty() gets an integer;
             // pretty() truncates it.
             let nclass = k.min(1e6) as i32;
             let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
             let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
                 (lo, hi)
             } else {
                 (0.0, 1.0)
@@ -626,7 +686,7 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
         _ => {
             let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
             let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo < hi {
+            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
                 (lo, hi)
             } else {
                 (0.0, 1.0)
@@ -643,7 +703,7 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
         opts.right.unwrap_or(true),
         include_lowest,
         opts.fuzz.unwrap_or(1e-7),
-    );
+    )?;
     let widths: Vec<f64> = breaks.windows(2).map(|w| w[1] - w[0]).collect();
     let density: Vec<f64> = counts
         .iter()
@@ -666,20 +726,20 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> HistResult {
     let mean = widths.iter().sum::<f64>() / widths.len() as f64;
     let equidist = !use_br || hi - lo < 1e-7 * mean;
 
-    HistResult {
+    Ok(HistResult {
         breaks,
         counts,
         density,
         mids,
         equidist,
-    }
+    })
 }
 
 impl<B: Backend> Device<B> {
     /// Draws R's `hist()`; the public entry is
     /// [`Graphics::hist`](crate::graphics::Graphics::hist), whose docs
     /// describe it.
-    pub(crate) fn hist_impl(&mut self, x: &[f64], opts: &HistOptions) -> HistResult {
+    pub(crate) fn hist_impl(&mut self, x: &[f64], opts: &HistOptions) -> Result<HistResult, Error> {
         if !opts.plot.unwrap_or(true) {
             return hist_bins(x, opts);
         }
@@ -689,7 +749,7 @@ impl<B: Backend> Device<B> {
             density,
             mids,
             equidist,
-        } = hist_bins(x, opts);
+        } = hist_bins(x, opts)?;
         let nb = breaks.len();
 
         // R's `freq = NULL`: counts if the bins are equally wide.
@@ -704,7 +764,7 @@ impl<B: Backend> Device<B> {
         // `plot.histogram()`: window, title, axes (unless `add`), then the
         // bars.
         if !opts.add {
-            self.plot_new_impl();
+            self.plot_new_impl()?;
             let window = PlotWindowOptions {
                 xlog: opts.xlog,
                 ylog: opts.ylog,
@@ -750,21 +810,21 @@ impl<B: Backend> Device<B> {
                     lwd: opts.lwd,
                     ..InlineAxis::default()
                 };
-                self.axis_impl(1, &inline.apply(AxisOptions::default()));
+                self.axis_impl(1, &inline.apply(AxisOptions::default()))?;
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
                 let yticks = if freq {
-                    self.default_ticks(2)
+                    self.ax_ticks(2)
                         .into_iter()
                         .filter(|v| v % 1.0 == 0.0)
                         .collect()
                 } else {
-                    self.default_ticks(2)
+                    self.ax_ticks(2)
                 };
                 let y_axis = AxisOptions {
                     at: Some(yticks),
                     ..AxisOptions::default()
                 };
-                self.axis_impl(2, &inline.apply(y_axis));
+                self.axis_impl(2, &inline.apply(y_axis))?;
             }
         }
 
@@ -790,7 +850,7 @@ impl<B: Backend> Device<B> {
             angle: opts.angle.clone(),
             ..RectOptions::default()
         };
-        self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars);
+        self.rect_impl(&breaks[..nb - 1], &[0.0], &breaks[1..], &heights, &bars)?;
         // `text(x$mids, y, labels, adj = c(0.5, -0.5))`: counts, or
         // densities rounded to 3 decimals, or the given labels.
         let labels: Vec<Label> = match &opts.labels {
@@ -815,16 +875,16 @@ impl<B: Backend> Device<B> {
                 ..TextOptions::default()
             };
             let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
-            self.text_impl(&mids, &heights, &labels, &at);
+            self.text_impl(&mids, &heights, &labels, &at)?;
         }
 
-        HistResult {
+        Ok(HistResult {
             breaks,
             counts,
             density,
             mids,
             equidist,
-        }
+        })
     }
 }
 

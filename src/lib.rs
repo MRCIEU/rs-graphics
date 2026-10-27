@@ -6,10 +6,13 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! A port of R's `graphics` package: `plot()`, `hist()`, `barplot()`,
-//! `boxplot()`, `pie()`, and the low-level functions they are built from
-//! (`axis()`, `title()`, `legend()`, `mtext()`, ...), drawing to PDF,
-//! SVG or PNG with R's layout rules and defaults.
+//! Plots in PDF, SVG and PNG that look the way they do in R: scatter and
+//! line plots, histograms, bar charts, box plots and pie charts, and the
+//! axes, titles, legends and margin text they are built from.
+//!
+//! This is a port of R's `graphics` package (`plot()`, `hist()`,
+//! `barplot()`, `boxplot()`, `pie()`, `axis()`, `title()`, `legend()`,
+//! `mtext()`, ...), with R's layout rules and defaults.
 //!
 //! ```no_run
 //! use rs_graphics::prelude::*;
@@ -36,13 +39,16 @@
 //! `Device` implements, named as in R (`box()` is `box_()`, as `box` is a
 //! Rust keyword). A method starts a call; the call's chainable setters
 //! take all of R's arguments, named as R's (data too: `.x(&x)`), and
-//! `.draw()` runs it. A required argument (one R gives no default) that is
-//! left out panics at `.draw()` with R's message. To reuse a set of arguments, build its options struct
+//! `.draw()` runs it. Where R would stop with an error (a required
+//! argument left out, an invalid value, margins too large for the page),
+//! `.draw()` panics with R's message, and `.try_draw()` returns it as an
+//! [`error::Error`] instead. To reuse a set of arguments, build its options struct
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
 //! [`prelude`] imports it all, including the trait. As in R, numbers may
 //! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (data
 //! vectors are any [`Numbers`](numbers::Numbers), by reference or by
-//! value; `f64` data isn't copied either way). R's `NA` in a style vector is `None`:
+//! value; `f64` data isn't copied either way; one number is a vector of
+//! one, as in R: `plot(1, 1)` is `.x(1).y(1)`). R's `NA` in a style vector is `None`:
 //! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`.
 //!
 //! # Devices and files
@@ -53,7 +59,8 @@
 //! and [`Device::png`](device::Device::png) (or
 //! [`Device::format`](device::Device::format), for a format chosen at run
 //! time) take the file and return a [`DeviceBuilder`](device::DeviceBuilder)
-//! for R's other arguments (`width` and `height` in inches, `pointsize`,
+//! for R's other arguments (`width` and `height`, in inches unless `units`
+//! is `"cm"`, `"mm"` or, for PNG, `"px"`; `pointsize`,
 //! `bg`, PNG's `res`, PDF's `compress` and `onefile`), with R's defaults;
 //! `.open()` opens the device and creates the file (so a bad path fails
 //! before any drawing), and [`close`](device::Device::close) (R's `dev.off()`)
@@ -180,3 +187,5 @@ pub mod prelude;
 pub mod pretty;
 pub mod recording;
 pub mod setters;
+
+pub use error::{Error, ErrorKind};
