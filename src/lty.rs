@@ -227,7 +227,9 @@ impl LineType {
 }
 
 impl Default for LineType {
-    /// Returns [`LineType::SOLID`], R's default `par(lty)`.
+    /// Returns [`LineType::SOLID`], R's default [`par(lty)`].
+    ///
+    /// [`par(lty)`]: crate::par::Par::lty
     fn default() -> Self {
         LineType::SOLID
     }

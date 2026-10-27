@@ -65,20 +65,30 @@ crate::setters::options! {
         /// `None`: use `line`.
         pub pos: Option<f64> => option f64,
         /// Whether to measure `line` from the inner region (inside
-        /// `par(oma)`) rather than the plot region. Default `false`.
+        /// [`par(oma)`]) rather than the plot region. Default `false`.
+        ///
+        /// [`par(oma)`]: crate::par::Par::oma
         pub outer: bool => value bool,
-        /// Font of the labels. `None`: `par(font.axis)`.
+        /// Font of the labels. `None`: [`par(font.axis)`].
+        ///
+        /// [`par(font.axis)`]: crate::par::Par::font_axis
         pub font: Option<FontFace> => option FontFace,
         /// Line type of the axis line and ticks. `None`: solid (R's default,
-        /// not `par(lty)`).
+        /// not [`par(lty)`]).
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Option<LineType> => option LineType,
         /// Width of the axis line; 0 or less draws no axis line. `None`: 1
-        /// (R's default, not `par(lwd)`).
+        /// (R's default, not [`par(lwd)`]).
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Option<f64> => option f64,
         /// Width of the tick marks; 0 or less draws no ticks. `None`: `lwd`.
         /// R's `lwd.ticks`.
         pub lwd_ticks: Option<f64> => option f64,
-        /// Colour of the axis line. `None`: `par(fg)`.
+        /// Colour of the axis line. `None`: [`par(fg)`].
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub col: Option<ColorSpec> => option ColorSpec,
         /// Colour of the tick marks. `None`: `col`. R's `col.ticks`.
         pub col_ticks: Option<ColorSpec> => option ColorSpec,
@@ -95,40 +105,62 @@ crate::setters::options! {
         /// axis) or "M" heights (perpendicular); a label closer than that to
         /// the previous one is dropped. `None`: 1 or 0.25. R's `gap.axis`.
         pub gap_axis: Option<f64> => option f64,
-        /// Size of the labels. `None`: `par(cex.axis)`; overrides it for this
+        /// Size of the labels. `None`: [`par(cex.axis)`]; overrides it for this
         /// call only.
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
         pub cex_axis: Option<f64> => option f64,
-        /// Colour of the labels. `None`: `par(col.axis)`; overrides it for
+        /// Colour of the labels. `None`: [`par(col.axis)`]; overrides it for
         /// this call only.
+        ///
+        /// [`par(col.axis)`]: crate::par::Par::col_axis
         pub col_axis: Option<ColorSpec> => option ColorSpec,
-        /// Orientation of the labels. `None`: `par(las)`; overrides it for
+        /// Orientation of the labels. `None`: [`par(las)`]; overrides it for
         /// this call only.
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
         /// Range and number of the default ticks, used when `at` is `None`.
-        /// `None`: `par(xaxp)` (sides 1, 3) or `par(yaxp)` (sides 2, 4);
+        /// `None`: [`par(xaxp)`] (sides 1, 3) or [`par(yaxp)`] (sides 2, 4);
         /// overrides it for this call only.
+        ///
+        /// [`par(xaxp)`]: crate::par::Par::xaxp
+        /// [`par(yaxp)`]: crate::par::Par::yaxp
         pub axp: Option<[f64; 3]> => array [f64; 3],
         /// Margin lines for the axis title, labels and line (only the labels
-        /// and line are used here). `None`: `par(mgp)`; overrides it for this
+        /// and line are used here). `None`: [`par(mgp)`]; overrides it for this
         /// call only.
+        ///
+        /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
         /// Whether to draw the axis at all: `AxisType::None` draws nothing.
-        /// `None`: `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4).
+        /// `None`: [`par(xaxt)`] (sides 1, 3) or [`par(yaxt)`] (sides 2, 4).
+        ///
+        /// [`par(xaxt)`]: crate::par::Par::xaxt
+        /// [`par(yaxt)`]: crate::par::Par::yaxt
         pub axt: Option<AxisType> => option AxisType,
         /// Tick length as a fraction of the plot region (of its height for an
         /// x axis if above 0.5, else of its smaller side); positive points
-        /// inwards. Overrides `tcl`. `None`: `par(tck)`, which is `NA` by
+        /// inwards. Overrides `tcl`. `None`: [`par(tck)`], which is `NA` by
         /// default, meaning `tcl` is used.
+        ///
+        /// [`par(tck)`]: crate::par::Par::tck
         pub tck: Option<f64> => option f64,
         /// Tick length in margin lines; negative points outwards. `None`:
-        /// `par(tcl)`.
+        /// [`par(tcl)`].
+        ///
+        /// [`par(tcl)`]: crate::par::Par::tcl
         pub tcl: Option<f64> => option f64,
         /// How far ticks and labels may reach along the axis: the plot
-        /// region, figure region or device, as for `par(xpd)`. The axis is
-        /// always clipped to the device, as R does. `None`: `par(xpd)`.
+        /// region, figure region or device, as for [`par(xpd)`]. The axis is
+        /// always clipped to the device, as R does. `None`: [`par(xpd)`].
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
         /// Ends of the axis line and ticks (`"round"`, `"butt"`,
-        /// `"square"`). `None`: `par(lend)`.
+        /// `"square"`). `None`: [`par(lend)`].
+        ///
+        /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
     }
 }

@@ -24,8 +24,10 @@ use crate::setters::pick_na;
 /// (`polygon()`/`rect()` treat a `density` that is all `NA` or negative
 /// as not given). R tests this with `is.numeric(density)`, so a logical
 /// `density = NA` takes the shading path anyway, filling with `col`
-/// (`par(fg)` by default) and outlining in it (an R bug, not copied:
+/// ([`par(fg)`] by default) and outlining in it (an R bug, not copied:
 /// `None`s are R's `NA_real_`).
+///
+/// [`par(fg)`]: crate::par::Par::fg
 pub(crate) fn shading(density: &[Option<f64>]) -> bool {
     density.iter().any(|d| d.is_some_and(|d| d >= 0.0))
 }
@@ -53,15 +55,17 @@ impl<B: Backend> Device<B> {
     ///
     /// Without shading (see [`shading`]) this is `C_polygon`: each polygon
     /// of at least two points is filled with `col` (empty: none) and
-    /// outlined with `border` (empty: `par(fg)`), `lty` and `lwd`, in turn.
+    /// outlined with `border` (empty: [`par(fg)`]), `lty` and `lwd`, in turn.
     ///
     /// With shading, as `polygon.R`: `col` is the colour of the shading
-    /// lines (empty or `None` elements: `par(fg)`) and `border` defaults to
+    /// lines (empty or `None` elements: [`par(fg)`]) and `border` defaults to
     /// it. Each polygon in turn is shaded with lines (`density` > 0, lines
     /// per inch, at `angle` degrees, default 45), left empty (`density` 0)
     /// or filled with its `col` (`density` `None` or negative); then all
     /// borders are drawn. Shading is skipped on log axes (R warns
     /// "cannot hatch with logarithmic scale active").
+    ///
+    /// [`par(fg)`]: crate::par::Par::fg
     pub(crate) fn polygons(&mut self, x: &[f64], y: &[f64], s: &ShapeStyle) {
         // Runs of finite points, in data units and in inches.
         let mut runs: Vec<Run> = Vec::new();

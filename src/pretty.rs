@@ -14,7 +14,7 @@
 //!
 //! - `GEPretty()` in `r-source/src/main/engine.c` - used (through
 //!   `GAxisPars()`, see [`axis_pars`]) by `plot.window()` to set
-//!   `par("xaxp")`/`par("yaxp")`, from which `axis()` places its default
+//!   [`par("xaxp")`]/[`par("yaxp")`], from which `axis()` places its default
 //!   ticks ([`create_at_vector`]). See [`ge_pretty`].
 //! - `pretty.default()` in `r-source/src/library/base/R/pretty.R` - the
 //!   user-facing `pretty()` function, also used internally by
@@ -24,6 +24,9 @@
 //! shrink_sml, high_u_bias, u5_bias, f_min, eps_correction, bounds)`
 //! parameters, kept here as a single generic function so the shared
 //! structure is easy to check line-by-line against the original.
+//!
+//! [`par("xaxp")`]: crate::par::Par::xaxp
+//! [`par("yaxp")`]: crate::par::Par::yaxp
 
 const ROUNDING_EPS: f64 = 1e-10;
 
@@ -259,7 +262,7 @@ pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
         .collect()
 }
 
-/// `GAxisPars()` (`main/graphics.c`): `par("xaxp")`/`par("yaxp")` for a `usr`
+/// `GAxisPars()` (`main/graphics.c`): [`par("xaxp")`]/[`par("yaxp")`] for a `usr`
 /// range `min..max` (log10 units on a log axis; may be decreasing) and
 /// `n = par("lab")` intervals: `[first tick, last tick, intervals]`.
 ///
@@ -269,6 +272,9 @@ pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
 /// only); under about two decades it is the negated interval count of
 /// linear `pretty()` ticks instead. A range too small for `pretty()` gives
 /// the range itself, less 0.5% at each end, with 1 interval (R warns).
+///
+/// [`par("xaxp")`]: crate::par::Par::xaxp
+/// [`par("yaxp")`]: crate::par::Par::yaxp
 pub fn axis_pars(min: f64, max: f64, n: i32, log: bool) -> [f64; 3] {
     const EPS_FAC_2: f64 = 16.0;
     let swap = min > max;

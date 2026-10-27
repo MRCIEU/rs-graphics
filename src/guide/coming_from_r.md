@@ -103,7 +103,7 @@ par(mfrow = c(1, 2), mar = c(4, 4, 2, 1), las = 1)
 dev.par().mfrow(1, 2).mar([4, 4, 2, 1]).las(1).draw();
 ```
 
-- `par("las")` (reading a value) is `dev.current_par().las`.
+- [`par("las")`] (reading a value) is `dev.current_par().las`.
 - R's `op <- par(...); ...; par(op)` is reading the values first and
   setting them back: `let mar = dev.current_par().mar;` ...
   `dev.par().mar(mar).draw();`.
@@ -205,3 +205,5 @@ let above: Vec<f64> = heights.iter().map(|h| h + 0.3).collect();
 dev.text().x(&mp).y(&above).labels(["3", "5", "2"]).draw();
 dev.mtext().text("Two panels").outer(true).line(0.5).font(2).draw();
 ```
+
+[`par("las")`]: crate::par::Par::las

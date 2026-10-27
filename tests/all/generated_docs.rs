@@ -271,7 +271,13 @@ fn plain(doc: &str) -> String {
     while let Some(start) = rest.find('[') {
         s.push_str(&rest[..start]);
         let after = &rest[start + 1..];
-        match after.find(']') {
+        // A code span's `]` (`[`mar([5, 4])`]`) isn't the link's end.
+        let close = if after.starts_with('`') {
+            after.find("`]").map(|e| e + 1)
+        } else {
+            after.find(']')
+        };
+        match close {
             // A link is `[`X`]` (intra-doc) or `[text](url)`; other
             // brackets (`[0, 2, 5]`) stay.
             Some(end) if after.starts_with('`') || after[end + 1..].starts_with('(') => {
@@ -768,6 +774,9 @@ fn for_llms(md: &str, shift: &str) -> String {
                 continue;
             }
             out.push_str(line);
+        } else if line.starts_with("[`") && line.contains("`]: crate::") {
+            // A rustdoc link definition: the link text stays, plainly.
+            continue;
         } else if line.starts_with('#') {
             out.push_str(shift);
             out.push_str(line);
@@ -809,4 +818,56 @@ fn llms_txt_is_up_to_date() {
     out.push_str("\n## Every R function and argument\n\n");
     out.push_str(&for_llms(&render(&sections, &par), ""));
     check_generated("llms.txt", &out);
+}
+
+/// Every `par(x)` in a doc comment links to what it names (written
+/// `` [`par(cex)`] `` with a `` [`par(cex)`]: crate::par::Par::cex ``
+/// definition at the end of the doc), except in code blocks, a `Par`
+/// field's mention of itself, and `par(family)`, which isn't supported.
+#[test]
+fn par_mentions_are_links() {
+    let mut bare = Vec::new();
+    for (path, text) in sources() {
+        let mut in_code = false;
+        let lines: Vec<&str> = text.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim_start();
+            let Some(doc) = t.strip_prefix("///").or_else(|| t.strip_prefix("//!")) else {
+                continue;
+            };
+            if doc.trim_start().starts_with("```") {
+                in_code = !in_code;
+                continue;
+            }
+            if in_code {
+                continue;
+            }
+            let mut rest = doc;
+            while let Some(p) = rest.find("`par(") {
+                let after = &rest[p + 5..];
+                let end = after.find(")`").map_or(after.len(), |e| e);
+                let name = after[..end].trim_matches('"');
+                let linked = rest[..p].ends_with('[') && after[end..].starts_with(")`]");
+                let is_name =
+                    !name.is_empty() && name.chars().all(|c| c.is_ascii_lowercase() || c == '.');
+                // A `Par` field's own doc doesn't link to itself.
+                let own_field = path.ends_with("src/par.rs")
+                    && lines[i..]
+                        .iter()
+                        .find(|l| !l.trim_start().starts_with("///"))
+                        .and_then(|l| l.trim_start().strip_prefix("pub "))
+                        .and_then(|l| l.split_once(':'))
+                        .is_some_and(|(f, _)| f == name.replace('.', "_"));
+                if is_name && !linked && name != "family" && !own_field {
+                    bare.push(format!("{}:{}: `par({name})`", path.display(), i + 1));
+                }
+                rest = &after[end..];
+            }
+        }
+    }
+    assert!(
+        bare.is_empty(),
+        "unlinked par() mentions:\n{}",
+        bare.join("\n")
+    );
 }

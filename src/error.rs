@@ -143,7 +143,7 @@ impl From<std::num::TryFromIntError> for Error {
 
 /// An error for a string that isn't a valid value of some parameter.
 ///
-/// E.g. `"zz"` as a colour or `"x"` as an axis style (`par(xaxs)`).
+/// E.g. `"zz"` as a colour or `"x"` as an axis style ([`par(xaxs)`]).
 /// Returned by the `FromStr` impls of
 /// [`Color`](crate::color::Color), [`LineType`](crate::lty::LineType),
 /// [`LineEnd`](crate::backend::LineEnd), [`LineJoin`](crate::backend::LineJoin),
@@ -165,6 +165,8 @@ impl From<std::num::TryFromIntError> for Error {
 /// assert_eq!(err.kind, "line type");
 /// assert_eq!(err.to_string(), "invalid line type: \"wavy\"");
 /// ```
+///
+/// [`par(xaxs)`]: crate::par::Par::xaxs
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseValueError {
     /// What was being parsed, e.g. `"colour"` or `"axis style"`.

@@ -43,8 +43,10 @@ crate::setters::options! {
         /// fractional. Empty: 0. A `NaN` entry leaves its label out (R writes
         /// it with a `nan` coordinate, an invalid PDF: R bug not copied).
         pub line: Vec<f64> => values f64,
-        /// Draws in the outer margins (`par(oma)`) rather than the figure's.
+        /// Draws in the outer margins ([`par(oma)`]) rather than the figure's.
         /// Default `false`.
+        ///
+        /// [`par(oma)`]: crate::par::Par::oma
         pub outer: bool => value bool,
         /// Position along the side, recycled per label: a user coordinate
         /// for inner margins, or a fraction (0 to 1) of the inner region for
@@ -60,25 +62,35 @@ crate::setters::options! {
         /// for `las = 0`).
         pub padj: Vec<f64> => values f64,
         /// Text sizes, recycled per label. Empty, `None` or `NaN`: 1. Unlike
-        /// most text, *not* scaled by `par(cex)` (so neither by the
+        /// most text, *not* scaled by [`par(cex)`] (so neither by the
         /// multi-panel reduction), as in R. (For an `NA` after a finite
         /// value, R keeps the previous label's size; that R bug isn't
         /// copied.)
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
         pub cex: Vec<Option<f64>> => na_values f64,
-        /// Text colours, recycled per label. Empty: `par(col)`.
+        /// Text colours, recycled per label. Empty: [`par(col)`].
+        ///
+        /// [`par(col)`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Fonts, recycled per label. Empty or `None`: `par(font)`.
+        /// Fonts, recycled per label. Empty or `None`: [`par(font)`].
+        ///
+        /// [`par(font)`]: crate::par::Par::font
         pub font: Vec<Option<FontFace>> => na_values FontFace,
         /// Text orientation: 0 parallel to the side, 1 horizontal, 2
         /// perpendicular to the side, 3 vertical. It also sets the default
-        /// `adj`, `padj` and `at`, as in R. `None`: `par(las)`; overrides it
+        /// `adj`, `padj` and `at`, as in R. `None`: [`par(las)`]; overrides it
         /// for this call only.
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
         /// Where the text is clipped: at least the figure region (`false`
         /// counts as `true` here), or the whole device for [`Xpd::Device`].
-        /// `None`: `par(xpd)`; overrides it for this call only. `outer` text
+        /// `None`: [`par(xpd)`]; overrides it for this call only. `outer` text
         /// clips to the device. This is what R means to do; R always clips
         /// `mtext()` to the device (an R bug, not copied).
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
     }
 }

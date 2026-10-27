@@ -11,7 +11,7 @@ The words the docs use come from R. In short:
 | outer margins | Space around all the panels of a page, e.g. for a shared title: [`oma`](crate::par::Par::oma) (lines), [`omi`](crate::par::Par::omi) (inches). Text goes there with `mtext().outer(true)`. |
 | inner region | The page less the outer margins, which the panels share. |
 | panels | Several figures on a page: [`par().mfrow(rows, cols)`](crate::graphics::ParCall::mfrow) fills them row by row, `mfcol` column by column, [`layout()`](crate::graphics::Graphics::layout) in any grid. Each high-level plot moves to the next panel. |
-| user coordinates | The data's units inside the plot region, set by the plot's limits (`xlim`, `ylim`), read as `par("usr")` ([`Device::usr`](crate::device::Device::usr)). Most drawing calls take them. |
+| user coordinates | The data's units inside the plot region, set by the plot's limits (`xlim`, `ylim`), read as [`par("usr")`] ([`Device::usr`](crate::device::Device::usr)). Most drawing calls take them. |
 | clipping | What is cut off at a region's edge: [`xpd`](crate::par::Par::xpd) ([`Xpd`](crate::par::Xpd)): the plot region (the default), the figure region, or the whole device. |
 
 # Calls
@@ -47,3 +47,5 @@ The words the docs use come from R. In short:
 | `bty` | `.bty()` | Which sides of the box around the plot to draw (`"o"` all, `"l"` left and bottom, `"n"` none, ...). |
 | `ann` | `.ann()` | Whether high-level plots draw their titles. |
 | `type` | `.type_()` | What `plot()`, `points()` and `lines()` draw: `"p"` points, `"l"` lines, `"b"` both, `"h"` vertical lines, `"s"` steps, `"n"` nothing. |
+
+[`par("usr")`]: crate::device::Device::usr

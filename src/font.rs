@@ -137,7 +137,9 @@ impl TryFrom<i32> for FontFace {
     ///
     /// # Errors
     ///
-    /// If `code` isn't 1 to 5 (R errors on an invalid `par(font)`).
+    /// If `code` isn't 1 to 5 (R errors on an invalid [`par(font)`]).
+    ///
+    /// [`par(font)`]: crate::par::Par::font
     fn try_from(code: i32) -> Result<Self, Self::Error> {
         FontFace::from_code(code).ok_or_else(|| {
             crate::error::Error::invalid(format!(

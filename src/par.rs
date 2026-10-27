@@ -15,11 +15,13 @@
 //! `Rscript -e 'str(par())'` and `r-source/src/library/graphics/src/par.c`).
 //!
 //! `cex` scales both text *and* the "line" unit that margins are measured
-//! in, as in R, where `par(cex)` sets the base `cex` (`cexbase`) and resets
+//! in, as in R, where [`par(cex)`] sets the base `cex` (`cexbase`) and resets
 //! the per-call `cex` to 1, and a margin line is `mex * cexbase` times the
 //! character height (`mapNDC2Dev()`). Multi-panel layouts (`par()`'s
 //! `mfrow`/`mfcol`, and `layout()`) set `cex` (0.83 for 2 x 2, 0.66
 //! beyond that) and `mex` just as R's `par(mfrow=)` does.
+//!
+//! [`par(cex)`]: crate::par::Par::cex
 
 use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};
 use crate::font::FontFace;
@@ -415,13 +417,15 @@ macro_rules! par_options {
                 /// ignored (R warns) before anything is plotted.
                 pub new: Option<bool> => option bool,
                 /// User coordinates of the plot region, `[x0, x1, y0, y1]`, in
-                /// log10 units on a log axis (as `par("usr")` reads). The default
+                /// log10 units on a log axis (as [`par("usr")`] reads). The default
                 /// tick settings (`xaxp`/`yaxp`) are worked out again from them.
                 /// Applied after the other fields and `xlog`/`ylog` in the same
                 /// call, so a `usr` given with them is in their units, uses a new
                 /// `lab`, and replaces an `xaxp`/`yaxp` given there. A value
                 /// `NaN`, `x0 == x1` or `y0 == y1` is an error of the call (R's
                 /// "invalid value specified for graphical parameter \"usr\"").
+                ///
+                /// [`par("usr")`]: crate::device::Device::usr
                 pub usr: Option<[f64; 4]> => array [f64; 4],
                 /// Makes the x axis logarithmic, or linear again: from now on, x
                 /// values are mapped through `log10` first. As in R, `usr` stays

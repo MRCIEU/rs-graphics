@@ -468,11 +468,15 @@ crate::setters::options! {
         /// Bar fills, recycled over the bars. Empty: `"lightgray"` (R's
         /// default).
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Bar borders, recycled over the bars. Empty: `par(fg)`, or with
+        /// Bar borders, recycled over the bars. Empty: [`par(fg)`], or with
         /// shading the bar's `col` (R's `border = NULL`).
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Line types of the bar borders, recycled over the bars. Empty:
-        /// `par(lty)`; `None`: that bar has no border.
+        /// [`par(lty)`]; `None`: that bar has no border.
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Shading lines per inch in the bars, recycled over the bars; the
         /// lines take the bar's `col` (see [`RectOptions::density`]). Empty:
@@ -502,26 +506,42 @@ crate::setters::options! {
         pub xlab: Option<Label> => option Label,
         /// y axis label. `None`: "Frequency" or "Density".
         pub ylab: Option<Label> => option Label,
-        /// Size of the main title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
+        /// Size of the main title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
         pub cex_main: Option<f64> => option f64,
-        /// Colour of the main title. `None`: `par(col.main)`. R's
+        /// Colour of the main title. `None`: [`par(col.main)`]. R's
         /// `col.main`.
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
         pub col_main: Option<ColorSpec> => option ColorSpec,
         /// Font of the main title (a [`FontFace`]). `None`:
-        /// `par(font.main)`. R's `font.main`.
+        /// [`par(font.main)`]. R's `font.main`.
+        ///
+        /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
         /// Size of the axis titles (`xlab` and `ylab`), relative to
-        /// `par(cex)`. `None`: `par(cex.lab)`. R's `cex.lab`.
+        /// [`par(cex)`]. `None`: [`par(cex.lab)`]. R's `cex.lab`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.lab)`]: crate::par::Par::cex_lab
         pub cex_lab: Option<f64> => option f64,
         /// Colour of the axis titles (`xlab` and `ylab`). `None`:
-        /// `par(col.lab)`. R's `col.lab`.
+        /// [`par(col.lab)`]. R's `col.lab`.
+        ///
+        /// [`par(col.lab)`]: crate::par::Par::col_lab
         pub col_lab: Option<ColorSpec> => option ColorSpec,
         /// Font of the axis titles (`xlab` and `ylab`; a [`FontFace`]).
-        /// `None`: `par(font.lab)`. R's `font.lab`.
+        /// `None`: [`par(font.lab)`]. R's `font.lab`.
+        ///
+        /// [`par(font.lab)`]: crate::par::Par::font_lab
         pub font_lab: Option<FontFace> => option FontFace,
-        /// Whether to draw the titles. Default `true`, whatever `par(ann)`
+        /// Whether to draw the titles. Default `true`, whatever [`par(ann)`]
         /// is, as R's `ann`.
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
         pub ann: bool => value bool,
         /// Whether to draw the axes. Default `true`.
         pub axes: bool => value bool,
@@ -536,22 +556,36 @@ crate::setters::options! {
         /// `ylog` are ignored). Default `false`.
         pub add: bool => value bool,
         /// Orientation of the axis labels: 0 parallel to the axis, 1
-        /// horizontal, 2 perpendicular, 3 vertical. `None`: `par(las)`.
+        /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
-        /// Size of the axis labels. `None`: `par(cex.axis)`. R's `cex.axis`.
+        /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
         pub cex_axis: Option<f64> => option f64,
-        /// Colour of the axis labels. `None`: `par(col.axis)`. R's
+        /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
+        ///
+        /// [`par(col.axis)`]: crate::par::Par::col_axis
         pub col_axis: Option<ColorSpec> => option ColorSpec,
-        /// Font of the axis labels. `None`: `par(font.axis)`. R's
+        /// Font of the axis labels. `None`: [`par(font.axis)`]. R's
         /// `font.axis`.
+        ///
+        /// [`par(font.axis)`]: crate::par::Par::font_axis
         pub font_axis: Option<FontFace> => option FontFace,
         /// Margin lines of the axis titles, axis labels and axis line, for
-        /// the axes and titles. `None`: `par(mgp)`.
+        /// the axes and titles. `None`: [`par(mgp)`].
+        ///
+        /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
-        /// Tick length as a fraction of the plot region. `None`: `par(tck)`.
+        /// Tick length as a fraction of the plot region. `None`: [`par(tck)`].
+        ///
+        /// [`par(tck)`]: crate::par::Par::tck
         pub tck: Option<f64> => option f64,
-        /// Tick length in margin lines. `None`: `par(tcl)`.
+        /// Tick length in margin lines. `None`: [`par(tcl)`].
+        ///
+        /// [`par(tcl)`]: crate::par::Par::tcl
         pub tcl: Option<f64> => option f64,
         /// Minimum gap between axis labels. `None`: R's default. R's
         /// `gap.axis`.

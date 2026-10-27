@@ -150,7 +150,9 @@ pub struct Device<B: Backend> {
     /// Inner region (the device minus the outer margins), as of the last
     /// `plot_new()`.
     inner: Rect,
-    /// `par(mar)` as of the last `plot_new()`, for `title()`.
+    /// [`par(mar)`] as of the last `plot_new()`, for `title()`.
+    ///
+    /// [`par(mar)`]: crate::par::Par::mar
     mar: Sides<f64>,
     /// Figure region (part of the inner region).
     fig: Rect,
@@ -159,28 +161,39 @@ pub struct Device<B: Backend> {
     /// R's error for invalid regions as of the last layout (see
     /// `region_error()`), raised by `plot_new()`.
     region_error: Option<&'static str>,
-    /// `par(cex)` as of the last layout (R's `cexbase` in `xNDCPerChar`,
+    /// [`par(cex)`] as of the last layout (R's `cexbase` in `xNDCPerChar`,
     /// set by `mapNDC2Dev()` at `plot.new()` and region changes, not by a
     /// later `par(cex = )`): the size of R's `CHARS` unit, e.g. `text()`'s
     /// `offset`.
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     pub(crate) layout_cex: f64,
     /// `(x0, x1, y0, y1)` in "user" coordinates - already log10-
-    /// transformed if `xlog`/`ylog` is set, matching `par("usr")`.
+    /// transformed if `xlog`/`ylog` is set, matching [`par("usr")`].
+    ///
+    /// [`par("usr")`]: crate::device::Device::usr
     usr: (f64, f64, f64, f64),
     xlog: bool,
     ylog: bool,
     /// How figures are arranged (`mfrow`/`mfcol`/`layout()`); the default
     /// is a single figure.
     arrangement: Arrangement,
-    /// `par("mfg")`'s `currentFigure`, 1-based.
+    /// [`par("mfg")`]'s `currentFigure`, 1-based.
+    ///
+    /// [`par("mfg")`]: crate::graphics::ParCall::mfg
     current_figure: usize,
-    /// `par(fig)` or `par(fin)` (R's `defaultFigure = FALSE`): one figure
+    /// [`par(fig)`] or [`par(fin)`] (R's `defaultFigure = FALSE`): one figure
     /// region, overriding the arrangement until `mfrow`/`mfcol`/`layout`
     /// is called.
+    ///
+    /// [`par(fig)`]: crate::graphics::ParCall::fig
+    /// [`par(fin)`]: crate::graphics::ParCall::fin
     fig_spec: Option<FigSpec>,
-    /// `par("new")`, set by `par(new = )` and `par(mfg = )`: the
+    /// [`par("new")`], set by `par(new = )` and `par(mfg = )`: the
     /// next `plot_new()` reuses the current figure instead of advancing.
     /// Cleared by drawing (see [`Device::dirty`]), not by `plot_new()`.
+    ///
+    /// [`par("new")`]: crate::par::ParOptions::new
     hold_figure: bool,
     /// Whether anything has been plotted yet (R's `gpptr(dd)->state`).
     used: bool,
@@ -462,14 +475,18 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
         self
     }
 
-    /// Size, relative to `par(cex)`. `None`: 1, so `par(cex)`.
+    /// Size, relative to [`par(cex)`]. `None`: 1, so [`par(cex)`].
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     pub fn cex(mut self, cex: impl Into<f64>) -> Self {
         self.cex = Some(cex.into());
         self
     }
 
     /// Font face of text ([`FontFace`]; R's number, a name or the enum).
-    /// `None`: `par(font)`. Expressions use their own fonts.
+    /// `None`: [`par(font)`]. Expressions use their own fonts.
+    ///
+    /// [`par(font)`]: crate::par::Par::font
     pub fn font(mut self, font: impl IntoArg<FontFace>) -> Self {
         match font.into_arg() {
             Ok(f) => self.font = Some(f),
@@ -548,9 +565,13 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
 /// A figure region set with `fig()` or `fin()`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum FigSpec {
-    /// `par(fig)`: fractions `[x0, x1, y0, y1]` of the inner region.
+    /// [`par(fig)`]: fractions `[x0, x1, y0, y1]` of the inner region.
+    ///
+    /// [`par(fig)`]: crate::graphics::ParCall::fig
     Nic([f64; 4]),
-    /// `par(fin)`: `[width, height]` in inches, centred.
+    /// [`par(fin)`]: `[width, height]` in inches, centred.
+    ///
+    /// [`par(fin)`]: crate::graphics::ParCall::fin
     Inches([f64; 2]),
 }
 
@@ -568,51 +589,80 @@ crate::setters::options! {
         pub xlab: Option<Label> => option Label,
         /// y axis label.
         pub ylab: Option<Label> => option Label,
-        /// Size of the main title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
+        /// Size of the main title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
         pub cex_main: Option<f64> => option f64,
-        /// Colour of the main title. `None`: `par(col.main)`. R's `col.main`.
+        /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
         pub col_main: Option<ColorSpec> => option ColorSpec,
         /// Font face of the main title ([`FontFace`]). `None`:
-        /// `par(font.main)`. R's `font.main`.
+        /// [`par(font.main)`]. R's `font.main`.
+        ///
+        /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
-        /// Size of the subtitle, relative to `par(cex)`. `None`:
-        /// `par(cex.sub)`. R's `cex.sub`.
+        /// Size of the subtitle, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.sub)`]. R's `cex.sub`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.sub)`]: crate::par::Par::cex_sub
         pub cex_sub: Option<f64> => option f64,
-        /// Colour of the subtitle. `None`: `par(col.sub)`. R's `col.sub`.
+        /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
+        ///
+        /// [`par(col.sub)`]: crate::par::Par::col_sub
         pub col_sub: Option<ColorSpec> => option ColorSpec,
-        /// Font face of the subtitle ([`FontFace`]). `None`: `par(font.sub)`.
+        /// Font face of the subtitle ([`FontFace`]). `None`: [`par(font.sub)`].
         /// R's `font.sub`.
+        ///
+        /// [`par(font.sub)`]: crate::par::Par::font_sub
         pub font_sub: Option<FontFace> => option FontFace,
-        /// Size of the axis labels (`xlab`, `ylab`), relative to `par(cex)`.
-        /// `None`: `par(cex.lab)`. R's `cex.lab`.
+        /// Size of the axis labels (`xlab`, `ylab`), relative to [`par(cex)`].
+        /// `None`: [`par(cex.lab)`]. R's `cex.lab`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.lab)`]: crate::par::Par::cex_lab
         pub cex_lab: Option<f64> => option f64,
-        /// Colour of the axis labels (`xlab`, `ylab`). `None`: `par(col.lab)`.
+        /// Colour of the axis labels (`xlab`, `ylab`). `None`: [`par(col.lab)`].
         /// R's `col.lab`.
+        ///
+        /// [`par(col.lab)`]: crate::par::Par::col_lab
         pub col_lab: Option<ColorSpec> => option ColorSpec,
         /// Font face of the axis labels (`xlab`, `ylab`; [`FontFace`]).
-        /// `None`: `par(font.lab)`. R's `font.lab`.
+        /// `None`: [`par(font.lab)`]. R's `font.lab`.
+        ///
+        /// [`par(font.lab)`]: crate::par::Par::font_lab
         pub font_lab: Option<FontFace> => option FontFace,
         /// Where each title sits along its side of the plot region, and how
         /// it's justified there: 0 left (bottom for `ylab`), 0.5 centred, 1
-        /// right (top). `None`: `par(adj)`.
+        /// right (top). `None`: [`par(adj)`].
+        ///
+        /// [`par(adj)`]: crate::par::Par::adj
         pub adj: Option<f64> => option f64,
         /// Margin lines for the axis labels (`mgp[0]`) and the subtitle
-        /// (`mgp[0] + 1`). `None`: `par(mgp)`.
+        /// (`mgp[0] + 1`). `None`: [`par(mgp)`].
+        ///
+        /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
         /// Margin line for every title given, instead of their defaults (half
         /// the top margin for `main`, `mgp[0]` for `xlab`/`ylab`, `mgp[0] + 1`
         /// for `sub`); `main` then sits with its baseline on it. `None` (or
         /// non-finite): the defaults.
         pub line: Option<f64> => option f64,
-        /// Draws in the outer margins (`par(oma)`) instead, positioned along
+        /// Draws in the outer margins ([`par(oma)`]) instead, positioned along
         /// the inner region; `main` defaults to half the top outer margin.
         /// Default `false`.
+        ///
+        /// [`par(oma)`]: crate::par::Par::oma
         pub outer: bool => value bool,
         /// Where the titles are clipped: at least the figure region
         /// ([`Xpd::Plot`] acts as [`Xpd::Figure`], as in R), or
-        /// [`Xpd::Device`] for the whole device. `None`: `par(xpd)`. `outer`
+        /// [`Xpd::Device`] for the whole device. `None`: [`par(xpd)`]. `outer`
         /// titles clip to the device.
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
     }
 }
@@ -747,7 +797,7 @@ impl<B: Backend> Device<B> {
 
     /// Returns the page size in inches, `(width, height)`.
     ///
-    /// This is R's `par("din")`.
+    /// This is R's [`par("din")`].
     ///
     /// # Examples
     ///
@@ -756,6 +806,8 @@ impl<B: Backend> Device<B> {
     /// let dev = Device::new(SvgBackend::new(7, 5), Par::default());
     /// assert_eq!(dev.din(), (7.0, 5.0));
     /// ```
+    ///
+    /// [`par("din")`]: crate::device::Device::din
     pub fn din(&self) -> (f64, f64) {
         (self.width_in, self.height_in)
     }
@@ -763,7 +815,7 @@ impl<B: Backend> Device<B> {
     /// Returns the current plot region, in inches from the page's bottom-left
     /// corner.
     ///
-    /// This is R's `par("plt")`, in inches rather than fractions of the figure.
+    /// This is R's [`par("plt")`], in inches rather than fractions of the figure.
     ///
     /// # Examples
     ///
@@ -774,6 +826,8 @@ impl<B: Backend> Device<B> {
     /// let r = dev.plot_region();
     /// assert!(r.x0 > 0.0 && r.x1 < dev.din().0);
     /// ```
+    ///
+    /// [`par("plt")`]: crate::par::Par::plt
     pub fn plot_region(&self) -> Rect {
         self.plt
     }
@@ -786,7 +840,7 @@ impl<B: Backend> Device<B> {
     /// units. Set by `plot_window()` (which high-level plots call) or
     /// `par(usr = )`.
     ///
-    /// This is R's `par("usr")`.
+    /// This is R's [`par("usr")`].
     ///
     /// # Examples
     ///
@@ -798,6 +852,8 @@ impl<B: Backend> Device<B> {
     /// let (x0, x1, ..) = dev.usr();
     /// assert!((x0 + 0.4).abs() < 1e-9 && (x1 - 10.4).abs() < 1e-9); // 4% added at each end
     /// ```
+    ///
+    /// [`par("usr")`]: crate::device::Device::usr
     pub fn usr(&self) -> (f64, f64, f64, f64) {
         self.usr
     }
@@ -807,7 +863,7 @@ impl<B: Backend> Device<B> {
     /// Set by the last `plot_window()` or `par(xlog = )`; `plot_new()` resets
     /// it.
     ///
-    /// This is R's `par("xlog")`.
+    /// This is R's [`par("xlog")`].
     ///
     /// # Examples
     ///
@@ -817,13 +873,15 @@ impl<B: Backend> Device<B> {
     /// dev.plot().x([1, 10, 100]).xlog(true).draw();
     /// assert!(dev.xlog());
     /// ```
+    ///
+    /// [`par("xlog")`]: crate::device::Device::xlog
     pub fn xlog(&self) -> bool {
         self.xlog
     }
 
     /// Returns whether the y axis is logarithmic; see [`Device::xlog`].
     ///
-    /// This is R's `par("ylog")`.
+    /// This is R's [`par("ylog")`].
     ///
     /// # Examples
     ///
@@ -833,6 +891,8 @@ impl<B: Backend> Device<B> {
     /// dev.plot().x([1, 10, 100]).ylog(true).draw();
     /// assert!(dev.ylog());
     /// ```
+    ///
+    /// [`par("ylog")`]: crate::device::Device::ylog
     pub fn ylog(&self) -> bool {
         self.ylog
     }
@@ -1041,7 +1101,7 @@ impl<B: Backend> Device<B> {
     ///
     /// Change them with [`par()`](crate::graphics::Graphics::par).
     ///
-    /// This is R's `par()` read form: R's `par("cex")` is
+    /// This is R's `par()` read form: R's [`par("cex")`] is
     /// `dev.current_par().cex`.
     ///
     /// # Examples
@@ -1052,6 +1112,8 @@ impl<B: Backend> Device<B> {
     /// dev.par().mfrow(2, 2).draw();
     /// assert_eq!(dev.current_par().cex, 0.83);
     /// ```
+    ///
+    /// [`par("cex")`]: crate::par::Par::cex
     pub fn current_par(&self) -> &Par {
         &self.par
     }
@@ -1061,7 +1123,7 @@ impl<B: Backend> Device<B> {
     ///
     /// Set with `dev.par().new(true)`; any drawing clears it.
     ///
-    /// This is R's `par("new")`.
+    /// This is R's [`par("new")`].
     ///
     /// # Examples
     ///
@@ -1072,13 +1134,15 @@ impl<B: Backend> Device<B> {
     /// dev.par().new(true).draw();
     /// assert!(dev.is_new());
     /// ```
+    ///
+    /// [`par("new")`]: crate::par::ParOptions::new
     pub fn is_new(&self) -> bool {
         self.hold_figure
     }
 
     /// Returns the number of the current figure (panel), counting from 1.
     ///
-    /// This is the position in R's `par("mfg")`.
+    /// This is the position in R's [`par("mfg")`].
     ///
     /// # Examples
     ///
@@ -1090,6 +1154,8 @@ impl<B: Backend> Device<B> {
     /// dev.plot().x([2, 1]).draw();
     /// assert_eq!(dev.current_figure(), 2);
     /// ```
+    ///
+    /// [`par("mfg")`]: crate::graphics::ParCall::mfg
     pub fn current_figure(&self) -> usize {
         self.current_figure
     }
@@ -1097,7 +1163,7 @@ impl<B: Backend> Device<B> {
     /// Returns the current figure region, in inches from the page's
     /// bottom-left corner.
     ///
-    /// This is R's `par("fig")`, in inches rather than fractions of the inner
+    /// This is R's [`par("fig")`], in inches rather than fractions of the inner
     /// region.
     ///
     /// # Examples
@@ -1109,6 +1175,8 @@ impl<B: Backend> Device<B> {
     /// dev.plot().x([1, 2]).draw();
     /// assert_eq!(dev.figure_region().x1, dev.din().0 / 2.0);
     /// ```
+    ///
+    /// [`par("fig")`]: crate::graphics::ParCall::fig
     pub fn figure_region(&self) -> Rect {
         self.fig
     }
@@ -1297,9 +1365,9 @@ impl<B: Backend> Device<B> {
     /// Returns the tick positions [`axis()`](crate::graphics::Graphics::axis)
     /// would use on `side` without `at`, in data units.
     ///
-    /// They come from `par("xaxp")` (sides 1 and 3) or `par("yaxp")` (sides 2
+    /// They come from [`par("xaxp")`] (sides 1 and 3) or [`par("yaxp")`] (sides 2
     /// and 4), which `plot_new()` and `plot_window()` set from the axis range
-    /// and `par("lab")`.
+    /// and [`par("lab")`].
     ///
     /// This is R's `axTicks()`.
     ///
@@ -1316,6 +1384,10 @@ impl<B: Backend> Device<B> {
     /// # Panics
     ///
     /// If `side` isn't 1 to 4 (R: "invalid axis number").
+    ///
+    /// [`par("lab")`]: crate::par::Par::lab
+    /// [`par("xaxp")`]: crate::par::Par::xaxp
+    /// [`par("yaxp")`]: crate::par::Par::yaxp
     pub fn ax_ticks(&self, side: impl IntoArg<Side>) -> Vec<f64> {
         let side = side
             .into_arg()
@@ -1477,7 +1549,7 @@ impl<B: Backend> Device<B> {
     ///
     /// It is the [`pointsize`](DeviceBuilder::pointsize) the device was opened
     /// with, or `par.ps` as passed to [`Device::new`]. Margin lines and
-    /// plotting symbols are sized from it; changing `par(ps)` later only
+    /// plotting symbols are sized from it; changing [`par(ps)`] later only
     /// changes the text size.
     ///
     /// This is R's `startps`.
@@ -1492,6 +1564,8 @@ impl<B: Backend> Device<B> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`par(ps)`]: crate::par::Par::ps
     pub fn start_ps(&self) -> f64 {
         self.start_ps
     }
@@ -1512,10 +1586,10 @@ impl<B: Backend> Device<B> {
         self.par.mex * self.par.cex * 1.2 * self.start_ps / 72.0
     }
 
-    /// Returns the margins in inches (bottom, left, top, right): `par(mai)` if
-    /// set, else `par(mar)` converted.
+    /// Returns the margins in inches (bottom, left, top, right): [`par(mai)`] if
+    /// set, else [`par(mar)`] converted.
     ///
-    /// This is R's `par("mai")`.
+    /// This is R's [`par("mai")`].
     ///
     /// # Examples
     ///
@@ -1525,6 +1599,10 @@ impl<B: Backend> Device<B> {
     /// dev.par().mar([5, 4, 4, 2]).draw();
     /// assert_eq!(dev.mai().bottom, 5.0 * dev.line_height_inches());
     /// ```
+    ///
+    /// [`par("mai")`]: crate::device::Device::mai
+    /// [`par(mai)`]: crate::par::Par::mai
+    /// [`par(mar)`]: crate::par::Par::mar
     pub fn mai(&self) -> Sides<f64> {
         if let Some(mai) = self.par.mai {
             return mai;
@@ -1535,9 +1613,9 @@ impl<B: Backend> Device<B> {
     }
 
     /// Returns the outer margins in inches (bottom, left, top, right), from
-    /// `par(omd)`, else `par(omi)`, else `par(oma)`.
+    /// [`par(omd)`], else [`par(omi)`], else [`par(oma)`].
     ///
-    /// This is R's `par("omi")`.
+    /// This is R's [`par("omi")`].
     ///
     /// # Examples
     ///
@@ -1547,6 +1625,11 @@ impl<B: Backend> Device<B> {
     /// dev.par().omi([0, 0, 1, 0]).draw();
     /// assert_eq!(dev.omi().top, 1.0);
     /// ```
+    ///
+    /// [`par("omi")`]: crate::device::Device::omi
+    /// [`par(oma)`]: crate::par::Par::oma
+    /// [`par(omd)`]: crate::par::Par::omd
+    /// [`par(omi)`]: crate::par::Par::omi
     pub fn omi(&self) -> Sides<f64> {
         if let Some([x0, x1, y0, y1]) = self.par.omd {
             let (w, h) = (self.width_in, self.height_in);
@@ -1575,8 +1658,10 @@ impl<B: Backend> Device<B> {
     // ---------------------------------------------------------------
 
     /// Where margin text (`title()`, `mtext()`) clips: R raises `xpd` (the
-    /// inline one, else `par(xpd)`) to at least `TRUE`, the figure region
+    /// inline one, else [`par(xpd)`]) to at least `TRUE`, the figure region
     /// (`NA`, the device, stays), and `outer` text clips to the device.
+    ///
+    /// [`par(xpd)`]: crate::par::Par::xpd
     fn margin_clip(&self, xpd: Option<Xpd>, outer: bool) -> Xpd {
         match (outer, xpd.unwrap_or(self.par.xpd)) {
             (true, _) | (_, Xpd::Device) => Xpd::Device,
@@ -1588,9 +1673,11 @@ impl<B: Backend> Device<B> {
         self.push_clip_region(xpd);
     }
 
-    /// Marks the current plot as drawn on, which resets `par(new)` (R's
+    /// Marks the current plot as drawn on, which resets [`par(new)`] (R's
     /// `GMode()`). Every drawing path goes through here, mostly via
     /// [`Device::push_clip_region`].
+    ///
+    /// [`par(new)`]: crate::par::ParOptions::new
     fn dirty(&mut self) {
         self.hold_figure = false;
     }
@@ -1626,7 +1713,9 @@ impl<B: Backend> Device<B> {
     }
 
     /// One symbol, as `GSymbol()`/`GESymbol()` draw it. `cex` is the
-    /// per-point `cex` (R multiplies it by `cexbase`, i.e. `par(cex)`).
+    /// per-point `cex` (R multiplies it by `cexbase`, i.e. [`par(cex)`]).
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     fn draw_pch(&mut self, pch: i32, p: Point, cex: f64, col: Color, bg: Option<Color>, lwd: f64) {
         let cex = self.par.cex * cex;
         let size = pch::symbol_size_inches(self.start_ps, cex);
@@ -1937,7 +2026,9 @@ impl<B: Backend> Device<B> {
     }
 
     /// Width and height in inches of text in `face` at `cex` (times
-    /// `par(cex)`): R's `GEStrWidth`/`GEStrHeight`.
+    /// [`par(cex)`]): R's `GEStrWidth`/`GEStrHeight`.
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     fn text_size_inches(&self, text: &str, face: FontFace, cex: f64) -> (f64, f64) {
         let size = self.font_size_pt(cex);
         let width = text
@@ -2007,12 +2098,15 @@ impl<B: Backend> Device<B> {
     // title()
     // ---------------------------------------------------------------
 
-    /// `GMtext()`'s `yLineBias` nudge (`graphics.c`; `par(ylbias)`), in
+    /// `GMtext()`'s `yLineBias` nudge (`graphics.c`; [`par(ylbias)`]), in
     /// margin lines, for text on `side`: `1 - bias` on sides 1 and 4, `bias`
     /// on 2 and 3, divided
-    /// by `par(mex)` as R does (so the nudge stays the same size in inches);
+    /// by [`par(mex)`] as R does (so the nudge stays the same size in inches);
     /// 0 for text perpendicular to the side. Shared by `title()`, `axis()`
     /// and `mtext()`.
+    ///
+    /// [`par(mex)`]: crate::par::Par::mex
+    /// [`par(ylbias)`]: crate::par::Par::ylbias
     pub(crate) fn line_bias(&self, side: Side, parallel: bool) -> f64 {
         if !parallel {
             return 0.0;

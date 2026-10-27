@@ -153,8 +153,10 @@ impl<B: Backend> Device<B> {
     }
 
     /// `strwidth(label, "inches", cex = cex, font = font)`, single-line
-    /// text or an expression; `cex` is multiplied by `par(cex)`, as in
+    /// text or an expression; `cex` is multiplied by [`par(cex)`], as in
     /// [`Graphics::text`](crate::graphics::Graphics::text).
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     pub(super) fn label_width(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
             Label::Text(t) => afm::str_width_inches(t, font, self.font_size_pt(cex), 1.0),
@@ -177,7 +179,9 @@ impl<B: Backend> Device<B> {
     /// Draws text (`GEText`) or an expression (`GEMathText`, in the plain
     /// font) at `anchor`. `xc`/`yc` align text as in `text_at_clipped`
     /// and an expression's bounding box; `yc = None` is R's `NA`. `cex` is
-    /// multiplied by `par(cex)`.
+    /// multiplied by [`par(cex)`].
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     #[allow(clippy::too_many_arguments)]
     pub(super) fn draw_label(
         &mut self,

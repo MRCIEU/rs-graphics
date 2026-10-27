@@ -212,6 +212,7 @@ dev.text().x(&mp).y(&above).labels(["3", "5", "2"]).draw();
 dev.mtext().text("Two panels").outer(true).line(0.5).font(2).draw();
 ```
 
+
 ## Concepts
 
 The words the docs use come from R. In short:
@@ -222,7 +223,7 @@ The words the docs use come from R. In short:
 |---|---|
 | device | Where drawing goes: a PDF, SVG or PNG file being written (`Device`). It has one or more pages. |
 | plot region | The rectangle the data is drawn in. Axes run along its edges; drawing is clipped to it by default. |
-| margins | The space around the plot region, for the axes, their labels and the titles. Measured in **lines** of text: `par().mar([5.1, 4.1, 4.1, 2.1)`](crate::par::Par::mar) (bottom, left, top, right), or in inches with `mai`. |
+| margins | The space around the plot region, for the axes, their labels and the titles. Measured in **lines** of text: `par().mar([5.1, 4.1, 4.1, 2.1])` (bottom, left, top, right), or in inches with `mai`. |
 | figure region | The plot region plus its margins: one panel. |
 | outer margins | Space around all the panels of a page, e.g. for a shared title: `oma` (lines), `omi` (inches). Text goes there with `mtext().outer(true)`. |
 | inner region | The page less the outer margins, which the panels share. |
@@ -263,6 +264,7 @@ The words the docs use come from R. In short:
 | `bty` | `.bty()` | Which sides of the box around the plot to draw (`"o"` all, `"l"` left and bottom, `"n"` none, ...). |
 | `ann` | `.ann()` | Whether high-level plots draw their titles. |
 | `type` | `.type_()` | What `plot()`, `points()` and `lines()` draw: `"p"` points, `"l"` lines, `"b"` both, `"h"` vertical lines, `"s"` steps, `"n"` nothing. |
+
 
 ## Every R function and argument
 

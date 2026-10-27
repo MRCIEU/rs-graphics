@@ -180,7 +180,9 @@ crate::setters::options! {
     /// `pch`, `cex` and `bg` here, then to `par()`, as in `bxp()`. Of the
     /// title parameters, only the `cex.*` and `col.*` ones are passed to
     /// `title()`, as `bxp()` does (`font.main` and co. come from `par()`), and
-    /// the frame follows `par(bty)` (`bxp()`'s `box()` takes no `bty`).
+    /// the frame follows [`par(bty)`] (`bxp()`'s `box()` takes no `bty`).
+    ///
+    /// [`par(bty)`]: crate::par::Par::bty
     #[derive(Clone, Debug)]
     pub struct BoxplotOptions => [BoxplotCall] {
         /// Group labels on the name axis (side 1, or 2 if `horizontal`).
@@ -191,7 +193,9 @@ crate::setters::options! {
         /// Passed to R's `bxp()` as `boxfill`.
         pub col: Vec<ColorSpec> => values ColorSpec,
         /// Colours of the box outlines, median, whiskers, staples and
-        /// outliers, recycled over the boxes. Empty: `par(fg)`.
+        /// outliers, recycled over the boxes. Empty: [`par(fg)`].
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// How far the whiskers reach: to the most extreme point within
         /// `range` times the box length (IQR); points beyond are outliers.
@@ -231,24 +235,41 @@ crate::setters::options! {
         pub xlab: Option<Label> => option Label,
         /// Label of the y axis. `None`: none.
         pub ylab: Option<Label> => option Label,
-        /// Size of the main title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
+        /// Size of the main title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
         pub cex_main: Option<f64> => option f64,
-        /// Colour of the main title. `None`: `par(col.main)`. R's `col.main`.
+        /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
         pub col_main: Option<ColorSpec> => option ColorSpec,
-        /// Size of the subtitle, relative to `par(cex)`. `None`:
-        /// `par(cex.sub)`. R's `cex.sub`.
+        /// Size of the subtitle, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.sub)`]. R's `cex.sub`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.sub)`]: crate::par::Par::cex_sub
         pub cex_sub: Option<f64> => option f64,
-        /// Colour of the subtitle. `None`: `par(col.sub)`. R's `col.sub`.
+        /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
+        ///
+        /// [`par(col.sub)`]: crate::par::Par::col_sub
         pub col_sub: Option<ColorSpec> => option ColorSpec,
         /// Size of the axis labels `xlab` and `ylab`, relative to
-        /// `par(cex)`. `None`: `par(cex.lab)`. R's `cex.lab`.
+        /// [`par(cex)`]. `None`: [`par(cex.lab)`]. R's `cex.lab`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.lab)`]: crate::par::Par::cex_lab
         pub cex_lab: Option<f64> => option f64,
-        /// Colour of `xlab` and `ylab`. `None`: `par(col.lab)`. R's
+        /// Colour of `xlab` and `ylab`. `None`: [`par(col.lab)`]. R's
         /// `col.lab`.
+        ///
+        /// [`par(col.lab)`]: crate::par::Par::col_lab
         pub col_lab: Option<ColorSpec> => option ColorSpec,
         /// Whether to draw the titles. `None`: unless `add` (R's default
-        /// `ann = !add`, not `par(ann)`).
+        /// `ann = !add`, not [`par(ann)`]).
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
         pub ann: Option<bool> => option bool,
         /// Draws the axes and the box around the plot, also with `add` (as
         /// in R). Default `true`.
@@ -274,23 +295,31 @@ crate::setters::options! {
         pub outwex: Vec<f64> => values f64,
 
         /// Default line type of the box, median and staples, and of the
-        /// whiskers. Empty: `par(lty)` (the whiskers: dashed). `None`: that
+        /// whiskers. Empty: [`par(lty)`] (the whiskers: dashed). `None`: that
         /// box's outline, median, whiskers and staples aren't drawn (unless
         /// their own type is given).
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Default line width of every part (the median: 3 times it). Empty:
-        /// `par(lwd)`. `None`: none of that box's lines or outliers are drawn
+        /// [`par(lwd)`]. `None`: none of that box's lines or outliers are drawn
         /// (unless their own width is given).
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
-        /// Default outlier symbol. Empty: `par(pch)`. `None`: that box's
+        /// Default outlier symbol. Empty: [`par(pch)`]. `None`: that box's
         /// outliers aren't drawn (unless `outpch` is given).
+        ///
+        /// [`par(pch)`]: crate::par::Par::pch
         pub pch: Vec<Option<i32>> => na_values i32,
         /// Default size of the median and outlier symbols. Empty: 1.
         /// `None`: that box's median and outlier symbols aren't drawn
         /// (unless their own size is given).
         pub cex: Vec<Option<f64>> => na_values f64,
         /// Default fill of the median and outlier symbols (21 to 25). Empty:
-        /// `par(bg)`.
+        /// [`par(bg)`].
+        ///
+        /// [`par(bg)`]: crate::par::Par::bg
         pub bg: Vec<ColorSpec> => values ColorSpec,
 
         /// Line type of the box outline. Empty: `lty`; `None`: no outline.
@@ -341,26 +370,40 @@ crate::setters::options! {
         /// Fill of the outlier symbols. Empty: `bg`.
         pub outbg: Vec<ColorSpec> => values ColorSpec,
         /// Orientation of the axis labels: 0 parallel to the axis, 1
-        /// horizontal, 2 perpendicular, 3 vertical. `None`: `par(las)`.
+        /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
-        /// Size of the axis labels. `None`: `par(cex.axis)`. R's `cex.axis`.
+        /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
         pub cex_axis: Option<f64> => option f64,
-        /// Colour of the axis labels. `None`: `par(col.axis)`. R's
+        /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
+        ///
+        /// [`par(col.axis)`]: crate::par::Par::col_axis
         pub col_axis: Option<ColorSpec> => option ColorSpec,
         /// Minimum gap between axis labels. `None`: R's default. R's
         /// `gap.axis`.
         pub gap_axis: Option<f64> => option f64,
         /// Type of the x axis: `AxisType::None` leaves it out. `None`:
-        /// `par(xaxt)`.
+        /// [`par(xaxt)`].
+        ///
+        /// [`par(xaxt)`]: crate::par::Par::xaxt
         pub xaxt: Option<AxisType> => option AxisType,
-        /// Type of the y axis, as `xaxt`. `None`: `par(yaxt)`.
+        /// Type of the y axis, as `xaxt`. `None`: [`par(yaxt)`].
+        ///
+        /// [`par(yaxt)`]: crate::par::Par::yaxt
         pub yaxt: Option<AxisType> => option AxisType,
         /// Default tick positions of the x axis (used by the value axis when
-        /// `horizontal`). `None`: `par(xaxp)`.
+        /// `horizontal`). `None`: [`par(xaxp)`].
+        ///
+        /// [`par(xaxp)`]: crate::par::Par::xaxp
         pub xaxp: Option<[f64; 3]> => array [f64; 3],
         /// Default tick positions of the y axis, as `xaxp`. `None`:
-        /// `par(yaxp)`.
+        /// [`par(yaxp)`].
+        ///
+        /// [`par(yaxp)`]: crate::par::Par::yaxp
         pub yaxp: Option<[f64; 3]> => array [f64; 3],
         /// Draws the box around the plot region. `None`: `axes`. R's
         /// `frame.plot`.

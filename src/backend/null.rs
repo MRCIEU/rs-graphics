@@ -52,8 +52,10 @@ impl NullBackend {
         }
     }
 
-    /// Sets the page background: what colour 0 (`par(bg)`) is and what a
+    /// Sets the page background: what colour 0 ([`par(bg)`]) is and what a
     /// legend box is filled with. Nothing is painted.
+    ///
+    /// [`par(bg)`]: crate::par::Par::bg
     pub fn with_background(mut self, color: Color) -> Self {
         self.background = color;
         self

@@ -45,43 +45,64 @@ crate::setters::options! {
         /// R's `NA`), draws no label or tick for its slice.
         pub labels: Option<Vec<Label>> => list Label,
         /// Rotation of the labels in degrees, counterclockwise. `None`:
-        /// `par(srt)`.
+        /// [`par(srt)`].
+        ///
+        /// [`par(srt)`]: crate::par::Par::srt
         pub srt: Option<f64> => option f64,
         /// Size of the labels (the title keeps `cex_main`). `None`: 1.
         pub cex: Option<f64> => option f64,
-        /// Font of the labels. `None`: `par(font)`.
+        /// Font of the labels. `None`: [`par(font)`].
+        ///
+        /// [`par(font)`]: crate::par::Par::font
         pub font: Option<FontFace> => option FontFace,
         /// Pie radius in user units, where the plot region's shorter side
         /// spans `[-1, 1]` before the usual 4% axis extension. `None`: 0.8.
         pub radius: Option<f64> => option f64,
         /// Slice fill colours, recycled over the slices. Empty: a cycle of 6
-        /// pastel colours, or `par(fg)` (the shading lines' colour) when
+        /// pastel colours, or [`par(fg)`] (the shading lines' colour) when
         /// `density` is given.
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Slice borders, recycled over the slices. Empty: `par(fg)`
+        /// Slice borders, recycled over the slices. Empty: [`par(fg)`]
         /// (`polygon()`'s default), or with shading the slice's `col` (R's
         /// `border = NULL`).
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Line types of the slice borders, recycled over the slices. Empty:
-        /// `par(lty)`; `None`: that slice has no border.
+        /// [`par(lty)`]; `None`: that slice has no border.
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Shading lines per inch in the slices, recycled over the slices (as
         /// [`PolygonOptions::density`]); the lines take `col`, whose default
-        /// is then `par(fg)`. Empty: no shading.
+        /// is then [`par(fg)`]. Empty: no shading.
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled over the slices.
         /// Empty: 45.
         pub angle: Vec<f64> => values f64,
         /// Title, as for `plot()` (text or a plotmath expression). `None`:
-        /// none. Drawn whatever `par(ann)` is, as in R.
+        /// none. Drawn whatever [`par(ann)`] is, as in R.
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
         pub main: Option<Label> => option Label,
-        /// Size of the title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
+        /// Size of the title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
         pub cex_main: Option<f64> => option f64,
-        /// Colour of the title. `None`: `par(col.main)`. R's `col.main`.
+        /// Colour of the title. `None`: [`par(col.main)`]. R's `col.main`.
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
         pub col_main: Option<ColorSpec> => option ColorSpec,
-        /// Font of the title (a [`FontFace`]). `None`: `par(font.main)`.
+        /// Font of the title (a [`FontFace`]). `None`: [`par(font.main)`].
         /// R's `font.main`.
+        ///
+        /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
         /// Approximate number of polygon edges for a full circle. `None`:
         /// 200.

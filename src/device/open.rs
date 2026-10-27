@@ -56,13 +56,17 @@ crate::setters::options! {
         /// or SVG device make [`open`](DeviceBuilder::open) fail. In R only
         /// bitmap devices such as `png()` take `units`, defaulting to pixels.
         pub units: Option<Units> => option Units,
-        /// Starting text size, `par(ps)`, in big points; it also fixes the
+        /// Starting text size, [`par(ps)`], in big points; it also fixes the
         /// size of plotting symbols and margin lines from the start. `None`:
         /// 12.
+        ///
+        /// [`par(ps)`]: crate::par::Par::ps
         pub pointsize: Option<f64> => option f64,
-        /// Page background, and the starting `par(bg)`; a colour that draws
+        /// Page background, and the starting [`par(bg)`]; a colour that draws
         /// nothing (`ColorSpec::None`, `"transparent"`) is transparent. `None`:
         /// transparent for PDF, white for SVG and PNG (R's defaults).
+        ///
+        /// [`par(bg)`]: crate::par::Par::bg
         pub bg: Option<ColorSpec> => option ColorSpec,
         /// Resolution in pixels per inch, PNG only (ignored for PDF and SVG).
         /// `None`: 72. R's `res`.

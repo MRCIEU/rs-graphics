@@ -294,11 +294,13 @@ pub trait Backend {
     /// (`svg()`, `png()`) don't.
     fn effective_font_size(&self, requested_pt: f64) -> f64;
 
-    /// Returns the background colour `par(bg)` starts as: white for SVG, the
+    /// Returns the background colour [`par(bg)`] starts as: white for SVG, the
     /// canvas colour for PNG, and transparent for PDF unless set with
     /// [`with_background`](pdf::PdfBackend::with_background).
     ///
-    /// New pages and default `legend()` boxes are filled with `par(bg)`.
+    /// New pages and default `legend()` boxes are filled with [`par(bg)`].
+    ///
+    /// [`par(bg)`]: crate::par::Par::bg
     fn default_bg(&self) -> Color;
 
     /// Starts a new page.

@@ -422,9 +422,12 @@ pub fn palette<G: Graphics>(g: &mut G) -> Result<(), Error> {
 /// the figure region, the margins (`mar`) and the plot region, with the
 /// margin lines numbered.
 ///
-/// It sets `par(oma)` to show the outer margins, and back to 0 at the end.
+/// It sets [`par(oma)`] to show the outer margins, and back to 0 at the end.
 ///
 /// Drawn best on a page about 7 x 6 inches.
+///
+///
+/// [`par(oma)`]: crate::par::Par::oma
 ///
 #[doc = include_str!("regions.svg")]
 ///

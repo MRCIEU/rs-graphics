@@ -23,7 +23,7 @@
 //! as on other axes.
 //!
 //! Labels and the title may be plotmath expressions (`Label::math`). As
-//! R draws them with `text()`, they are rotated by `par(srt)`.
+//! R draws them with `text()`, they are rotated by [`par(srt)`].
 //!
 //! The per-key arguments are R's vectors, recycled over the keys
 //! ([`LegendOptions`]), including shaded boxes (`density`/`angle`). Not
@@ -36,9 +36,13 @@
 //! `"blank"` gets no line column here, while R (seeing a string) leaves
 //! an empty one.
 //!
-//! `par(cex)` scales everything as in `legend.R`: the character cell
+//! [`par(cex)`] scales everything as in `legend.R`: the character cell
 //! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and
-//! `text(cex = )` both multiply by `par("cex")`, i.e. `cexbase`).
+//! `text(cex = )` both multiply by [`par("cex")`], i.e. `cexbase`).
+//!
+//! [`par("cex")`]: crate::par::Par::cex
+//! [`par(cex)`]: crate::par::Par::cex
+//! [`par(srt)`]: crate::par::Par::srt
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
@@ -412,7 +416,7 @@ crate::setters::options! {
     /// element is R's `NA` for that key (`.pch([Some(19), None])`): the
     /// field says what it does. Which parts a key has follows R's rules:
     /// - a box, if `fill` or `density` is given (every key gets one; without
-    ///   `density` a `None` fill is an empty box, with it `None` is `par(fg)`),
+    ///   `density` a `None` fill is an empty box, with it `None` is [`par(fg)`]),
     ///   shaded with lines if `density` is;
     /// - a line, if `lty` has a line type other than blank, or `lwd` is given
     ///   (R: "one of these two must be specified for line drawing"; `lty` is
@@ -422,9 +426,13 @@ crate::setters::options! {
     ///   unless `merge` is `false`; keys whose `pch` is `None` (or negative and
     ///   above -32, as in R) have none.
     ///
+    ///
+    /// [`par(fg)`]: crate::par::Par::fg
     #[derive(Clone, Debug, Default)]
     pub struct LegendOptions => [LegendCall] {
-        /// Colours of the lines and points. Empty: `par("col")`.
+        /// Colours of the lines and points. Empty: [`par("col")`].
+        ///
+        /// [`par("col")`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
         /// Plotting symbols (see [`LegendPch`] for characters). Empty: no
         /// points; `None`: no point on that key.
@@ -433,19 +441,26 @@ crate::setters::options! {
         /// `None`: no line on that key.
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Line widths of the lines; giving any draws lines. Empty:
-        /// `par("lwd")`; `None`: no line on that key (its point, if any, uses
-        /// `par(lwd)`).
+        /// [`par("lwd")`]; `None`: no line on that key (its point, if any, uses
+        /// [`par(lwd)`]).
+        ///
+        /// [`par("lwd")`]: crate::par::Par::lwd
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
         /// Fill colours of box keys; giving any draws boxes. Empty: no fill,
         /// and no boxes unless `density` is given. With shading, the colour of
-        /// the lines (empty or `None`: `par(fg)`).
+        /// the lines (empty or `None`: [`par(fg)`]).
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub fill: Vec<ColorSpec> => values ColorSpec,
         /// Border colours of box keys. Empty: black (R's default).
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Shading lines per inch in the box keys; giving any draws boxes.
         /// As for [`rect()`](crate::graphics::Graphics::rect): the lines take
-        /// the `fill` colour (empty: `par(fg)`); `None` or negative fills the
+        /// the `fill` colour (empty: [`par(fg)`]); `None` or negative fills the
         /// box instead, 0 leaves it empty. Empty: no shading.
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled over the keys.
         /// Empty: 45.
@@ -460,11 +475,15 @@ crate::setters::options! {
         pub pt_lwd: Vec<Option<f64>> => na_values f64,
         /// Whether to draw the surrounding box. `None`: a box (R's `"o"`).
         pub bty: Option<LegendBty> => option LegendBty,
-        /// Fill colour of the legend box. `None`: `par("bg")` (transparent, so
+        /// Fill colour of the legend box. `None`: [`par("bg")`] (transparent, so
         /// unfilled, on PDF by default: see [`Backend::default_bg`]).
+        ///
+        /// [`par("bg")`]: crate::par::Par::bg
         pub bg: Option<ColorSpec> => option ColorSpec,
-        /// Size of each key's text and symbol, times `par(cex)`. Empty and
+        /// Size of each key's text and symbol, times [`par(cex)`]. Empty and
         /// `None`: 1.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
         pub cex: Vec<Option<f64>> => na_values f64,
         /// Horizontal justification of the box relative to its `x` position.
         /// `None`: 0, or 0.5 for [`LegendPos::Corners`] (R's defaults).
@@ -516,21 +535,33 @@ crate::setters::options! {
         /// Inset from the plot region's edges for keyword positions, as
         /// fractions of the plot region, `(x, y)`. `None`: `(0, 0)`.
         pub inset: Option<(f64, f64)> => option_pair (f64, f64),
-        /// Colours of the labels. Empty: `par("col")`. R's `text.col`.
+        /// Colours of the labels. Empty: [`par("col")`]. R's `text.col`.
+        ///
+        /// [`par("col")`]: crate::par::Par::col
         pub text_col: Vec<ColorSpec> => values ColorSpec,
         /// Fonts of the labels (also for measuring them). Empty and `None`:
-        /// `par("font")`. R's `text.font`.
+        /// [`par("font")`]. R's `text.font`.
+        ///
+        /// [`par("font")`]: crate::par::Par::font
         pub text_font: Vec<Option<FontFace>> => na_values FontFace,
-        /// Line width of the legend box. `None`: `par("lwd")`. R's `box.lwd`.
+        /// Line width of the legend box. `None`: [`par("lwd")`]. R's `box.lwd`.
+        ///
+        /// [`par("lwd")`]: crate::par::Par::lwd
         pub box_lwd: Option<f64> => option f64,
-        /// Line type of the legend box. `None`: `par("lty")`. R's `box.lty`.
+        /// Line type of the legend box. `None`: [`par("lty")`]. R's `box.lty`.
+        ///
+        /// [`par("lty")`]: crate::par::Par::lty
         pub box_lty: Option<LineType> => option LineType,
         /// Colour of the legend box's border (`ColorSpec::None`: no border).
-        /// `None`: `par("fg")`. R's `box.col`.
+        /// `None`: [`par("fg")`]. R's `box.col`.
+        ///
+        /// [`par("fg")`]: crate::par::Par::fg
         pub box_col: Option<ColorSpec> => option ColorSpec,
         /// How far drawing may reach ([`Xpd`]; the setter also takes
-        /// `false`/`true`). `None`: `par(xpd)`; overrides it for this call
+        /// `false`/`true`). `None`: [`par(xpd)`]; overrides it for this call
         /// only.
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
         /// Whether to draw: `false` works out the layout (returned as usual)
         /// but draws nothing. `None`: `true`.

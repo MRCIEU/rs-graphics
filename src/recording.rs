@@ -458,7 +458,7 @@ impl<B: Backend> Device<B> {
     /// A figure starting with a high-level call (other than one with `add`) or
     /// `plot_new()` moves to the next panel, as that call would. The graphical
     /// parameters are restored afterwards, so the figure's `par()` calls don't
-    /// affect what is drawn next; the panel position, `par(new)` and the
+    /// affect what is drawn next; the panel position, [`par(new)`] and the
     /// coordinates (`plot_window()`, `par(usr/xlog/ylog)`) are device state and
     /// are not restored. Returns what the figure's `legend()` and `axis()`
     /// calls returned (see [`FigureResult`]).
@@ -490,6 +490,8 @@ impl<B: Backend> Device<B> {
     /// With the first R error a recorded call raises on the device, as
     /// [`try_add_figure`](Device::try_add_figure) would return it (for
     /// example `plot.new(): figure margins too large` on a small page).
+    ///
+    /// [`par(new)`]: crate::par::ParOptions::new
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
         self.try_add_figure(fig).unwrap_or_else(|e| panic!("{e}"))
     }

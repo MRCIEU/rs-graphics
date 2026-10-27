@@ -163,12 +163,15 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// (the margins leave no room for the plot region, e.g. on a small page,
     /// with many panels or with large `oma`), "figure region too large" (`fin()`
     /// or `layout()` cm sizes beyond the inner region), "plot region too large"
-    /// (`par(pin)` or `par(plt)` beyond the figure). Every high-level plot starts
+    /// ([`par(pin)`] or [`par(plt)`] beyond the figure). Every high-level plot starts
     /// with `plot_new()`, so they fail the same way (on a
     /// [`Figure`](crate::recording::Figure), when it is added to a device). It
     /// first moves back to the previous figure, so after fixing the cause the
     /// next call retries the same figure. Use
     /// [`try_plot_new`](Graphics::try_plot_new) to handle the error.
+    ///
+    /// [`par(pin)`]: crate::par::Par::pin
+    /// [`par(plt)`]: crate::par::Par::plt
     fn plot_new(&mut self) {
         self.try_plot_new().unwrap_or_else(|e| panic!("{e}"))
     }
@@ -581,7 +584,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// over the points (extra labels are ignored). Horizontally, `adj` sets
     /// which part of a label is at its point (0 its left end, 0.5 its centre, 1
     /// its right end); vertically see [`TextOptions::vadj`]; labels are rotated
-    /// by `srt`, else `par(srt)`. A label at a non-finite position (a missing
+    /// by `srt`, else [`par(srt)`]. A label at a non-finite position (a missing
     /// value, or a value <= 0 on a log axis) is skipped.
     ///
     /// This is R's `text()`.
@@ -599,6 +602,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing (R's message) or a `pos` isn't 1 to 4 ("invalid 'pos' value").
+    ///
+    /// [`par(srt)`]: crate::par::Par::srt
     fn text(&mut self) -> TextCall<'_, Self> {
         TextCall::start(self)
     }
@@ -608,7 +613,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// Which one is set by `which` in [`BoxOptions`] (the plot region by
     /// default); the box is not clipped. For the plot region, `bty` (else
-    /// `par(bty)`) picks the sides: `"o"` all four, `"l"`, `"7"`, `"c"`, `"u"`
+    /// [`par(bty)`]) picks the sides: `"o"` all four, `"l"`, `"7"`, `"c"`, `"u"`
     /// and `"]"` the sides those characters suggest, `"n"` none.
     ///
     /// This is R's `box()` (`box` is a Rust keyword, hence `box_`).
@@ -621,6 +626,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # dev.plot().x([0, 10]).y([0, 10]).draw();
     /// dev.box_().bty("l").lwd(2).draw();
     /// ```
+    ///
+    /// [`par(bty)`]: crate::par::Par::bty
     fn box_(&mut self) -> BoxCall<'_, Self> {
         BoxCall::start(self)
     }
@@ -736,7 +743,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`side`](MtextCall::side) defaults to 3, the top. The other arguments
     /// (the margin line, `at`, `outer`, ...) are in [`MtextOptions`]; the text
     /// and those arguments are recycled over the longest. Text is rotated
-    /// according to `las` (else `par(las)`), and a `None` text (a missing
+    /// according to `las` (else [`par(las)`]), and a `None` text (a missing
     /// value) is skipped.
     ///
     /// This is R's `mtext()`.
@@ -754,6 +761,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
     /// `text` is missing or empty, or `side` isn't 1 to 4.
+    ///
+    /// [`par(las)`]: crate::par::Par::las
     fn mtext(&mut self) -> MtextCall<'_, Self> {
         MtextCall::start(self)
     }
@@ -766,7 +775,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `font_main` and the `sub` and `lab` ones; else `par()`'s). They are
     /// drawn in the order main, sub, xlab, ylab. The main title is centred on
     /// the line halfway out in the top margin; the subtitle and axis titles go
-    /// on their margin lines (set by `par(mgp)`).
+    /// on their margin lines (set by [`par(mgp)`]).
     ///
     /// This is R's `title()`.
     ///
@@ -779,6 +788,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # dev.box_().draw();
     /// dev.title().main("Growth").xlab("Day").ylab("Height (cm)").draw();
     /// ```
+    ///
+    /// [`par(mgp)`]: crate::par::Par::mgp
     fn title(&mut self) -> TitleCall<'_, Self> {
         TitleCall::start(self)
     }
@@ -834,7 +845,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`heights`](crate::device::LayoutCall::heights) and
     /// [`respect`](crate::device::LayoutCall::respect), then apply it with
     /// [`draw`](crate::device::LayoutCall::draw). Like `par()`'s
-    /// [`mfrow`](ParCall::mfrow), it sets `par(cex)` and
+    /// [`mfrow`](ParCall::mfrow), it sets [`par(cex)`] and
     /// `mex` from the grid's size, and the next `plot_new()` starts a new
     /// page at the first figure. It replaces `mfrow`/`mfcol` and `fig`/`fin`.
     /// A [`Figure`](crate::recording::Figure) records it like the rest, so a
@@ -855,6 +866,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
     /// dev.pie().x([1, 2]).draw(); // bottom right
     /// ```
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     fn layout(&mut self) -> LayoutCall<'_, Self> {
         LayoutCall::start(self)
     }
@@ -1745,7 +1758,7 @@ impl<G: Graphics> ParCall<'_, G> {
     /// Splits the page into a grid of `nrow` by `ncol` panels, filled row by
     /// row.
     ///
-    /// It also sets `par(cex)` to 0.83 (2 x 2) or 0.66 (more than 2 rows or
+    /// It also sets [`par(cex)`] to 0.83 (2 x 2) or 0.66 (more than 2 rows or
     /// columns) and `mex` to 1, and the next `plot_new()` starts a new page at
     /// the first panel. It replaces `fig`/`fin` and [`layout()`](Graphics::layout).
     ///
@@ -1770,6 +1783,8 @@ impl<G: Graphics> ParCall<'_, G> {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `nrow` or
     /// `ncol` is zero.
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     pub fn mfrow(mut self, nrow: usize, ncol: usize) -> Self {
         self.page.grid = Some(ParGrid::Rows(nrow, ncol));
         self
@@ -1831,10 +1846,10 @@ impl<G: Graphics> ParCall<'_, G> {
     }
 
     /// Places the next figure anywhere on the page, given as fractions
-    /// `[x0, x1, y0, y1]` of the inner region (the device less `par(oma)`).
+    /// `[x0, x1, y0, y1]` of the inner region (the device less [`par(oma)`]).
     ///
     /// The next `plot_new()` starts a new page unless `new` is set too
-    /// (`.fig(..).new(true)` adds a plot to the current page). `par(cex)` is
+    /// (`.fig(..).new(true)` adds a plot to the current page). [`par(cex)`] is
     /// left as it is, and `mfrow`/`mfcol`/[`layout()`](Graphics::layout) replace it.
     ///
     /// This is R's `par(fig = c(x0, x1, y0, y1))`.
@@ -1855,6 +1870,9 @@ impl<G: Graphics> ParCall<'_, G> {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, unless
     /// `0 <= x0 < x1 <= 1` and `0 <= y0 < y1 <= 1`.
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
+    /// [`par(oma)`]: crate::par::Par::oma
     pub fn fig(mut self, fig: [impl Into<f64>; 4]) -> Self {
         self.page.fig = Some(fig.map(Into::into));
         self

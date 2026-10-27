@@ -46,13 +46,17 @@ pub struct PchGeometry {
     /// bg=)`) and stroked with `col` (the pch 21-25 family).
     pub filled_with_bg: Vec<Shape>,
     /// Plain line segments, always stroked with `col` at `lty = "solid"`
-    /// regardless of `par(lty)` (matches `gc.lty = LTY_SOLID;` forced by
+    /// regardless of [`par(lty)`] (matches `gc.lty = LTY_SOLID;` forced by
     /// `GSymbol()`).
+    ///
+    /// [`par(lty)`]: crate::par::Par::lty
     pub lines: Vec<((f64, f64), (f64, f64))>,
 }
 
 /// `size_inches` for `GESymbol`, given the device's starting point size
-/// (`cra`, not the current `par(ps)`) and `cex`. See module docs.
+/// (`cra`, not the current [`par(ps)`]) and `cex`. See module docs.
+///
+/// [`par(ps)`]: crate::par::Par::ps
 pub fn symbol_size_inches(pointsize: f64, cex: f64) -> f64 {
     pointsize * cex / 120.0
 }

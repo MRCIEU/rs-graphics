@@ -10,10 +10,12 @@
 //!
 //! Lines span `getxlimits`/`getylimits` (the plot region, the figure
 //! region with `xpd = TRUE`, or the device with `xpd = NA`; inline or
-//! from `par(xpd)`) and are clipped to the same region.
+//! from [`par(xpd)`]) and are clipped to the same region.
 //! On log axes `h`/`v` are data values, and the `a`/`b` line is straight on
 //! the page (`untf = FALSE`) or `y = a + b * x` in data units (`untf =
 //! TRUE`).
+//!
+//! [`par(xpd)`]: crate::par::Par::xpd
 
 use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::ColorSpec;
@@ -27,13 +29,17 @@ use super::Device;
 
 crate::setters::options! {
     /// The arguments of R's `abline()`, with R's defaults. Empty
-    /// `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/`par("lwd")`;
+    /// `col`/`lty`/`lwd` mean [`par("col")`]/[`par("lty")`]/[`par("lwd")`];
     /// otherwise they are recycled over the lines in drawing order: each
     /// `a`/`b` line, then each `h`, then each `v`.
     ///
     /// Unlike R, `a` and `b` take several values (one line per pair), so every
     /// kind of line can be given several times. R's `coef = c(a, b)` (and
     /// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
+    ///
+    /// [`par("col")`]: crate::par::Par::col
+    /// [`par("lty")`]: crate::par::Par::lty
+    /// [`par("lwd")`]: crate::par::Par::lwd
     #[derive(Clone, Debug, Default)]
     pub struct AblineOptions => [AblineCall] {
         /// Intercepts of the lines `y = a + b * x`, paired with `b` (either
@@ -49,28 +55,42 @@ crate::setters::options! {
         pub h: Vec<f64> => values f64,
         /// Vertical lines at these x values. Empty: none.
         pub v: Vec<f64> => values f64,
-        /// Line colours, recycled over the lines. Empty: `par(col)`.
+        /// Line colours, recycled over the lines. Empty: [`par(col)`].
+        ///
+        /// [`par(col)`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Line types, recycled over the lines. Empty: `par(lty)`; `None`:
+        /// Line types, recycled over the lines. Empty: [`par(lty)`]; `None`:
         /// no line.
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
-        /// Line widths, recycled over the lines. Empty: `par(lwd)`; `None`:
+        /// Line widths, recycled over the lines. Empty: [`par(lwd)`]; `None`:
         /// no line.
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
         /// How far the lines run and where they are clipped: the plot region
         /// for [`Xpd::Plot`], the figure region for [`Xpd::Figure`], the
         /// whole device for [`Xpd::Device`] (the setter also takes
-        /// `false`/`true`). `None`: `par(xpd)`; overrides it for this call
+        /// `false`/`true`). `None`: [`par(xpd)`]; overrides it for this call
         /// only.
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
         /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: `par(lend)`; overrides it for this call only.
+        /// `None`: [`par(lend)`]; overrides it for this call only.
+        ///
+        /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
         /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: `par(ljoin)`; overrides it for this call only.
+        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        ///
+        /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
         /// overrides it for this call only.
+        ///
+        /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => option f64,
     }
 }
