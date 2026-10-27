@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 504 360" role="img" aria-label="line_types chart" style="width: 100%; max-width: 672px; height: auto; background: white">
+<rect x="0" y="0" width="504" height="360" fill="#ffffff" stroke="none"/>
+<clipPath id="line_types-clip0"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip0)">
+<line x1="228" y1="93.8" x2="450.72" y2="93.8" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="228" y1="111.3556" x2="450.72" y2="111.3556" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4.5,7.5"/>
+<line x1="228" y1="128.9111" x2="450.72" y2="128.9111" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0,6"/>
+<line x1="228" y1="146.4667" x2="450.72" y2="146.4667" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0,6,4.5,6"/>
+<line x1="228" y1="164.0222" x2="450.72" y2="164.0222" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="9,6"/>
+<line x1="228" y1="181.5778" x2="450.72" y2="181.5778" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1.5,4.5,7.5,4.5"/>
+<line x1="228" y1="199.1333" x2="450.72" y2="199.1333" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4.5,7.5"/>
+<line x1="228" y1="216.6889" x2="450.72" y2="216.6889" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0,6"/>
+<line x1="228" y1="234.2444" x2="450.72" y2="234.2444" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0,6,4.5,6"/>
+<line x1="228" y1="251.8" x2="450.72" y2="251.8" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="9,6"/>
+<line x1="228" y1="269.3556" x2="450.72" y2="269.3556" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1.5,4.5,7.5,4.5"/>
+</g>
+<clipPath id="line_types-clip1"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip1)">
+<text x="151.668" y="80.4384" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">0 or &quot;blank&quot;</text>
+</g>
+<clipPath id="line_types-clip2"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip2)">
+<text x="155.436" y="98.018" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">1 or &quot;solid&quot;</text>
+</g>
+<clipPath id="line_types-clip3"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip3)">
+<text x="140.748" y="115.5736" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">2 or &quot;dashed&quot;</text>
+</g>
+<clipPath id="line_types-clip4"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip4)">
+<text x="146.748" y="133.1051" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">3 or &quot;dotted&quot;</text>
+</g>
+<clipPath id="line_types-clip5"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip5)">
+<text x="137.412" y="150.6847" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">4 or &quot;dotdash&quot;</text>
+</g>
+<clipPath id="line_types-clip6"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip6)">
+<text x="131.412" y="167.0102" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">5 or &quot;longdash&quot;</text>
+</g>
+<clipPath id="line_types-clip7"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip7)">
+<text x="135.54" y="185.7718" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">6 or &quot;twodash&quot;</text>
+</g>
+<clipPath id="line_types-clip8"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip8)">
+<text x="190.776" y="203.4413" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">&quot;44&quot;</text>
+</g>
+<clipPath id="line_types-clip9"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip9)">
+<text x="190.776" y="220.8829" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">&quot;13&quot;</text>
+</g>
+<clipPath id="line_types-clip10"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip10)">
+<text x="177.432" y="238.4384" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">&quot;1343&quot;</text>
+</g>
+<clipPath id="line_types-clip11"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip11)">
+<text x="190.776" y="255.994" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">&quot;73&quot;</text>
+</g>
+<clipPath id="line_types-clip12"><rect x="59.04" y="59.04" width="414.72" height="227.52"/></clipPath>
+<g clip-path="url(#line_types-clip12)">
+<text x="177.432" y="273.5496" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">&quot;2262&quot;</text>
+</g>
+<clipPath id="line_types-clip13"><rect x="0" y="0" width="504" height="360"/></clipPath>
+<g clip-path="url(#line_types-clip13)">
+<text x="211.1904" y="34.6896" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="14.4" font-style="normal" font-weight="bold" fill="#000000">Line types: .lty()</text>
+</g>
+</svg>

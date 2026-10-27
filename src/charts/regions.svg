@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 504 432" role="img" aria-label="regions chart" style="width: 100%; max-width: 672px; height: auto; background: white">
+<rect x="0" y="0" width="504" height="432" fill="#ffffff" stroke="none"/>
+<rect x="0" y="0" width="504" height="432" fill="none" stroke="#666666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="28.8" y="28.8" width="446.4" height="374.4" fill="none" stroke="#ff8c00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="87.84" y="87.84" width="357.12" height="241.92" fill="none" stroke="#4682b4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<clipPath id="regions-clip0"><rect x="87.84" y="87.84" width="357.12" height="241.92"/></clipPath>
+<g clip-path="url(#regions-clip0)">
+<text x="238.386" y="184.908" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#4682b4">plot region</text>
+</g>
+<clipPath id="regions-clip1"><rect x="87.84" y="87.84" width="357.12" height="241.92"/></clipPath>
+<g clip-path="url(#regions-clip1)">
+<text x="197.712" y="211.956" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">user coordinates: par(usr)</text>
+</g>
+<clipPath id="regions-clip2"><rect x="87.84" y="87.84" width="357.12" height="241.92"/></clipPath>
+<g clip-path="url(#regions-clip2)">
+<text x="180.06" y="238.758" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#4d4d4d">drawing clipped here: .xpd(false)</text>
+</g>
+<clipPath id="regions-clip3"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip3)">
+<text x="114.8035" y="341.28" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 0</text>
+</g>
+<clipPath id="regions-clip4"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip4)">
+<text x="114.8035" y="355.68" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 1</text>
+</g>
+<clipPath id="regions-clip5"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip5)">
+<text x="114.8035" y="370.08" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 2</text>
+</g>
+<clipPath id="regions-clip6"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip6)">
+<text x="114.8035" y="384.48" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 3</text>
+</g>
+<clipPath id="regions-clip7"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip7)">
+<text x="114.8035" y="398.88" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 4</text>
+</g>
+<clipPath id="regions-clip8"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip8)">
+<text x="249.696" y="384.48" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#ff8c00">margin 1: mar[1]</text>
+</g>
+<clipPath id="regions-clip9"><rect x="0" y="0" width="504" height="432"/></clipPath>
+<g clip-path="url(#regions-clip9)">
+<text x="191.64" y="421.92" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#666666">outer margin 1: oma[1]</text>
+</g>
+<clipPath id="regions-clip10"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip10)">
+<text x="84.96" y="312.0125" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 84.96 312.0125)">line 0</text>
+</g>
+<clipPath id="regions-clip11"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip11)">
+<text x="70.56" y="312.0125" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 70.56 312.0125)">line 1</text>
+</g>
+<clipPath id="regions-clip12"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip12)">
+<text x="56.16" y="312.0125" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 56.16 312.0125)">line 2</text>
+</g>
+<clipPath id="regions-clip13"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip13)">
+<text x="41.76" y="312.0125" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 41.76 312.0125)">line 3</text>
+</g>
+<clipPath id="regions-clip14"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip14)">
+<text x="56.16" y="237.024" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#ff8c00" transform="rotate(-90 56.16 237.024)">margin 2: mar[2]</text>
+</g>
+<clipPath id="regions-clip15"><rect x="0" y="0" width="504" height="432"/></clipPath>
+<g clip-path="url(#regions-clip15)">
+<text x="18.72" y="276.36" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 18.72 276.36)">outer margin 2: oma[2]</text>
+</g>
+<clipPath id="regions-clip16"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip16)">
+<text x="114.8035" y="84.96" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 0</text>
+</g>
+<clipPath id="regions-clip17"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip17)">
+<text x="114.8035" y="70.56" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 1</text>
+</g>
+<clipPath id="regions-clip18"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip18)">
+<text x="114.8035" y="56.16" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 2</text>
+</g>
+<clipPath id="regions-clip19"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip19)">
+<text x="114.8035" y="41.76" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666">line 3</text>
+</g>
+<clipPath id="regions-clip20"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip20)">
+<text x="249.696" y="56.16" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#ff8c00">margin 3: mar[3]</text>
+</g>
+<clipPath id="regions-clip21"><rect x="0" y="0" width="504" height="432"/></clipPath>
+<g clip-path="url(#regions-clip21)">
+<text x="191.64" y="18.72" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#666666">outer margin 3: oma[3]</text>
+</g>
+<clipPath id="regions-clip22"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip22)">
+<text x="456.48" y="312.0125" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 456.48 312.0125)">line 0</text>
+</g>
+<clipPath id="regions-clip23"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip23)">
+<text x="470.88" y="312.0125" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="8.4" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 470.88 312.0125)">line 1</text>
+</g>
+<clipPath id="regions-clip24"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip24)">
+<text x="456.48" y="237.024" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#ff8c00" transform="rotate(-90 456.48 237.024)">margin 4: mar[4]</text>
+</g>
+<clipPath id="regions-clip25"><rect x="0" y="0" width="504" height="432"/></clipPath>
+<g clip-path="url(#regions-clip25)">
+<text x="493.92" y="276.36" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#666666" transform="rotate(-90 493.92 276.36)">outer margin 4: oma[4]</text>
+</g>
+<clipPath id="regions-clip26"><rect x="28.8" y="28.8" width="446.4" height="374.4"/></clipPath>
+<g clip-path="url(#regions-clip26)">
+<text x="378.264" y="41.76" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#ff8c00">figure region</text>
+</g>
+<clipPath id="regions-clip27"><rect x="0" y="0" width="504" height="432"/></clipPath>
+<g clip-path="url(#regions-clip27)">
+<text x="440.88" y="18.72" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#666666">device</text>
+</g>
+</svg>

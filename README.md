@@ -201,6 +201,10 @@ impl<G: Graphics> Diagnostics for G {
 dev.obs_vs_exp(&[1.0, 2.0, 3.0], &[1.2, 1.9, 3.4]);
 ```
 
+### Guides
+
+The crate's documentation (`cargo doc --open`) has guides in `rs_graphics::guide`: R's plotting vocabulary for those who don't know R (`concepts`), how to translate R code (`coming_from_r`), and every R function and argument with its Rust form (`r_reference`). `rs_graphics::charts` draws the symbols, line types, colours and fonts to choose from. For tools that write code, [llms.txt](llms.txt) has the same in one file.
+
 For a more extensive run-down of what is implemented and what isn't, the design notes, the example gallery and the tests, see [DEVELOPER.md](DEVELOPER.md).
 
 ## License

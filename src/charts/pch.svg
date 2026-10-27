@@ -1,0 +1,233 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 324" role="img" aria-label="pch chart" style="width: 100%; max-width: 768px; height: auto; background: white">
+<rect x="0" y="0" width="576" height="324" fill="#ffffff" stroke="none"/>
+<clipPath id="pch-clip0"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip0)">
+<g fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<rect x="92.85" y="81.55" width="13.5" height="13.5"/>
+<circle cx="144.6667" cy="88.3" r="6.75"/>
+<polygon points="189.7333,77.8029 198.8241,93.5485 180.6426,93.5485"/>
+</g>
+<g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<line x1="225.2541" y1="88.3" x2="244.3459" y2="88.3"/>
+<line x1="234.8" y1="97.8459" x2="234.8" y2="78.7541"/>
+<line x1="273.1167" y1="95.05" x2="286.6167" y2="81.55"/>
+<line x1="273.1167" y1="81.55" x2="286.6167" y2="95.05"/>
+</g>
+<g fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<polygon points="315.3874,88.3 324.9333,78.7541 334.4793,88.3 324.9333,97.8459"/>
+<polygon points="370,98.7971 379.0907,83.0515 360.9093,83.0515"/>
+<rect x="408.3167" y="81.55" width="13.5" height="13.5"/>
+</g>
+<g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<line x1="408.3167" y1="95.05" x2="421.8167" y2="81.55"/>
+<line x1="408.3167" y1="81.55" x2="421.8167" y2="95.05"/>
+<line x1="453.3833" y1="95.05" x2="466.8833" y2="81.55"/>
+<line x1="453.3833" y1="81.55" x2="466.8833" y2="95.05"/>
+<line x1="450.5874" y1="88.3" x2="469.6793" y2="88.3"/>
+<line x1="460.1333" y1="97.8459" x2="460.1333" y2="78.7541"/>
+</g>
+<polygon points="495.6541,88.3 505.2,78.7541 514.7459,88.3 505.2,97.8459" fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+<g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<line x1="495.6541" y1="88.3" x2="514.7459" y2="88.3"/>
+<line x1="505.2" y1="97.8459" x2="505.2" y2="78.7541"/>
+</g>
+<circle cx="99.6" cy="132.6333" r="6.75" fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+<g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<line x1="92.85" y1="132.6333" x2="106.35" y2="132.6333"/>
+<line x1="99.6" y1="139.3833" x2="99.6" y2="125.8833"/>
+</g>
+<g fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<polygon points="144.6667,143.1304 153.7574,124.7605 135.5759,124.7605"/>
+<polygon points="144.6667,122.1363 153.7574,140.5061 135.5759,140.5061"/>
+<rect x="182.9833" y="125.8833" width="13.5" height="13.5"/>
+</g>
+<g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<line x1="182.9833" y1="132.6333" x2="196.4833" y2="132.6333"/>
+<line x1="189.7333" y1="139.3833" x2="189.7333" y2="125.8833"/>
+</g>
+<circle cx="234.8" cy="132.6333" r="6.75" fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+<g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<line x1="228.05" y1="139.3833" x2="241.55" y2="125.8833"/>
+<line x1="228.05" y1="125.8833" x2="241.55" y2="139.3833"/>
+</g>
+<g fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<polygon points="279.8667,125.8833 286.6167,139.3833 273.1167,139.3833"/>
+<rect x="273.1167" y="125.8833" width="13.5" height="13.5"/>
+</g>
+<g fill="#0000ff" stroke="none">
+<polygon points="318.1833,139.3833 331.6833,139.3833 331.6833,125.8833 318.1833,125.8833"/>
+<circle cx="370" cy="132.6333" r="6.75"/>
+<polygon points="415.0667,122.1363 424.1574,137.8819 405.9759,137.8819"/>
+<polygon points="453.3833,132.6333 460.1333,125.8833 466.8833,132.6333 460.1333,139.3833"/>
+</g>
+<g fill="#0000ff" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="505.2" cy="132.6333" r="6.75"/>
+<circle cx="99.6" cy="176.9667" r="4.5"/>
+</g>
+<g fill="#ffd700" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="144.6667" cy="176.9667" r="6.75"/>
+<rect x="183.7513" y="170.9846" width="11.9641" height="11.9641"/>
+<polygon points="234.8,185.4265 243.2599,176.9667 234.8,168.5068 226.3401,176.9667"/>
+<polygon points="279.8667,166.4696 288.9574,182.2152 270.7759,182.2152"/>
+<polygon points="324.9333,187.4637 334.0241,171.7181 315.8426,171.7181"/>
+</g>
+<text x="93.765" y="238.535" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">*</text>
+<rect x="143.7667" y="220.4" width="1.8" height="1.8" fill="#0000ff" stroke="none"/>
+<text x="181.3933" y="229.16" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">o</text>
+<text x="223.13" y="232.07" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">O</text>
+<text x="271.5267" y="231.56" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">0</text>
+<text x="316.1733" y="228.875" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">+</text>
+<text x="365.005" y="229.61" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">-</text>
+<text x="411.1667" y="229.55" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">|</text>
+<text x="446.7983" y="231.56" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">%</text>
+<text x="496.86" y="231.62" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="30" font-style="normal" font-weight="normal" fill="#0000ff">#</text>
+</g>
+<clipPath id="pch-clip1"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip1)">
+<text x="96.5976" y="108.8403" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">0</text>
+</g>
+<clipPath id="pch-clip2"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip2)">
+<text x="141.6643" y="108.9429" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">1</text>
+</g>
+<clipPath id="pch-clip3"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip3)">
+<text x="186.7309" y="108.9429" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">2</text>
+</g>
+<clipPath id="pch-clip4"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip4)">
+<text x="231.7976" y="108.8403" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">3</text>
+</g>
+<clipPath id="pch-clip5"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip5)">
+<text x="276.8643" y="108.9429" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">4</text>
+</g>
+<clipPath id="pch-clip6"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip6)">
+<text x="321.9309" y="108.7593" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">5</text>
+</g>
+<clipPath id="pch-clip7"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip7)">
+<text x="366.9976" y="108.8403" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">6</text>
+</g>
+<clipPath id="pch-clip8"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip8)">
+<text x="412.0643" y="108.8619" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">7</text>
+</g>
+<clipPath id="pch-clip9"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip9)">
+<text x="457.1309" y="108.8403" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">8</text>
+</g>
+<clipPath id="pch-clip10"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip10)">
+<text x="502.1976" y="108.8403" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">9</text>
+</g>
+<clipPath id="pch-clip11"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip11)">
+<text x="93.5952" y="153.1736" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">10</text>
+</g>
+<clipPath id="pch-clip12"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip12)">
+<text x="138.6619" y="153.2762" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">11</text>
+</g>
+<clipPath id="pch-clip13"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip13)">
+<text x="183.7285" y="153.2762" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">12</text>
+</g>
+<clipPath id="pch-clip14"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip14)">
+<text x="228.7952" y="153.1736" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">13</text>
+</g>
+<clipPath id="pch-clip15"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip15)">
+<text x="273.8619" y="153.2762" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">14</text>
+</g>
+<clipPath id="pch-clip16"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip16)">
+<text x="318.9285" y="153.1736" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">15</text>
+</g>
+<clipPath id="pch-clip17"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip17)">
+<text x="363.9952" y="153.1736" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">16</text>
+</g>
+<clipPath id="pch-clip18"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip18)">
+<text x="409.0619" y="153.2762" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">17</text>
+</g>
+<clipPath id="pch-clip19"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip19)">
+<text x="454.1285" y="153.1736" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">18</text>
+</g>
+<clipPath id="pch-clip20"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip20)">
+<text x="499.1952" y="153.1736" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">19</text>
+</g>
+<clipPath id="pch-clip21"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip21)">
+<text x="93.5952" y="197.5069" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">20</text>
+</g>
+<clipPath id="pch-clip22"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip22)">
+<text x="138.6619" y="197.6095" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">21</text>
+</g>
+<clipPath id="pch-clip23"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip23)">
+<text x="183.7285" y="197.6095" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">22</text>
+</g>
+<clipPath id="pch-clip24"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip24)">
+<text x="228.7952" y="197.5069" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">23</text>
+</g>
+<clipPath id="pch-clip25"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip25)">
+<text x="273.8619" y="197.6095" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">24</text>
+</g>
+<clipPath id="pch-clip26"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip26)">
+<text x="318.9285" y="197.5069" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">25</text>
+</g>
+<clipPath id="pch-clip27"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip27)">
+<text x="95.1018" y="244.3513" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'*'</text>
+</g>
+<clipPath id="pch-clip28"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip28)">
+<text x="141.3079" y="242.0239" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'.'</text>
+</g>
+<clipPath id="pch-clip29"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip29)">
+<text x="184.3333" y="241.9483" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'o'</text>
+</g>
+<clipPath id="pch-clip30"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip30)">
+<text x="228.2012" y="242.0239" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'O'</text>
+</g>
+<clipPath id="pch-clip31"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip31)">
+<text x="274.4667" y="241.9213" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'0'</text>
+</g>
+<clipPath id="pch-clip32"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip32)">
+<text x="319.3821" y="242.0239" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'+'</text>
+</g>
+<clipPath id="pch-clip33"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip33)">
+<text x="365.8042" y="243.2767" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'-'</text>
+</g>
+<clipPath id="pch-clip34"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip34)">
+<text x="411.2651" y="241.1167" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'|'</text>
+</g>
+<clipPath id="pch-clip35"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip35)">
+<text x="452.9351" y="241.9213" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'%'</text>
+</g>
+<clipPath id="pch-clip36"><rect x="59.04" y="59.04" width="486.72" height="191.52"/></clipPath>
+<g clip-path="url(#pch-clip36)">
+<text x="499.8" y="242.0239" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="10.8" font-style="normal" font-weight="normal" fill="#4d4d4d">'#'</text>
+</g>
+<clipPath id="pch-clip37"><rect x="0" y="0" width="576" height="324"/></clipPath>
+<g clip-path="url(#pch-clip37)">
+<text x="220.464" y="34.6896" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="14.4" font-style="normal" font-weight="bold" fill="#000000">Plotting symbols: .pch()</text>
+</g>
+</svg>

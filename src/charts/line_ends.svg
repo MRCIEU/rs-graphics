@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 504 288" role="img" aria-label="line_ends chart" style="width: 100%; max-width: 672px; height: auto; background: white">
+<rect x="0" y="0" width="504" height="288" fill="#ffffff" stroke="none"/>
+<clipPath id="line_ends-clip0"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip0)">
+<polyline points="112.8,100.8 164,100.8" fill="none" stroke="#999999" stroke-width="13.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip1"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip1)">
+<polyline points="112.8,100.8 164,100.8" fill="none" stroke="#ffffff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip2"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip2)">
+<text x="101.794" y="129.156" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">.lend(&quot;round&quot;)</text>
+</g>
+<clipPath id="line_ends-clip3"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip3)">
+<polyline points="240.8,100.8 292,100.8" fill="none" stroke="#999999" stroke-width="13.5" stroke-linecap="butt" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip4"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip4)">
+<polyline points="240.8,100.8 292,100.8" fill="none" stroke="#ffffff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip5"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip5)">
+<text x="235.248" y="129.156" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">.lend(&quot;butt&quot;)</text>
+</g>
+<clipPath id="line_ends-clip6"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip6)">
+<polyline points="368.8,100.8 420,100.8" fill="none" stroke="#999999" stroke-width="13.5" stroke-linecap="square" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip7"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip7)">
+<polyline points="368.8,100.8 420,100.8" fill="none" stroke="#ffffff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip8"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip8)">
+<text x="354.794" y="129.156" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">.lend(&quot;square&quot;)</text>
+</g>
+<clipPath id="line_ends-clip9"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip9)">
+<polyline points="112.8,183.6 138.4,154.8 164,183.6" fill="none" stroke="#999999" stroke-width="13.5" stroke-linecap="butt" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip10"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip10)">
+<polyline points="112.8,183.6 138.4,154.8 164,183.6" fill="none" stroke="#ffffff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip11"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip11)">
+<text x="102.466" y="201.138" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">.ljoin(&quot;round&quot;)</text>
+</g>
+<clipPath id="line_ends-clip12"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip12)">
+<polyline points="240.8,183.6 266.4,154.8 292,183.6" fill="none" stroke="#999999" stroke-width="13.5" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10"/>
+</g>
+<clipPath id="line_ends-clip13"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip13)">
+<polyline points="240.8,183.6 266.4,154.8 292,183.6" fill="none" stroke="#ffffff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip14"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip14)">
+<text x="232.476" y="201.138" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">.ljoin(&quot;mitre&quot;)</text>
+</g>
+<clipPath id="line_ends-clip15"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip15)">
+<polyline points="368.8,183.6 394.4,154.8 420,183.6" fill="none" stroke="#999999" stroke-width="13.5" stroke-linecap="butt" stroke-linejoin="bevel"/>
+</g>
+<clipPath id="line_ends-clip16"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip16)">
+<polyline points="368.8,183.6 394.4,154.8 420,183.6" fill="none" stroke="#ffffff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<clipPath id="line_ends-clip17"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#line_ends-clip17)">
+<text x="359.798" y="201.138" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">.ljoin(&quot;bevel&quot;)</text>
+</g>
+<clipPath id="line_ends-clip18"><rect x="0" y="0" width="504" height="288"/></clipPath>
+<g clip-path="url(#line_ends-clip18)">
+<text x="199.1808" y="34.6896" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="14.4" font-style="normal" font-weight="bold" fill="#000000">Line ends and joins</text>
+</g>
+</svg>

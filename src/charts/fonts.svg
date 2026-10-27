@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 504 288" role="img" aria-label="fonts chart" style="width: 100%; max-width: 672px; height: auto; background: white">
+<rect x="0" y="0" width="504" height="288" fill="#ffffff" stroke="none"/>
+<clipPath id="fonts-clip0"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip0)">
+<text x="154.764" y="82.266" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">1 or &quot;plain&quot;</text>
+</g>
+<clipPath id="fonts-clip1"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip1)">
+<text x="228" y="84.6522" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15.6" font-style="normal" font-weight="normal" fill="#000000">Plots in R and Rust 0123</text>
+</g>
+<clipPath id="fonts-clip2"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip2)">
+<text x="157.428" y="112.218" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">2 or &quot;bold&quot;</text>
+</g>
+<clipPath id="fonts-clip3"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip3)">
+<text x="228" y="113.5068" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15.6" font-style="normal" font-weight="bold" fill="#000000">Plots in R and Rust 0123</text>
+</g>
+<clipPath id="fonts-clip4"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip4)">
+<text x="156.108" y="140.994" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">3 or &quot;italic&quot;</text>
+</g>
+<clipPath id="fonts-clip5"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip5)">
+<text x="228" y="142.2522" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15.6" font-style="italic" font-weight="normal" fill="#000000">Plots in R and Rust 0123</text>
+</g>
+<clipPath id="fonts-clip6"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip6)">
+<text x="130.092" y="169.818" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">4 or &quot;bold.italic&quot;</text>
+</g>
+<clipPath id="fonts-clip7"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip7)">
+<text x="228" y="171.1068" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15.6" font-style="italic" font-weight="bold" fill="#000000">Plots in R and Rust 0123</text>
+</g>
+<clipPath id="fonts-clip8"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip8)">
+<text x="142.104" y="197.424" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="12" font-style="normal" font-weight="normal" fill="#000000">5 or &quot;symbol&quot;</text>
+</g>
+<clipPath id="fonts-clip9"><rect x="59.04" y="59.04" width="414.72" height="155.52"/></clipPath>
+<g clip-path="url(#fonts-clip9)">
+<text x="228" y="198.4248" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15.6" font-style="normal" font-weight="normal" fill="#000000">αβγδπθσ ΑΒΓΔΠΘΣ</text>
+</g>
+<clipPath id="fonts-clip10"><rect x="0" y="0" width="504" height="288"/></clipPath>
+<g clip-path="url(#fonts-clip10)">
+<text x="205.7472" y="34.6896" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="14.4" font-style="normal" font-weight="bold" fill="#000000">Font faces: .font()</text>
+</g>
+</svg>

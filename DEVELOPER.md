@@ -525,6 +525,17 @@ against a real R installation by shelling out to `Rscript`:
   style vectors of points, lines, segments, arrows, rect, polygon, text,
   mtext, abline, boxplot and legend: where R defines `NA`, R's drawing;
   otherwise R drawing the skipped element or the default.
+- `tests/all/errors_matches_r.rs` - R's errors as values: `try_draw()`'s
+  messages vs R's `conditionMessage()` (device and `Figure`), errors found
+  while drawing, setter values that don't convert (kept for `try_draw()`,
+  also through `.with()`), `?`, plotmath delimiters, log `axp`, `open()`.
+- `tests/all/generated_docs.rs` (no R needed) - the generated files are up
+  to date: the R-to-Rust table `src/guide/r_reference.md` (from the
+  `call!`/`options!` declarations and `tests/data/r_formals.txt`, R's
+  arguments; refresh that with `Rscript tests/data/r_formals.R >
+  tests/data/r_formals.txt`), the chart SVGs `src/charts/*.svg` and
+  `llms.txt`. `RS_GRAPHICS_BLESS=1 cargo test --test all generated_docs`
+  rewrites them.
 - `tests/all/required_args.rs` (no R needed) - every required argument left
   out is an error with R's message (`argument "x" is missing, with no
   default`) and the call's name, on a device and in a `Figure`; `.draw()`

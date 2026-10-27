@@ -51,6 +51,12 @@
 //! one, as in R: `plot(1, 1)` is `.x(1).y(1)`). R's `NA` in a style vector is `None`:
 //! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`.
 //!
+//! New to R's plotting words (`cex`, `pch`, margins, ...)? See
+//! [`guide::concepts`]. Translating R code? See [`guide::coming_from_r`]
+//! and [`guide::r_reference`], every R function and argument with its Rust
+//! form. [`charts`] shows the symbols, line types, colours and fonts to
+//! choose from.
+//!
 //! # Devices and files
 //!
 //! As in R, a device is opened for a file with R's arguments, which
@@ -166,12 +172,14 @@
 #[doc(hidden)]
 pub mod afm;
 pub mod backend;
+pub mod charts;
 pub mod color;
 pub mod device;
 pub mod error;
 pub mod font;
 pub mod geometry;
 pub mod graphics;
+pub mod guide;
 pub mod highlevel;
 pub mod layout;
 pub mod lty;

@@ -36,6 +36,7 @@ mod colour_zero_matches_r;
 mod device_layout_matches_r;
 mod device_open;
 mod errors_matches_r;
+mod generated_docs;
 mod figure_legends_matches_r;
 mod figure_replay;
 mod frozen_margins;
