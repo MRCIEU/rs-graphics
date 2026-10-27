@@ -569,7 +569,10 @@ fn sections() -> (Vec<Section>, Vec<String>) {
     }
     let calls = calls(graphics);
     for (method, builder) in &methods {
-        let (_, rname, args) = calls.iter().find(|(b, _, _)| b == builder).unwrap();
+        // Hand-written builders (`layout()`) have their own section below.
+        let Some((_, rname, args)) = calls.iter().find(|(b, _, _)| b == builder) else {
+            continue;
+        };
         let mut setters = args.clone();
         setters.extend(fields_of(builder));
         if builder == "ParCall" {

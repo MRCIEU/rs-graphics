@@ -60,15 +60,16 @@ use std::borrow::Cow;
 
 use crate::backend::Backend;
 use crate::device::{
-    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LegendLayout, LegendOptions,
-    LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side,
-    TextOptions, TitleOptions, XyOptions,
+    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, Device, LayoutCall, LegendLayout,
+    LegendOptions, LegendPos, MtextOptions, PlotWindowOptions, PolygonOptions, RectOptions,
+    SegmentsOptions, Side, TextOptions, TitleOptions, XyOptions,
 };
 use crate::error::Error;
 use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions,
 };
+use crate::layout::{LayoutRespect, LayoutSize};
 use crate::numbers::{Groups, Numbers};
 use crate::par::ParOptions;
 use crate::plotmath::{Label, Labels};
@@ -118,7 +119,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   or log axes.
     /// - **Which figure:** the next one in the order set by `par()`'s
     ///   [`mfrow`](ParCall::mfrow) / [`mfcol`](ParCall::mfcol),
-    ///   [`Device::layout`] or `par()`'s [`mfg`](ParCall::mfg) (one figure per
+    ///   [`layout()`](Graphics::layout) or `par()`'s [`mfg`](ParCall::mfg) (one figure per
     ///   page by default). After the last figure, it wraps to figure 1 on a new
     ///   page. The first call always starts page one. After `par()`'s
     ///   [`fig`](ParCall::fig) or [`fin`](ParCall::fin), the next call starts a
@@ -795,17 +796,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// and `mar`, `oma`, `pty` and `plt` take effect at the next
     /// [`plot_new`](Graphics::plot_new).
     ///
-    /// On a `Device`, the call also takes the page layout:
-    /// [`mfrow`](ParCall::mfrow), [`mfcol`](ParCall::mfcol),
-    /// [`mfg`](ParCall::mfg), [`fig`](ParCall::fig) and [`fin`](ParCall::fin).
-    /// A `Figure` is one panel, so it can't change how the page is split; its
-    /// `par()` call has no such setters:
-    ///
-    /// ```compile_fail
-    /// # use rs_graphics::prelude::*;
-    /// let mut fig = Figure::new();
-    /// fig.par().mfrow(1, 2).draw(); // error: no method `mfrow`
-    /// ```
+    /// The call also takes the page layout: [`mfrow`](ParCall::mfrow),
+    /// [`mfcol`](ParCall::mfcol), [`mfg`](ParCall::mfg), [`fig`](ParCall::fig)
+    /// and [`fin`](ParCall::fin). In a `Figure` they are recorded too, so the
+    /// figure holds a whole multi-panel plot (see
+    /// [`add_figure`](Device::add_figure)).
     ///
     /// This is R's `par()`.
     ///
@@ -829,6 +824,39 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// other layout setters).
     fn par(&mut self) -> ParCall<'_, Self> {
         ParCall::start(self)
+    }
+
+    /// Starts dividing the page into figures of different sizes: a grid in
+    /// which each figure takes one or more cells.
+    ///
+    /// Set the grid with [`mat`](crate::device::LayoutCall::mat) (required) and,
+    /// optionally, [`widths`](crate::device::LayoutCall::widths),
+    /// [`heights`](crate::device::LayoutCall::heights) and
+    /// [`respect`](crate::device::LayoutCall::respect), then apply it with
+    /// [`draw`](crate::device::LayoutCall::draw). Like `par()`'s
+    /// [`mfrow`](ParCall::mfrow), it sets `par(cex)` and
+    /// `mex` from the grid's size, and the next `plot_new()` starts a new
+    /// page at the first figure. It replaces `mfrow`/`mfcol` and `fig`/`fin`.
+    /// A [`Figure`](crate::recording::Figure) records it like the rest, so a
+    /// figure can hold a whole multi-panel plot.
+    ///
+    /// This is R's `layout()`.
+    ///
+    /// # Examples
+    ///
+    /// A wide panel on top and two below, the top one twice as tall:
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # let mut dev = Device::null().open().unwrap();
+    /// let n = dev.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
+    /// assert_eq!(n, 3);
+    /// dev.plot().x([1, 2, 3]).draw(); // top
+    /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
+    /// dev.pie().x([1, 2]).draw(); // bottom right
+    /// ```
+    fn layout(&mut self) -> LayoutCall<'_, Self> {
+        LayoutCall::start(self)
     }
 
     // ---- what `.draw()` calls; not part of the public API ----
@@ -923,6 +951,14 @@ pub trait Graphics: sealed::Sealed + Sized {
     fn emit_title(&mut self, opts: TitleOptions) -> Result<(), Error>;
     #[doc(hidden)]
     fn emit_par(&mut self, opts: ParOptions, page: ParPage) -> Result<(), Error>;
+    #[doc(hidden)]
+    fn emit_layout(
+        &mut self,
+        rows: Vec<Vec<usize>>,
+        widths: Vec<LayoutSize>,
+        heights: Vec<LayoutSize>,
+        respect: LayoutRespect,
+    ) -> Result<(), Error>;
 }
 
 impl<B: Backend> Graphics for Device<B> {
@@ -1044,6 +1080,15 @@ impl<B: Backend> Graphics for Device<B> {
             d.title_impl(&opts);
             Ok(())
         })
+    }
+    fn emit_layout(
+        &mut self,
+        rows: Vec<Vec<usize>>,
+        widths: Vec<LayoutSize>,
+        heights: Vec<LayoutSize>,
+        respect: LayoutRespect,
+    ) -> Result<(), Error> {
+        self.run(|d| d.layout_impl(&rows, &widths, &heights, &respect))
     }
     fn emit_par(&mut self, opts: ParOptions, page: ParPage) -> Result<(), Error> {
         self.run(|d| {
@@ -1634,6 +1679,7 @@ call!(
     state { page: ParPage },
     |t, o| {
         o.check()?;
+        page.check()?;
         t.emit_par(o, page)
     }
 );
@@ -1653,7 +1699,7 @@ fn segment_ends<'a>(
 }
 
 /// A `par()` call's page layout arguments (`mfrow`/`mfcol`, `mfg`, `fig`,
-/// `fin`), which only a [`Device`] takes.
+/// `fin`).
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ParPage {
@@ -1667,6 +1713,23 @@ impl ParPage {
     pub(crate) fn is_empty(&self) -> bool {
         *self == ParPage::default()
     }
+
+    /// R's checks of the values, made when the call is drawn or recorded
+    /// (`mfg`'s range depends on the device's grid, so is checked there).
+    pub(crate) fn check(&self) -> Result<(), Error> {
+        match self.grid {
+            Some(ParGrid::Rows(r, c)) => crate::device::check_grid("mfrow", r, c)?,
+            Some(ParGrid::Cols(r, c)) => crate::device::check_grid("mfcol", r, c)?,
+            None => {}
+        }
+        if let Some(fig) = self.fig {
+            crate::device::check_fig(fig)?;
+        }
+        if let Some(fin) = self.fin {
+            crate::device::check_fin(fin)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1675,16 +1738,16 @@ pub(crate) enum ParGrid {
     Cols(usize, usize),
 }
 
-/// Page layout, which only a [`Device`] has: a [`Figure`] is one panel.
-///
-/// [`Figure`]: crate::recording::Figure
-impl<B: Backend> ParCall<'_, Device<B>> {
+/// Page layout: on a device, or recorded in a
+/// [`Figure`](crate::recording::Figure), which can then hold a whole
+/// multi-panel plot.
+impl<G: Graphics> ParCall<'_, G> {
     /// Splits the page into a grid of `nrow` by `ncol` panels, filled row by
     /// row.
     ///
     /// It also sets `par(cex)` to 0.83 (2 x 2) or 0.66 (more than 2 rows or
     /// columns) and `mex` to 1, and the next `plot_new()` starts a new page at
-    /// the first panel. It replaces `fig`/`fin` and [`Device::layout`].
+    /// the first panel. It replaces `fig`/`fin` and [`layout()`](Graphics::layout).
     ///
     /// In one call the page layout is applied first, in the order grid, `fig`,
     /// `fin`, `mfg`, then the other settings, then `new`: so a `cex` or `mex`
@@ -1740,7 +1803,7 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     /// counting from 1.
     ///
     /// It neither advances nor starts a new page. The panel number is derived
-    /// from the `mfrow`/`mfcol` ordering, even under [`Device::layout`], and it
+    /// from the `mfrow`/`mfcol` ordering, even under [`layout()`](Graphics::layout), and it
     /// has no effect before anything has been plotted: the first `plot_new()`
     /// always starts at panel 1 (see [`add_figure_at`](Device::add_figure_at),
     /// which handles that).
@@ -1772,7 +1835,7 @@ impl<B: Backend> ParCall<'_, Device<B>> {
     ///
     /// The next `plot_new()` starts a new page unless `new` is set too
     /// (`.fig(..).new(true)` adds a plot to the current page). `par(cex)` is
-    /// left as it is, and `mfrow`/`mfcol`/[`Device::layout`] replace it.
+    /// left as it is, and `mfrow`/`mfcol`/[`layout()`](Graphics::layout) replace it.
     ///
     /// This is R's `par(fig = c(x0, x1, y0, y1))`.
     ///

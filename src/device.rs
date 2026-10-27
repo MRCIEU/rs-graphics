@@ -14,7 +14,7 @@
 //! [`Device::png`] or [`Device::format`] (a [`DeviceBuilder`]) and written
 //! by [`Device::close`]; [`Device::new`] with [`Device::finish`] keeps the
 //! output in memory. Draw on a device with the
-//! [`Graphics`](crate::graphics::Graphics) methods. The module also holds
+//! [`Graphics`] methods. The module also holds
 //! the options structs of the low-level functions ([`XyOptions`],
 //! [`AxisOptions`], [`LegendOptions`], ...) and the types they use
 //! ([`Side`], [`LegendPos`], ...).
@@ -38,14 +38,15 @@ use std::ops::{Deref, DerefMut};
 use crate::backend::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::error::Error;
-use crate::setters::IntoArg;
 use crate::geometry::{Point, Rect};
+use crate::graphics::Graphics;
 use crate::layout::{Arrangement, Layout, LayoutRespect, LayoutSize};
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Par, Pty, Sides, Xpd};
 use crate::pch;
 use crate::plotmath::Label;
 use crate::pretty::{axis_pars, create_at_vector};
+use crate::setters::IntoArg;
 
 mod abline;
 mod axis;
@@ -111,7 +112,9 @@ impl TryFrom<i32> for Side {
             2 => Ok(Side::Left),
             3 => Ok(Side::Top),
             4 => Ok(Side::Right),
-            _ => Err(crate::error::Error::invalid(format!("invalid axis number {n}"))),
+            _ => Err(crate::error::Error::invalid(format!(
+                "invalid axis number {n}"
+            ))),
         }
     }
 }
@@ -122,7 +125,7 @@ impl TryFrom<i32> for Side {
 /// Open one for a file with [`Device::pdf`], [`Device::svg`],
 /// [`Device::png`] or [`Device::format`], or wrap a backend kept in memory
 /// with [`Device::new`]; draw on it with the
-/// [`Graphics`](crate::graphics::Graphics) methods.
+/// [`Graphics`] methods.
 ///
 /// # Examples
 ///
@@ -192,17 +195,19 @@ pub struct Device<B: Backend> {
     pending_error: std::cell::RefCell<Option<Error>>,
 }
 
-/// A [`layout()`](Device::layout) call being built: it divides the page
-/// into figures of different sizes.
+/// A [`layout()`](crate::graphics::Graphics::layout) call being built: it
+/// divides the page into figures of different sizes.
 ///
 /// Set its arguments with the setters below, then apply it with
-/// [`draw`](LayoutCall::draw), which returns the number of figures.
+/// [`draw`](LayoutCall::draw), which returns the number of figures: on a
+/// device, or recorded in a [`Figure`](crate::recording::Figure).
 /// Without `.draw()`, nothing happens (the compiler warns).
 ///
-/// See [`Device::layout`] for an example.
+/// See [`Graphics::layout`] for an
+/// example.
 #[must_use = "nothing is changed until `.draw()`"]
-pub struct LayoutCall<'a, B: Backend> {
-    dev: &'a mut Device<B>,
+pub struct LayoutCall<'a, G: Graphics> {
+    target: &'a mut G,
     mat: Option<Vec<Vec<f64>>>,
     widths: Vec<LayoutSize>,
     heights: Vec<LayoutSize>,
@@ -211,7 +216,18 @@ pub struct LayoutCall<'a, B: Backend> {
     error: Option<Error>,
 }
 
-impl<B: Backend> LayoutCall<'_, B> {
+impl<'a, G: Graphics> LayoutCall<'a, G> {
+    pub(crate) fn start(target: &'a mut G) -> Self {
+        LayoutCall {
+            target,
+            mat: None,
+            widths: Vec::new(),
+            heights: Vec::new(),
+            respect: LayoutRespect::No,
+            error: None,
+        }
+    }
+
     /// The grid of figure numbers, as rows, top to bottom (as the matrix
     /// reads on screen). Every figure number from 1 to the largest must
     /// appear; `0` marks an empty cell, and a number in several cells
@@ -281,7 +297,8 @@ impl<B: Backend> LayoutCall<'_, B> {
     /// than 50 rows, 50 columns or 500 cells, has no figure, or skips a
     /// figure number; if `respect`'s grid doesn't have `mat`'s dimensions;
     /// and, unlike R (which accepts them), if `mat` has a negative or
-    /// non-finite value. The device is unchanged after an error.
+    /// non-finite value. The device is unchanged after an error, and a
+    /// `Figure` fails when recording, as the device does.
     pub fn try_draw(self) -> Result<usize, Error> {
         if let Some(e) = self.error {
             return Err(e.in_call("layout"));
@@ -301,23 +318,50 @@ impl<B: Backend> LayoutCall<'_, B> {
             }
             rows.push(r);
         }
-        let mut layout = Layout::new(&rows).map_err(|e| fail(e.0))?;
-        if !self.widths.is_empty() {
-            layout = layout.widths(&self.widths);
-        }
-        if !self.heights.is_empty() {
-            layout = layout.heights(&self.heights);
-        }
-        layout = match self.respect {
-            LayoutRespect::No => layout,
-            LayoutRespect::All => layout.respect(true),
-            LayoutRespect::Cells(cells) => layout.respect_matrix(&cells).map_err(|e| fail(e.0))?,
-        };
-        let n = layout.num_figures();
-        self.dev
-            .set_arrangement(Arrangement::Layout(layout))
+        let n = build_layout(&rows, &self.widths, &self.heights, &self.respect)
+            .map_err(|e| e.in_call("layout"))?
+            .num_figures();
+        self.target
+            .emit_layout(rows, self.widths, self.heights, self.respect)
             .map_err(|e| e.in_call("layout"))?;
         Ok(n)
+    }
+}
+
+/// A [`Layout`] from `layout()`'s checked arguments, or R's error.
+pub(crate) fn build_layout(
+    rows: &[Vec<usize>],
+    widths: &[LayoutSize],
+    heights: &[LayoutSize],
+    respect: &LayoutRespect,
+) -> Result<Layout, Error> {
+    let fail = |m: String| Error::invalid(m);
+    let mut layout = Layout::new(rows).map_err(|e| fail(e.0))?;
+    if !widths.is_empty() {
+        layout = layout.widths(widths);
+    }
+    if !heights.is_empty() {
+        layout = layout.heights(heights);
+    }
+    Ok(match respect {
+        LayoutRespect::No => layout,
+        LayoutRespect::All => layout.respect(true),
+        LayoutRespect::Cells(cells) => layout.respect_matrix(cells).map_err(|e| fail(e.0))?,
+    })
+}
+
+impl<B: Backend> Device<B> {
+    /// `layout()`'s effect on the device; see
+    /// [`Graphics::layout`].
+    pub(crate) fn layout_impl(
+        &mut self,
+        rows: &[Vec<usize>],
+        widths: &[LayoutSize],
+        heights: &[LayoutSize],
+        respect: &LayoutRespect,
+    ) -> Result<(), Error> {
+        let layout = build_layout(rows, widths, heights, respect)?;
+        self.set_arrangement(Arrangement::Layout(layout))
     }
 }
 
@@ -511,7 +555,7 @@ enum FigSpec {
 }
 
 crate::setters::options! {
-    /// The labels of [`Graphics::title`](crate::graphics::Graphics::title) (`None` draws
+    /// The labels of [`Graphics::title`] (`None` draws
     /// nothing) and R's inline `cex.main`/`col.main`/`font.main` and the
     /// `sub` and `lab` ones (`None`: the `par()` value).
     #[derive(Clone, Debug, Default)]
@@ -888,12 +932,7 @@ impl<B: Backend> Device<B> {
 
     /// `par(fig = )`; see [`ParCall::fig`](crate::graphics::ParCall::fig).
     pub(crate) fn fig(&mut self, fig: [f64; 4]) -> Result<(), Error> {
-        let [x0, x1, y0, y1] = fig;
-        if !(0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0) {
-            return Err(Error::invalid(
-                "invalid value specified for graphical parameter \"fig\"",
-            ));
-        }
+        check_fig(fig)?;
         self.arrangement = Arrangement::Grid {
             nrow: 1,
             ncol: 1,
@@ -914,11 +953,7 @@ impl<B: Backend> Device<B> {
     /// `par(fin = )` (R's `fUnits = INCHES`); see
     /// [`ParCall::fin`](crate::graphics::ParCall::fin).
     pub(crate) fn fin(&mut self, fin: [f64; 2]) -> Result<(), Error> {
-        if !(fin.iter().all(|&v| v > 0.0 && v.is_finite())) {
-            return Err(Error::invalid(
-                "invalid value specified for graphical parameter \"fin\"",
-            ));
-        }
+        check_fin(fin)?;
         self.arrangement = Arrangement::Grid {
             nrow: 1,
             ncol: 1,
@@ -950,46 +985,6 @@ impl<B: Backend> Device<B> {
             ncol,
             by_col: true,
         })
-    }
-
-    /// Starts dividing the page into figures of different sizes: a grid in
-    /// which each figure takes one or more cells.
-    ///
-    /// Set the grid with [`mat`](LayoutCall::mat) (required) and,
-    /// optionally, [`widths`](LayoutCall::widths),
-    /// [`heights`](LayoutCall::heights) and
-    /// [`respect`](LayoutCall::respect), then apply it with
-    /// [`draw`](LayoutCall::draw). Like `par()`'s
-    /// [`mfrow`](crate::graphics::ParCall::mfrow), it sets `par(cex)` and
-    /// `mex` from the grid's size, and the next `plot_new()` starts a new
-    /// page at the first figure. It replaces `mfrow`/`mfcol` and `fig`/`fin`.
-    /// A [`Figure`](crate::recording::Figure) is one panel, so only a
-    /// device has it.
-    ///
-    /// This is R's `layout()`.
-    ///
-    /// # Examples
-    ///
-    /// A wide panel on top and two below, the top one twice as tall:
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::null().open().unwrap();
-    /// let n = dev.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
-    /// assert_eq!(n, 3);
-    /// dev.plot().x([1, 2, 3]).draw(); // top
-    /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
-    /// dev.pie().x([1, 2]).draw(); // bottom right
-    /// ```
-    pub fn layout(&mut self) -> LayoutCall<'_, B> {
-        LayoutCall {
-            dev: self,
-            mat: None,
-            widths: Vec::new(),
-            heights: Vec::new(),
-            respect: LayoutRespect::No,
-            error: None,
-        }
     }
 
     fn set_arrangement(&mut self, arrangement: Arrangement) -> Result<(), Error> {
@@ -1119,7 +1114,7 @@ impl<B: Backend> Device<B> {
     }
 
     /// Draws R's `plot_new()`; the public entry is
-    /// [`Graphics::plot_new`](crate::graphics::Graphics::plot_new), whose docs
+    /// [`Graphics::plot_new`], whose docs
     /// describe it.
     pub(crate) fn plot_new_impl(&mut self) -> Result<(), Error> {
         let mut new_page = false;
@@ -1190,7 +1185,7 @@ impl<B: Backend> Device<B> {
 
     /// The user coordinates for limits `xlim`/`ylim` (data units) on
     /// linear or log axes, through `GScale()`, and `par.xaxp`/`yaxp`; see
-    /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window).
+    /// [`Graphics::plot_window`].
     /// R's `par(xlog = , ylog = )` (`None`: unchanged): only the flags, as
     /// in R; `usr` and the mapping stay.
     pub(crate) fn set_log(&mut self, xlog: Option<bool>, ylog: Option<bool>) {
@@ -1322,7 +1317,9 @@ impl<B: Backend> Device<B> {
     ///
     /// If `side` isn't 1 to 4 (R: "invalid axis number").
     pub fn ax_ticks(&self, side: impl IntoArg<Side>) -> Vec<f64> {
-        let side = side.into_arg().unwrap_or_else(|e| panic!("axTicks(): {}", e.message()));
+        let side = side
+            .into_arg()
+            .unwrap_or_else(|e| panic!("axTicks(): {}", e.message()));
         let axp = if side.is_horizontal() {
             self.par.xaxp
         } else {
@@ -2028,7 +2025,7 @@ impl<B: Backend> Device<B> {
     }
 
     /// Draws R's `title()`; the public entry is
-    /// [`Graphics::title`](crate::graphics::Graphics::title), whose docs
+    /// [`Graphics::title`], whose docs
     /// describe it.
     pub(crate) fn title_impl(&mut self, opts: &TitleOptions) {
         let lh = self.line_height_inches();
@@ -2275,8 +2272,29 @@ fn region_error(fig: [f64; 4], plt: [f64; 4]) -> Option<&'static str> {
     }
 }
 
+/// R's check of `par(fig = )`: `0 <= x0 < x1 <= 1`, `0 <= y0 < y1 <= 1`.
+pub(crate) fn check_fig(fig: [f64; 4]) -> Result<(), Error> {
+    let [x0, x1, y0, y1] = fig;
+    if !(0.0 <= x0 && x0 < x1 && x1 <= 1.0 && 0.0 <= y0 && y0 < y1 && y1 <= 1.0) {
+        return Err(Error::invalid(
+            "invalid value specified for graphical parameter \"fig\"",
+        ));
+    }
+    Ok(())
+}
+
+/// R's check of `par(fin = )`: both sizes positive.
+pub(crate) fn check_fin(fin: [f64; 2]) -> Result<(), Error> {
+    if !(fin.iter().all(|&v| v > 0.0 && v.is_finite())) {
+        return Err(Error::invalid(
+            "invalid value specified for graphical parameter \"fin\"",
+        ));
+    }
+    Ok(())
+}
+
 /// R's check of `par(mfrow/mfcol = )`: at least one row and column.
-fn check_grid(name: &str, nrow: usize, ncol: usize) -> Result<(), Error> {
+pub(crate) fn check_grid(name: &str, nrow: usize, ncol: usize) -> Result<(), Error> {
     if nrow == 0 || ncol == 0 {
         return Err(Error::invalid(format!(
             "invalid value specified for graphical parameter \"{name}\""

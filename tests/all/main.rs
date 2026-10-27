@@ -38,6 +38,7 @@ mod device_open;
 mod errors_matches_r;
 mod generated_docs;
 mod figure_legends_matches_r;
+mod figure_pages;
 mod figure_replay;
 mod frozen_margins;
 mod hatch_matches_r;

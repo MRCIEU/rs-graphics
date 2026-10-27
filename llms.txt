@@ -126,9 +126,12 @@ dev.par().mfrow(1, 2).mar([4, 4, 2, 1]).las(1).draw();
 ### Recorded plots
 
 A `Figure` records calls without a device,
-like a function of R code, and is drawn later with `dev.add_figure(&fig)`
-(any panel, any number of times). Write your own plots as functions over
-the `Graphics` trait and they work on both.
+like R's `recordPlot()`, and is drawn later with `dev.add_figure(&fig)`
+(R's `replayPlot()`), any number of times and on any device. It can hold
+one panel (then `add_figure_at(row, col, &fig)` puts it in a chosen one)
+or a whole plot with its page layout (`fig.par().mfrow(..)`,
+`fig.layout()`) and pages. Write your own plots as functions over the
+`Graphics` trait and they work on both.
 
 ### Where it differs from R
 

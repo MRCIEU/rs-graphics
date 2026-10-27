@@ -18,7 +18,7 @@
 //! in, as in R, where `par(cex)` sets the base `cex` (`cexbase`) and resets
 //! the per-call `cex` to 1, and a margin line is `mex * cexbase` times the
 //! character height (`mapNDC2Dev()`). Multi-panel layouts (`par()`'s
-//! `mfrow`/`mfcol`, and `Device::layout()`) set `cex` (0.83 for 2 x 2, 0.66
+//! `mfrow`/`mfcol`, and `layout()`) set `cex` (0.83 for 2 x 2, 0.66
 //! beyond that) and `mex` just as R's `par(mfrow=)` does.
 
 use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};

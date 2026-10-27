@@ -136,9 +136,7 @@ Every call that takes arguments has an options struct: `PlotOptions`, `HistOptio
 
 ### Figures as values
 
-A `Figure` records the same calls without a device, so you can build a figure (a plot and its margins) once and draw it later, on any device and in any panel. 
-
-Page layout stays with the device. A figure is one panel, so a figure's `par()` has no `mfrow` or `mfcol`.
+A `Figure` records the same calls without a device, so you can build a figure (a plot and its margins) once and draw it later, on any device and in any panel. A figure can also hold a whole plot, page layout and several pages included: `fig.par().mfrow(2, 2).draw()` and `fig.layout()` are recorded too, and adding such a figure sets that layout up on the device (R's `recordPlot()`/`replayPlot()`).
 
 ```rust
 let dose = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];

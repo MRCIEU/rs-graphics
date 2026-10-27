@@ -8,7 +8,7 @@
 
 //! Pages divided into several figures (panels): the column and row sizes
 //! ([`LayoutSize`]) and `respect` ([`LayoutRespect`]) of
-//! [`Device::layout`](crate::device::Device::layout), for figures of
+//! [`Graphics::layout`](crate::graphics::Graphics::layout), for figures of
 //! different sizes, and the grids that `par()`'s
 //! [`mfrow`](crate::graphics::ParCall::mfrow) and
 //! [`mfcol`](crate::graphics::ParCall::mfcol) set up.
@@ -160,7 +160,7 @@ enum Respect {
 /// A page divided into figures of different sizes: which figure occupies
 /// each cell of a grid, with column widths, row heights and whether x and
 /// y units are kept equal. Built and applied by
-/// [`Device::layout`](crate::device::Device::layout)'s builder.
+/// [`Graphics::layout`](crate::graphics::Graphics::layout)'s builder.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Layout {
     nrow: usize,

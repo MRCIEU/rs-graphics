@@ -98,7 +98,7 @@
 //!
 //! `par()`'s [`mfrow`](graphics::ParCall::mfrow) and
 //! [`mfcol`](graphics::ParCall::mfcol), as in R, and
-//! [`Device::layout`](device::Device::layout) split the page into panels;
+//! [`layout()`](graphics::Graphics::layout) split the page into panels;
 //! each high-level call (or `plot_new()`) fills the next one, and
 //! low-level calls after it draw in that panel. `par()`'s
 //! [`mfg`](graphics::ParCall::mfg) picks the next panel,
@@ -124,7 +124,8 @@
 //!
 //! A [`recording::Figure`] implements the same trait but records the calls
 //! instead of drawing them, so a figure (a plot and its margins, as R's
-//! figure region) can be built without a device and drawn later with
+//! figure region, or a whole plot with its page layout and pages) can be
+//! built without a device and drawn later with
 //! [`Device::add_figure`](device::Device::add_figure) (or
 //! [`add_figure_at`](device::Device::add_figure_at) for a chosen panel),
 //! as often as needed and on any device. The output is identical to making

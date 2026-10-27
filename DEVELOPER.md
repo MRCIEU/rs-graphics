@@ -86,7 +86,7 @@ usage, see [README.md](README.md).
   `Device::xlog()`/`ylog()` tell which axes are logarithmic, and
   `user_to_inches`/`inches_to_user` convert between data units and
   device inches.
-- Multi-panel layouts (`src/layout.rs`, the `Device::layout()` builder,
+- Multi-panel layouts (`src/layout.rs`, the `layout()` builder,
   and `mfrow`/`mfcol`/`mfg` on a device's `par()` call):
   `par(mfrow=)`/`par(mfcol=)` (incl. R's automatic `cex` of
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
