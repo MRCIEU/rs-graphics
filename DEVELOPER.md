@@ -553,6 +553,13 @@ for any change touching layout, tick placement, or text metrics, please
 run with R available if you can. Setting `RS_GRAPHICS_REQUIRE_R=1` makes
 them fail instead of skipping (`tests/all/common.rs`).
 
+Most of them share their machinery: `tests/all/common/r.rs` runs the R
+cases in one `Rscript` and draws ours (`run_r`, `ours`), and
+`tests/all/common/pdf.rs` reads both uncompressed PDFs (`parse`: every
+painted path and text item per page, with colours, alpha, line style,
+clip and the text matrix) and compares them in order (`assert_same_pdf`,
+with per-file tolerances and exclusions in `Compare`).
+
 ### Continuous integration
 
 `.github/workflows/rust.yml` runs on pushes and pull requests to `main`

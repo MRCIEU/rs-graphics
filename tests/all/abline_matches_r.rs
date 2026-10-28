@@ -7,13 +7,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks `abline()` with vectors of `h`/`v` and recycled `col`/
-//! `lty`/`lwd` and `a`/`b` (several lines, and R's `coef =`), against a real R `pdf()` device's uncompressed output: every
-//! stroked path in drawing order (vertices, colour, width, dash pattern),
-//! on linear and log axes, and dashes with square and butt line ends. Skipped if `Rscript` isn't available.
+//! `lty`/`lwd` and `a`/`b` (several lines, and R's `coef =`), against a
+//! real R `pdf()` device's uncompressed output: every painted path in
+//! drawing order (see `common::pdf::assert_same`), on linear and log axes,
+//! and dashes with square and butt line ends. Skipped if `Rscript` isn't
+//! available.
 
 use crate::common;
-
-use std::process::Command;
+use crate::common::{pdf, r};
 
 use rs_graphics::backend::LineEnd;
 use rs_graphics::backend::pdf::PdfBackend;
@@ -213,149 +214,43 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-#[derive(Clone, Debug)]
-struct Gs {
-    stroke: [f64; 3],
-    lwd: f64,
-    dash: Vec<f64>,
-}
-
-#[derive(Debug)]
-struct Stroked {
-    vertices: Vec<f64>,
-    colour: [f64; 3],
-    lwd: f64,
-    dash: Vec<f64>,
-}
-
-fn interpret(pdf: &str) -> Vec<Stroked> {
-    let mut out = Vec::new();
-    let mut gs = Gs {
-        stroke: [0.0; 3],
-        lwd: 1.0,
-        dash: Vec::new(),
-    };
-    let mut stack = Vec::new();
-    let mut nums: Vec<f64> = Vec::new();
-    let mut array: Option<Vec<f64>> = None;
-    let mut path: Vec<f64> = Vec::new();
-    let mut rest = pdf;
-    while let Some(i) = rest.find("stream\n") {
-        let content = &rest[i + 7..];
-        let j = content.find("endstream").unwrap_or(content.len());
-        let content_str = &content[..j];
-        rest = &content[j..];
-        if !content_str.contains(" m") {
-            continue;
-        }
-        for t in content_str
-            .replace('[', " [ ")
-            .replace(']', " ] ")
-            .split_whitespace()
-        {
-            if let Ok(v) = t.parse::<f64>() {
-                match &mut array {
-                    Some(a) => a.push(v),
-                    None => nums.push(v),
-                }
-                continue;
-            }
-            let last = |k: usize| nums[nums.len() - k..].to_vec();
-            match t {
-                "[" => array = Some(Vec::new()),
-                "]" => {
-                    gs.dash = array.take().unwrap_or_default();
-                    continue;
-                }
-                "q" => stack.push(gs.clone()),
-                "Q" => gs = stack.pop().unwrap(),
-                "RG" | "SCN" => gs.stroke = last(3).try_into().unwrap(),
-                "G" => gs.stroke = [nums[nums.len() - 1]; 3],
-                "w" => gs.lwd = nums[nums.len() - 1],
-                "m" | "l" => path.extend(last(2)),
-                "n" | "f" | "B" | "b" => path.clear(),
-                "S" => out.push(Stroked {
-                    vertices: std::mem::take(&mut path),
-                    colour: gs.stroke,
-                    lwd: gs.lwd,
-                    dash: gs.dash.clone(),
-                }),
-                _ => {}
-            }
-            nums.clear();
-        }
-    }
-    out
-}
-
-fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
-    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < tol)
-}
-
 #[test]
 fn abline_matches_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = String::new();
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_abline_{}.pdf", c.name));
-        let ((x0, x1), (y0, y1)) = c.lims;
-        script.push_str(&format!(
-            "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
-             plot.new(); plot.window(c({x0}, {x1}), c({y0}, {y1}), log = '{}')\n{}\n\
-             invisible(dev.off())\n",
-            path.display(),
-            c.log,
-            c.r
-        ));
-    }
-    let script_path = dir.join("rs_graphics_abline.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_abline_{}.pdf", c.name));
-        let r = interpret(&String::from_utf8_lossy(&std::fs::read(&path).unwrap()));
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        );
-        dev.plot_new();
-        let (xl, yl) = c.lims;
-        dev.plot_window()
-            .xlim(xl.0, xl.1)
-            .ylim(yl.0, yl.1)
-            .with(&PlotWindowOptions {
-                xlog: c.log.contains('x'),
-                ylog: c.log.contains('y'),
-                ..PlotWindowOptions::default()
-            })
-            .draw();
-        (c.draw)(&mut dev);
-        let ours = interpret(&String::from_utf8_lossy(&dev.into_backend().finish()));
-        let name = c.name;
-
-        assert!(!r.is_empty(), "{name}: nothing from R");
-        assert_eq!(ours.len(), r.len(), "{name}: line count\nours={ours:#?}\nr={r:#?}");
-        for (k, (a, b)) in ours.iter().zip(&r).enumerate() {
-            let ctx = format!("{name}, line {k}:\n ours={a:?}\n r=   {b:?}");
-            assert!(close(&a.vertices, &b.vertices, 0.05), "vertices differ. {ctx}");
-            assert!(close(&a.colour, &b.colour, 0.005), "colour differs. {ctx}");
-            // R writes widths to 2 decimals.
-            assert!((a.lwd - b.lwd).abs() < 0.0051, "width differs. {ctx}");
-            assert!(close(&a.dash, &b.dash, 0.005), "dash differs. {ctx}");
-        }
+    let page = (PAGE_W, PAGE_H);
+    let codes: Vec<String> = cases
+        .iter()
+        .map(|c| {
+            let ((x0, x1), (y0, y1)) = c.lims;
+            format!(
+                "plot.new(); plot.window(c({x0}, {x1}), c({y0}, {y1}), log = '{}')\n{}",
+                c.log, c.r
+            )
+        })
+        .collect();
+    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r = r::run_r("abline", page, "", &r_cases);
+    // R writes widths to 2 decimals.
+    let how = pdf::Compare {
+        lwd: 0.0051,
+        ..Default::default()
+    };
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours_pdf, ()) = r::ours(page, |dev| {
+            dev.plot_new();
+            let (xl, yl) = c.lims;
+            dev.plot_window()
+                .xlim(xl.0, xl.1)
+                .ylim(yl.0, yl.1)
+                .xlog(c.log.contains('x'))
+                .ylog(c.log.contains('y'))
+                .draw();
+            (c.draw)(dev);
+        });
+        pdf::assert_same_pdf(c.name, pdf::parse(&ours_pdf), pdf::parse(r_pdf), &how);
     }
 }
 

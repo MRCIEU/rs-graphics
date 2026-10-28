@@ -8,6 +8,9 @@
 
 //! Shared by the `*_matches_r` tests.
 
+pub mod pdf;
+pub mod r;
+
 use std::process::Command;
 
 /// Whether `Rscript` is on `PATH`, so the R cross-checks can run. When it

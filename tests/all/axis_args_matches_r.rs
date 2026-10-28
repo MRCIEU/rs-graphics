@@ -10,11 +10,12 @@
 //! `hadj`, `padj`, `gap.axis`, `tick`, `labels` (incl. `NA`), `lty`, `lwd`/`lwd.ticks`,
 //! `col`/`col.ticks`/`col.axis`, `cex.axis`, `font`, `xaxt`/`yaxt`) and
 //! its tick limits (reversed axes, `par(xpd = TRUE)`) against a real R `pdf()` device's
-//! uncompressed output: every stroked path in drawing order (vertices,
-//! colour, width, dash pattern) and every label (origin, direction,
-//! colour). Skipped if `Rscript` isn't available.
+//! uncompressed output: every painted path and label in drawing order
+//! (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
+//! available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
 use std::process::Command;
 
@@ -439,13 +440,11 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-fn r_script(c: &Case, path: &str) -> String {
+fn r_code(c: &Case) -> String {
     format!(
-        "pdf(file = '{path}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
-         {par}\n\
+        "{par}\n\
          plot.new(); plot.window(xlim = c({x0}, {x1}), ylim = c(0, 10))\n\
-         {body}\n\
-         invisible(dev.off())\n",
+         {body}",
         par = c.r_par,
         x0 = c.xlim.0,
         x1 = c.xlim.1,
@@ -453,219 +452,41 @@ fn r_script(c: &Case, path: &str) -> String {
     )
 }
 
-fn draw_ours(c: &Case) -> String {
+fn draw_ours(c: &Case) -> Vec<u8> {
     let mut par = Par::default();
     (c.setup)(&mut par);
-    let mut dev = Device::new(
-        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-        par,
-    );
-    dev.plot_new();
-    dev.plot_window()
-        .xlim(c.xlim.0, c.xlim.1)
-        .ylim(0.0, 10.0)
-        .draw();
-    (c.draw)(&mut dev);
-    String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
+    let (pdf, ()) = r::ours_with((PAGE_W, PAGE_H), par, |dev| {
+        dev.plot_new();
+        dev.plot_window()
+            .xlim(c.xlim.0, c.xlim.1)
+            .ylim(0.0, 10.0)
+            .draw();
+        (c.draw)(dev);
+    });
+    pdf
 }
 
 // -------------------------------------------------------------------
 // A minimal PDF content-stream interpreter (see `boxplot_draw_matches_r.rs`)
 // -------------------------------------------------------------------
 
-#[derive(Clone, Debug)]
-struct Gs {
-    fill: [f64; 3],
-    stroke: [f64; 3],
-    lwd: f64,
-    dash: Vec<f64>,
-}
-
-#[derive(Debug)]
-struct Stroked {
-    vertices: Vec<f64>,
-    colour: [f64; 3],
-    lwd: f64,
-    dash: Vec<f64>,
-}
-
-#[derive(Debug)]
-struct Label {
-    /// Text-matrix direction (signs) and origin.
-    dir: (i32, i32),
-    origin: (f64, f64),
-    colour: [f64; 3],
-}
-
-fn tokens(content: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut chars = content.chars().peekable();
-    while let Some(&c) = chars.peek() {
-        if c.is_whitespace() {
-            chars.next();
-        } else if c == '[' || c == ']' {
-            chars.next();
-            out.push(c.to_string());
-        } else {
-            let mut s = String::new();
-            while let Some(&c) = chars.peek() {
-                if c.is_whitespace() || c == '[' || c == ']' {
-                    break;
-                }
-                s.push(c);
-                chars.next();
-            }
-            out.push(s);
-        }
-    }
-    out
-}
-
-fn sgn(v: f64) -> i32 {
-    if v > 1e-9 {
-        1
-    } else if v < -1e-9 {
-        -1
-    } else {
-        0
-    }
-}
-
-fn interpret(pdf: &str) -> (Vec<Stroked>, Vec<Label>) {
-    let mut strokes = Vec::new();
-    let mut labels = Vec::new();
-    let mut rest = pdf;
-    while let Some(i) = rest.find("stream\n") {
-        let body = &rest[i + 7..];
-        let Some(j) = body.find("endstream") else {
-            break;
-        };
-        let content = &body[..j];
-        rest = &body[j + 9..];
-        if !content.contains(" m") && !content.contains(" Tm") {
-            continue;
-        }
-        let mut gs = Gs {
-            fill: [0.0; 3],
-            stroke: [0.0; 3],
-            lwd: 1.0,
-            dash: Vec::new(),
-        };
-        let mut stack: Vec<Gs> = Vec::new();
-        let mut nums: Vec<f64> = Vec::new();
-        let mut array: Option<Vec<f64>> = None;
-        let mut path: Vec<f64> = Vec::new();
-        for t in tokens(content) {
-            if let Ok(v) = t.parse::<f64>() {
-                match &mut array {
-                    Some(a) => a.push(v),
-                    None => nums.push(v),
-                }
-                continue;
-            }
-            let last = |k: usize| nums[nums.len() - k..].to_vec();
-            match t.as_str() {
-                "[" => array = Some(Vec::new()),
-                "]" => {
-                    gs.dash = array.take().unwrap_or_default();
-                    continue;
-                }
-                "q" => stack.push(gs.clone()),
-                "Q" => gs = stack.pop().unwrap(),
-                "rg" | "scn" => gs.fill = last(3).try_into().unwrap(),
-                "RG" | "SCN" => gs.stroke = last(3).try_into().unwrap(),
-                "g" => gs.fill = [nums[nums.len() - 1]; 3],
-                "G" => gs.stroke = [nums[nums.len() - 1]; 3],
-                "w" => gs.lwd = nums[nums.len() - 1],
-                "m" | "l" => path.extend(last(2)),
-                "n" => path.clear(),
-                "S" => strokes.push(Stroked {
-                    vertices: std::mem::take(&mut path),
-                    colour: gs.stroke,
-                    lwd: gs.lwd,
-                    dash: gs.dash.clone(),
-                }),
-                "f" | "F" | "f*" | "B" | "b" | "s" => path.clear(),
-                "Tm" => {
-                    let m = last(6);
-                    labels.push(Label {
-                        dir: (sgn(m[0]), sgn(m[1])),
-                        origin: (m[4], m[5]),
-                        colour: gs.fill,
-                    });
-                }
-                _ => {}
-            }
-            nums.clear();
-        }
-    }
-    (strokes, labels)
-}
-
-fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
-    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < tol)
-}
-
 #[test]
 fn axis_arguments_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = String::new();
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_axis_args_{}.pdf", c.name));
-        script.push_str(&r_script(c, &path.display().to_string()));
-    }
-    let script_path = dir.join("rs_graphics_axis_args.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_axis_args_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-        let (r_strokes, r_labels) = interpret(&r_pdf);
-        let (our_strokes, our_labels) = interpret(&draw_ours(c));
-        let name = c.name;
-
-        assert_eq!(
-            our_strokes.len(),
-            r_strokes.len(),
-            "{name}: stroked path count\nours={our_strokes:#?}\nr={r_strokes:#?}"
-        );
-        for (k, (a, b)) in our_strokes.iter().zip(&r_strokes).enumerate() {
-            let ctx = format!("{name}, path {k}:\n ours={a:?}\n r=   {b:?}");
-            assert!(close(&a.vertices, &b.vertices, 0.05), "vertices differ. {ctx}");
-            assert!(close(&a.colour, &b.colour, 0.005), "colour differs. {ctx}");
-            // R writes widths to 2 decimals.
-            assert!((a.lwd - b.lwd).abs() < 0.0051, "line width differs. {ctx}");
-            assert!(close(&a.dash, &b.dash, 0.005), "dash pattern differs. {ctx}");
-        }
-
-        assert!(!r_labels.is_empty(), "{name}: no labels from R");
-        assert_eq!(
-            our_labels.len(),
-            r_labels.len(),
-            "{name}: label count\nours={our_labels:#?}\nr={r_labels:#?}"
-        );
-        for (k, (a, b)) in our_labels.iter().zip(&r_labels).enumerate() {
-            let ctx = format!("{name}, label {k}:\n ours={a:?}\n r=   {b:?}");
-            assert_eq!(a.dir, b.dir, "direction differs. {ctx}");
-            assert!(
-                close(&[a.origin.0, a.origin.1], &[b.origin.0, b.origin.1], 0.05),
-                "origin differs. {ctx}"
-            );
-            assert!(close(&a.colour, &b.colour, 0.005), "colour differs. {ctx}");
-        }
+    let codes: Vec<String> = cases.iter().map(r_code).collect();
+    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r = r::run_r("axis_args", (PAGE_W, PAGE_H), "", &r_cases);
+    // R writes widths to 2 decimals.
+    let how = pdf::Compare {
+        lwd: 0.0051,
+        ..Default::default()
+    };
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let ours_pdf = draw_ours(c);
+        pdf::assert_same_pdf(c.name, pdf::parse(&ours_pdf), pdf::parse(r_pdf), &how);
     }
 }
 
