@@ -48,8 +48,9 @@
 //! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (data
 //! vectors are any [`Numbers`](numbers::Numbers), by reference or by
 //! value; `f64` data isn't copied either way; one number is a vector of
-//! one, as in R: `plot(1, 1)` is `.x(1).y(1)`). R's `NA` in a style vector is `None`:
-//! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`.
+//! one, as in R: `plot(1, 1)` is `.x(1).y(1)`). R's `NA` in a setting is `None`:
+//! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`; in data and
+//! coordinates (`x`, `y`, ...) a missing value is `f64::NAN`, and is skipped.
 //!
 //! New to R's plotting words (`cex`, `pch`, margins, ...)? See
 //! [`guide::concepts`]. Translating R code? See [`guide::coming_from_r`]

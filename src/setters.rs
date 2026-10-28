@@ -295,8 +295,11 @@ impl Values<i32> for char {
 /// once one element is `None` the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
-/// (for text sizes and fonts, and `legend()`'s spacing, it means the
-/// default instead; each setter says which).
+/// (for text sizes and fonts, positions such as `mtext()`'s `at`, and
+/// `legend()`'s spacing, it means the default instead; each setter says
+/// which). Settings use `None` for `NA` so that "missing" is explicit;
+/// data and coordinates (`x`, `y`, segment ends, ...) use `f64::NAN`
+/// instead, as a missing value in an `f64` column already is.
 ///
 /// # Examples
 ///
@@ -383,9 +386,11 @@ mod na_numbers {
             Ok(vec![Some(self.to_f64())])
         }
     }
-    impl<N: Num> NaValues<f64> for Option<N> {
+    /// A lone `Option` is an `Option<f64>`, so a bare `None` (one `NA`)
+    /// needs no type; in arrays and `Vec`s the other elements give it.
+    impl NaValues<f64> for Option<f64> {
         fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
-            Ok(vec![self.map(Num::to_f64)])
+            Ok(vec![self])
         }
     }
     impl<N: Num, const M: usize> NaValues<f64> for [N; M] {

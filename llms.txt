@@ -68,7 +68,8 @@ dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 | `c(1, 2, 3)` | `[1, 2, 3]` or `&v` (a `Vec`, array or slice) |
 | `1:10` | `1..=10` |
 | `TRUE`, `FALSE` | `true`, `false` |
-| `NA` in a style vector: `pch = c(19, NA)` | `None`: `.pch([Some(19), None])` |
+| `NA` in a setting: `pch = c(19, NA)`, `mtext(at = c(1, NA))` | `None`: `.pch([Some(19), None])`, `.at([Some(1.0), None])` |
+| `NA` in data or coordinates: `x = c(1, NA, 3)` | `f64::NAN`: that value is skipped, as in R |
 | `NA` as a whole argument | leave the setter out |
 | `"red"`, `"#FF000080"`, `2` (colours) | the same: `.col("red")`, `.col(2)` |
 | `lty = "dashed"`, `lty = 2`, `"44"` | the same: `.lty("dashed")`, `.lty(2)` |
@@ -793,7 +794,7 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `x.intersp` | `.x_intersp()` | Space between each key and its label, in character widths (a column is as wide as its widest). |
 | `y.intersp` | `.y_intersp()` | Space between rows, in character heights, recycled over the rows. |
 | `adj` | `.adj()` | Horizontal adjustment of the labels. |
-| `text.width` | `.text_width()` | Width of the label text, in x *user* units: one width for every column, or one per column; `f64::NAN` (R's `NA`) makes each column as wide as its own widest label. |
+| `text.width` | `.text_width()` | Width of the label text, in x *user* units: one width for every column, or one per column; `None` (R's `NA`) makes each column as wide as its own widest label. |
 | `text.col` | `.text_col()` | Colours of the labels. |
 | `text.font` | `.text_font()` | Fonts of the labels (also for measuring them). |
 | `merge` | `.merge()` | Whether to draw each point in the middle of its line. |

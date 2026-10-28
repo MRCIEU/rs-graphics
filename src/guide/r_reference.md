@@ -523,7 +523,7 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `x.intersp` | `.x_intersp()` | Space between each key and its label, in character widths (a column is as wide as its widest). |
 | `y.intersp` | `.y_intersp()` | Space between rows, in character heights, recycled over the rows. |
 | `adj` | `.adj()` | Horizontal adjustment of the labels. |
-| `text.width` | `.text_width()` | Width of the label text, in x *user* units: one width for every column, or one per column; `f64::NAN` (R's `NA`) makes each column as wide as its own widest label. |
+| `text.width` | `.text_width()` | Width of the label text, in x *user* units: one width for every column, or one per column; `None` (R's `NA`) makes each column as wide as its own widest label. |
 | `text.col` | `.text_col()` | Colours of the labels. |
 | `text.font` | `.text_font()` | Fonts of the labels (also for measuring them). |
 | `merge` | `.merge()` | Whether to draw each point in the middle of its line. |

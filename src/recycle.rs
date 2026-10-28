@@ -27,6 +27,13 @@ pub(crate) fn pick_na<T: Copy>(v: &[Option<T>], i: usize, default: T) -> Option<
     pick(v, i, Some(default))
 }
 
+/// Element `i` of a recycled numeric setting whose `NA` is `None`:
+/// `Some(Some(x))` for a number, `Some(None)` for `NA` (`None`, or a `NaN`
+/// kept from before `None` was its spelling), `None` when `v` is empty.
+pub(crate) fn nth_na(v: &[Option<f64>], i: usize) -> Option<Option<f64>> {
+    nth(v, i).map(|x| x.filter(|x| !x.is_nan()))
+}
+
 /// `v` recycled to length `n` (R's `rep_len()`); empty stays empty.
 pub(crate) fn rep_len<T: Copy>(v: &[T], n: usize) -> Vec<T> {
     if v.is_empty() {

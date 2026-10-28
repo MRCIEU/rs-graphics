@@ -53,11 +53,11 @@ As in R, numbers may be integers or floats (a vector's elements must all be the 
 
 Vectors can be passed by reference or by value (`.x(&x)` or `.x(x)`, `.h([1, 2])`).
 
-Use `None` where R uses `NA`: 
+Use `None` where R uses `NA` in a setting: 
 
 `pch = c(19, NA)` is `.pch([Some(19), None])` 
 
-(but `.pch([19, 20])` is fine when you intend no missing values).
+(but `.pch([19, 20])` is fine when you intend no missing values). In data and coordinates (`x`, `y`, segment ends, `abline()`'s `h`/`v`, `axis()`'s `at`) a missing value is `f64::NAN` instead, as it usually already is in an `f64` column, and that value is skipped.
 
 ### Errors
 

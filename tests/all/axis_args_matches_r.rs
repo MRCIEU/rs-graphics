@@ -169,7 +169,7 @@ fn cases() -> Vec<Case> {
                 d.axis().side(2).with(&o).draw();
                 let o = AxisOptions::default().las(2).hadj(0.2);
                 d.axis().side(3).with(&o).draw();
-                let o = AxisOptions::default().padj(vec![1.0, f64::NAN, 0.5]);
+                let o = AxisOptions::default().padj([Some(1.0), None, Some(0.5)]);
                 d.axis().side(4).with(&o).draw();
             },
         },

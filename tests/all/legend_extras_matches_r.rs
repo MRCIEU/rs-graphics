@@ -291,7 +291,7 @@ fn cases() -> Vec<Case> {
                     .labels(["a", "mmmmmm", "cc", "d"])
                     .pch([1, 2, 3, 4])
                     .ncol(3)
-                    .text_width(f64::NAN)
+                    .text_width(None)
                     .draw()
             },
         },

@@ -53,7 +53,7 @@ use crate::lty::LineType;
 use crate::numbers::Pair;
 
 use crate::plotmath::Label;
-use crate::recycle::{pick_na, rep_or};
+use crate::recycle::{nth_na, pick_na, rep_or};
 
 use super::hatch::ShapeStyle;
 use super::{Device, Xpd};
@@ -349,10 +349,10 @@ crate::setters::options! {
         /// 2. R's `seg.len`.
         pub seg_len: Vec<Option<f64>> => na_values f64,
         /// Width of the label text, in x *user* units: one width for every
-        /// column, or one per column; `f64::NAN` (R's `NA`) makes each column
-        /// as wide as its own widest label. Empty: every column as wide as the
+        /// column, or one per column; `None` (R's `NA`) makes each column as
+        /// wide as its own widest label. Empty: every column as wide as the
         /// widest label. R's `text.width`.
-        pub text_width: Vec<f64> => numbers f64,
+        pub text_width: Vec<Option<f64>> => na_values f64,
         /// Horizontal adjustment of the labels. `None`: 0 (left). R's
         /// `adj[1]`.
         pub adj: Option<f64> => number f64,
@@ -422,9 +422,11 @@ pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Re
     if labels.is_empty() {
         return Err(Error::invalid("'legend' is of length 0"));
     }
-    let tw = &opts.text_width;
-    let any_na = tw.iter().any(|v| v.is_nan());
-    let bad = (tw.len() > 1 && any_na) || (!any_na && tw.iter().any(|&v| v < 0.0));
+    let tw: Vec<Option<f64>> = (0..opts.text_width.len())
+        .map(|i| nth_na(&opts.text_width, i).flatten())
+        .collect();
+    let any_na = tw.iter().any(Option::is_none);
+    let bad = (tw.len() > 1 && any_na) || tw.iter().flatten().any(|&v| v < 0.0);
     if bad {
         return Err(Error::invalid(
             "'text.width' must be numeric, >= 0, or a scalar NA",
@@ -532,7 +534,8 @@ impl<B: Backend> Device<B> {
         // the given widths, one per column.
         let (ux0, ux1, _, _) = self.usr;
         let inches_per_user_x = plt.width() / (ux1 - ux0).abs();
-        let auto_text_width = opts.text_width.len() == 1 && opts.text_width[0].is_nan();
+        let auto_text_width =
+            opts.text_width.len() == 1 && nth_na(&opts.text_width, 0) == Some(None);
         if auto_text_width {
             ncol = n.div_ceil(n_per_col);
         }
@@ -552,9 +555,11 @@ impl<B: Backend> Device<B> {
         } else if opts.text_width.is_empty() {
             vec![label_w.iter().copied().fold(0.0, f64::max); ncol]
         } else {
-            let tw = &opts.text_width;
+            // `check_legend` allows `NA` only as the one value (above).
             (0..ncol)
-                .map(|c| tw[c % tw.len()].abs() * inches_per_user_x)
+                .map(|c| {
+                    nth_na(&opts.text_width, c).flatten().unwrap_or(0.0).abs() * inches_per_user_x
+                })
                 .collect()
         };
 
@@ -955,18 +960,16 @@ mod tests {
     #[test]
     fn text_width_is_checked_like_r() {
         let labels = [Some(Label::from("a"))];
-        let check = |tw: Vec<f64>| {
-            let opts = LegendOptions {
-                text_width: tw,
-                ..LegendOptions::default()
-            };
+        let check = |tw: Vec<Option<f64>>| {
+            let opts = LegendOptions::default().text_width(tw);
             check_legend(&labels, &opts).is_ok()
         };
         assert!(check(vec![]));
-        assert!(check(vec![f64::NAN]));
-        assert!(check(vec![0.0, 1.5]));
-        assert!(!check(vec![-1.0]));
-        assert!(!check(vec![1.0, f64::NAN]));
+        assert!(check(vec![None]));
+        assert!(check(vec![Some(f64::NAN)])); // the old spelling of `NA`
+        assert!(check(vec![Some(0.0), Some(1.5)]));
+        assert!(!check(vec![Some(-1.0)]));
+        assert!(!check(vec![Some(1.0), None]));
     }
 
     #[test]

@@ -28,6 +28,7 @@ use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::AxisType;
 use crate::plotmath::Label;
+use crate::recycle::nth;
 
 use super::{Device, Side, Xpd, default_padj, format_axis_labels, las_perpendicular, las_rotation};
 
@@ -97,10 +98,10 @@ crate::setters::options! {
         /// on sides 1 and 2 and left-justified on 3 and 4.
         pub hadj: Option<f64> => number f64,
         /// Justification across each label, recycled over the ticks in
-        /// increasing order of `at`. `NaN` entries and an empty vector mean
-        /// the default, which depends on `side` and `las` (0, i.e. baseline
-        /// on the line, for `las = 0`).
-        pub padj: Vec<f64> => numbers f64,
+        /// increasing order of `at`. `None` entries (R's `NA`) and an empty
+        /// vector mean the default, which depends on `side` and `las` (0,
+        /// i.e. baseline on the line, for `las = 0`).
+        pub padj: Vec<Option<f64>> => na_values f64,
         /// Minimum gap between labels, in "m" widths (labels parallel to the
         /// axis) or "M" heights (perpendicular); a label closer than that to
         /// the previous one is dropped. `None`: 1 or 0.25. R's `gap.axis`.
@@ -424,15 +425,10 @@ impl<B: Backend> Device<B> {
             if !(low < v && v < high) {
                 continue;
             }
-            let padj = match opts.padj.len() {
-                0 => f64::NAN,
-                n => opts.padj[i % n],
-            };
-            let padj = if padj.is_finite() {
-                padj
-            } else {
-                default_padj(side, las)
-            };
+            let padj = nth(&opts.padj, i)
+                .flatten()
+                .filter(|p| p.is_finite())
+                .unwrap_or_else(|| default_padj(side, las));
             let temp = along(v);
             let label = match label {
                 Label::Text(t) => t.as_str(),

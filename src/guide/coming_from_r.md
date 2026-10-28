@@ -52,7 +52,8 @@ dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 | `c(1, 2, 3)` | `[1, 2, 3]` or `&v` (a `Vec`, array or slice) |
 | `1:10` | `1..=10` |
 | `TRUE`, `FALSE` | `true`, `false` |
-| `NA` in a style vector: `pch = c(19, NA)` | `None`: `.pch([Some(19), None])` |
+| `NA` in a setting: `pch = c(19, NA)`, `mtext(at = c(1, NA))` | `None`: `.pch([Some(19), None])`, `.at([Some(1.0), None])` |
+| `NA` in data or coordinates: `x = c(1, NA, 3)` | `f64::NAN`: that value is skipped, as in R |
 | `NA` as a whole argument | leave the setter out |
 | `"red"`, `"#FF000080"`, `2` (colours) | the same: `.col("red")`, `.col(2)` |
 | `lty = "dashed"`, `lty = 2`, `"44"` | the same: `.lty("dashed")`, `.lty(2)` |

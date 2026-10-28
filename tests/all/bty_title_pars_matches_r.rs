@@ -580,7 +580,7 @@ fn mtext_nan_line_skips_the_label() {
     dev.mtext()
         .text(["p", "q"])
         .side(2)
-        .line([1.0, f64::NAN])
+        .line([Some(1.0), None])
         .draw();
     let texts = pdf::parse(&dev.into_backend().finish()).page().texts;
     let strings: Vec<&str> = texts.iter().map(|t| t.string.as_str()).collect();

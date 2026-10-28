@@ -27,22 +27,23 @@ use crate::geometry::Point;
 use crate::plotmath::Label;
 
 use super::{Device, Side, Xpd, default_padj, las_perpendicular, las_rotation};
-use crate::recycle::{nth, pick_na};
+use crate::recycle::{nth, nth_na, pick_na};
 
 crate::setters::options! {
     /// The arguments of R's `mtext()` other than `text` and `side`, with
     /// R's defaults. As in R, the text and the vector arguments are recycled
     /// over the longest: `dev.mtext().text(["a", "b"]).at([1, 2]).draw()`
     /// writes two labels.
-    /// Empty: R's default for every label; a `NaN` entry is R's `NA`, the
+    /// Empty: R's default for every label; a `None` entry is R's `NA`, the
     /// default for that label.
     #[derive(Clone, Debug, Default)]
     pub struct MtextOptions => [MtextCall] {
         /// Margin line, recycled per label, counting from 0 next to the plot
         /// region (or the inner region for `outer`); may be negative or
-        /// fractional. Empty: 0. A `NaN` entry leaves its label out (R writes
-        /// it with a `nan` coordinate, an invalid PDF: R bug not copied).
-        pub line: Vec<f64> => numbers f64,
+        /// fractional. Empty: 0. A `None` entry (R's `NA`) leaves its label
+        /// out (R writes it with a `nan` coordinate, an invalid PDF: R bug
+        /// not copied).
+        pub line: Vec<Option<f64>> => na_values f64,
         /// Draws in the outer margins ([`par(oma)`]) rather than the figure's.
         /// Default `false`.
         ///
@@ -50,17 +51,17 @@ crate::setters::options! {
         pub outer: bool => value bool,
         /// Position along the side, recycled per label: a user coordinate
         /// for inner margins, or a fraction (0 to 1) of the inner region for
-        /// outer ones. Empty or `NaN`: from `adj` (text parallel to the
-        /// side) or centred (perpendicular).
-        pub at: Vec<f64> => numbers f64,
-        /// Justification along the text, recycled per label. Empty or `NaN`:
+        /// outer ones. Empty or `None` (R's `NA`): from `adj` (text parallel
+        /// to the side) or centred (perpendicular).
+        pub at: Vec<Option<f64>> => na_values f64,
+        /// Justification along the text, recycled per label. Empty or `None`:
         /// 0.5 for text parallel to the side, otherwise justified at the end
         /// nearest the plot (1 on sides 1 and 2, 0 on sides 3 and 4).
-        pub adj: Vec<f64> => numbers f64,
+        pub adj: Vec<Option<f64>> => na_values f64,
         /// Justification across the text, recycled per label. Empty or
-        /// `NaN`: depends on `side` and `las` (0, i.e. baseline on the line,
+        /// `None`: depends on `side` and `las` (0, i.e. baseline on the line,
         /// for `las = 0`).
-        pub padj: Vec<f64> => numbers f64,
+        pub padj: Vec<Option<f64>> => na_values f64,
         /// Text sizes, recycled per label. Empty, `None` or `NaN`: 1. Unlike
         /// most text, *not* scaled by [`par(cex)`] (so neither by the
         /// multi-panel reduction), as in R. (For an `NA` after a finite
@@ -154,13 +155,13 @@ impl<B: Backend> Device<B> {
         .into_iter()
         .max()
         .unwrap_or(1);
-        let pick = |v: &[f64], i: usize| nth(v, i).filter(|x| !x.is_nan());
+        let pick = |v: &[Option<f64>], i: usize| nth_na(v, i).flatten();
         for i in 0..n {
             // An `NA` line puts the label nowhere: R draws nothing for it.
-            let line = nth(&opts.line, i);
-            if line.is_some_and(f64::is_nan) {
-                continue;
-            }
+            let line = match nth_na(&opts.line, i) {
+                Some(None) => continue,
+                line => line.flatten(),
+            };
             let one = One {
                 line,
                 outer: opts.outer,

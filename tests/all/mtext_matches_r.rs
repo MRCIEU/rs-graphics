@@ -17,7 +17,6 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-
 use rs_graphics::device::MtextOptions;
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
@@ -105,6 +104,12 @@ fn mtext_placement_matches_r() {
     }
     // Inline `las` doesn't change `par(las)`; without it, `par(las)` applies.
     script.push_str("par(las = 1); mtext('par las', side = 2, line = 2.5)\n");
+    // `NA` elements in the recycled vectors (`None` here): the default for
+    // that label.
+    script.push_str(
+        "mtext(c('n1', 'n2', 'n3'), side = 3, line = 1, at = c(2, NA, 8), \
+         adj = c(NA, 0, 1), padj = c(1, NA, 0))\n",
+    );
     let r_pdf = r::run_r("mtext", page, "", &[("all", &script)])
         .pdfs
         .remove(0);
@@ -142,10 +147,18 @@ fn mtext_placement_matches_r() {
         assert_eq!(dev.current_par().las, 0);
         dev.par().las(1).draw();
         dev.mtext().text("par las").side(2).line(2.5).draw();
+        dev.mtext()
+            .text(["n1", "n2", "n3"])
+            .side(3)
+            .line(1)
+            .at([Some(2.0), None, Some(8.0)])
+            .adj([None, Some(0.0), Some(1.0)])
+            .padj([Some(1.0), None, Some(0.0)])
+            .draw();
     });
 
     let (ours, r) = (pdf::parse(&ours), pdf::parse(&r_pdf));
-    assert_eq!(r.pages[0].texts.len(), cases.len() + 1);
+    assert_eq!(r.pages[0].texts.len(), cases.len() + 4);
     // R clips `mtext()` to the device even for inner margins (its `C_mtext`
     // tests `outer` on the SEXP); we clip it to the figure.
     let how = pdf::Compare {
