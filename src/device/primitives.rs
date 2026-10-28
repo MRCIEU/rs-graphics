@@ -11,10 +11,10 @@
 //! `plot.window()`: the options structs of their builder calls (see
 //! [`Graphics`](crate::graphics::Graphics)), with R's arguments.
 //!
-//! An empty `Vec` (or `None`) field means R's default for that argument,
-//! usually the `par()` value; a field R recycles per element (`col` in
-//! `points(x, y, col = groups)`) is a `Vec` used in turn and repeated as
-//! needed. `xpd` is R's inline `xpd = ` (clip to the plot region, the
+//! A setting left unset means R's default for that argument, usually the
+//! `par()` value; a setting R recycles per element (`col` in
+//! `points(x, y, col = groups)`) takes one value or several, used in turn
+//! and repeated as needed. `xpd` is R's inline `xpd = ` (clip to the plot region, the
 //! figure region or the device: [`Xpd`]); `None` uses [`par(xpd)`].
 //!
 //! [`par(xpd)`]: crate::par::Par::xpd

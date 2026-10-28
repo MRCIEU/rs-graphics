@@ -140,7 +140,7 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `offset` | `.offset()` | Shifts the bars along the value axis, recycled over the bars of a vector, the rows of a `beside` matrix, or the columns (stacks) of a stacked one. |
 | `add` | `.add()` | Draws on the current plot instead of starting a new one: no new plot or panel, no new coordinates; the names, legend and axis are still drawn. |
 | `ann` | `.ann()` | Whether to draw the titles. |
-| `args.legend` | `.args_legend()` | Legend options (e.g. `bty`, `inset`, `ncol`, `cex`, `title`, `fill`); every field set here overrides barplot's choice (`fill` from `col`, `xjust = yjust = 1`, otherwise `legend()`'s defaults). |
+| `args.legend` | `.args_legend()` | Legend options (e.g. `bty`, `inset`, `ncol`, `cex`, `title`, `fill`); every setting made here overrides barplot's choice (`fill` from `col`, `xjust = yjust = 1`, otherwise `legend()`'s defaults). |
 | `orderH` | `.order_h()` | Stacked bars only: order of the segments within each stack; each segment keeps its row's colour. |
 | `args.legend` (`x`, `y`) | `.legend_pos()` | Position of the legend, e.g. `"topleft"` or `(x, y)`. |
 | `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |

@@ -52,8 +52,8 @@ use super::InlineAxis;
 
 crate::setters::options! {
     /// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
-    /// `barplot.default`'s arguments this crate implements. Unset fields are
-    /// R's defaults, given for each.
+    /// `barplot.default`'s arguments this crate implements. Settings left
+    /// unset are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct BarplotOptions => [BarplotCall] {
         /// Labels under the bars, or beside them if `horiz`. For a `beside`
@@ -98,7 +98,7 @@ crate::setters::options! {
         /// `args.legend = list(x = .., y = ..)`.
         pub legend_pos: Option<LegendPos> => option LegendPos,
         /// Legend options (e.g. `bty`, `inset`, `ncol`, `cex`, `title`,
-        /// `fill`); every field set here overrides barplot's choice (`fill`
+        /// `fill`); every setting made here overrides barplot's choice (`fill`
         /// from `col`, `xjust = yjust = 1`, otherwise `legend()`'s defaults).
         /// The labels always come from `legend_text`. Default: no overrides.
         /// The rest of R's `args.legend`.

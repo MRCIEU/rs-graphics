@@ -38,7 +38,7 @@ const DEFAULT_COLORS: [&str; 6] = [
 
 crate::setters::options! {
     /// Options for [`Graphics::pie`](crate::graphics::Graphics::pie), covering the subset of `pie()`'s arguments this
-    /// crate implements. Unset fields are R's defaults, given for each.
+    /// crate implements. Settings left unset are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct PieOptions => [PieCall] {
         /// Slice labels (text or plotmath expressions). `None`: `1, 2, ...`.

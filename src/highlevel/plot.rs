@@ -120,8 +120,8 @@ crate::error::from_r_string!(
 
 crate::setters::options! {
     /// Options for [`Graphics::plot`](crate::graphics::Graphics::plot), covering the subset of
-    /// `plot.default`'s arguments this crate implements. Unset fields are R's
-    /// defaults, given for each.
+    /// `plot.default`'s arguments this crate implements. Settings left unset
+    /// are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct PlotOptions => [PlotCall] {
         /// What to draw: points, lines, both, steps, ... (see [`PlotType`]).

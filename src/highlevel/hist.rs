@@ -444,8 +444,8 @@ impl<L: Into<Label>> From<Vec<L>> for HistLabels {
 
 crate::setters::options! {
     /// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
-    /// and `plot.histogram`'s arguments this crate implements. Unset fields
-    /// are R's defaults, given for each.
+    /// and `plot.histogram`'s arguments this crate implements. Settings left
+    /// unset are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct HistOptions => [HistCall] {
         /// How to choose the bins: edges (`.breaks([0, 2, 5, 10])`, sorted

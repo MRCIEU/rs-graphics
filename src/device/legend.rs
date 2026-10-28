@@ -408,14 +408,14 @@ legend_pch_impls!(@each char, |c: char| Some(char_pch(c)), |c: Option<char>| c.m
 
 crate::setters::options! {
     /// The arguments of R's `legend()` other than its position and labels.
-    /// Empty `Vec`s and `None` are R's defaults, given for each field.
+    /// Settings left unset are R's defaults, given on each setter.
     ///
     /// The per-key arguments (`col`, `pch`, `lty`, `lwd`, `fill`, `border`,
     /// `density`, `angle`, `pt_bg`, `pt_cex`, `pt_lwd`, `cex`, `x_intersp`,
     /// `seg_len`, `text_col`, `text_font`) are recycled over the keys, as in
     /// R. A `None`
     /// element is R's `NA` for that key (`.pch([Some(19), None])`): the
-    /// field says what it does. Which parts a key has follows R's rules:
+    /// setter says what it does. Which parts a key has follows R's rules:
     /// - a box, if `fill` or `density` is given (every key gets one; without
     ///   `density` a `None` fill is an empty box, with it `None` is [`par(fg)`]),
     ///   shaded with lines if `density` is;

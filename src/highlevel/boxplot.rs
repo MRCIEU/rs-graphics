@@ -173,7 +173,7 @@ crate::setters::options! {
     /// Options for [`Graphics::boxplot`](crate::graphics::Graphics::boxplot):
     /// the arguments of R's `boxplot.default` and `bxp()`, including the
     /// drawing parameters R takes in `pars` or directly (`boxplot(x, medlwd =
-    /// 2)`). Unset fields are R's defaults, given for each.
+    /// 2)`). Settings left unset are R's defaults, given on each setter.
     ///
     /// Like R's, the per-box values (`col`, `border`, `boxwex` and every
     /// `box*`/`med*`/`whisk*`/`staple*`/`out*` style) are recycled over the

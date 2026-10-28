@@ -21,15 +21,15 @@
 //! dev.points().x([0.2, 0.8]).y([0.5, 0.5]).with(&opts).draw();
 //! ```
 //!
-//! Each setter is named after its
-//! field and carries the field's doc. `Option` fields take the value itself
-//! (`.las(1)`, `.main("Title")`); fields R recycles per element take one
+//! Each setter is named after R's argument and documents it. Optional
+//! settings take the value itself (`.las(1)`, `.main("Title")`) or an
+//! `Option` of it (see [`OptionArg`]); settings R recycles per element take one
 //! value or several (see [`Values`]), and in style vectors (symbols, line
 //! types and widths, sizes, fonts, colours) an element may be `None`,
 //! R's `NA`: `.pch([Some(19), None])`, `.col([Some("red"), None])` (see
 //! [`NaValues`]); limits take two numbers
 //! (`.xlim(0.0, 10.0)`). As in R, numbers may be integers or floats
-//! (`.cex(2)`, `.xlim(0, 10)`, `.mar([5, 4, 4, 2])`). Fields holding one of R's string-valued choices
+//! (`.cex(2)`, `.xlim(0, 10)`, `.mar([5, 4, 4, 2])`). Settings holding one of R's string-valued choices
 //! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
 //! `.order_h("decr")`).
 //!
@@ -91,15 +91,15 @@ where
 /// Marker types that let a setter take a value or an `Option` of one
 /// ([`OptionArg`], [`OptionNum`]); they are inferred, never written.
 pub mod markers {
-    /// A value (the field is set to `Some` of it).
+    /// A value (the setting is set to it).
     pub struct Value;
-    /// An `Option` of a value (`None` leaves the field unset).
+    /// An `Option` of a value (`None` leaves the setting unset).
     pub struct OptionOf;
 }
 
 /// A value, or an `Option` of one, for a setting R may leave unset.
 ///
-/// Takes anything that converts to the field's type ([`IntoArg`]), or an
+/// Takes anything that converts to the setting's type ([`IntoArg`]), or an
 /// `Option` of it: `None` leaves the setting at its default (for
 /// [`par()`](crate::graphics::Graphics::par), unchanged), so an
 /// `Option` held in a variable can be passed as it is. A bare `None`
@@ -195,11 +195,11 @@ impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::OptionOf> fo
     }
 }
 
-/// One value or several, for a field R recycles per element.
+/// One value or several, for a setting R recycles per element.
 ///
 /// Takes a single value or a `Vec`, array or slice of them, by value or
 /// by reference: `"red"`, `["red", "blue"]`, `[1, 2]`, ... (Numeric
-/// fields take [`Numbers`](crate::numbers::Numbers) instead: any number
+/// settings take [`Numbers`](crate::numbers::Numbers) instead: any number
 /// type, and ranges.) Colours take anything that converts to a
 /// [`ColorSpec`] (one palette index as an `i32`); line types take a
 /// [`LineType`], R's string or code; a character `pch` is its ASCII code,
@@ -288,13 +288,13 @@ impl Values<i32> for char {
 /// Takes a single value, an `Option` of one, or an array, `Vec` or slice
 /// of either, by value or by reference: `19`, `[1, 2]`,
 /// `[Some(19), None]`, `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`,
-/// ... Numeric fields take any number type ([`Num`](crate::numbers::Num))
+/// ... Numeric settings take any number type ([`Num`](crate::numbers::Num))
 /// and integer ranges (`1..=3`). Rust arrays hold one element type, so
 /// once one element is `None` the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
 /// (for text sizes and fonts, and `legend()`'s spacing, it means the
-/// default instead; each field says which).
+/// default instead; each setter says which).
 ///
 /// # Examples
 ///

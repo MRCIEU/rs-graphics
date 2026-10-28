@@ -38,7 +38,7 @@ crate::setters::options! {
     /// The arguments of R's `axis()` other than `side`, plus the inline
     /// graphical parameters it uses, with R's defaults. `None` is R's `NA` (or
     /// `NULL`), which falls back to the matching `par()` value unless the
-    /// field says otherwise.
+    /// setter says otherwise.
     #[derive(Clone, Debug)]
     pub struct AxisOptions => [AxisCall] {
         /// Tick positions, in user coordinates (data units, also on a log

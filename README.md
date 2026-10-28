@@ -146,7 +146,7 @@ dev.close()?;
 
 ### Reusing arguments
 
-Build an options struct once and apply it using `.with()`. Setters called after `.with()` change only that call; anything set before `.with()` is replaced.
+Build an options struct once, with the same setters as the call, and apply it using `.with()`. Setters called after `.with()` change only that call; anything set before `.with()` is replaced.
 
 ```rust
 let grid = AblineOptions::default().col("grey").lty("dotted");
