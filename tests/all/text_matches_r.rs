@@ -9,37 +9,14 @@
 //! Cross-checks `text()` placement against a real R `pdf()` device's
 //! uncompressed output: single `adj` (vertical adjustment `NA`, i.e. ink
 //! centring on the glyph bounding boxes), two-element `adj` (baseline
-//! offset by `adj[2] * strheight("M")`), rotation, `cex` and `font`.
-//! Skipped if `Rscript` isn't available.
+//! offset by `adj[2] * strheight("M")`), rotation, `cex` and `font`: every
+//! text item (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
+//! available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
-
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::Device;
-use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
-
-/// `(x, y, font size)` of every text matrix, in drawing order.
-fn text_origins(pdf: &str) -> Vec<(f64, f64, f64)> {
-    let mut out = Vec::new();
-    let mut tf = 1.0;
-    for line in pdf.lines() {
-        let toks: Vec<&str> = line.split_whitespace().collect();
-        for (i, t) in toks.iter().enumerate() {
-            let num = |k: usize| toks[i - k].parse::<f64>().unwrap();
-            if *t == "Tf" {
-                tf = num(1);
-            } else if *t == "Tm" {
-                let (a, b) = (num(6), num(5));
-                out.push((num(2), num(1), tf * a.hypot(b)));
-            }
-        }
-    }
-    out
-}
 
 /// `(label, hadj, vadj, srt, cex, font)`; `vadj = None` is a single `adj`.
 const CASES: &[(&str, f64, Option<f64>, f64, f64, i32)] = &[
@@ -60,13 +37,9 @@ fn text_placement_matches_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
-    let pdf_path = dir.join("rs_graphics_text.pdf");
-    let mut script = format!(
-        "pdf(file = '{}', width = 6, height = 4, compress = FALSE)\n\
-         par(mar = c(0, 0, 0, 0))\nplot.new(); plot.window(c(0, 10), c(0, 11))\n",
-        pdf_path.display()
-    );
+    let page = (6.0, 4.0);
+    let mut script =
+        String::from("par(mar = c(0, 0, 0, 0))\nplot.new(); plot.window(c(0, 10), c(0, 11))\n");
     for (i, (label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
         let adj = match v {
             Some(v) => format!("c({h}, {v})"),
@@ -77,51 +50,30 @@ fn text_placement_matches_r() {
             y = i + 1
         ));
     }
-    script.push_str("invisible(dev.off())\n");
-    let script_path = dir.join("rs_graphics_text.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let r_pdf = String::from_utf8_lossy(&std::fs::read(&pdf_path).unwrap()).into_owned();
-
-    let mut par = Par::default();
-    par.mar = Sides::new(0.0, 0.0, 0.0, 0.0);
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), par);
-    dev.plot_new();
-    dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 11.0).draw();
-    let black = ColorSpec::Color(Color::BLACK);
-    for (i, &(label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
-        dev.text()
-            .x([5.0])
-            .y([(i + 1) as f64])
-            .labels([label])
-            .with(&TextOptions {
-                adj: Some(h),
-                vadj: v,
-                srt: Some(srt),
-                col: vec![black],
-                cex: vec![Some(cex)],
-                font: vec![Some(FontFace::try_from(font).unwrap())],
-                ..TextOptions::default()
-            })
-            .draw();
-    }
-    let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-
-    let (r, o) = (text_origins(&r_pdf), text_origins(&ours));
-    assert_eq!(o.len(), r.len(), "text count\nours={o:?}\nr={r:?}");
-    for ((a, b), case) in o.iter().zip(&r).zip(CASES) {
-        assert!(
-            (a.0 - b.0).abs() < 0.05 && (a.1 - b.1).abs() < 0.05 && (a.2 - b.2).abs() < 0.05,
-            "{:?}: ours={a:?} r={b:?}",
-            case.0
-        );
-    }
+    let r_pdf = r::run_r("text", page, "", &[("all", &script)])
+        .pdfs
+        .remove(0);
+    let (ours, ()) = r::ours(page, |dev| {
+        dev.par().mar([0, 0, 0, 0]).draw();
+        dev.plot_new();
+        dev.plot_window().xlim(0, 10).ylim(0, 11).draw();
+        for (i, &(label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
+            let text = dev
+                .text()
+                .x(5)
+                .y((i + 1) as f64)
+                .labels(label)
+                .adj(h)
+                .srt(srt)
+                .cex(cex)
+                .font(font);
+            match v {
+                Some(v) => text.vadj(v).draw(),
+                None => text.draw(),
+            }
+        }
+    });
+    let (ours, r) = (pdf::parse(&ours), pdf::parse(&r_pdf));
+    assert_eq!(r.pages[0].texts.len(), CASES.len());
+    pdf::assert_same_pdf("text", ours, r, &pdf::Compare::default());
 }

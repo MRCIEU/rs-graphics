@@ -7,44 +7,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks `arrows()` against a real R `pdf()` device's uncompressed
-//! output: every vertex of every shaft and head, for heads at the start,
-//! end and both ends, `angle = 90` error-bar caps, steep/diagonal shafts,
-//! a skipped `NA` segment and a zero-length arrow (drawn without heads).
+//! output: every shaft and head in order (see `common::pdf::assert_same`),
+//! for heads at the start, end and both ends, `angle = 90` error-bar caps,
+//! steep/diagonal shafts, a skipped `NA` segment and a zero-length arrow
+//! (drawn without heads).
 //! Skipped if `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
-
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::Device;
-use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
-
-/// Every stroked/filled `m`/`l` path's vertices, in drawing order (clips
-/// and rectangles are skipped).
-fn paths(pdf: &str) -> Vec<Vec<(f64, f64)>> {
-    let mut out = Vec::new();
-    let mut cur: Vec<(f64, f64)> = Vec::new();
-    for tok_line in pdf.lines() {
-        let toks: Vec<&str> = tok_line.split_whitespace().collect();
-        for (i, t) in toks.iter().enumerate() {
-            let num = |k: usize| toks[i - k].parse::<f64>().unwrap();
-            match *t {
-                "m" | "l" => cur.push((num(2), num(1))),
-                "re" | "n" => cur.clear(),
-                "S" | "s" | "f" | "B" | "b" | "f*" | "B*" | "b*" => {
-                    if !cur.is_empty() {
-                        out.push(std::mem::take(&mut cur));
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    out
-}
 
 /// `(x0, y0, x1, y1, length, angle, code)` per `arrows()` call.
 type Call = (&'static [f64], &'static [f64], &'static [f64], &'static [f64], f64, f64, u8);
@@ -75,13 +47,8 @@ fn arrows_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
-    let pdf_path = dir.join("rs_graphics_arrows.pdf");
-    let mut script = format!(
-        "pdf(file = '{}', width = 7, height = 5, compress = FALSE)\n\
-         plot.new(); plot.window(c(0, 10), c(0, 10))\n",
-        pdf_path.display()
-    );
+    let page = (7.0, 5.0);
+    let mut script = String::from("plot.new(); plot.window(c(0, 10), c(0, 10))\n");
     for (x0, y0, x1, y1, length, angle, code) in CALLS {
         script.push_str(&format!(
             "suppressWarnings(arrows({}, {}, {}, {}, length = {length}, angle = {angle}, code = {code}))\n",
@@ -91,44 +58,25 @@ fn arrows_match_r() {
             r_vec(y1)
         ));
     }
-    script.push_str("invisible(dev.off())\n");
-    let script_path = dir.join("rs_graphics_arrows.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let r_pdf = String::from_utf8_lossy(&std::fs::read(&pdf_path).unwrap()).into_owned();
-
-    let mut dev = Device::new(PdfBackend::new(7.0, 5.0).with_compression(false), Par::default());
-    dev.plot_new();
-    dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
-    for &(x0, y0, x1, y1, length, angle, code) in CALLS {
-        let opts = ArrowsOptions {
-            length: Some(length),
-            angle: Some(angle),
-            code: Some(code),
-            col: vec![ColorSpec::Color(Color::BLACK)],
-            ..ArrowsOptions::default()
-        };
-        dev.arrows().x0(x0).y0(y0).x1(x1).y1(y1).with(&opts).draw();
-    }
-    let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-
-    let (r, o) = (paths(&r_pdf), paths(&ours));
-    assert_eq!(o.len(), r.len(), "path count\nours={o:?}\nr={r:?}");
-    for (i, (a, b)) in o.iter().zip(&r).enumerate() {
-        assert_eq!(a.len(), b.len(), "path {i}: ours={a:?} r={b:?}");
-        for (p, q) in a.iter().zip(b) {
-            assert!(
-                (p.0 - q.0).abs() < 0.05 && (p.1 - q.1).abs() < 0.05,
-                "path {i}: ours={a:?} r={b:?}"
-            );
+    let r_pdf = r::run_r("arrows", page, "", &[("all", &script)])
+        .pdfs
+        .remove(0);
+    let (ours, ()) = r::ours(page, |dev| {
+        dev.plot_new();
+        dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
+        for &(x0, y0, x1, y1, length, angle, code) in CALLS {
+            dev.arrows()
+                .x0(x0)
+                .y0(y0)
+                .x1(x1)
+                .y1(y1)
+                .length(length)
+                .angle(angle)
+                .code(code)
+                .draw();
         }
-    }
+    });
+    let (ours, r) = (pdf::parse(&ours), pdf::parse(&r_pdf));
+    assert!(r.pages[0].paths.len() > 10);
+    pdf::assert_same_pdf("arrows", ours, r, &pdf::Compare::default());
 }

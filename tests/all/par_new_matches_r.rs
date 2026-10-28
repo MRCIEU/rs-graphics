@@ -10,12 +10,12 @@
 //! uncompressed output: a second y axis overlaid on a plot, overlays in a
 //! multi-figure page, `plot.new()` not resetting it, drawing and outer
 //! `mtext()` (not) resetting it, and setting it before anything is
-//! plotted. Compares every text origin and every data line's vertices
-//! (paths of 5 or more points). Skipped if `Rscript` isn't available.
+//! plotted. Compares every painted path and text item in order (see
+//! `common::pdf::assert_same`). Skipped if `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
@@ -195,99 +195,32 @@ fn cases() -> Vec<Case> {
 
 /// `(x, y)` of every text matrix, and the vertices of every stroked path
 /// with at least 5 points (the data lines), each sorted.
-fn extract(pdf: &str) -> (Vec<(f64, f64)>, Vec<Vec<f64>>) {
-    let mut texts = Vec::new();
-    let mut lines = Vec::new();
-    let mut path: Vec<f64> = Vec::new();
-    let mut nums: Vec<f64> = Vec::new();
-    for t in pdf.split_whitespace() {
-        if let Ok(v) = t.parse::<f64>() {
-            nums.push(v);
-            continue;
-        }
-        match t {
-            "m" | "l" if nums.len() >= 2 => path.extend(&nums[nums.len() - 2..]),
-            "Tm" if nums.len() >= 6 => texts.push((nums[nums.len() - 2], nums[nums.len() - 1])),
-            "S" => {
-                if path.len() >= 10 {
-                    lines.push(std::mem::take(&mut path));
-                }
-                path.clear();
-            }
-            "n" | "f" | "B" | "b" | "s" | "h" | "re" => path.clear(),
-            _ => {}
-        }
-        nums.clear();
-    }
-    let key = |p: &(f64, f64)| ((p.0 * 10.0).round() as i64, (p.1 * 10.0).round() as i64);
-    texts.sort_by_key(key);
-    lines.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    (texts, lines)
-}
-
-fn r_script(c: &Case, path: &str) -> String {
-    format!(
-        "pdf(file = '{path}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
-         falling <- function() 11 - x\n{}\ninvisible(dev.off())\n",
-        c.r
-    )
-}
-
 #[test]
 fn par_new_matches_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = R_PRELUDE.to_string();
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_par_new_{}.pdf", c.name));
-        script.push_str(&r_script(c, &path.display().to_string()));
-    }
-    let script_path = dir.join("rs_graphics_par_new.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_par_new_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-        let (r_texts, r_lines) = extract(&r_pdf);
-
+    let page = (PAGE_W, PAGE_H);
+    let codes: Vec<String> = cases
+        .iter()
+        .map(|c| format!("falling <- function() 11 - x\n{}", c.r))
+        .collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
+    let r = r::run_r("par_new", page, R_PRELUDE, &r_cases);
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
         let mut par = Par::default();
         (c.setup)(&mut par);
-        let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
-        (c.draw)(&mut dev);
-        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-        let (our_texts, our_lines) = extract(&ours);
-        let name = c.name;
-
-        assert!(!r_texts.is_empty() && !r_lines.is_empty(), "{name}: nothing from R");
-        assert_eq!(
-            our_texts.len(),
-            r_texts.len(),
-            "{name}: text count\nours={our_texts:?}\nr={r_texts:?}"
+        let (ours, ()) = r::ours_with(page, par, c.draw);
+        pdf::assert_same_pdf(
+            c.name,
+            pdf::parse(&ours),
+            pdf::parse(r_pdf),
+            &pdf::Compare::default(),
         );
-        for (a, b) in our_texts.iter().zip(&r_texts) {
-            assert!(
-                (a.0 - b.0).abs() < 0.05 && (a.1 - b.1).abs() < 0.05,
-                "{name}: text origin differs: ours={a:?} r={b:?}\nours={our_texts:?}\nr={r_texts:?}"
-            );
-        }
-        assert_eq!(our_lines.len(), r_lines.len(), "{name}: data line count");
-        for (a, b) in our_lines.iter().zip(&r_lines) {
-            assert!(
-                a.len() == b.len() && a.iter().zip(b).all(|(p, q)| (p - q).abs() < 0.05),
-                "{name}: data line differs:\n ours={a:?}\n r=   {b:?}"
-            );
-        }
     }
 }

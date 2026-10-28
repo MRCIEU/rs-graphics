@@ -10,33 +10,19 @@
 //! against a real R `pdf()` device: R snaps a tick within `range / (100 *
 //! n)` of zero to exactly 0 (`CreateAtVector()`), so e.g. -0.2..0.4 is
 //! labelled `-0.2 -0.1 0.0 0.1 ...`, not `... 2.775558e-17 ...` (which also
-//! turned every label scientific and made them overlap). Compares the label
-//! strings only: negative labels are laid out slightly differently in PDF
-//! output because R's `pdf()` draws `-` as `/minus` (a deliberate
+//! turned every label scientific and made them overlap). Compares every
+//! painted path and text item (see `common::pdf::assert_same`), except the
+//! origins of negative labels, which are laid out slightly differently in
+//! PDF output because R's `pdf()` draws `-` as `/minus` (a deliberate
 //! difference, see CLAUDE.md); the page is wide enough that this doesn't
 //! change which labels `gap.axis` drops. Skipped if `Rscript` isn't
 //! available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
 
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::color::{Color, ColorSpec};
-use rs_graphics::device::Device;
-use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
-
-/// The string of every `(...) Tj`, in drawing order.
-fn text_strings(pdf: &str) -> Vec<String> {
-    pdf.lines()
-        .filter_map(|l| {
-            let l = l.trim_end();
-            let end = l.strip_suffix(") Tj")?;
-            Some(end[end.find('(')? + 1..].to_string())
-        })
-        .collect()
-}
 
 type Range = (f64, f64);
 
@@ -52,66 +38,37 @@ fn zero_ticks_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
-    let pdf_path = dir.join("rs_graphics_zero_tick.pdf");
-    let mut script = format!(
-        "pdf(file = '{}', width = 15, height = 5, compress = FALSE)\npar(mfrow = c(1, 3))\n",
-        pdf_path.display()
-    );
+    let page = (15.0, 5.0);
+    let mut script = String::from("par(mfrow = c(1, 3))\n");
     for ((x0, x1), (y0, y1)) in RANGES {
         script.push_str(&format!(
             "plot.new(); plot.window(c({x0}, {x1}), c({y0}, {y1})); axis(1); axis(2)\n"
         ));
     }
-    script.push_str("invisible(dev.off())\n");
-    let script_path = dir.join("rs_graphics_zero_tick.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
+    let r_pdf = r::run_r("zero_tick", page, "", &[("all", &script)])
+        .pdfs
+        .remove(0);
+    let (ours, ()) = r::ours(page, |dev| {
+        dev.par().mfrow(1, 3).draw();
+        for &(xlim, ylim) in RANGES {
+            dev.plot_new();
+            dev.plot_window()
+                .xlim(xlim.0, xlim.1)
+                .ylim(ylim.0, ylim.1)
+                .draw();
+            dev.axis().side(1).draw();
+            dev.axis().side(2).draw();
+        }
+    });
+    let r = pdf::parse(&r_pdf);
     assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
+        r.pages[0].texts.iter().any(|t| t.string == "0.0"),
+        "R labels: {:?}",
+        r.pages[0].texts
     );
-    let r_pdf = String::from_utf8_lossy(&std::fs::read(&pdf_path).unwrap()).into_owned();
-
-    let mut dev = Device::new(PdfBackend::new(15.0, 5.0).with_compression(false), Par::default());
-    dev.par().mfrow(1, 3).draw();
-    let black = ColorSpec::Color(Color::BLACK);
-    for &(xlim, ylim) in RANGES {
-        dev.plot_new();
-        dev.plot_window()
-            .xlim(xlim.0, xlim.1)
-            .ylim(ylim.0, ylim.1)
-            .draw();
-        dev.axis()
-            .side(1)
-            .with(&AxisOptions {
-                col: Some(black),
-                col_axis: Some(black),
-                cex_axis: Some(1.0),
-                font: Some(FontFace::Plain),
-                las: Some(0),
-                ..AxisOptions::default()
-            })
-            .draw();
-        dev.axis()
-            .side(2)
-            .with(&AxisOptions {
-                col: Some(black),
-                col_axis: Some(black),
-                cex_axis: Some(1.0),
-                font: Some(FontFace::Plain),
-                las: Some(0),
-                ..AxisOptions::default()
-            })
-            .draw();
-    }
-    let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-
-    let (r, o) = (text_strings(&r_pdf), text_strings(&ours));
-    assert!(r.iter().any(|s| s == "0.0"), "R labels: {r:?}");
-    assert_eq!(o, r);
+    let how = pdf::Compare {
+        skip_origin: |t| t.string.contains('-'),
+        ..Default::default()
+    };
+    pdf::assert_same_pdf("zero_tick", pdf::parse(&ours), r, &how);
 }

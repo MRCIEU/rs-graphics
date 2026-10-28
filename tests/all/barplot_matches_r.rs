@@ -8,69 +8,19 @@
 
 //! Cross-checks `barplot()` (vector, stacked / `beside` matrix, `horiz`,
 //! `width`/`space`, `legend.text`) against a real R `pdf()` device's
-//! uncompressed output: every bar/legend rectangle and every text origin.
-//! Skipped if `Rscript` isn't available.
+//! uncompressed output: every painted path and text item in order (see
+//! `common::pdf::assert_same`), except the origins of labels with a minus
+//! sign (R's `/minus`). Skipped if `Rscript` isn't available.
 
 use crate::common;
-
-use std::process::Command;
+use crate::common::{pdf, r};
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::BarplotOptions;
-use rs_graphics::par::Par;
 use rs_graphics::plotmath::Label;
 use rs_graphics::graphics::Graphics;
-
-/// `(x, y)` of every text matrix, sorted.
-fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let Some(idx) = line.find(" Tm") else {
-            continue;
-        };
-        // Reversed: [y, x, ...].
-        let nums: Vec<f64> = line[..idx]
-            .split_whitespace()
-            .rev()
-            .take(6)
-            .filter_map(|t| t.parse().ok())
-            .collect();
-        if nums.len() == 6 {
-            out.push((nums[1], nums[0]));
-        }
-    }
-    out.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    out
-}
-
-/// `[x, y_bottom, w, h]` of every drawn rectangle (`... re` without a clip),
-/// ignoring the full-page background, normalised so `h > 0`.
-fn rects(pdf: &str) -> Vec<[f64; 4]> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let line = line.trim();
-        if !line.ends_with(" re") {
-            continue;
-        }
-        let nums: Vec<f64> = line
-            .split_whitespace()
-            .filter_map(|t| t.parse().ok())
-            .collect();
-        if nums.len() != 4 || (nums[2] >= 431.0 && nums[3] >= 287.0) {
-            continue;
-        }
-        let (x, y, w, h) = (nums[0], nums[1], nums[2], nums[3]);
-        out.push(if h < 0.0 {
-            [x, y + h, w, -h]
-        } else {
-            [x, y, w, h]
-        });
-    }
-    out.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    out
-}
 
 fn names(n: &[&str]) -> Option<Vec<Label>> {
     Some(n.iter().map(|&s| s.into()).collect())
@@ -101,10 +51,6 @@ struct Case {
     name: &'static str,
     r: &'static str,
     run: fn(&mut Device<PdfBackend>),
-    /// Compare text origins too. Off where negative tick labels appear: R's
-    /// pdf device draws `-` as the wider `minus` glyph (see `devPS.c`,
-    /// `/Differences [ 45/minus ]`), which we deliberately don't replicate.
-    check_text: bool,
 }
 
 fn cases() -> Vec<Case> {
@@ -121,7 +67,6 @@ fn cases() -> Vec<Case> {
                 };
                 d.barplot().height([23.0, 41.0, 12.0, -5.0]).with(&o).draw();
             },
-            check_text: true,
         },
         Case {
             name: "stacked_legend",
@@ -134,7 +79,6 @@ fn cases() -> Vec<Case> {
                 };
                 d.barplot().height(mat()).with(&o).draw();
             },
-            check_text: true,
         },
         Case {
             name: "beside_col",
@@ -148,7 +92,6 @@ fn cases() -> Vec<Case> {
                 };
                 d.barplot().height(mat()).with(&o).draw();
             },
-            check_text: true,
         },
         Case {
             name: "horiz_stacked",
@@ -161,7 +104,6 @@ fn cases() -> Vec<Case> {
                 };
                 d.barplot().height(mat()).with(&o).draw();
             },
-            check_text: true,
         },
         Case {
             name: "horiz_beside_space_width_legend",
@@ -177,7 +119,6 @@ fn cases() -> Vec<Case> {
                 };
                 d.barplot().height(mat()).with(&o).draw();
             },
-            check_text: true,
         },
         Case {
             name: "stacked_negative_ylim",
@@ -193,7 +134,6 @@ fn cases() -> Vec<Case> {
                 };
                 d.barplot().height(&cols).with(&o).draw();
             },
-            check_text: false,
         },
     ]
 }
@@ -204,71 +144,17 @@ fn barplot_matches_r() {
         return;
     }
     let cases = cases();
-    let dir = std::env::temp_dir();
-    let mut script = format!("{R_MAT}\n");
-    for c in &cases {
-        script.push_str(&format!(
-            "pdf(file = '{}/rs_graphics_barplot_{}.pdf', width = 6, height = 4, compress = FALSE)\n\
-             {}\ninvisible(dev.off())\n",
-            dir.display(),
-            c.name,
-            c.r
-        ));
-    }
-    let script_path = dir.join("rs_graphics_barplot.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_barplot_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-
-        let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), Par::default());
-        (c.run)(&mut dev);
-        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-
-        let (r_t, our_t) = if c.check_text {
-            (text_origins(&r_pdf), text_origins(&ours))
-        } else {
-            (Vec::new(), Vec::new())
-        };
-        assert_eq!(
-            our_t.len(),
-            r_t.len(),
-            "{}: text item count\nours={our_t:?}\nr={r_t:?}",
-            c.name
-        );
-        for (a, b) in our_t.iter().zip(&r_t) {
-            assert!(
-                (a.0 - b.0).abs() < 0.05 && (a.1 - b.1).abs() < 0.05,
-                "{}: text origin differs: ours={a:?} r={b:?}\nours={our_t:?}\nr={r_t:?}",
-                c.name
-            );
-        }
-
-        let (r_r, our_r) = (rects(&r_pdf), rects(&ours));
-        assert_eq!(
-            our_r.len(),
-            r_r.len(),
-            "{}: rect count\nours={our_r:?}\nr={r_r:?}",
-            c.name
-        );
-        for (a, b) in our_r.iter().zip(&r_r) {
-            for k in 0..4 {
-                assert!(
-                    (a[k] - b[k]).abs() < 0.05,
-                    "{}: rect differs: ours={a:?} r={b:?}",
-                    c.name
-                );
-            }
-        }
+    let page = (6.0, 4.0);
+    let r_cases: Vec<_> = cases.iter().map(|c| (c.name, c.r)).collect();
+    let r = r::run_r("barplot", page, R_MAT, &r_cases);
+    // R's pdf device draws `-` as the wider `minus` glyph (see `devPS.c`,
+    // `/Differences [ 45/minus ]`), which we deliberately don't replicate.
+    let how = pdf::Compare {
+        skip_origin: |t| t.string.contains('-'),
+        ..Default::default()
+    };
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours, ()) = r::ours(page, c.run);
+        pdf::assert_same_pdf(c.name, pdf::parse(&ours), pdf::parse(r_pdf), &how);
     }
 }

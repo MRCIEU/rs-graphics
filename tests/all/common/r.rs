@@ -37,12 +37,23 @@ pub fn run_r(tag: &str, page: (f64, f64), prelude: &str, cases: &[(&str, &str)])
 
 /// [`run_r`] with a page size per case.
 pub fn run_r_sized(tag: &str, prelude: &str, cases: &[(&str, (f64, f64), &str)]) -> RRun {
+    let full: Vec<_> = cases
+        .iter()
+        .map(|&(name, page, code)| (name, page, "", code))
+        .collect();
+    run_r_args(tag, prelude, &full)
+}
+
+/// [`run_r_sized`] with more `pdf()` arguments per case (e.g.
+/// `", pointsize = 9"`).
+pub fn run_r_args(tag: &str, prelude: &str, cases: &[(&str, (f64, f64), &str, &str)]) -> RRun {
     let dir = std::env::temp_dir();
     let path = |name: &str| dir.join(format!("rs_graphics_{tag}_{name}.pdf"));
     let mut script = format!("{prelude}\n");
-    for (name, page, code) in cases {
+    for (name, page, args, code) in cases {
         script.push_str(&format!(
-            "pdf(file = '{}', width = {}, height = {}, compress = FALSE)\n{code}\ninvisible(dev.off())\n",
+            "pdf(file = '{}', width = {}, height = {}, compress = FALSE{args})\n{code}\n\
+             invisible(dev.off())\n",
             path(name).display(),
             page.0,
             page.1
@@ -62,7 +73,7 @@ pub fn run_r_sized(tag: &str, prelude: &str, cases: &[(&str, (f64, f64), &str)])
     RRun {
         pdfs: cases
             .iter()
-            .map(|(name, _, _)| std::fs::read(path(name)).unwrap())
+            .map(|(name, ..)| std::fs::read(path(name)).unwrap())
             .collect(),
         stdout: String::from_utf8(out.stdout).unwrap(),
     }

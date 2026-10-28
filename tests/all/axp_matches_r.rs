@@ -9,13 +9,15 @@
 //! Cross-checks `par(xaxp/yaxp)` against R: the values `plot.window()`
 //! sets (linear, log with each tick-rule code, reversed, tiny ranges,
 //! `par(lab)`), and the ticks `axis()` draws when they are changed
-//! afterwards, overridden inline, or passed to `plot()` (labels with their
-//! origins, and every two-point stroke, vs. an uncompressed R `pdf()`).
-//! Skipped if `Rscript` isn't available.
+//! afterwards, overridden inline, or passed to `plot()` (every painted path
+//! and text item in order vs. an uncompressed R `pdf()`, see
+//! `common::pdf::assert_same`). Skipped if `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
 use std::process::Command;
+
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
@@ -149,97 +151,22 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-/// A label's string and origin.
-type Label = (String, f64, f64);
-
-/// Labels in order, and every stroked two-point path.
-fn extract(pdf: &str) -> (Vec<Label>, Vec<Vec<f64>>) {
-    let mut labels = Vec::new();
-    let mut segments = Vec::new();
-    let mut path: Vec<f64> = Vec::new();
-    let mut nums: Vec<f64> = Vec::new();
-    let mut origin: Option<(f64, f64)> = None;
-    for line in pdf.lines() {
-        if let Some(i) = line.find(" Tm") {
-            let m: Vec<f64> = line[..i]
-                .split_whitespace()
-                .rev()
-                .take(2)
-                .filter_map(|t| t.parse().ok())
-                .collect();
-            origin = (m.len() == 2).then(|| (m[1], m[0]));
-        }
-        if let (Some((x, y)), Some(a), Some(b)) = (origin, line.find('('), line.rfind(')')) {
-            if line.contains("Tj") {
-                labels.push((line[a + 1..b].to_string(), x, y));
-                origin = None;
-                continue;
-            }
-        }
-        for t in line.split_whitespace() {
-            if let Ok(v) = t.parse::<f64>() {
-                nums.push(v);
-                continue;
-            }
-            match t {
-                "m" | "l" if nums.len() >= 2 => path.extend(&nums[nums.len() - 2..]),
-                "S" => {
-                    if path.len() == 4 {
-                        segments.push(path.clone());
-                    }
-                    path.clear();
-                }
-                "n" | "f" | "B" | "b" | "s" | "re" => path.clear(),
-                _ => {}
-            }
-            nums.clear();
-        }
-    }
-    (labels, segments)
-}
-
 #[test]
 fn axp_ticks_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = String::new();
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_axp_{}.pdf", c.name));
-        script.push_str(&format!(
-            "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n{}\n\
-             invisible(dev.off())\n",
-            path.display(),
-            c.r
-        ));
-    }
-    rscript("ticks", &script);
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_axp_{}.pdf", c.name));
-        let (r_labels, r_segs) = extract(&String::from_utf8_lossy(&std::fs::read(&path).unwrap()));
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
+    let page = (PAGE_W, PAGE_H);
+    let r_cases: Vec<_> = cases.iter().map(|c| (c.name, c.r)).collect();
+    let r = r::run_r("axp", page, "", &r_cases);
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours, ()) = r::ours(page, c.draw);
+        pdf::assert_same_pdf(
+            c.name,
+            pdf::parse(&ours),
+            pdf::parse(r_pdf),
+            &pdf::Compare::default(),
         );
-        (c.draw)(&mut dev);
-        let (labels, segs) = extract(&String::from_utf8_lossy(&dev.into_backend().finish()));
-        let name = c.name;
-        let strings = |l: &[Label]| l.iter().map(|t| t.0.clone()).collect::<Vec<_>>();
-        assert_eq!(strings(&labels), strings(&r_labels), "{name}: labels");
-        for (a, b) in labels.iter().zip(&r_labels) {
-            assert!(
-                (a.1 - b.1).abs() < 0.05 && (a.2 - b.2).abs() < 0.05,
-                "{name}: label origin differs: ours={a:?} r={b:?}"
-            );
-        }
-        assert_eq!(segs.len(), r_segs.len(), "{name}: segments\nours={segs:?}\nr={r_segs:?}");
-        for (a, b) in segs.iter().zip(&r_segs) {
-            assert!(
-                a.iter().zip(b).all(|(p, q)| (p - q).abs() < 0.05),
-                "{name}: segment differs: ours={a:?} r={b:?}"
-            );
-        }
     }
 }

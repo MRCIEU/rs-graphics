@@ -59,6 +59,8 @@ pub struct Stroke {
     pub lwd: f64,
     pub cap: i32,
     pub join: i32,
+    /// Mitre limit (`M`).
+    pub mitre: f64,
     pub dash: Vec<f64>,
 }
 
@@ -328,6 +330,7 @@ struct Gs {
     lwd: f64,
     cap: i32,
     join: i32,
+    mitre: f64,
     dash: Vec<f64>,
     clip: [f64; 4],
 }
@@ -362,6 +365,7 @@ fn page(
         lwd: 1.0,
         cap: 0,
         join: 0,
+        mitre: 10.0,
         dash: Vec::new(),
         clip: [0.0, 0.0, size.0, size.1],
     };
@@ -436,7 +440,7 @@ fn page(
             "w" => gs.lwd = nums[nums.len() - 1],
             "J" => gs.cap = nums[nums.len() - 1] as i32,
             "j" => gs.join = nums[nums.len() - 1] as i32,
-            "M" => {}
+            "M" => gs.mitre = nums[nums.len() - 1],
             "d" => {
                 gs.dash = arr
                     .expect("d without an array")
@@ -492,6 +496,7 @@ fn page(
                         lwd: gs.lwd,
                         cap: gs.cap,
                         join: gs.join,
+                        mitre: gs.mitre,
                         dash: gs.dash.clone(),
                     }),
                     clip: gs.clip,
@@ -554,7 +559,7 @@ pub struct Compare {
     pub curves_by_bbox: bool,
     /// Compare clip rectangles.
     pub clip: bool,
-    /// Compare line joins.
+    /// Compare line joins and mitre limits.
     pub join: bool,
     /// Paths left out of the comparison (on both sides); by default page
     /// backgrounds.
@@ -649,6 +654,10 @@ pub fn assert_same(name: &str, ours: &Page, r: &Page, how: &Compare) {
             assert_eq!(sa.cap, sb.cap, "line cap differs. {ctx}");
             if how.join {
                 assert_eq!(sa.join, sb.join, "line join differs. {ctx}");
+                assert!(
+                    (sa.mitre - sb.mitre).abs() < 1e-6,
+                    "mitre limit differs. {ctx}"
+                );
             }
             assert!(
                 close(&sa.dash, &sb.dash, how.lwd),
