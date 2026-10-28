@@ -2011,15 +2011,73 @@ impl<B: Backend> Device<B> {
     /// [`par(cex)`]): R's `GEStrWidth`/`GEStrHeight`.
     ///
     /// [`par(cex)`]: crate::par::Par::cex
-    fn text_size_inches(&self, text: &str, face: FontFace, cex: f64) -> (f64, f64) {
+    pub(crate) fn text_size_inches(&self, text: &str, face: FontFace, cex: f64) -> (f64, f64) {
         let size = self.font_size_pt(cex);
         let width = text
             .split('\n')
             .map(|line| afm::str_width_inches(line, face, size))
             .fold(0.0, f64::max);
         let newlines = text.matches('\n').count() as f64;
-        let line = self.par.lheight * 1.2 * self.par.ps * self.par.cex * cex / 72.0;
-        (width, newlines * line + afm::m_height_inches(face, size))
+        (
+            width,
+            newlines * self.text_line_height(cex) + afm::m_height_inches(face, size),
+        )
+    }
+
+    /// The distance in inches between the baselines of multi-line text at
+    /// `cex` (times [`par(cex)`]): [`par(lheight)`] times 1.2 times the
+    /// unrounded font size, as R's `GEText()` and `GEStrHeight()`.
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
+    /// [`par(lheight)`]: crate::par::Par::lheight
+    fn text_line_height(&self, cex: f64) -> f64 {
+        self.par.lheight * 1.2 * self.par.ps * self.par.cex * cex / 72.0
+    }
+
+    /// Draws text at `anchor` (device inches), clipped to `clip`, as
+    /// `GEText()`: each line of a string with newlines is drawn on its own,
+    /// [`Device::text_line_height`] apart, the block placed so that `vadj`
+    /// (`None`: 0.5) of it is below the anchor and each line justified by
+    /// `hadj` (`NaN`: 0.5); one line is drawn by
+    /// [`Device::text_line_at_clipped`].
+    #[allow(clippy::too_many_arguments)]
+    fn text_at_clipped(
+        &mut self,
+        clip: Xpd,
+        anchor: Point,
+        label: &str,
+        hadj: f64,
+        vadj: Option<f64>,
+        rotation_deg: f64,
+        col: ColorSpec,
+        cex: f64,
+        font: FontFace,
+    ) {
+        if !label.contains('\n') {
+            return self.text_line_at_clipped(
+                clip,
+                anchor,
+                label,
+                hadj,
+                vadj,
+                rotation_deg,
+                col,
+                cex,
+                font,
+            );
+        }
+        let n = label.split('\n').count() as f64;
+        let xc = if hadj.is_finite() { hadj } else { 0.5 };
+        let yc = vadj.filter(|v| v.is_finite()).unwrap_or(0.5);
+        let step = self.text_line_height(cex);
+        let theta = rotation_deg.to_radians();
+        let (c, s) = (theta.cos(), theta.sin());
+        for (i, line) in label.split('\n').enumerate() {
+            let off = ((1.0 - yc) * (n - 1.0) - i as f64) * step;
+            let at = Point::new(anchor.x - off * s, anchor.y + off * c);
+            let (vadj, rot) = (Some(yc), rotation_deg);
+            self.text_line_at_clipped(clip, at, line, xc, vadj, rot, col, cex, font);
+        }
     }
 
     /// Draws one line of text at `anchor` (device inches), clipped to
@@ -2029,7 +2087,7 @@ impl<B: Backend> Device<B> {
     /// of the string's glyphs on it (baseline at `anchor - (ury + lly) / 2`
     /// of the glyph bounding boxes).
     #[allow(clippy::too_many_arguments)]
-    fn text_at_clipped(
+    fn text_line_at_clipped(
         &mut self,
         clip: Xpd,
         anchor: Point,

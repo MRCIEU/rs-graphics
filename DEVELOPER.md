@@ -337,6 +337,11 @@ against a real R installation by shelling out to `Rscript`:
   `radius`, `par(xaxs = "i")`) vs. an uncompressed R `pdf()`.
 - `tests/all/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
+- `tests/all/multiline_text_matches_r.rs` - text with newlines drawn
+  line by line and measured line by line, as R's `GEText()`/
+  `strwidth()`: `text()` (`adj`, `srt`, `cex`, `par(lheight)`),
+  `mtext()`, `title()`, `legend()` labels and title, `axis()` labels
+  (incl. `gap.axis`) and `barplot()` names: every path and text item.
 - `tests/all/strwidth_matches_r.rs` - `Device::strwidth`/`strheight` vs.
   R's `strwidth()`/`strheight()` in inches, user (incl. a reversed axis)
   and figure units: `cex`, `font`, multi-line text, `par(ps)`,

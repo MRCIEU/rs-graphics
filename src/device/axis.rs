@@ -447,11 +447,9 @@ impl<B: Backend> Device<B> {
                     continue;
                 }
             };
-            let labw = if perpendicular {
-                m_h
-            } else {
-                afm::str_width_inches(label, face, size_pt)
-            };
+            // `GStrHeight()`/`GStrWidth()`: multi-line labels count every line.
+            let (w, h) = self.text_size_inches(label, face, cex);
+            let labw = if perpendicular { h } else { w };
             let tnew = temp - 0.5 * labw;
             if tnew - tlast >= gap {
                 self.text_at_clipped(

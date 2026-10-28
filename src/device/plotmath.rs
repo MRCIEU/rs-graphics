@@ -152,23 +152,24 @@ impl<B: Backend> Device<B> {
         (bbox.height, bbox.depth, bbox.width)
     }
 
-    /// `strwidth(label, "inches", cex = cex, font = font)`, single-line
-    /// text or an expression; `cex` is multiplied by [`par(cex)`], as in
+    /// `strwidth(label, "inches", cex = cex, font = font)`, text (the
+    /// widest line) or an expression; `cex` is multiplied by [`par(cex)`], as in
     /// [`Graphics::text`](crate::graphics::Graphics::text).
     ///
     /// [`par(cex)`]: crate::par::Par::cex
     pub(super) fn label_width(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(t) => afm::str_width_inches(t, font, self.font_size_pt(cex)),
+            Label::Text(t) => self.text_size_inches(t, font, cex).0,
             Label::Math(e) => self.expression_metrics(e, self.par.cex * cex).2,
         }
     }
 
-    /// `strheight(label, "inches", cex = cex, font = font)`: the height of
-    /// "M" for single-line text, height + depth for an expression.
+    /// `strheight(label, "inches", cex = cex, font = font)`: for text the
+    /// height of "M" plus a line height per newline, for an expression its
+    /// height + depth.
     pub(super) fn label_height(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(_) => afm::m_height_inches(font, self.font_size_pt(cex)),
+            Label::Text(t) => self.text_size_inches(t, font, cex).1,
             Label::Math(e) => {
                 let (h, d, _) = self.expression_metrics(e, self.par.cex * cex);
                 h + d

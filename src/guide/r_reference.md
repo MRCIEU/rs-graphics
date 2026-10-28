@@ -619,7 +619,7 @@ R's arguments not available: `trace`.
 | `lab` | `.lab()` | Approximate number of tick intervals on the x and y axes for default ticks; the third value (label length) is unused, as in R. |
 | `las` | `.las()` | Orientation of axis labels and `mtext()` text: 0 = parallel to the axis (the default), 1 = horizontal, 2 = perpendicular to the axis, 3 = vertical. |
 | `lend` | `.lend()` | Line end style. |
-| `lheight` | `.lheight()` | Multiplies the height of each extra line of text in `Device::strheight`. |
+| `lheight` | `.lheight()` | Multiplies the spacing of the lines of text with newlines, when drawn and in `Device::strheight`. |
 | `ljoin` | `.ljoin()` | Line join style. |
 | `lmitre` | `.lmitre()` | Mitre limit for mitred joins. |
 | `lty` | `.lty()` | Line type. |

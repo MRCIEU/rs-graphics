@@ -584,8 +584,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// over the points (extra labels are ignored). Horizontally, `adj` sets
     /// which part of a label is at its point (0 its left end, 0.5 its centre, 1
     /// its right end); vertically see [`TextOptions::vadj`]; labels are rotated
-    /// by `srt`, else [`par(srt)`]. A label at a non-finite position (a missing
-    /// value, or a value <= 0 on a log axis) is skipped.
+    /// by `srt`, else [`par(srt)`]. A label with newlines (`"one\ntwo"`) is
+    /// drawn line by line, [`par(lheight)`] line heights apart, as all text
+    /// is. A label at a non-finite position (a missing value, or a value <=
+    /// 0 on a log axis) is skipped.
     ///
     /// This is R's `text()`.
     ///
@@ -603,6 +605,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing (R's message) or a `pos` isn't 1 to 4 ("invalid 'pos' value").
     ///
+    /// [`par(lheight)`]: crate::par::Par::lheight
     /// [`par(srt)`]: crate::par::Par::srt
     fn text(&mut self) -> TextCall<'_, Self> {
         TextCall::start(self)

@@ -648,9 +648,8 @@ par_options! {
         pub xaxp: [f64; 3] => array [f64; 3],
         /// As `xaxp`, for the y axis.
         pub yaxp: [f64; 3] => array [f64; 3],
-        /// Multiplies the height of each extra line of text in
-        /// [`Device::strheight`](crate::device::Device::strheight). Text is
-        /// drawn one line at a time, so this doesn't affect drawing.
+        /// Multiplies the spacing of the lines of text with newlines, when
+        /// drawn and in [`Device::strheight`](crate::device::Device::strheight).
         /// Default 1.
         pub lheight: f64 => option f64,
         /// How far text parallel to its side is moved out from its margin

@@ -55,6 +55,7 @@ mod log_axis_matches_r;
 mod log_plots_matches_r;
 mod margins_regions_matches_r;
 mod mtext_matches_r;
+mod multiline_text_matches_r;
 mod null_device;
 mod multipage_matches_r;
 mod na_values_matches_r;

@@ -327,7 +327,8 @@ crate::setters::options! {
         /// `vadj * height("M")` below the point, or puts the point that
         /// fraction of an expression's box height above the box's bottom.
         /// `None` (the default) centres the text's ink, or an expression's
-        /// box, on the point. R's `adj[2]`.
+        /// box, on the point. For text with newlines it places the block of
+        /// lines (`None`: 0.5), each line's baseline as above. R's `adj[2]`.
         pub vadj: Option<f64> => option f64,
         /// Rotation in degrees, anticlockwise. `None`: [`par(srt)`] (0 by
         /// default). R's `srt`.
