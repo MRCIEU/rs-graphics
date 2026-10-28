@@ -15,7 +15,6 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-
 use rs_graphics::prelude::*;
 
 const PAGE_W: f64 = 6.0;

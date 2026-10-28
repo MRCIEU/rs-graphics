@@ -231,7 +231,11 @@ fn abline_matches_r() {
             )
         })
         .collect();
-    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
     let r = r::run_r("abline", page, "", &r_cases);
     // R writes widths to 2 decimals.
     let how = pdf::Compare {

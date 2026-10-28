@@ -553,7 +553,12 @@ fn bty_and_title_pars_match_r() {
     let cases = cases();
     let page = (PAGE_W, PAGE_H);
     let r_cases: Vec<_> = cases.iter().map(|c| (c.name, c.r)).collect();
-    let prelude = format!("x <- {}\ny <- {}\nh <- {}", r::r_vec(&X), r::r_vec(&Y), r::r_vec(&H));
+    let prelude = format!(
+        "x <- {}\ny <- {}\nh <- {}",
+        r::r_vec(&X),
+        r::r_vec(&Y),
+        r::r_vec(&H)
+    );
     let r = r::run_r("bty_title", page, &prelude, &r_cases);
     for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
         let (ours_pdf, ()) = r::ours(page, c.ours);

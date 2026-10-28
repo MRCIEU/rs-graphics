@@ -8,16 +8,15 @@
 
 //! Cross-checks multi-page PDF output against a real R `pdf()` device's
 //! uncompressed output: the number of pages, and on each page every painted
-//! path in drawing order (operator and vertices, `re` expanded; circles by
-//! operator only) and every text item (origin and string). Pages start as
-//! in R: each `plot.new()` on a one-figure page, `mfrow` wrapping, and
-//! `par(fig = )` without `new = TRUE`; `par(new = TRUE)` adds none.
+//! path and text item in drawing order (see `common::pdf::assert_same`).
+//! Pages start as in R: each `plot.new()` on a one-figure page, `mfrow`
+//! wrapping, and `par(fig = )` without `new = TRUE`; `par(new = TRUE)` adds
+//! none.
 //! Skipped if `Rscript` isn't available. Also, without R: compressed pages
 //! inflate to the uncompressed ones.
 
 use crate::common;
-
-use std::process::Command;
+use crate::common::{pdf, r};
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
@@ -92,195 +91,27 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-#[derive(Debug)]
-struct Painted {
-    op: String,
-    vertices: Vec<f64>,
-}
-
-#[derive(Debug)]
-struct Text {
-    string: String,
-    x: f64,
-    y: f64,
-}
-
-/// Each page's (paths, texts): one per content stream that draws anything.
-fn pages(pdf: &str) -> Vec<(Vec<Painted>, Vec<Text>)> {
-    let mut out = Vec::new();
-    let mut rest = pdf;
-    while let Some(i) = rest.find("stream\n") {
-        let body = &rest[i + 7..];
-        let Some(j) = body.find("endstream") else {
-            break;
-        };
-        let content = &body[..j];
-        rest = &body[j + 9..];
-        if content.contains(" m\n") || content.contains(" re\n") || content.contains(" Tm") {
-            out.push(extract(content));
-        }
-    }
-    out
-}
-
-fn extract(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
-    let mut painted = Vec::new();
-    let mut texts = Vec::new();
-    let mut path: Vec<f64> = Vec::new();
-    let mut curved = false;
-    let mut pending = false;
-    let mut nums: Vec<f64> = Vec::new();
-    for line in pdf.lines() {
-        // A text matrix, then the string(s) shown (on the same line in R's
-        // output, the next line in ours), kerning numbers dropped.
-        if let Some(i) = line.find(" Tm") {
-            let m: Vec<f64> = line[..i]
-                .split_whitespace()
-                .rev()
-                .take(2)
-                .filter_map(|t| t.parse().ok())
-                .collect();
-            if m.len() == 2 {
-                texts.push(Text { string: String::new(), x: m[1], y: m[0] });
-                pending = true;
-            }
-        }
-        if pending && (line.contains("Tj") || line.contains("TJ")) {
-            let start = line.find(" Tm").map_or(0, |i| i + 3);
-            let mut depth = 0;
-            let string = &mut texts.last_mut().unwrap().string;
-            for c in line[start..].chars() {
-                match c {
-                    '(' => depth += 1,
-                    ')' => depth -= 1,
-                    _ if depth > 0 => string.push(c),
-                    _ => {}
-                }
-            }
-            pending = false;
-            continue;
-        }
-        if line.contains(" Tm") {
-            continue;
-        }
-        for t in line.split_whitespace() {
-            if let Ok(v) = t.parse::<f64>() {
-                nums.push(v);
-                continue;
-            }
-            match t {
-                "m" | "l" if nums.len() >= 2 => path.extend(&nums[nums.len() - 2..]),
-                "re" if nums.len() >= 4 => {
-                    // Normalised to a positive width and height (R writes
-                    // some with a negative height).
-                    let mut n = nums[nums.len() - 4..].to_vec();
-                    for (p, d) in [(0, 2), (1, 3)] {
-                        if n[d] < 0.0 {
-                            n[p] += n[d];
-                            n[d] = -n[d];
-                        }
-                    }
-                    path.extend([
-                        n[0],
-                        n[1],
-                        n[0] + n[2],
-                        n[1],
-                        n[0] + n[2],
-                        n[1] + n[3],
-                        n[0],
-                        n[1] + n[3],
-                    ]);
-                }
-                // Circles (points) are compared by operator only: R and we
-                // start them at different points.
-                "c" => curved = true,
-                "n" => {
-                    path.clear();
-                    curved = false;
-                }
-                "S" | "s" | "f" | "F" | "f*" | "B" | "B*" | "b" | "b*" => {
-                    let mut vertices = std::mem::take(&mut path);
-                    if std::mem::take(&mut curved) {
-                        vertices.clear();
-                    }
-                    painted.push(Painted {
-                        op: t.to_string(),
-                        vertices,
-                    });
-                }
-                _ => {}
-            }
-            nums.clear();
-        }
-    }
-    (painted, texts)
-}
-
 #[test]
 fn multipage_pdf_matches_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = R_PRELUDE.to_string();
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_multipage_{}.pdf", c.name));
-        script.push_str(&format!(
-            "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n{}\n\
-             invisible(dev.off())\n",
-            path.display(),
-            c.r
-        ));
-    }
-    let script_path = dir.join("rs_graphics_multipage.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_multipage_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-        let r = pages(&r_pdf);
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        );
-        (c.draw)(&mut dev);
-        let ours_pdf = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-        let ours = pages(&ours_pdf);
+    let page = (PAGE_W, PAGE_H);
+    let r_cases: Vec<_> = cases.iter().map(|c| (c.name, c.r)).collect();
+    let r = r::run_r("multipage", page, R_PRELUDE, &r_cases);
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours_pdf, ()) = r::ours(page, c.draw);
         let name = c.name;
-
-        assert_eq!(r.len(), c.pages, "{name}: R's page count");
-        assert_eq!(ours.len(), c.pages, "{name}: our page count");
-        assert!(ours_pdf.contains(&format!("/Count {}", c.pages)), "{name}: /Count");
-        for (p, ((our_paths, our_texts), (r_paths, r_texts))) in ours.iter().zip(&r).enumerate() {
-            assert_eq!(our_paths.len(), r_paths.len(), "{name} page {p}: path count");
-            for (k, (a, b)) in our_paths.iter().zip(r_paths).enumerate() {
-                let ctx = format!("{name} page {p}, path {k}:\n ours={a:?}\n r=   {b:?}");
-                assert_eq!(a.op, b.op, "operator differs. {ctx}");
-                assert!(
-                    a.vertices.len() == b.vertices.len()
-                        && a.vertices.iter().zip(&b.vertices).all(|(x, y)| (x - y).abs() < 0.05),
-                    "vertices differ. {ctx}"
-                );
-            }
-            assert_eq!(our_texts.len(), r_texts.len(), "{name} page {p}: text count");
-            for (a, b) in our_texts.iter().zip(r_texts) {
-                assert_eq!(a.string, b.string, "{name} page {p}: text differs");
-                assert!(
-                    (a.x - b.x).abs() < 0.05 && (a.y - b.y).abs() < 0.05,
-                    "{name} page {p}: text origin differs: ours={a:?} r={b:?}"
-                );
-            }
-        }
+        let (ours, theirs) = (pdf::parse(&ours_pdf), pdf::parse(r_pdf));
+        assert_eq!(theirs.pages.len(), c.pages, "{name}: R's page count");
+        assert_eq!(ours.pages.len(), c.pages, "{name}: our page count");
+        let text = String::from_utf8_lossy(&ours_pdf);
+        assert!(
+            text.contains(&format!("/Count {}", c.pages)),
+            "{name}: /Count"
+        );
+        pdf::assert_same_pdf(name, ours, theirs, &pdf::Compare::default());
     }
 }
 

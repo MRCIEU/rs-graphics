@@ -214,8 +214,17 @@ fn barplot_extras_match_r() {
         .iter()
         .map(|c| format!("suppressWarnings({{\n{}\n}})", c.r))
         .collect();
-    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
-    let r = r::run_r("bar_extras", page, &format!("m <- {}", r_matrix()), &r_cases);
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
+    let r = r::run_r(
+        "bar_extras",
+        page,
+        &format!("m <- {}", r_matrix()),
+        &r_cases,
+    );
     let how = pdf::Compare {
         skip_origin: |t| t.string.contains('-'),
         ..Default::default()

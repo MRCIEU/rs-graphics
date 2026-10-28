@@ -393,7 +393,11 @@ fn legend_extras_match_r() {
             )
         })
         .collect();
-    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
     let prelude = format!("x <- {}\ny <- {}", r::r_vec(&X), r::r_vec(&Y));
     let r = r::run_r("legend_extras", page, &prelude, &r_cases);
     let r_values: Vec<&str> = r.stdout.lines().collect();
@@ -432,6 +436,5 @@ fn legend_extras_match_r() {
                 "{name}: returned value {k}: ours={a} r={b}\nours={layout:?}\nr={r:?}"
             );
         }
-
     }
 }

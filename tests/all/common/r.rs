@@ -28,10 +28,19 @@ pub struct RRun {
 /// `pdf()` device of `page` inches, in one `Rscript`. Files are named
 /// `rs_graphics_<tag>_<case>.pdf` in the temp directory.
 pub fn run_r(tag: &str, page: (f64, f64), prelude: &str, cases: &[(&str, &str)]) -> RRun {
+    let sized: Vec<_> = cases
+        .iter()
+        .map(|&(name, code)| (name, page, code))
+        .collect();
+    run_r_sized(tag, prelude, &sized)
+}
+
+/// [`run_r`] with a page size per case.
+pub fn run_r_sized(tag: &str, prelude: &str, cases: &[(&str, (f64, f64), &str)]) -> RRun {
     let dir = std::env::temp_dir();
     let path = |name: &str| dir.join(format!("rs_graphics_{tag}_{name}.pdf"));
     let mut script = format!("{prelude}\n");
-    for (name, code) in cases {
+    for (name, page, code) in cases {
         script.push_str(&format!(
             "pdf(file = '{}', width = {}, height = {}, compress = FALSE)\n{code}\ninvisible(dev.off())\n",
             path(name).display(),
@@ -53,7 +62,7 @@ pub fn run_r(tag: &str, page: (f64, f64), prelude: &str, cases: &[(&str, &str)])
     RRun {
         pdfs: cases
             .iter()
-            .map(|(name, _)| std::fs::read(path(name)).unwrap())
+            .map(|(name, _, _)| std::fs::read(path(name)).unwrap())
             .collect(),
         stdout: String::from_utf8(out.stdout).unwrap(),
     }

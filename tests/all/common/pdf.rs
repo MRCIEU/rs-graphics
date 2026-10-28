@@ -25,7 +25,7 @@ pub struct Pdf {
 }
 
 /// What one page paints, in order.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Page {
     /// The page size in points (`/MediaBox`).
     pub size: (f64, f64),
@@ -213,9 +213,7 @@ fn tokens(content: &str) -> Vec<Tok> {
                 while i < b.len() && !b[i].is_ascii_whitespace() && !b"([]".contains(&b[i]) {
                     i += 1;
                 }
-                out.push(Tok::Word(
-                    b[start..i].iter().map(|&c| c as char).collect(),
-                ));
+                out.push(Tok::Word(b[start..i].iter().map(|&c| c as char).collect()));
             }
         }
     }
@@ -640,13 +638,22 @@ pub fn assert_same(name: &str, ours: &Page, r: &Page, how: &Compare) {
             assert!(close(&fa, &fb, how.col), "fill colour differs. {ctx}");
         }
         if let (Some(sa), Some(sb)) = (&a.stroke, &b.stroke) {
-            assert!(close(&sa.col, &sb.col, how.col), "stroke colour differs. {ctx}");
-            assert!((sa.lwd - sb.lwd).abs() < how.lwd, "line width differs. {ctx}");
+            assert!(
+                close(&sa.col, &sb.col, how.col),
+                "stroke colour differs. {ctx}"
+            );
+            assert!(
+                (sa.lwd - sb.lwd).abs() < how.lwd,
+                "line width differs. {ctx}"
+            );
             assert_eq!(sa.cap, sb.cap, "line cap differs. {ctx}");
             if how.join {
                 assert_eq!(sa.join, sb.join, "line join differs. {ctx}");
             }
-            assert!(close(&sa.dash, &sb.dash, how.lwd), "dash pattern differs. {ctx}");
+            assert!(
+                close(&sa.dash, &sb.dash, how.lwd),
+                "dash pattern differs. {ctx}"
+            );
         }
         if how.clip {
             assert!(close(&a.clip, &b.clip, how.pos), "clip differs. {ctx}");
@@ -663,7 +670,10 @@ pub fn assert_same(name: &str, ours: &Page, r: &Page, how: &Compare) {
         let ctx = format!("{name}: text\n ours={a:?}\n r=   {b:?}");
         assert_eq!(a.font, b.font, "font differs. {ctx}");
         assert!((a.size - b.size).abs() < how.size, "size differs. {ctx}");
-        assert!(close(&a.fill, &b.fill, how.col), "text colour differs. {ctx}");
+        assert!(
+            close(&a.fill, &b.fill, how.col),
+            "text colour differs. {ctx}"
+        );
         let (oa, ob) = (a.origin(), b.origin());
         assert!(
             (how.skip_origin)(a) || close(&[oa.0, oa.1], &[ob.0, ob.1], how.pos),
@@ -707,7 +717,11 @@ mod tests {
         assert_eq!(p.texts[0].string, "To");
         assert_eq!(
             p.texts[0].pieces,
-            [Piece::Str("T".into()), Piece::Kern(74.0), Piece::Str("o".into())]
+            [
+                Piece::Str("T".into()),
+                Piece::Kern(74.0),
+                Piece::Str("o".into())
+            ]
         );
         assert_eq!(p.paths[0].stroke.as_ref().unwrap().dash, [3.0, 2.0]);
         assert_eq!(p.texts[0].font, "Helvetica");
@@ -749,7 +763,10 @@ mod tests {
         let path = &p.paths[0];
         assert_eq!(path.fill, Some([1.0, 0.0, 0.0, 0.5]));
         let s = path.stroke.as_ref().unwrap();
-        assert_eq!((s.col, s.lwd, s.cap, s.join), ([0.0, 0.0, 1.0, 1.0], 3.0, 2, 1));
+        assert_eq!(
+            (s.col, s.lwd, s.cap, s.join),
+            ([0.0, 0.0, 1.0, 1.0], 3.0, 2, 1)
+        );
         assert_eq!(p.texts[0].string, "café (x)");
         assert_eq!(p.texts[0].font, "Helvetica-Bold");
         assert_eq!(p.texts[0].size, 10.0);

@@ -205,7 +205,11 @@ fn boxplot_extras_match_r() {
         .iter()
         .map(|c| format!("suppressWarnings({{\n{}\n}})", c.r))
         .collect();
-    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
     let prelude = format!("G <- {}\nP <- {}", r_list(&G), r_list(&P));
     let r = r::run_r("bxp_extras", page, &prelude, &r_cases);
     let how = pdf::Compare {

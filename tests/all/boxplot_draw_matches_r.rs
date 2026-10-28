@@ -18,8 +18,8 @@ use crate::common::{pdf, r};
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
-use rs_graphics::highlevel::BoxplotOptions;
 use rs_graphics::graphics::Graphics;
+use rs_graphics::highlevel::BoxplotOptions;
 
 const PAGE_W: f64 = 6.0;
 const PAGE_H: f64 = 4.0;
@@ -152,7 +152,11 @@ fn boxplot_drawing_matches_r() {
     let cases = cases();
     let page = (PAGE_W, PAGE_H);
     let codes: Vec<String> = cases.iter().map(r_code).collect();
-    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
     let r = r::run_r("bxp", page, "", &r_cases);
     let how = pdf::Compare::default();
     for (c, r_pdf) in cases.iter().zip(&r.pdfs) {

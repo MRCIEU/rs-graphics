@@ -477,7 +477,11 @@ fn axis_arguments_match_r() {
     }
     let cases = cases();
     let codes: Vec<String> = cases.iter().map(r_code).collect();
-    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
     let r = r::run_r("axis_args", (PAGE_W, PAGE_H), "", &r_cases);
     // R writes widths to 2 decimals.
     let how = pdf::Compare {

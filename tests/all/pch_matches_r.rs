@@ -108,7 +108,8 @@ fn draw_ours(c: &Case, dev: &mut Device<PdfBackend>) {
     dev.par().mar([0, 0, 0, 0]).cex(c.par_cex).draw();
     dev.plot_new();
     dev.plot_window().xlim(0, 8).ylim(0, 6).draw();
-    let bg = c.bg.map_or(ColorSpec::None, |b| ColorSpec::try_from(b).unwrap());
+    let bg =
+        c.bg.map_or(ColorSpec::None, |b| ColorSpec::try_from(b).unwrap());
     let (xs, ys): (Vec<f64>, Vec<f64>) = (0..26).map(pch_pos).unzip();
     dev.points()
         .x(&xs)
@@ -142,7 +143,11 @@ fn every_pch_matches_r() {
     let cases = cases();
     let page = (PAGE_W, PAGE_H);
     let codes: Vec<String> = cases.iter().map(r_code).collect();
-    let r_cases: Vec<_> = cases.iter().zip(&codes).map(|(c, r)| (c.name, r.as_str())).collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
     let r = r::run_r("pch", page, "", &r_cases);
     let how = pdf::Compare::default();
     for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
@@ -150,4 +155,3 @@ fn every_pch_matches_r() {
         pdf::assert_same_pdf(c.name, pdf::parse(&ours_pdf), pdf::parse(r_pdf), &how);
     }
 }
-

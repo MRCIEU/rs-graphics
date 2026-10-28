@@ -14,14 +14,12 @@
 //! `plot.window(asp = )`, `plot()`'s axes taking their style from
 //! `par()`, and the high-level plots' `par()`-based defaults (borders,
 //! boxplot lines and outliers, `ann`), unequal-width `hist()` densities
-//! and missing pie labels. Every painted path (operator, vertices, fill and
-//! stroke colour, width, dash; circles by operator only) and every text
-//! item (string, origin, size, colour) is compared in order. Skipped if
-//! `Rscript` isn't available.
+//! and missing pie labels. Every painted path and text item is compared
+//! in order (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
+//! available.
 
 use crate::common;
-
-use std::process::Command;
+use crate::common::{pdf, r};
 
 use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::prelude::*;
@@ -514,276 +512,36 @@ fn on_window(name: &str) -> bool {
     )
 }
 
-#[derive(Clone, Debug)]
-struct Gs {
-    fill: [f64; 3],
-    stroke: [f64; 3],
-    lwd: f64,
-    dash: Vec<f64>,
-}
-
-#[derive(Debug)]
-struct Painted {
-    op: String,
-    vertices: Vec<f64>,
-    fill: [f64; 3],
-    stroke: [f64; 3],
-    lwd: f64,
-    dash: Vec<f64>,
-}
-
-#[derive(Debug)]
-struct Text {
-    string: String,
-    x: f64,
-    y: f64,
-    size: f64,
-    fill: [f64; 3],
-}
-
-/// Painted paths (clipping paths excluded) and text items, in order, with
-/// the graphics state each was drawn in.
-fn extract(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
-    let mut painted = Vec::new();
-    let mut texts = Vec::new();
-    let mut gs = Gs {
-        fill: [0.0; 3],
-        stroke: [0.0; 3],
-        lwd: 1.0,
-        dash: Vec::new(),
-    };
-    let mut stack = Vec::new();
-    let mut nums: Vec<f64> = Vec::new();
-    let mut array: Option<Vec<f64>> = None;
-    let mut path: Vec<f64> = Vec::new();
-    let mut curved = false;
-    let mut font_size = 1.0;
-    let mut rest = pdf;
-    while let Some(i) = rest.find("stream\n") {
-        let content = &rest[i + 7..];
-        let j = content.find("endstream").unwrap_or(content.len());
-        let body = &content[..j];
-        rest = &content[j..];
-        if !body.contains(" w") && !body.contains("Tf") {
-            continue; // e.g. R's ICC profile
-        }
-        let mut chars = body.char_indices().peekable();
-        let mut token = String::new();
-        let mut tokens: Vec<String> = Vec::new();
-        // Tokens, with `( ... )` strings kept whole.
-        while let Some((_, c)) = chars.next() {
-            if c == '(' {
-                let mut s = String::from("(");
-                let mut depth = 1;
-                for (_, c) in chars.by_ref() {
-                    s.push(c);
-                    match c {
-                        '(' => depth += 1,
-                        ')' => {
-                            depth -= 1;
-                            if depth == 0 {
-                                break;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                tokens.push(s);
-            } else if c.is_whitespace() || c == '[' || c == ']' {
-                if !token.is_empty() {
-                    tokens.push(std::mem::take(&mut token));
-                }
-                if c != ' ' && !c.is_whitespace() {
-                    tokens.push(c.to_string());
-                }
-            } else {
-                token.push(c);
-            }
-        }
-        if !token.is_empty() {
-            tokens.push(token);
-        }
-        for t in &tokens {
-            if let Ok(v) = t.parse::<f64>() {
-                match &mut array {
-                    Some(a) => a.push(v),
-                    None => nums.push(v),
-                }
-                continue;
-            }
-            let last = |k: usize| nums[nums.len() - k..].to_vec();
-            match t.as_str() {
-                "[" => {
-                    array = Some(Vec::new());
-                    continue;
-                }
-                "]" => {
-                    gs.dash = array.take().unwrap_or_default();
-                    continue;
-                }
-                s if s.starts_with('(') => {
-                    if let Some(t) = texts.last_mut() {
-                        let t: &mut Text = t;
-                        t.string.push_str(&s[1..s.len() - 1]);
-                    }
-                    continue;
-                }
-                "q" => stack.push(gs.clone()),
-                "Q" => gs = stack.pop().unwrap(),
-                "rg" | "scn" => gs.fill = last(3).try_into().unwrap(),
-                "RG" | "SCN" => gs.stroke = last(3).try_into().unwrap(),
-                "g" => gs.fill = [nums[nums.len() - 1]; 3],
-                "G" => gs.stroke = [nums[nums.len() - 1]; 3],
-                "w" => gs.lwd = nums[nums.len() - 1],
-                "Tf" => font_size = nums[nums.len() - 1],
-                "Tm" => {
-                    let m = last(6);
-                    texts.push(Text {
-                        string: String::new(),
-                        x: m[4],
-                        y: m[5],
-                        size: font_size * m[0].hypot(m[1]),
-                        fill: gs.fill,
-                    });
-                }
-                "m" | "l" => path.extend(last(2)),
-                "re" => {
-                    // Corners, normalised to a positive width and height.
-                    let mut n = last(4);
-                    for (p, d) in [(0, 2), (1, 3)] {
-                        if n[d] < 0.0 {
-                            n[p] += n[d];
-                            n[d] = -n[d];
-                        }
-                    }
-                    path.extend([
-                        n[0],
-                        n[1],
-                        n[0] + n[2],
-                        n[1],
-                        n[0] + n[2],
-                        n[1] + n[3],
-                        n[0],
-                        n[1] + n[3],
-                    ]);
-                }
-                "c" => curved = true,
-                "n" => {
-                    path.clear();
-                    curved = false;
-                }
-                "S" | "s" | "f" | "F" | "f*" | "B" | "B*" | "b" | "b*" => {
-                    let mut vertices = std::mem::take(&mut path);
-                    // Circles are compared by operator only: R and we
-                    // start them at different points.
-                    if std::mem::take(&mut curved) {
-                        vertices.clear();
-                    }
-                    let fills = !matches!(t.as_str(), "S" | "s");
-                    let strokes = !matches!(t.as_str(), "f" | "F" | "f*");
-                    painted.push(Painted {
-                        op: t.clone(),
-                        vertices,
-                        fill: if fills { gs.fill } else { [0.0; 3] },
-                        stroke: if strokes { gs.stroke } else { [0.0; 3] },
-                        lwd: if strokes { gs.lwd } else { 0.0 },
-                        dash: if strokes { gs.dash.clone() } else { Vec::new() },
-                    });
-                }
-                _ => {}
-            }
-            nums.clear();
-        }
-    }
-    (painted, texts)
-}
-
-fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
-    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < tol)
-}
-
 #[test]
 fn primitives_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = String::new();
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_primitives_{}.pdf", c.name));
-        script.push_str(&format!(
-            "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n{}{}\n\
-             invisible(dev.off())\n",
-            path.display(),
-            if on_window(c.name) { WINDOW_R } else { "" },
-            c.r
-        ));
-    }
-    let script_path = dir.join("rs_graphics_primitives.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_primitives_{}.pdf", c.name));
-        let latin1 = |b: &[u8]| -> String { b.iter().map(|&c| c as char).collect() };
-        let (r_paths, r_texts) = extract(&latin1(&std::fs::read(&path).unwrap()));
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        );
-        if on_window(c.name) {
-            window(&mut dev);
-        }
-        (c.draw)(&mut dev);
-        let (our_paths, our_texts) = extract(&latin1(&dev.into_backend().finish()));
-        let name = c.name;
-
-        assert!(
-            !r_paths.is_empty() || !r_texts.is_empty(),
-            "{name}: nothing from R"
-        );
-        assert_eq!(
-            our_paths.len(),
-            r_paths.len(),
-            "{name}: painted path count\nours={our_paths:#?}\nr={r_paths:#?}"
-        );
-        for (k, (a, b)) in our_paths.iter().zip(&r_paths).enumerate() {
-            let ctx = format!("{name}, path {k}:\n ours={a:?}\n r=   {b:?}");
-            assert_eq!(a.op, b.op, "operator differs. {ctx}");
-            assert!(
-                close(&a.vertices, &b.vertices, 0.05),
-                "vertices differ. {ctx}"
-            );
-            assert!(close(&a.fill, &b.fill, 0.005), "fill differs. {ctx}");
-            assert!(close(&a.stroke, &b.stroke, 0.005), "stroke differs. {ctx}");
-            // R writes widths to 2 decimals.
-            assert!((a.lwd - b.lwd).abs() < 0.0051, "width differs. {ctx}");
-            assert!(close(&a.dash, &b.dash, 0.005), "dash differs. {ctx}");
-        }
-        assert_eq!(
-            our_texts.len(),
-            r_texts.len(),
-            "{name}: text count\nours={our_texts:#?}\nr={r_texts:#?}"
-        );
-        for (a, b) in our_texts.iter().zip(&r_texts) {
-            let ctx = format!("{name}:\n ours={a:?}\n r=   {b:?}");
-            assert_eq!(a.string, b.string, "string differs. {ctx}");
-            assert!(
-                (a.x - b.x).abs() < 0.05 && (a.y - b.y).abs() < 0.05,
-                "origin differs. {ctx}"
-            );
-            assert!((a.size - b.size).abs() < 0.01, "size differs. {ctx}");
-            assert!(close(&a.fill, &b.fill, 0.005), "colour differs. {ctx}");
-        }
+    let page = (PAGE_W, PAGE_H);
+    let codes: Vec<String> = cases
+        .iter()
+        .map(|c| format!("{}{}", if on_window(c.name) { WINDOW_R } else { "" }, c.r))
+        .collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
+    let r = r::run_r("primitives", page, "", &r_cases);
+    // R writes widths to 2 decimals.
+    let how = pdf::Compare {
+        lwd: 0.0051,
+        ..Default::default()
+    };
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours_pdf, ()) = r::ours(page, |dev| {
+            if on_window(c.name) {
+                window(dev);
+            }
+            (c.draw)(dev);
+        });
+        pdf::assert_same_pdf(c.name, pdf::parse(&ours_pdf), pdf::parse(r_pdf), &how);
     }
 }
 
