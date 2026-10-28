@@ -51,6 +51,9 @@ pub struct PchGeometry {
     ///
     /// [`par(lty)`]: crate::par::Par::lty
     pub lines: Vec<((f64, f64), (f64, f64))>,
+    /// Draw `lines` before the shapes, as `GESymbol()` does for pch 9 and
+    /// 12 (after them for every other symbol).
+    pub lines_first: bool,
 }
 
 /// `size_inches` for `GESymbol`, given the device's starting point size
@@ -166,6 +169,7 @@ pub fn pch_geometry(pch: i32, x: f64, y: f64, size: f64) -> Option<PchGeometry> 
         9 => {
             let xc = SQRT2 * RADIUS * gstr0;
             let yc = xc;
+            g.lines_first = true;
             g.lines.push(((x - xc, y), (x + xc, y)));
             g.lines.push(((x, y - yc), (x, y + yc)));
             g.outline_only.push(Shape::Polygon(vec![
@@ -203,6 +207,7 @@ pub fn pch_geometry(pch: i32, x: f64, y: f64, size: f64) -> Option<PchGeometry> 
         }
         12 => {
             let (xc, yc) = (RADIUS * gstr0, RADIUS * gstr0);
+            g.lines_first = true;
             g.lines.push(((x - xc, y), (x + xc, y)));
             g.lines.push(((x, y - yc), (x, y + yc)));
             g.outline_only.push(Shape::Rect {

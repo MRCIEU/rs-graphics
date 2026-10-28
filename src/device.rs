@@ -1730,6 +1730,15 @@ impl<B: Backend> Device<B> {
                 stroke.ljoin = ljoin;
                 stroke.lmitre = lmitre;
             }
+            let lines = |d: &mut Self| {
+                for &(a, b) in &geom.lines {
+                    d.backend
+                        .draw_line(Point::new(a.0, a.1), Point::new(b.0, b.1), &stroke);
+                }
+            };
+            if geom.lines_first {
+                lines(self);
+            }
             for shape in &geom.outline_only {
                 self.paint_shape(shape, None, Some(&stroke));
             }
@@ -1742,9 +1751,8 @@ impl<B: Backend> Device<B> {
             for shape in &geom.filled_with_bg {
                 self.paint_shape(shape, bg, Some(&stroke));
             }
-            for &(a, b) in &geom.lines {
-                self.backend
-                    .draw_line(Point::new(a.0, a.1), Point::new(b.0, b.1), &stroke);
+            if !geom.lines_first {
+                lines(self);
             }
         } else if pch == '.' as i32 {
             // A filled 0.01in square scaled by `cex`, but at least one

@@ -25,13 +25,13 @@
 <line x1="453.3833" y1="81.55" x2="466.8833" y2="95.05"/>
 <line x1="450.5874" y1="88.3" x2="469.6793" y2="88.3"/>
 <line x1="460.1333" y1="97.8459" x2="460.1333" y2="78.7541"/>
-</g>
-<polygon points="495.6541,88.3 505.2,78.7541 514.7459,88.3 505.2,97.8459" fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
-<g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
 <line x1="495.6541" y1="88.3" x2="514.7459" y2="88.3"/>
 <line x1="505.2" y1="97.8459" x2="505.2" y2="78.7541"/>
 </g>
-<circle cx="99.6" cy="132.6333" r="6.75" fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+<g fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<polygon points="495.6541,88.3 505.2,78.7541 514.7459,88.3 505.2,97.8459"/>
+<circle cx="99.6" cy="132.6333" r="6.75"/>
+</g>
 <g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
 <line x1="92.85" y1="132.6333" x2="106.35" y2="132.6333"/>
 <line x1="99.6" y1="139.3833" x2="99.6" y2="125.8833"/>
@@ -39,13 +39,15 @@
 <g fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
 <polygon points="144.6667,143.1304 153.7574,124.7605 135.5759,124.7605"/>
 <polygon points="144.6667,122.1363 153.7574,140.5061 135.5759,140.5061"/>
-<rect x="182.9833" y="125.8833" width="13.5" height="13.5"/>
 </g>
 <g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
 <line x1="182.9833" y1="132.6333" x2="196.4833" y2="132.6333"/>
 <line x1="189.7333" y1="139.3833" x2="189.7333" y2="125.8833"/>
 </g>
-<circle cx="234.8" cy="132.6333" r="6.75" fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/>
+<g fill="none" stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
+<rect x="182.9833" y="125.8833" width="13.5" height="13.5"/>
+<circle cx="234.8" cy="132.6333" r="6.75"/>
+</g>
 <g stroke="#0000ff" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round">
 <line x1="228.05" y1="139.3833" x2="241.55" y2="125.8833"/>
 <line x1="228.05" y1="125.8833" x2="241.55" y2="139.3833"/>
