@@ -312,7 +312,7 @@ crate::setters::options! {
         /// outliers aren't drawn (unless `outpch` is given).
         ///
         /// [`par(pch)`]: crate::par::Par::pch
-        pub pch: Vec<Option<i32>> => na_values i32,
+        pub pch: Vec<Option<i32>> => pch Option<i32>,
         /// Default size of the median and outlier symbols. Empty: 1.
         /// `None`: that box's median and outlier symbols aren't drawn
         /// (unless their own size is given).
@@ -335,7 +335,7 @@ crate::setters::options! {
         /// line.
         pub medlwd: Vec<Option<f64>> => na_values f64,
         /// Symbol drawn at the median. Empty: none; `None`: no median symbol.
-        pub medpch: Vec<Option<i32>> => na_values i32,
+        pub medpch: Vec<Option<i32>> => pch Option<i32>,
         /// Size of the median symbol. Empty: `cex`; `None`: no median symbol.
         pub medcex: Vec<Option<f64>> => na_values f64,
         /// Colour of the median line and symbol. Empty: `border`.
@@ -362,7 +362,7 @@ crate::setters::options! {
         /// `None`: no outlier lines or symbols.
         pub outlwd: Vec<Option<f64>> => na_values f64,
         /// Outlier symbol. Empty: `pch`; `None`: no outlier symbols.
-        pub outpch: Vec<Option<i32>> => na_values i32,
+        pub outpch: Vec<Option<i32>> => pch Option<i32>,
         /// Size of the outlier symbols. Empty: `cex`; `None`: no outlier
         /// symbols.
         pub outcex: Vec<Option<f64>> => na_values f64,

@@ -64,6 +64,7 @@ mod page_files;
 mod par_new_matches_r;
 mod par_page_layout;
 mod pch_matches_r;
+mod pch_strings_matches_r;
 mod pie_matches_r;
 mod plot_new_matches_r;
 mod plot_type_b_matches_r;

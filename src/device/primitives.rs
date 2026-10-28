@@ -39,12 +39,12 @@ crate::setters::options! {
         /// What to draw: points, lines, both, steps, ... (see [`PlotType`]).
         /// `None`: points for `points()`, lines for `lines()`. R's `type`.
         pub type_: Option<PlotType> => option PlotType,
-        /// Plotting symbols, recycled over the points; characters work too
-        /// (a negative value is minus a Unicode code point, as in R). Empty:
+        /// Plotting symbols, recycled over the points: R's symbol codes,
+        /// characters or strings (a string's first character). Empty:
         /// [`par(pch)`]; `None`: no point there.
         ///
         /// [`par(pch)`]: crate::par::Par::pch
-        pub pch: Vec<Option<i32>> => na_values i32,
+        pub pch: Vec<Option<i32>> => pch Option<i32>,
         /// Colours, recycled over the points. Lines use the first, except
         /// for `type = "h"`, which has one per point. Empty: [`par(col)`].
         ///

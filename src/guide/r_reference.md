@@ -22,7 +22,7 @@
 | `asp` | `.asp()` | Aspect ratio: one x unit is `asp` y units long (1 for equal scales); ignored on log axes. |
 | `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
 | `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
-| `pch` | `.pch()` | Plotting symbols, recycled over the points; characters work too (a negative value is minus a Unicode code point). |
+| `pch` | `.pch()` | Plotting symbols, recycled over the points: R's symbol codes, characters or strings (a string's first character). |
 | `col` | `.col()` | Colours, recycled over the points. |
 | `bg` | `.bg()` | Fill of symbols 21-25, recycled over the points. |
 | `lwd` | `.lwd()` | Line widths, recycled over the points; lines use the first. |
@@ -290,7 +290,7 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `x` | `.x()` | The x coordinates, or, without `y`, the values to plot against their index. |
 | `y` | `.y()` | The y coordinates, as many as `x`. |
 | `type` | `.type_()` | What to draw: points, lines, both, steps, ... |
-| `pch` | `.pch()` | Plotting symbols, recycled over the points; characters work too (a negative value is minus a Unicode code point, as in R). |
+| `pch` | `.pch()` | Plotting symbols, recycled over the points: R's symbol codes, characters or strings (a string's first character). |
 | `col` | `.col()` | Colours, recycled over the points. |
 | `bg` | `.bg()` | Fill colours of symbols 21 to 25, recycled over the points. |
 | `cex` | `.cex()` | Symbol sizes, relative to `par(cex)`, recycled over the points. |
@@ -311,7 +311,7 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `x` | `.x()` | The x coordinates, or, without `y`, the values to draw against their index. |
 | `y` | `.y()` | The y coordinates, as many as `x`. |
 | `type` | `.type_()` | What to draw: points, lines, both, steps, ... |
-| `pch` | `.pch()` | Plotting symbols, recycled over the points; characters work too (a negative value is minus a Unicode code point, as in R). |
+| `pch` | `.pch()` | Plotting symbols, recycled over the points: R's symbol codes, characters or strings (a string's first character). |
 | `col` | `.col()` | Colours, recycled over the points. |
 | `bg` | `.bg()` | Fill colours of symbols 21 to 25, recycled over the points. |
 | `cex` | `.cex()` | Symbol sizes, relative to `par(cex)`, recycled over the points. |
@@ -506,7 +506,7 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `border` | `.border()` | Border colours of box keys. |
 | `lty` | `.lty()` | Line types of the lines. |
 | `lwd` | `.lwd()` | Line widths of the lines; giving any draws lines. |
-| `pch` | `.pch()` | Plotting symbols (see `LegendPch` for characters). |
+| `pch` | `.pch()` | Plotting symbols: R's symbol codes, characters or strings; a first string of several characters gives one symbol per key, as R's `legend(pch = "abc")`. |
 | `angle` | `.angle()` | Angle of the shading lines in degrees, recycled over the keys. |
 | `density` | `.density()` | Shading lines per inch in the box keys; giving any draws boxes. |
 | `bty` | `.bty()` | Whether to draw the surrounding box. |

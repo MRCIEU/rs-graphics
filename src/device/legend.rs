@@ -54,7 +54,6 @@ use crate::numbers::Pair;
 
 use crate::plotmath::Label;
 use crate::recycle::{pick_na, rep_or};
-use crate::setters::char_pch;
 
 use super::hatch::ShapeStyle;
 use super::{Device, Xpd};
@@ -246,165 +245,10 @@ impl LegendBty {
 crate::error::from_str_via_parse!(LegendBty, "legend box type");
 crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
 
-/// Values the legend's `pch` setter takes: plotting symbols for the keys,
-/// as numbers, characters or strings.
-///
-/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
-/// `['a', 'b']`) or strings (`["a", "b"]`), recycled over the keys;
-/// `None` elements are R's `NA`, a key without a point (`[Some(19), None]`,
-/// `[Some("x"), None]`).
-///
-/// As in R: a string's first character is its symbol (`""` draws none),
-/// except that when the first string has several characters, it alone is
-/// used, one character per key (`"abc"` gives keys `a`, `b`, `c`, as R's
-/// `legend(pch = "abc")`). ASCII characters are their character codes;
-/// other characters are stored as minus their Unicode code point (R's
-/// negative `pch`), so `'é'` is `-233`.
-///
-/// This is R's `legend(pch = )`.
-///
-/// # Examples
-///
-/// ```
-/// use rs_graphics::prelude::*;
-///
-/// assert_eq!([19, 1].into_pch(), [Some(19), Some(1)]);
-/// assert_eq!("abc".into_pch(), [Some(97), Some(98), Some(99)]);
-/// assert_eq!([Some("x"), None].into_pch(), [Some(120), None]);
-/// assert_eq!('é'.into_pch(), [Some(-233)]);
-/// # let mut dev = Device::null().open().unwrap();
-/// # dev.plot().x(&[1, 2]).draw();
-/// dev.legend().pos("topleft").labels(["a", "b"]).pch([19, 1]).draw();
-/// ```
-pub trait LegendPch {
-    /// Converts the value into `pch` codes, one per key in order; `None`
-    /// for a key without a point.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert_eq!(vec![Some(19), None].into_pch(), [Some(19), None]);
-    /// ```
-    fn into_pch(self) -> Vec<Option<i32>>;
-}
-
-/// R's `pch` codes for character `pch` values (`None` = `NA`).
-fn string_pch<S: AsRef<str>>(strings: &[Option<S>]) -> Vec<Option<i32>> {
-    match strings.first() {
-        Some(Some(first)) if first.as_ref().chars().count() > 1 => {
-            first.as_ref().chars().map(|c| Some(char_pch(c))).collect()
-        }
-        _ => strings
-            .iter()
-            .map(|s| {
-                s.as_ref()
-                    .and_then(|s| s.as_ref().chars().next())
-                    .map(char_pch)
-            })
-            .collect(),
-    }
-}
-
-macro_rules! legend_pch_impls {
-    (numbers: $($n:ty),*; strings: $($s:ty),*) => {
-        $(
-            legend_pch_impls!(@each $n, |v: $n| Some(i32::from(v)), |v: Option<$n>| v.map(i32::from));
-        )*
-        $(
-            impl LegendPch for $s {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&[Some(self)])
-                }
-            }
-            impl LegendPch for Option<$s> {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&[self])
-                }
-            }
-            impl<const N: usize> LegendPch for [$s; N] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.map(Some))
-                }
-            }
-            impl<const N: usize> LegendPch for [Option<$s>; N] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self)
-                }
-            }
-            impl LegendPch for &[$s] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.iter().map(Some).collect::<Vec<_>>())
-                }
-            }
-            impl<const N: usize> LegendPch for &[$s; N] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.iter().map(Some).collect::<Vec<_>>())
-                }
-            }
-            impl LegendPch for Vec<$s> {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.into_iter().map(Some).collect::<Vec<_>>())
-                }
-            }
-            impl LegendPch for Vec<Option<$s>> {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self)
-                }
-            }
-        )*
-    };
-    (@each $e:ty, $one:expr, $opt:expr) => {
-        impl LegendPch for $e {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                vec![$one(self)]
-            }
-        }
-        impl LegendPch for Option<$e> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                vec![$opt(self)]
-            }
-        }
-        impl<const N: usize> LegendPch for [$e; N] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($one).collect()
-            }
-        }
-        impl<const N: usize> LegendPch for [Option<$e>; N] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($opt).collect()
-            }
-        }
-        impl LegendPch for &[$e] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.iter().copied().map($one).collect()
-            }
-        }
-        impl<const N: usize> LegendPch for &[$e; N] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.iter().copied().map($one).collect()
-            }
-        }
-        impl LegendPch for Vec<$e> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($one).collect()
-            }
-        }
-        impl LegendPch for &Vec<$e> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.iter().copied().map($one).collect()
-            }
-        }
-        impl LegendPch for Vec<Option<$e>> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($opt).collect()
-            }
-        }
-    };
-}
-legend_pch_impls!(numbers: i32, i16, u8, u16; strings: &str, String, &String);
-legend_pch_impls!(@each char, |c: char| Some(char_pch(c)), |c: Option<char>| c.map(char_pch));
+/// The old name of [`Pch`](crate::setters::Pch), the trait every `pch`
+/// setter takes.
+#[doc(hidden)]
+pub use crate::setters::Pch as LegendPch;
 
 crate::setters::options! {
     /// The arguments of R's `legend()` other than its position and labels.
@@ -435,8 +279,10 @@ crate::setters::options! {
         ///
         /// [`par("col")`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Plotting symbols (see [`LegendPch`] for characters). Empty: no
-        /// points; `None`: no point on that key.
+        /// Plotting symbols: R's symbol codes, characters or strings; a first
+        /// string of several characters gives one symbol per key, as R's
+        /// `legend(pch = "abc")`. Empty: no points; `None`: no point on that
+        /// key.
         pub pch: Vec<Option<i32>> => legend_pch Option<i32>,
         /// Line types of the lines. Empty: solid, if `lwd` asks for lines;
         /// `None`: no line on that key.
@@ -1087,9 +933,12 @@ mod tests {
         assert_eq!(['a', '\u{e9}'].into_pch(), vec![Some(97), Some(-233)]);
         // One character each; "" draws nothing (R's `NA`).
         assert_eq!(["x", "+", ""].into_pch(), vec![Some(120), Some(43), None]);
-        // A first string of several characters is split, the rest unused.
-        assert_eq!("abc".into_pch(), vec![Some(97), Some(98), Some(99)]);
-        assert_eq!(["ab", "z"].into_pch(), vec![Some(97), Some(98)]);
+        // In `legend()` a first string of several characters is split, the
+        // rest unused; `points()` takes each string's first character.
+        assert_eq!("abc".into_legend_pch(), vec![Some(97), Some(98), Some(99)]);
+        assert_eq!(["ab", "z"].into_legend_pch(), vec![Some(97), Some(98)]);
+        assert_eq!(["ab", "z"].into_pch(), vec![Some(97), Some(122)]);
+        assert_eq!(["", "z"].into_legend_pch(), vec![None, Some(122)]);
         assert_eq!(String::from("\u{e9}").into_pch(), vec![Some(-233)]);
         // `None` is R's `NA`, for numbers, characters and strings.
         assert_eq!([Some(19), None].into_pch(), vec![Some(19), None]);

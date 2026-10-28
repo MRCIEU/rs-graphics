@@ -26,7 +26,7 @@ pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
 pub use crate::device::{
     AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, DeviceBuilder,
-    LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos, MtextOptions,
+    LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextOptions,
     PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
     StrUnits, TitleOptions, Units, XyOptions,
 };
@@ -44,3 +44,7 @@ pub use crate::numbers::{Groups, Numbers, Pair};
 pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};
 pub use crate::plotmath::{Expression, Label, LabelValues, Labels};
 pub use crate::recording::{Figure, FigureResult};
+pub use crate::setters::Pch;
+// The old name of `Pch`.
+#[doc(hidden)]
+pub use crate::setters::Pch as LegendPch;

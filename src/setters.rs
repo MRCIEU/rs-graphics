@@ -459,6 +459,149 @@ na_values!(i32: |c: char| Ok::<i32, Error>(char_pch(c)); char);
 na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
 na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
 
+/// Plotting symbols for a `pch` setter: numbers, characters or strings.
+///
+/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
+/// `['a', 'b']`) or strings (`"a"`, `["a", "b"]`), by value or by
+/// reference; `None` elements are R's `NA`, no symbol (`[Some(19), None]`,
+/// `[Some("x"), None]`). Numbers are R's symbol codes 0 to 25 (see
+/// [`charts::pch`](crate::charts::pch)). A character is drawn as itself:
+/// ASCII ones are their character codes, other characters are stored as
+/// minus their Unicode code point (R's negative `pch`), so `'é'` is `-233`.
+/// A string's first character is its symbol, and `""` draws none, as in R.
+///
+/// `legend()` reads one case differently, as R's does: when the first
+/// string has several characters, it alone is used, one character per key
+/// (`"abc"` gives keys `a`, `b`, `c`; [`into_legend_pch`](Pch::into_legend_pch)).
+///
+/// This is R's `pch` argument.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+///
+/// assert_eq!([19, 1].into_pch(), [Some(19), Some(1)]);
+/// assert_eq!("abc".into_pch(), [Some(97)]);
+/// assert_eq!("abc".into_legend_pch(), [Some(97), Some(98), Some(99)]);
+/// assert_eq!([Some("x"), None].into_pch(), [Some(120), None]);
+/// assert_eq!('é'.into_pch(), [Some(-233)]);
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot_new();
+/// dev.points().x([0.2, 0.5, 0.8]).y([0.5; 3]).pch(["a", "b", "c"]).draw();
+/// ```
+pub trait Pch {
+    /// The `pch` codes as `points()` reads them, in order; `None` for no
+    /// symbol.
+    fn into_pch(self) -> Vec<Option<i32>>;
+
+    /// The `pch` codes as `legend()` reads them: as [`into_pch`](Pch::into_pch),
+    /// except that a first string of several characters gives one code per
+    /// character.
+    fn into_legend_pch(self) -> Vec<Option<i32>>;
+}
+
+/// An element a [`Pch`] value is made of: an integer symbol code, a
+/// character or a string.
+///
+/// Sealed: implemented only in this crate.
+pub trait PchElement: pch_sealed::Sealed + Sized {
+    /// The codes of `items` (`None` = `NA`); `legend` applies `legend()`'s
+    /// rule for a first string of several characters.
+    #[doc(hidden)]
+    fn codes(items: &[Option<Self>], legend: bool) -> Vec<Option<i32>>;
+}
+
+mod pch_sealed {
+    pub trait Sealed {}
+}
+
+macro_rules! pch_codes {
+    ($($t:ty),*) => {
+        $(
+            impl pch_sealed::Sealed for $t {}
+            impl PchElement for $t {
+                fn codes(items: &[Option<Self>], _legend: bool) -> Vec<Option<i32>> {
+                    items.iter().map(|v| v.map(i32::from)).collect()
+                }
+            }
+        )*
+    };
+}
+pch_codes!(i32, i16, u8, u16);
+
+impl pch_sealed::Sealed for char {}
+impl PchElement for char {
+    fn codes(items: &[Option<Self>], _legend: bool) -> Vec<Option<i32>> {
+        items.iter().map(|c| c.map(char_pch)).collect()
+    }
+}
+
+macro_rules! pch_strings {
+    ($($t:ty),*) => {
+        $(
+            impl pch_sealed::Sealed for $t {}
+            impl PchElement for $t {
+                fn codes(items: &[Option<Self>], legend: bool) -> Vec<Option<i32>> {
+                    string_pch(items, legend)
+                }
+            }
+        )*
+    };
+}
+pch_strings!(&str, String, &String);
+
+/// R's `pch` codes for strings (`None` = `NA`): each string's first
+/// character (`""`: none), or with `legend` a first string of several
+/// characters split into one code per character.
+fn string_pch<S: AsRef<str>>(strings: &[Option<S>], legend: bool) -> Vec<Option<i32>> {
+    match strings.first() {
+        Some(Some(first)) if legend && first.as_ref().chars().count() > 1 => {
+            first.as_ref().chars().map(|c| Some(char_pch(c))).collect()
+        }
+        _ => strings
+            .iter()
+            .map(|s| {
+                s.as_ref()
+                    .and_then(|s| s.as_ref().chars().next())
+                    .map(char_pch)
+            })
+            .collect(),
+    }
+}
+
+/// `Pch` for one shape of value: `$items` turns it into `Option` elements.
+macro_rules! pch_shape {
+    ($([$($g:tt)*] $ty:ty => |$v:ident| $items:expr;)*) => {
+        $(
+            impl<$($g)*> Pch for $ty {
+                fn into_pch(self) -> Vec<Option<i32>> {
+                    let $v = self;
+                    E::codes(&$items, false)
+                }
+                fn into_legend_pch(self) -> Vec<Option<i32>> {
+                    let $v = self;
+                    E::codes(&$items, true)
+                }
+            }
+        )*
+    };
+}
+pch_shape! {
+    [E: PchElement] E => |v| [Some(v)];
+    [E: PchElement] Option<E> => |v| [v];
+    [E: PchElement, const N: usize] [E; N] => |v| v.map(Some);
+    [E: PchElement, const N: usize] [Option<E>; N] => |v| v;
+    [E: PchElement] Vec<E> => |v| v.into_iter().map(Some).collect::<Vec<_>>();
+    [E: PchElement] Vec<Option<E>> => |v| v;
+    [E: PchElement + Clone] &[E] => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
+    [E: PchElement] &[Option<E>] => |v| v;
+    [E: PchElement + Clone, const N: usize] &[E; N] => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
+    [E: PchElement, const N: usize] &[Option<E>; N] => |v| v.as_slice();
+    [E: PchElement + Clone] &Vec<E> => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
+    [E: PchElement] &Vec<Option<E>> => |v| v;
+}
+
 /// A character's `pch` code, as R's `GEstring_to_pch()` in a UTF-8 locale:
 /// its ASCII code, or minus its Unicode code point for any other character
 /// (`'é'` is -233).
@@ -510,8 +653,8 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// [`Pair`](crate::numbers::Pair) tuple), `array` (`Option<[f64; N]>`
 /// from an array of any numbers), `na` (`Option<Option<f64>>`, R's
 /// `NA`-able number, from one number; `f64::NAN` is `NA`), `count`
-/// (`Option<usize>` from any integer) and `legend_pch` (`legend()`'s `pch`, a `Vec<i32>` from
-/// [`LegendPch`](crate::device::LegendPch)).
+/// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
+/// [`Pch`]) and `legend_pch` (the same, read as `legend()` does).
 ///
 /// [`par(plt)`]: crate::par::Par::plt
 macro_rules! options {
@@ -663,12 +806,21 @@ macro_rules! options {
             self
         }
     };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pch $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes numbers, characters or strings; `None` is R's `NA` (see [`Pch`](crate::setters::Pch))."]
+        pub fn $field(mut self, values: impl $crate::setters::Pch) -> Self {
+            self$(.$p)?.$field = values.into_pch();
+            self
+        }
+    };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident legend_pch $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes numbers, characters or strings (see [`LegendPch`](crate::device::LegendPch))."]
-        pub fn $field(mut self, values: impl $crate::device::LegendPch) -> Self {
-            self$(.$p)?.$field = values.into_pch();
+        #[doc = "Takes numbers, characters or strings; `None` is R's `NA` (see [`Pch`](crate::setters::Pch))."]
+        pub fn $field(mut self, values: impl $crate::setters::Pch) -> Self {
+            self$(.$p)?.$field = values.into_legend_pch();
             self
         }
     };
@@ -796,6 +948,24 @@ mod tests {
         let xy = XyOptions::default().pch(&[1, 2]).lwd(&[Some(1.0), None]);
         assert_eq!(xy.pch, vec![Some(1), Some(2)]);
         assert_eq!(xy.lwd, vec![Some(1.0), None]);
+    }
+
+    #[test]
+    #[allow(clippy::needless_borrows_for_generic_args)] // the `&` forms on purpose
+    fn pch_setters_take_every_shape() {
+        use crate::device::XyOptions;
+        let abc = vec![Some("a"), None, Some("bc")];
+        let codes = [Some(97), None, Some(98)];
+        assert_eq!(abc.clone().into_pch(), codes);
+        assert_eq!((&abc).into_pch(), codes);
+        assert_eq!(abc.as_slice().into_pch(), codes);
+        assert_eq!((&[Some('a'), None]).into_pch(), [Some(97), None]);
+        assert_eq!((&vec![1_u8, 2]).into_pch(), [Some(1), Some(2)]);
+        assert_eq!(Some(String::from("z")).into_pch(), [Some(122)]);
+        // The setters of points/lines/plot/boxplot take them all, and read
+        // strings as `points()` does.
+        assert_eq!(XyOptions::default().pch("abc").pch, [Some(97)]);
+        assert_eq!(XyOptions::default().pch(&abc).pch, codes);
     }
 
     #[test]
