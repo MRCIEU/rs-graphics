@@ -266,7 +266,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
                 .font(vec![Some(FontFace::Plain)]),
         )
         .draw();
-    let red = ColorSpec::Color(Color::parse("red").unwrap());
+    let red = ColorSpec::Color(Color::try_from("red").unwrap());
     d.text()
         .x([5.0])
         .y([2.0])

@@ -392,7 +392,9 @@ impl<B: Backend> Device<B> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// assert_eq!(StrUnits::parse("in"), Some(StrUnits::Inches));
+/// assert_eq!("in".parse::<StrUnits>().unwrap(), StrUnits::Inches);
+/// assert_eq!("fig".parse::<StrUnits>().unwrap(), StrUnits::Figure);
+/// assert!("cm".parse::<StrUnits>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum StrUnits {
@@ -407,17 +409,10 @@ pub enum StrUnits {
 }
 
 impl StrUnits {
-    /// Reads `"user"`, `"inches"` or `"figure"`, or a unique prefix of one
-    /// (R's `match.arg()`); `None` for anything else.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(StrUnits::parse("figure"), Some(StrUnits::Figure));
-    /// assert_eq!(StrUnits::parse("cm"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<StrUnits> {
+    /// `"user"`, `"inches"` or `"figure"`, or a unique prefix (R's
+    /// `match.arg()`); `None` otherwise. The public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<StrUnits> {
         let all = [
             ("user", StrUnits::User),
             ("inches", StrUnits::Inches),
@@ -433,7 +428,6 @@ impl StrUnits {
     }
 }
 
-crate::error::from_str_via_parse!(StrUnits, "string units");
 crate::error::from_r_string!(
     StrUnits,
     "string units",

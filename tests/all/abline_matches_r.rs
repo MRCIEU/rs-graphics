@@ -30,7 +30,7 @@ const PAGE_H: f64 = 5.0;
 fn col(names: &[&str]) -> Vec<ColorSpec> {
     names
         .iter()
-        .map(|n| ColorSpec::Color(Color::parse(n).unwrap()))
+        .map(|n| ColorSpec::Color(Color::try_from(*n).unwrap()))
         .collect()
 }
 
@@ -139,7 +139,7 @@ fn cases() -> Vec<Case> {
                             .h(vec![6.0, 8.0])
                             .lty(vec![
                                 Some(LineType::from_code(4).unwrap()),
-                                Some(LineType::parse("42").unwrap()),
+                                Some(LineType::try_from("42").unwrap()),
                             ])
                             .lwd(vec![Some(2.0)]),
                     )
@@ -189,7 +189,7 @@ fn cases() -> Vec<Case> {
             log: "xy",
             lims: ((1.0, 100.0), (0.5, 500.0)),
             draw: |d| {
-                d.par().col(Color::parse("grey40").unwrap()).draw();
+                d.par().col(Color::try_from("grey40").unwrap()).draw();
                 d.par().lty(LineType::from_code(2).unwrap()).draw();
                 d.par().lwd(2.0).draw();
                 d.abline()

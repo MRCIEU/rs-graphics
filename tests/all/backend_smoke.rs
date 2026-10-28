@@ -290,7 +290,7 @@ fn any_backend_output_is_the_wrapped_backends() {
 fn format_names_parse_ignoring_case() {
     use rs_graphics::backend::Format;
     assert_eq!("Png".parse::<Format>(), Ok(Format::Png));
-    assert_eq!(Format::parse("pdf"), Some(Format::Pdf));
+    assert_eq!("pdf".parse::<Format>().ok(), Some(Format::Pdf));
     assert_eq!(Format::try_from("SVG").unwrap(), Format::Svg);
     assert!("jpg".parse::<Format>().is_err());
 }

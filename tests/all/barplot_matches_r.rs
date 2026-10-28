@@ -29,7 +29,7 @@ fn names(n: &[&str]) -> Vec<Label> {
 fn red_green_blue() -> Vec<ColorSpec> {
     ["red", "green", "blue"]
         .iter()
-        .map(|c| ColorSpec::Color(Color::parse(c).unwrap()))
+        .map(|c| ColorSpec::Color(Color::try_from(*c).unwrap()))
         .collect()
 }
 

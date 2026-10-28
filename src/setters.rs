@@ -216,7 +216,7 @@ impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::OptionOf> fo
 /// let one: Vec<f64> = 2_i32.into_values().unwrap();
 /// assert_eq!(one, [2.0]);
 /// let cols: Vec<ColorSpec> = ["red", "blue"].into_values().unwrap();
-/// assert_eq!(cols[1], ColorSpec::Color(Color::parse("blue").unwrap()));
+/// assert_eq!(cols[1], ColorSpec::Color("blue".parse().unwrap()));
 /// ```
 pub trait Values<T> {
     /// The values, in order.
@@ -630,16 +630,16 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// }
 /// ```
 ///
-/// gives the struct, a setter per field on it, and the same setters on
-/// each listed builder in [`crate::graphics`] (writing to its `opts`),
-/// plus `with(&Struct)` there. Fields are `pub(crate)` (whatever the
-/// declaration says), so outside the crate the setters are the one way in. Each setter's doc is the field's own doc,
-/// then (for kinds that take several forms) a line on what it takes.
-/// Field docs should therefore have no headings (`# Panics`): that line
-/// would land under them. Every field
-/// needs its `=> kind Type`, so a field can't be added without a setter
-/// by mistake; one set by a constructor is marked `=> no_setter`. The
-/// builder list `=> [..]` may be left out.
+/// gives the struct, a setter per field on it, and the same setters on each
+/// listed builder in [`crate::graphics`] (writing to its `opts`), plus
+/// `with(&Struct)` there. Fields are `pub(crate)` (whatever the declaration
+/// says), so outside the crate the setters are the one way in. Each setter's
+/// doc is the field's own doc, then (for kinds that take several forms) a
+/// line on what it takes. Field docs should therefore have no headings (`#
+/// Panics`): that line would land under them. Every field needs its `=> kind
+/// Type`, so a field can't be added without a setter by mistake; one set by a
+/// constructor is marked `=> no_setter`. The builder list `=> [..]` may be
+/// left out.
 ///
 /// Setter kinds: `value` (plain field), `option` (`Option<T>` from a
 /// value or an `Option`, [`OptionArg`]), `option_value`

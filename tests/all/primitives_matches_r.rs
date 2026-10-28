@@ -110,7 +110,7 @@ fn cases() -> Vec<Case> {
                        col = c('red', NA))\n\
                 arrows(1, 9, 1, 7)",
             draw: |d| {
-                d.par().fg(Color::parse("blue").unwrap()).draw();
+                d.par().fg(Color::try_from("blue").unwrap()).draw();
                 let solid_dashed = SegmentsOptions::default()
                     .lty(vec![Some(LineType::SOLID), Some(LineType::DASHED)])
                     .lwd(vec![Some(1.0), Some(4.0)]);
@@ -153,7 +153,7 @@ fn cases() -> Vec<Case> {
                 polygon(c(1, 2, 3, NA, 5, 6, 7, NA, 8, 9, 9), c(5, 8, 5, NA, 5, 8, 5, NA, 6, 6, 9),\n\
                         col = c('orange', NA, 'cyan'), border = c(1, 2), lty = c(1, 2, 3))",
             draw: |d| {
-                d.par().fg(Color::parse("darkgreen").unwrap()).draw();
+                d.par().fg(Color::try_from("darkgreen").unwrap()).draw();
                 let three = RectOptions::default()
                     .col(vec![ColorSpec::try_from("grey").unwrap(), ColorSpec::None])
                     .border(vec![
@@ -239,7 +239,7 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.par().oma(Sides::from([1.0, 2.0, 1.0, 1.0])).draw();
                 d.par().lty(LineType::DOTTED).draw();
-                d.par().col(Color::parse("darkred").unwrap()).draw();
+                d.par().col(Color::try_from("darkred").unwrap()).draw();
                 d.par().mfrow(1, 2).draw();
                 d.plot_new();
                 d.box_().draw();
@@ -274,10 +274,10 @@ fn cases() -> Vec<Case> {
             r: "par(fg = 'red', col.axis = 'blue', cex.axis = 1.3, font.axis = 2, las = 1)\n\
                 plot(c(1, 3), c(2, 5), pch = 19, ann = FALSE)",
             draw: |d| {
-                let red = Color::parse("red").unwrap();
+                let red = Color::try_from("red").unwrap();
                 d.par().fg(red).draw();
                 d.par().col(red).draw();
-                d.par().col_axis(Color::parse("blue").unwrap()).draw();
+                d.par().col_axis(Color::try_from("blue").unwrap()).draw();
                 d.par().cex_axis(1.3).draw();
                 d.par().font_axis(2).draw();
                 d.par().las(1).draw();
@@ -299,7 +299,7 @@ fn cases() -> Vec<Case> {
                 pie(c(1, 2, 3), labels = c('a', 'b'))",
             draw: |d| {
                 d.par().mfrow(2, 2).draw();
-                let red = Color::parse("red").unwrap();
+                let red = Color::try_from("red").unwrap();
                 d.par().fg(red).draw();
                 d.par().col(red).draw();
                 d.par().ann(false).draw();
@@ -324,7 +324,7 @@ fn cases() -> Vec<Case> {
             r: "par(pch = 2, lty = 2, fg = 'blue', col = 'blue')\n\
                 boxplot(list(c(1, 2, 3, 4, 5, 12)))",
             draw: |d| {
-                let blue = Color::parse("blue").unwrap();
+                let blue = Color::try_from("blue").unwrap();
                 d.par().pch(2).draw();
                 d.par().lty(LineType::DASHED).draw();
                 d.par().fg(blue).draw();

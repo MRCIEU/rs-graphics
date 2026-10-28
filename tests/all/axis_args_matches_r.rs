@@ -42,7 +42,7 @@ struct Case {
 }
 
 fn col(name: &str) -> Option<ColorSpec> {
-    Some(ColorSpec::Color(Color::parse(name).unwrap()))
+    Some(ColorSpec::Color(Color::try_from(name).unwrap()))
 }
 
 /// `c(...)` of strings, `"NA"` being `NA`.

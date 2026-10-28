@@ -223,6 +223,18 @@ impl DeviceBuilder {
 
 /// The units of a device's `width` and `height`
 /// ([`DeviceBuilder::units`]): R's `units` of `png()`.
+///
+/// From a string (`"cm".parse::<Units>()` or `TryFrom<&str>`): `"px"`,
+/// `"in"`, `"cm"` or `"mm"`, or a unique prefix (R's `match.arg()`). Anything
+/// else is an error.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("c".parse::<Units>().unwrap(), Units::Cm);
+/// assert!("pt".parse::<Units>().is_err());
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Units {
     /// `"in"`: inches (the default here; R's `png()` defaults to pixels).
@@ -237,9 +249,9 @@ pub enum Units {
 }
 
 impl Units {
-    /// `"px"`, `"in"`, `"cm"` or `"mm"`, or a unique prefix of one (R's
-    /// `match.arg()`); `None` for anything else.
-    pub fn parse(s: &str) -> Option<Units> {
+    /// `"px"`, `"in"`, `"cm"` or `"mm"`, or a unique prefix; `None`
+    /// otherwise. The public routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<Units> {
         let all = [
             ("px", Units::Px),
             ("in", Units::In),
@@ -256,7 +268,6 @@ impl Units {
     }
 }
 
-crate::error::from_str_via_parse!(Units, "units");
 crate::error::from_r_string!(Units, "units", "\"px\", \"in\", \"cm\" or \"mm\"");
 
 /// Creates (or empties) `path`, with R's message on failure.

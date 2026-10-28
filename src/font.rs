@@ -27,8 +27,9 @@
 /// A font face: plain, bold, italic, bold italic or the Symbol font.
 ///
 /// Convert from a number 1 to 5 ([`FontFace::from_code`], `TryFrom<i32>`)
-/// or a name ([`FontFace::parse`], `TryFrom<&str>`): grid's `fontface` names
-/// (`"plain"`, `"bold"`, `"italic"`, `"bold.italic"`), plus `"symbol"`.
+/// or a name (`"bold".parse::<FontFace>()`, `TryFrom<&str>`): grid's
+/// `fontface` names (`"plain"`, `"bold"`, `"italic"`, `"bold.italic"`), plus
+/// `"symbol"`, case-sensitive, or a number 1 to 5 as a string (`"2"`).
 /// The default is [`FontFace::Plain`].
 ///
 /// Text in [`FontFace::Symbol`] is in Adobe Symbol encoding, one `char`
@@ -44,6 +45,9 @@
 /// assert_eq!(FontFace::try_from(2), Ok(FontFace::Bold));
 /// assert_eq!(FontFace::try_from("bold.italic").unwrap().code(), 4);
 /// assert_eq!(FontFace::default(), FontFace::Plain);
+/// assert_eq!("italic".parse::<FontFace>().unwrap(), FontFace::Italic);
+/// assert_eq!("3".parse::<FontFace>().unwrap(), FontFace::Italic);
+/// assert!("heavy".parse::<FontFace>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum FontFace {
@@ -104,21 +108,9 @@ impl FontFace {
         }
     }
 
-    /// Parses a face name or number, or returns `None` if `s` is neither.
-    ///
-    /// Takes grid's names (`"plain"`, `"bold"`, `"italic"`,
-    /// `"bold.italic"`), `"symbol"`, or a number 1 to 5 as a string
-    /// (`"2"`). Names are case-sensitive.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(FontFace::parse("italic"), Some(FontFace::Italic));
-    /// assert_eq!(FontFace::parse("3"), Some(FontFace::Italic));
-    /// assert_eq!(FontFace::parse("heavy"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<FontFace> {
+    /// A face name or number as a string, `None` if it is neither; the public
+    /// routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<FontFace> {
         match s {
             "plain" => Some(FontFace::Plain),
             "bold" => Some(FontFace::Bold),
@@ -149,7 +141,6 @@ impl TryFrom<i32> for FontFace {
     }
 }
 
-crate::error::from_str_via_parse!(FontFace, "font");
 crate::error::from_r_string!(
     FontFace,
     "font",

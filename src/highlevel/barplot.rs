@@ -40,7 +40,7 @@ use crate::color::{Color, ColorSpec, gray_colors};
 use crate::device::{
     AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions, TitleOptions,
 };
-use crate::error::{Error, from_r_string, from_str_via_parse};
+use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
@@ -310,6 +310,10 @@ impl Default for BarplotOptions {
 /// unique prefix (`.order_h("decr")`); any other string is an error of the
 /// call.
 ///
+/// From a string (`"decr".parse::<OrderH>()` or `TryFrom<&str>`): `"none"`,
+/// `"incr"` or `"decr"`, or a unique prefix (R's `match.arg()`). Anything
+/// else is an error.
+///
 /// This is R's `barplot(orderH = )`.
 ///
 /// # Examples
@@ -321,6 +325,8 @@ impl Default for BarplotOptions {
 /// let columns = vec![vec![1, 4, 2], vec![3, 1, 5]];
 /// dev.barplot().height(&columns).order_h(OrderH::Decr).draw();
 /// dev.barplot().height(&columns).order_h("incr").draw();
+/// assert_eq!("d".parse::<OrderH>().unwrap(), OrderH::Decr);
+/// assert!("up".parse::<OrderH>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum OrderH {
@@ -334,20 +340,9 @@ pub enum OrderH {
 }
 
 impl OrderH {
-    /// Reads an order from its name: `"none"`, `"incr"` or `"decr"`, or a
-    /// unique prefix of one; `None` for anything else.
-    ///
-    /// This matches names as R's `match.arg()`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert_eq!(OrderH::parse("d"), Some(OrderH::Decr));
-    /// assert_eq!(OrderH::parse("up"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<OrderH> {
+    /// `"none"`, `"incr"` or `"decr"`, or a unique prefix; `None` otherwise.
+    /// The public routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<OrderH> {
         let all = [
             ("none", OrderH::None),
             ("incr", OrderH::Incr),
@@ -363,7 +358,6 @@ impl OrderH {
     }
 }
 
-from_str_via_parse!(OrderH, "orderH");
 from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 
 /// The heights of a bar chart: a vector (one bar per value) or a matrix

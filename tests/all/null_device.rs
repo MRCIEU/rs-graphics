@@ -89,7 +89,7 @@ fn takes_pdfs_options() {
     let (w, h) = dev.din();
     assert!((w - 10.0 / 2.54).abs() < 1e-12 && (h - 5.0 / 2.54).abs() < 1e-12);
     assert_eq!(dev.start_ps(), 9.0);
-    assert_eq!(dev.current_par().bg, Color::parse("ivory").unwrap());
+    assert_eq!(dev.current_par().bg, Color::try_from("ivory").unwrap());
     // Transparent by default, as PDF's; also through `Device::new`.
     let dev = Device::null().open().unwrap();
     assert_eq!(dev.current_par().bg.a, 0);

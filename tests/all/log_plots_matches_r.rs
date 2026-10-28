@@ -52,7 +52,7 @@ fn solid() -> LineType {
 }
 
 fn red() -> ColorSpec {
-    ColorSpec::Color(Color::parse("red").unwrap())
+    ColorSpec::Color(Color::try_from("red").unwrap())
 }
 
 fn cases() -> Vec<Case> {
@@ -240,7 +240,7 @@ fn cases() -> Vec<Case> {
                 let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
                 let o = HistOptions::default()
                     .add(true)
-                    .col(vec![ColorSpec::Color(Color::parse("pink").unwrap())])
+                    .col(vec![ColorSpec::Color(Color::try_from("pink").unwrap())])
                     .border(vec![red()]);
                 d.hist().x(&more).with(&o).draw();
             },

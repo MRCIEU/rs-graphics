@@ -38,6 +38,10 @@ use super::{InlineAxis, data_range};
 /// values <= 0 on a log axis). Setters also take R's letters
 /// (`.type_("b")`); any other string is an error of the call.
 ///
+/// From a string (`"b".parse::<PlotType>()` or `TryFrom<&str>`): R's letters
+/// `"p"`, `"l"`, `"b"`, `"c"`, `"o"`, `"h"`, `"s"`, `"S"` and `"n"`. Anything
+/// else is an error.
+///
 /// This is R's `type` argument.
 ///
 /// # Examples
@@ -49,6 +53,8 @@ use super::{InlineAxis, data_range};
 /// let y = [3, 1, 4, 1, 5];
 /// dev.plot().x(&y).type_(PlotType::Both).draw();
 /// dev.lines().x(&y).type_("s").draw();
+/// assert_eq!("S".parse::<PlotType>().unwrap(), PlotType::StepsVerticalFirst);
+/// assert!("x".parse::<PlotType>().is_err());
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlotType {
@@ -81,21 +87,9 @@ pub enum PlotType {
 }
 
 impl PlotType {
-    /// Reads a plot type from its letter: `"p"`, `"l"`, `"b"`, `"c"`,
-    /// `"o"`, `"h"`, `"s"`, `"S"` or `"n"`; `None` for anything else (R
-    /// errors: "invalid plot type").
-    ///
-    /// These are R's `type =` letters.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert_eq!(PlotType::parse("S"), Some(PlotType::StepsVerticalFirst));
-    /// assert_eq!(PlotType::parse("x"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<PlotType> {
+    /// R's `type` letter, `None` if it isn't one; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<PlotType> {
         match s {
             "p" => Some(PlotType::Points),
             "l" => Some(PlotType::Lines),
@@ -111,7 +105,6 @@ impl PlotType {
     }
 }
 
-crate::error::from_str_via_parse!(PlotType, "plot type");
 crate::error::from_r_string!(
     PlotType,
     "plot type",

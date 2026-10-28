@@ -24,6 +24,14 @@ use crate::numbers::Num;
 ///
 /// Strings work too (`"pdf"`, `"svg"`, `"png"`, ignoring case), so
 /// `Device::format("png", file)` works.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("PNG".parse::<Format>().unwrap(), Format::Png);
+/// assert!("jpeg".parse::<Format>().is_err());
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Format {
     /// PDF, a vector format.
@@ -35,17 +43,9 @@ pub enum Format {
 }
 
 impl Format {
-    /// Reads `"pdf"`, `"svg"` or `"png"`, ignoring case; `None` for anything
-    /// else.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(Format::parse("PNG"), Some(Format::Png));
-    /// assert_eq!(Format::parse("jpeg"), None);
-    /// ```
-    pub fn parse(name: &str) -> Option<Format> {
+    /// `"pdf"`, `"svg"` or `"png"`, ignoring case; `None` otherwise. The
+    /// public routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(name: &str) -> Option<Format> {
         match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
             "svg" => Some(Format::Svg),
@@ -55,7 +55,6 @@ impl Format {
     }
 }
 
-crate::error::from_str_via_parse!(Format, "output format");
 crate::error::from_r_string!(Format, "output format", "\"pdf\", \"svg\" or \"png\"");
 
 /// A PDF, SVG or PNG backend behind one type, for a format chosen at run

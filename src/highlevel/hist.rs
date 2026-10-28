@@ -146,10 +146,15 @@ type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 ///
 /// A rule or a number of classes `k` gives the edges `pretty(range(x), n =
 /// k, min.n = 1)`; edges are used as given (after sorting). Setters take
-/// a rule's name (`.breaks("FD")`, see [`HistBreaks::parse`]; an unknown
-/// name is an error of the call), a number (`.breaks(20)`) or several numbers as edges
+/// a rule's name (`.breaks("FD")`, see below; an unknown name is an error of
+/// the call), a number (`.breaks(20)`) or several numbers as edges
 /// (`.breaks([0, 2, 5, 10])`; one value in an array, `Vec` or slice is a
 /// number of classes, as R's length rule).
+///
+/// From a string (`"FD".parse::<HistBreaks>()` or `TryFrom<&str>`): a rule's
+/// name, `"Sturges"`, `"Scott"`, `"FD"` or `"Freedman-Diaconis"`, in any case
+/// or as a unique prefix (R's `match.arg(tolower(breaks), ..)`). Anything
+/// else is an error.
 ///
 /// This is R's `hist(breaks = )`.
 ///
@@ -164,6 +169,8 @@ type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 /// assert_eq!(h.counts, [1.0, 2.0, 3.0]);
 /// let h = dev.hist().x(&x).breaks(HistBreaks::Scott).draw();
 /// assert!(h.equidist);
+/// assert!(matches!("fd".parse::<HistBreaks>(), Ok(HistBreaks::FreedmanDiaconis)));
+/// assert!("F".parse::<HistBreaks>().is_err()); // "fd" or "freedman-diaconis"
 /// ```
 #[derive(Clone)]
 pub enum HistBreaks {
@@ -209,22 +216,9 @@ impl HistBreaks {
         HistBreaks::Function(std::sync::Arc::new(f))
     }
 
-    /// Reads a rule from its name: `"Sturges"`, `"Scott"`, `"FD"` or
-    /// `"Freedman-Diaconis"` in any case, or a unique prefix; `None` for
-    /// anything else.
-    ///
-    /// This is R's `match.arg(tolower(breaks), ..)`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert!(matches!(HistBreaks::parse("fd"), Some(HistBreaks::FreedmanDiaconis)));
-    /// assert!(matches!(HistBreaks::parse("Sc"), Some(HistBreaks::Scott)));
-    /// assert!(HistBreaks::parse("F").is_none()); // "fd" or "freedman-diaconis"
-    /// ```
-    pub fn parse(s: &str) -> Option<HistBreaks> {
+    /// A rule's name or a unique prefix, `None` otherwise; the public routes
+    /// are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<HistBreaks> {
         const ALL: [&str; 4] = ["sturges", "fd", "freedman-diaconis", "scott"];
         let s = s.to_lowercase();
         let name = ALL.iter().find(|&&a| a == s).copied().or_else(|| {

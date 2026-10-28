@@ -50,12 +50,12 @@ const DRAW_R: &str = "plot.window(c(0, 1), c(0, 1))\n\
 fn draw_ours(c: &Case) -> Vec<u8> {
     let mut backend = PdfBackend::new(PAGE_W, PAGE_H).with_compression(false);
     if let Some(bg) = c.page_bg {
-        backend = backend.with_background(Color::parse(bg).unwrap());
+        backend = backend.with_background(Color::try_from(bg).unwrap());
     }
     let mut d = Device::new(backend, Par::default());
     d.plot_new();
     if let Some(bg) = c.par_bg {
-        d.par().bg(Color::parse(bg).unwrap()).draw();
+        d.par().bg(Color::try_from(bg).unwrap()).draw();
     }
     d.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
     let zero = ColorSpec::Index(0);

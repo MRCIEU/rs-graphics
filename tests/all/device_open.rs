@@ -105,7 +105,7 @@ fn size_pointsize_and_res() {
 
 #[test]
 fn backgrounds() {
-    let yellow = Color::parse("yellow").unwrap();
+    let yellow = Color::try_from("yellow").unwrap();
     assert_eq!(
         opened(Device::pdf(temp("a.pdf")).bg("white")),
         direct(
@@ -158,7 +158,7 @@ fn explicit_background_is_kept() {
                 .unwrap();
             assert_eq!(
                 dev.current_par().bg,
-                Color::parse(bg).unwrap(),
+                Color::try_from(bg).unwrap(),
                 "{format}, bg {bg}"
             );
         }
@@ -372,12 +372,12 @@ fn pixels_need_a_png_device() {
 
 #[test]
 fn units_parse_like_match_arg() {
-    assert_eq!(Units::parse("px"), Some(Units::Px));
-    assert_eq!(Units::parse("i"), Some(Units::In));
-    assert_eq!(Units::parse("c"), Some(Units::Cm));
-    assert_eq!(Units::parse("m"), Some(Units::Mm));
-    assert_eq!(Units::parse(""), None);
-    assert_eq!(Units::parse("pt"), None);
+    assert_eq!("px".parse::<Units>().ok(), Some(Units::Px));
+    assert_eq!("i".parse::<Units>().ok(), Some(Units::In));
+    assert_eq!("c".parse::<Units>().ok(), Some(Units::Cm));
+    assert_eq!("m".parse::<Units>().ok(), Some(Units::Mm));
+    assert_eq!("".parse::<Units>().ok(), None);
+    assert_eq!("pt".parse::<Units>().ok(), None);
     assert_eq!("mm".parse::<Units>(), Ok(Units::Mm));
 }
 

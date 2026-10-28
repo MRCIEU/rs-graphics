@@ -86,7 +86,7 @@ fn draw_ours(c: &Case) -> Vec<u8> {
         ..Par::default()
     };
     let opts = PlotOptions::default()
-        .type_(PlotType::parse(c.type_).unwrap())
+        .type_(PlotType::try_from(c.type_).unwrap())
         .ylog(c.ylog)
         .axes(false);
     r::ours_with((PAGE_W, PAGE_H), par, |dev| {

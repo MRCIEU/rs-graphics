@@ -85,7 +85,7 @@ fn cases() -> Vec<Case> {
                 let opts = PlotOptions::default()
                     .type_(PlotType::Lines)
                     .axes(false)
-                    .col(vec![ColorSpec::Color(Color::parse("red").unwrap())]);
+                    .col(vec![ColorSpec::Color(Color::try_from("red").unwrap())]);
                 d.plot().x(xs()).y(roots()).with(&opts).draw();
                 d.axis().side(4).draw();
                 let o = MtextOptions::default().line(vec![3.0]);

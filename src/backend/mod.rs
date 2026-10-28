@@ -46,7 +46,19 @@ use crate::numbers::Num;
 /// How the ends of a line are drawn: round, butt (flat at the end) or
 /// square (flat, extended by half the line width).
 ///
+/// From a string (`"butt".parse::<LineEnd>()` or `TryFrom<&str>`): `"round"`,
+/// `"butt"` or `"square"`, or their codes as strings, `"0"` to `"2"` (R takes
+/// the codes only as numbers). Anything else is an error.
+///
 /// This is R's `par(lend = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("butt".parse::<LineEnd>().unwrap(), LineEnd::Butt);
+/// assert!("flat".parse::<LineEnd>().is_err());
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineEnd {
     /// Rounded ends (the default).
@@ -58,19 +70,9 @@ pub enum LineEnd {
 }
 
 impl LineEnd {
-    /// Reads `"round"`, `"butt"` or `"square"`, or their numeric codes as
-    /// strings `"0"`, `"1"`, `"2"`; `None` for anything else.
-    ///
-    /// These are R's `lend` names; R accepts the codes only as numbers.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineEnd::parse("butt"), Some(LineEnd::Butt));
-    /// assert_eq!(LineEnd::parse("flat"), None);
-    /// ```
-    pub fn parse(spec: &str) -> Option<LineEnd> {
+    /// R's `lend` name or code, `None` otherwise; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(spec: &str) -> Option<LineEnd> {
         match spec {
             "round" | "0" => Some(LineEnd::Round),
             "butt" | "1" => Some(LineEnd::Butt),
@@ -80,13 +82,23 @@ impl LineEnd {
     }
 }
 
-crate::error::from_str_via_parse!(LineEnd, "line end");
 crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"square\"");
 
 /// How the corners of a line are drawn: round, mitred (pointed) or
 /// bevelled (cut off).
 ///
+/// From a string (`"mitre".parse::<LineJoin>()` or `TryFrom<&str>`): `"round"`,
+/// `"mitre"` or `"bevel"`, or their codes as strings, `"0"` to `"2"` (R takes
+/// the codes only as numbers). Anything else is an error.
+///
 /// This is R's `par(ljoin = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("mitre".parse::<LineJoin>().unwrap(), LineJoin::Mitre);
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineJoin {
     /// Rounded corners (the default).
@@ -98,18 +110,9 @@ pub enum LineJoin {
 }
 
 impl LineJoin {
-    /// Reads `"round"`, `"mitre"` or `"bevel"`, or their numeric codes as
-    /// strings `"0"`, `"1"`, `"2"`; `None` for anything else.
-    ///
-    /// These are R's `ljoin` names; R accepts the codes only as numbers.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineJoin::parse("mitre"), Some(LineJoin::Mitre));
-    /// ```
-    pub fn parse(spec: &str) -> Option<LineJoin> {
+    /// R's `ljoin` name or code, `None` otherwise; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(spec: &str) -> Option<LineJoin> {
         match spec {
             "round" | "0" => Some(LineJoin::Round),
             "mitre" | "1" => Some(LineJoin::Mitre),
@@ -119,7 +122,6 @@ impl LineJoin {
     }
 }
 
-crate::error::from_str_via_parse!(LineJoin, "line join");
 crate::error::from_r_string!(LineJoin, "line join", "\"round\", \"mitre\" or \"bevel\"");
 
 /// Everything a [`Backend`] needs to draw a line: colour, width, line type,

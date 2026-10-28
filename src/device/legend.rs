@@ -90,9 +90,8 @@ impl From<LegendKeyword> for LegendPos {
 impl TryFrom<&str> for LegendPos {
     type Error = crate::error::Error;
 
-    /// One of R's keywords, matched like R's `match.arg()`
-    /// ([`LegendKeyword::parse`]: the full name, or a unique prefix such
-    /// as `"topr"`).
+    /// One of R's keywords, matched like R's `match.arg()` (the full name,
+    /// or a unique prefix such as `"topr"`; see [`LegendKeyword`]).
     ///
     /// # Errors
     ///
@@ -173,8 +172,18 @@ corners!(
 /// A legend position by keyword: a corner, an edge or the centre of the
 /// plot region.
 ///
-/// Strings work too, as R's keywords (`"bottomright"`, `"top"`, ...; see
-/// [`LegendKeyword::parse`]).
+/// Strings work too (`FromStr`, `TryFrom<&str>`), as R's keywords
+/// (`"bottomright"`, `"top"`, ...), matched like R's `match.arg()`: the
+/// full name, or a unique prefix (`"topr"` is `TopRight`; `"to"` is
+/// ambiguous, an error).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("topr".parse::<LegendKeyword>().unwrap(), LegendKeyword::TopRight);
+/// assert!("to".parse::<LegendKeyword>().is_err()); // top or topleft/topright
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LegendKeyword {
     BottomRight,
@@ -201,9 +210,9 @@ impl LegendKeyword {
         ("center", LegendKeyword::Center),
     ];
 
-    /// Parse like R's `match.arg()`: an exact match, or else a unique
-    /// prefix (so `"topr"` is `TopRight`, but `"to"` is ambiguous).
-    pub fn parse(s: &str) -> Option<LegendKeyword> {
+    /// Like R's `match.arg()`: an exact match, or else a unique prefix
+    /// (`"topr"` is `TopRight`, `"to"` is ambiguous); `None` otherwise.
+    pub(crate) fn parse(s: &str) -> Option<LegendKeyword> {
         if let Some(&(_, k)) = Self::ALL.iter().find(|(name, _)| *name == s) {
             return Some(k);
         }
@@ -217,11 +226,26 @@ impl LegendKeyword {
     }
 }
 
-crate::error::from_str_via_parse!(LegendKeyword, "legend position");
+crate::error::from_r_string!(
+    LegendKeyword,
+    "legend position",
+    "\"bottomright\", \"bottom\", \"bottomleft\", \"left\", \"topleft\", \"top\", \"topright\", \"right\" or \"center\" (or a unique prefix)"
+);
+crate::error::from_str_via_try_from!(LegendPos);
 
 /// Whether a legend has a box around it.
 ///
+/// From a string (`"n".parse::<LegendBty>()` or `TryFrom<&str>`): `"o"` or
+/// `"n"`. Anything else is an error.
+///
 /// This is R's `legend(bty = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("n".parse::<LegendBty>().unwrap(), LegendBty::None);
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LegendBty {
     /// `"o"` (the default): draw the box.
@@ -232,8 +256,9 @@ pub enum LegendBty {
 }
 
 impl LegendBty {
-    /// `"o"` or `"n"`.
-    pub fn parse(s: &str) -> Option<LegendBty> {
+    /// `"o"` or `"n"`, `None` otherwise; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<LegendBty> {
         match s {
             "o" => Some(LegendBty::Box),
             "n" => Some(LegendBty::None),
@@ -242,7 +267,6 @@ impl LegendBty {
     }
 }
 
-crate::error::from_str_via_parse!(LegendBty, "legend box type");
 crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
 
 /// The old name of [`Pch`](crate::setters::Pch), the trait every `pch`
@@ -270,7 +294,6 @@ crate::setters::options! {
     /// - a point, if `pch` is given, drawn through the middle of the line
     ///   unless `merge` is `false`; keys whose `pch` is `None` (or negative and
     ///   above -32, as in R) have none.
-    ///
     ///
     /// [`par(fg)`]: crate::par::Par::fg
     #[derive(Clone, Debug, Default)]

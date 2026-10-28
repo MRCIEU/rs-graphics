@@ -97,6 +97,10 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
 /// `"d"`, but then errors when plotting ("axis style unimplemented"); here
 /// they are treated as `"r"`. Setters take the strings.
 ///
+/// From a string (`"i".parse::<AxisStyle>()` or `TryFrom<&str>`): `"i"` is
+/// [`AxisStyle::Exact`]; `"r"`, `"s"`, `"e"` and `"d"` are
+/// [`AxisStyle::Regular`]. Anything else is an error.
+///
 /// This is R's `par(xaxs = )` / `par(yaxs = )`.
 ///
 /// # Examples
@@ -109,6 +113,8 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
 /// let (x0, x1, y0, _) = dev.usr();
 /// assert_eq!((x0, x1), (0.0, 10.0)); // exact
 /// assert!(y0 < 0.0); // yaxs "r": extended
+/// assert_eq!("i".parse::<AxisStyle>().unwrap(), AxisStyle::Exact);
+/// assert!("x".parse::<AxisStyle>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AxisStyle {
@@ -119,22 +125,9 @@ pub enum AxisStyle {
 }
 
 impl AxisStyle {
-    /// Parses an axis style string, or returns `None` if it isn't one.
-    ///
-    /// `"i"` is [`AxisStyle::Exact`]; `"r"`, `"s"`, `"e"` and `"d"` are
-    /// [`AxisStyle::Regular`] (R accepts the last three in `par()` but errors
-    /// when plotting). `None` for anything else (R: "invalid 'xaxs' value").
-    ///
-    /// These are R's `xaxs`/`yaxs` values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(AxisStyle::parse("i"), Some(AxisStyle::Exact));
-    /// assert_eq!(AxisStyle::parse("x"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<AxisStyle> {
+    /// R's `xaxs`/`yaxs` string, `None` if it isn't one; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<AxisStyle> {
         match s {
             "i" => Some(AxisStyle::Exact),
             "r" | "s" | "e" | "d" => Some(AxisStyle::Regular),
@@ -143,13 +136,15 @@ impl AxisStyle {
     }
 }
 
-crate::error::from_str_via_parse!(AxisStyle, "axis style");
 crate::error::from_r_string!(AxisStyle, "axis style", "\"r\" or \"i\"");
 
 /// The shape of the plot region when it comes from the margins: maximal or
 /// square.
 ///
 /// Setters take R's strings, `"m"` and `"s"`.
+///
+/// From a string (`"s".parse::<Pty>()` or `TryFrom<&str>`): `"m"` or `"s"`.
+/// Anything else is an error.
 ///
 /// This is R's `par(pty = )`.
 ///
@@ -162,6 +157,8 @@ crate::error::from_r_string!(AxisStyle, "axis style", "\"r\" or \"i\"");
 /// dev.plot_new();
 /// let r = dev.plot_region();
 /// assert!((r.width() - r.height()).abs() < 1e-9);
+/// assert_eq!("s".parse::<Pty>().unwrap(), Pty::Square);
+/// assert!("q".parse::<Pty>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Pty {
@@ -172,17 +169,9 @@ pub enum Pty {
 }
 
 impl Pty {
-    /// Parses `"m"` or `"s"`, or returns `None` for anything else (R:
-    /// "invalid value specified for graphical parameter \"pty\"").
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(Pty::parse("s"), Some(Pty::Square));
-    /// assert_eq!(Pty::parse("q"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<Pty> {
+    /// `"m"` or `"s"`, `None` otherwise; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<Pty> {
         match s {
             "m" => Some(Pty::Maximal),
             "s" => Some(Pty::Square),
@@ -191,7 +180,6 @@ impl Pty {
     }
 }
 
-crate::error::from_str_via_parse!(Pty, "pty");
 crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 
 /// Which sides of the plot region `box()` (and `plot()`'s frame) draws.
@@ -199,6 +187,10 @@ crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 /// It applies to the plot region only, as in R; `box()` with
 /// `which = "figure"` and the other regions always draws all four sides.
 /// Setters take R's strings (`"l"`, `"n"`, ...).
+///
+/// From a string (`"l".parse::<Bty>()` or `TryFrom<&str>`): R's first
+/// character, `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"`
+/// (letters in either case). Anything else is an error.
 ///
 /// This is R's `par(bty = )`.
 ///
@@ -210,6 +202,9 @@ crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 /// dev.plot().x([1, 2, 3]).y([3, 1, 2]).bty("l").draw();
 /// dev.par().bty("n").draw();
 /// assert_eq!(dev.current_par().bty, Bty::N);
+/// assert_eq!("L".parse::<Bty>().unwrap(), Bty::L);
+/// assert_eq!("[".parse::<Bty>().unwrap(), Bty::C);
+/// assert!("x".parse::<Bty>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Bty {
@@ -231,24 +226,9 @@ pub enum Bty {
 }
 
 impl Bty {
-    /// Parses a box type string from its first character, or returns `None`
-    /// if it isn't one.
-    ///
-    /// Takes `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"`
-    /// (letters in either case). `None` for anything else (R: "invalid
-    /// value specified for graphical parameter \"bty\"").
-    ///
-    /// These are R's `bty` strings, read as R does.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(Bty::parse("L"), Some(Bty::L));
-    /// assert_eq!(Bty::parse("["), Some(Bty::C));
-    /// assert_eq!(Bty::parse("x"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<Bty> {
+    /// R's `bty` string read from its first character, `None` if it isn't
+    /// one; the public routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<Bty> {
         match s.chars().next()? {
             'o' | 'O' => Some(Bty::O),
             'l' | 'L' => Some(Bty::L),
@@ -262,7 +242,6 @@ impl Bty {
     }
 }
 
-crate::error::from_str_via_parse!(Bty, "box type");
 crate::error::from_r_string!(
     Bty,
     "box type",
@@ -312,6 +291,10 @@ impl From<bool> for Xpd {
 /// `"l"` and `"t"` all mean [`AxisType::Standard`]; `"n"` is
 /// [`AxisType::None`]. Setters take the strings.
 ///
+/// From a string (`"n".parse::<AxisType>()` or `TryFrom<&str>`): `"n"` is
+/// [`AxisType::None`]; `"s"`, `"l"` and `"t"` are [`AxisType::Standard`].
+/// Anything else is an error.
+///
 /// This is R's `par(xaxt = )` / `par(yaxt = )`.
 ///
 /// # Examples
@@ -321,6 +304,8 @@ impl From<bool> for Xpd {
 /// # let mut dev = Device::null().open().unwrap();
 /// dev.plot().x([1, 2, 3]).y([3, 1, 2]).xaxt("n").draw();
 /// dev.axis().side(1).at([1, 2, 3]).labels(["a", "b", "c"]).draw();
+/// assert_eq!("n".parse::<AxisType>().unwrap(), AxisType::None);
+/// assert!("y".parse::<AxisType>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AxisType {
@@ -331,22 +316,9 @@ pub enum AxisType {
 }
 
 impl AxisType {
-    /// Parses an axis type string, or returns `None` if it isn't one.
-    ///
-    /// `"n"` is [`AxisType::None`]; `"s"`, `"l"` and `"t"` are
-    /// [`AxisType::Standard`]. `None` for anything else.
-    ///
-    /// These are R's `xaxt`/`yaxt` values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(AxisType::parse("n"), Some(AxisType::None));
-    /// assert_eq!(AxisType::parse("t"), Some(AxisType::Standard));
-    /// assert_eq!(AxisType::parse("y"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<AxisType> {
+    /// R's `xaxt`/`yaxt` string, `None` if it isn't one; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<AxisType> {
         match s {
             "n" => Some(AxisType::None),
             "s" | "l" | "t" => Some(AxisType::Standard),
@@ -355,7 +327,6 @@ impl AxisType {
     }
 }
 
-crate::error::from_str_via_parse!(AxisType, "axis type");
 crate::error::from_r_string!(AxisType, "axis type", "\"s\" or \"n\"");
 
 // `Par` and `ParOptions` from one list of `Par`'s fields: `ParOptions`

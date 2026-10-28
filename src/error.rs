@@ -6,9 +6,9 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The crate's error types: [`Error`], an R error from a drawing call
-//! (returned by `.try_draw()`), and [`ParseValueError`], a string that
-//! isn't a valid value (returned by the `FromStr` impls).
+//! The crate's error type, [`Error`]: an R error from a drawing call
+//! (returned by `.try_draw()`), or a string that isn't a valid value
+//! (returned by the string-valued types' `FromStr` and `TryFrom`).
 
 use std::fmt;
 
@@ -141,83 +141,29 @@ impl From<std::num::TryFromIntError> for Error {
     }
 }
 
-/// An error for a string that isn't a valid value of some parameter.
-///
-/// E.g. `"zz"` as a colour or `"x"` as an axis style ([`par(xaxs)`]).
-/// Returned by the `FromStr` impls of
-/// [`Color`](crate::color::Color), [`LineType`](crate::lty::LineType),
-/// [`LineEnd`](crate::backend::LineEnd), [`LineJoin`](crate::backend::LineJoin),
-/// [`PlotType`](crate::highlevel::PlotType),
-/// [`LegendKeyword`](crate::device::LegendKeyword),
-/// [`LegendBty`](crate::device::LegendBty),
-/// [`OrderH`](crate::highlevel::OrderH), [`Bty`](crate::par::Bty),
-/// [`FontFace`](crate::font::FontFace),
-/// [`Format`](crate::backend::Format), [`Units`](crate::device::Units)
-/// and the `par()` enums. It displays as `invalid <kind>: "<value>"`.
-///
-/// # Examples
-///
-/// ```
-/// # use rs_graphics::prelude::*;
-/// use rs_graphics::error::ParseValueError;
-///
-/// let err: ParseValueError = "wavy".parse::<LineType>().unwrap_err();
-/// assert_eq!(err.kind, "line type");
-/// assert_eq!(err.to_string(), "invalid line type: \"wavy\"");
-/// ```
-///
-/// [`par(xaxs)`]: crate::par::Par::xaxs
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParseValueError {
-    /// What was being parsed, e.g. `"colour"` or `"axis style"`.
-    pub kind: &'static str,
-    /// The rejected input.
-    pub value: String,
-}
-
-impl ParseValueError {
-    pub(crate) fn new(kind: &'static str, value: &str) -> Self {
-        ParseValueError {
-            kind,
-            value: value.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for ParseValueError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "invalid {}: {:?}", self.kind, self.value)
-    }
-}
-
-impl std::error::Error for ParseValueError {}
-
-/// `impl FromStr for $ty` via its `parse(&str) -> Option<$ty>`.
-macro_rules! from_str_via_parse {
-    ($ty:ty, $kind:literal) => {
-        impl std::str::FromStr for $ty {
-            type Err = $crate::error::ParseValueError;
-
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                <$ty>::parse(s).ok_or_else(|| $crate::error::ParseValueError::new($kind, s))
-            }
-        }
-    };
-}
-pub(crate) use from_str_via_parse;
-
-/// `impl TryFrom<&str>` (and `String`, `&String`) for `$ty` via its
-/// `parse(&str) -> Option<$ty>`, so setters taking an
-/// [`IntoArg<$ty>`](crate::setters::IntoArg) accept R's strings
-/// (`.order_h("decr")`). An invalid string is an [`Error`] naming `$kind`
-/// and the accepted values `$valid`, as R errors.
+/// The string forms of `$ty`, from its crate-private
+/// `parse(&str) -> Option<$ty>`: `TryFrom<&str>` (and `String`, `&String`),
+/// so setters taking an [`IntoArg<$ty>`](crate::setters::IntoArg) accept
+/// R's strings (`.order_h("decr")`), and `FromStr` (`"decr".parse()`). An
+/// invalid string is an [`Error`] naming `$kind` and the accepted values
+/// `$valid`, as R errors. This is every string-valued type's one route
+/// from a string.
 macro_rules! from_r_string {
     ($ty:ident, $kind:literal, $valid:literal) => {
+        impl std::str::FromStr for $ty {
+            type Err = $crate::error::Error;
+
+            /// Converts as `TryFrom<&str>` does.
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                <$ty>::try_from(s)
+            }
+        }
+
         impl TryFrom<&str> for $ty {
             type Error = $crate::error::Error;
 
             #[doc = concat!("Converts the string form of a [`", stringify!($ty), "`] (R's, \
-                where R has one), via [`", stringify!($ty), "::parse`].")]
+                where R has one).")]
             ///
             /// # Errors
             ///
@@ -252,3 +198,67 @@ macro_rules! from_r_string {
     };
 }
 pub(crate) use from_r_string;
+
+/// `impl FromStr for $ty` through its `TryFrom<&str>`, for types whose
+/// string conversion is written by hand (colours, legend positions).
+macro_rules! from_str_via_try_from {
+    ($ty:ident) => {
+        impl std::str::FromStr for $ty {
+            type Err = $crate::error::Error;
+
+            /// Converts as `TryFrom<&str>` does.
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                <$ty>::try_from(s)
+            }
+        }
+    };
+}
+pub(crate) use from_str_via_try_from;
+
+#[cfg(test)]
+mod string_route_tests {
+    use crate::backend::{Format, LineEnd, LineJoin};
+    use crate::color::{Color, ColorSpec};
+    use crate::device::{LegendBty, LegendKeyword, LegendPos, StrUnits, Units};
+    use crate::font::FontFace;
+    use crate::highlevel::{HistBreaks, OrderH, PlotType};
+    use crate::lty::LineType;
+    use crate::par::{AxisStyle, AxisType, Bty, Pty};
+    use std::fmt::Debug;
+    use std::str::FromStr;
+
+    /// `FromStr` and `TryFrom<&str>` agree, for a good and a bad string.
+    fn same<T>(good: &str, bad: &str)
+    where
+        T: FromStr<Err = super::Error> + for<'a> TryFrom<&'a str, Error = super::Error> + Debug,
+    {
+        let (a, b) = (good.parse::<T>(), T::try_from(good));
+        assert!(a.is_ok() && b.is_ok(), "{good:?}");
+        assert_eq!(format!("{a:?}"), format!("{b:?}"));
+        let (a, b) = (bad.parse::<T>(), T::try_from(bad));
+        assert_eq!(a.unwrap_err(), b.unwrap_err());
+    }
+
+    #[test]
+    fn every_string_valued_type_has_one_route() {
+        same::<AxisStyle>("i", "x");
+        same::<Pty>("s", "q");
+        same::<Bty>("l", "x");
+        same::<AxisType>("n", "y");
+        same::<FontFace>("bold", "heavy");
+        same::<Color>("red", "notacolour");
+        same::<ColorSpec>("2", "notacolour");
+        same::<StrUnits>("in", "cm");
+        same::<LineType>("dashed", "wavy");
+        same::<PlotType>("b", "x");
+        same::<HistBreaks>("FD", "F");
+        same::<OrderH>("decr", "up");
+        same::<LineEnd>("butt", "flat");
+        same::<LineJoin>("mitre", "spiky");
+        same::<Format>("png", "jpeg");
+        same::<LegendKeyword>("topr", "to");
+        same::<LegendPos>("topleft", "middle");
+        same::<LegendBty>("n", "x");
+        same::<Units>("cm", "pt");
+    }
+}
