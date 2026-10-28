@@ -26,8 +26,8 @@ use crate::geometry::Point;
 
 use crate::plotmath::Label;
 
-use super::{Device, Side, Xpd};
-use crate::setters::pick_na;
+use super::{Device, Side, Xpd, default_padj, las_perpendicular, las_rotation};
+use crate::recycle::{nth, pick_na};
 
 crate::setters::options! {
     /// The arguments of R's `mtext()` other than `text` and `side`, with
@@ -119,26 +119,14 @@ fn default_adj(side: Side, las: i32) -> f64 {
     }
 }
 
-/// `ComputePAdjValue()`.
-fn default_padj(side: Side, las: i32) -> f64 {
-    use Side::*;
-    match (las, side) {
-        (1, Left) | (1, Right) | (2, _) | (3, Bottom) | (3, Top) => 0.5,
-        _ => 0.0,
-    }
-}
-
 /// `ComputeAtValue()` for `at = NA`, as a fraction along the side: `adj`
 /// when the text runs parallel to the side, otherwise the middle.
 fn default_at_fraction(adj: f64, side: Side, las: i32) -> f64 {
-    let horizontal_side = side.is_horizontal();
-    let parallel = match las {
-        1 => horizontal_side,
-        2 => false,
-        3 => !horizontal_side,
-        _ => true,
-    };
-    if parallel { adj } else { 0.5 }
+    if las_perpendicular(side, las) {
+        0.5
+    } else {
+        adj
+    }
 }
 
 impl<B: Backend> Device<B> {
@@ -166,14 +154,10 @@ impl<B: Backend> Device<B> {
         .into_iter()
         .max()
         .unwrap_or(1);
-        let pick = |v: &[f64], i: usize| {
-            (!v.is_empty())
-                .then(|| v[i % v.len()])
-                .filter(|x| !x.is_nan())
-        };
+        let pick = |v: &[f64], i: usize| nth(v, i).filter(|x| !x.is_nan());
         for i in 0..n {
             // An `NA` line puts the label nowhere: R draws nothing for it.
-            let line = (!opts.line.is_empty()).then(|| opts.line[i % opts.line.len()]);
+            let line = nth(&opts.line, i);
             if line.is_some_and(f64::is_nan) {
                 continue;
             }
@@ -185,10 +169,8 @@ impl<B: Backend> Device<B> {
                 padj: pick(&opts.padj, i),
                 // An `NA` (`None`) `cex` or `font` is the default, as in R.
                 cex: pick_na(&opts.cex, i, f64::NAN).filter(|c| !c.is_nan()),
-                col: (!opts.col.is_empty()).then(|| opts.col[i % opts.col.len()]),
-                font: (!opts.font.is_empty())
-                    .then(|| opts.font[i % opts.font.len()])
-                    .flatten(),
+                col: nth(&opts.col, i),
+                font: nth(&opts.font, i).flatten(),
                 las: opts.las,
                 xpd: opts.xpd,
             };
@@ -219,16 +201,7 @@ impl<B: Backend> Device<B> {
             }
         } else {
             match opts.at {
-                Some(at) => {
-                    let (ux0, _, uy0, _) = self.usr;
-                    let x0 = if self.xlog { 10f64.powf(ux0) } else { ux0 };
-                    let y0 = if self.ylog { 10f64.powf(uy0) } else { uy0 };
-                    if horizontal_side {
-                        self.data_to_inches(at, y0).x
-                    } else {
-                        self.data_to_inches(x0, at).y
-                    }
-                }
+                Some(at) => self.data_to_inches_along(horizontal_side, at),
                 None => {
                     let f = default_at_fraction(adj, side, las);
                     if horizontal_side {
@@ -242,16 +215,8 @@ impl<B: Backend> Device<B> {
 
         // `GMtext()`: rotation, and the `yLineBias` nudge for text parallel
         // to the side.
-        let parallel_text = if horizontal_side {
-            !(las == 2 || las == 3)
-        } else {
-            !(las == 1 || las == 2)
-        };
-        let rotation = if parallel_text == horizontal_side {
-            0.0
-        } else {
-            90.0
-        };
+        let parallel_text = !las_perpendicular(side, las);
+        let rotation = las_rotation(side, las);
         let line = opts.line.unwrap_or(0.0) + self.line_bias(side, parallel_text);
 
         // Position across the side.

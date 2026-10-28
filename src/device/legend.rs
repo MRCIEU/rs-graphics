@@ -53,7 +53,8 @@ use crate::lty::LineType;
 use crate::numbers::Pair;
 
 use crate::plotmath::Label;
-use crate::setters::{char_pch, pick_na};
+use crate::recycle::{pick_na, rep_or};
+use crate::setters::char_pch;
 
 use super::hatch::ShapeStyle;
 use super::{Device, Xpd};
@@ -636,32 +637,17 @@ impl<B: Backend> Device<B> {
     ) -> LegendLayout {
         let n = labels.len();
         let plt = self.plt;
-        // The per-key arguments, recycled over the keys (R's `rep_len`),
-        // with R's defaults for those left unset.
-        fn rep<T: Copy>(v: &[T], n: usize, default: T) -> Vec<T> {
-            (0..n)
-                .map(|i| {
-                    if v.is_empty() {
-                        default
-                    } else {
-                        v[i % v.len()]
-                    }
-                })
-                .collect()
-        }
-        // The same for `NaValues` vectors (`None` = R's `NA`), and for those
-        // where `NA` means the default.
-        fn rep_na<T: Copy>(v: &[Option<T>], n: usize, default: T) -> Vec<Option<T>> {
-            (0..n).map(|i| pick_na(v, i, default)).collect()
-        }
-        fn rep_or<T: Copy>(v: &[Option<T>], n: usize, default: T) -> Vec<T> {
+        // The per-key arguments are recycled over the keys (R's
+        // `rep_len`), with R's defaults for those left unset. For these
+        // `NA` (`None`) is the default too.
+        fn rep_na_or<T: Copy>(v: &[Option<T>], n: usize, default: T) -> Vec<T> {
             (0..n)
                 .map(|i| pick_na(v, i, default).unwrap_or(default))
                 .collect()
         }
-        let cex = rep_or(&opts.cex, n, 1.0);
-        let x_intersp = rep_or(&opts.x_intersp, n, 1.0);
-        let seg_len = rep_or(&opts.seg_len, n, 2.0);
+        let cex = rep_na_or(&opts.cex, n, 1.0);
+        let x_intersp = rep_na_or(&opts.x_intersp, n, 1.0);
+        let seg_len = rep_na_or(&opts.seg_len, n, 2.0);
         let inset = opts.inset.unwrap_or((0.0, 0.0));
 
         // Number of columns and of rows ("legends per column").
@@ -685,7 +671,7 @@ impl<B: Backend> Device<B> {
 
         // `text.font` recycled over the keys, as R's `mapply()`; the
         // title's font defaults to the first.
-        let fonts = rep_or(&opts.text_font, n, self.par.font);
+        let fonts = rep_na_or(&opts.text_font, n, self.par.font);
         let title_font = opts.title_font.unwrap_or(fonts[0]);
         let label_w: Vec<f64> = (0..n)
             // An `NA` label takes no room (R's `strwidth(NA)` is 0).
@@ -730,7 +716,7 @@ impl<B: Backend> Device<B> {
         // (an expression can be taller). Row `r` holds keys `r`,
         // `r + n_per_col`, ...
         let row_keys = |r: usize| (r..n).step_by(n_per_col);
-        let y_intersp = rep_or(&opts.y_intersp, n_per_col, 1.0);
+        let y_intersp = rep_na_or(&opts.y_intersp, n_per_col, 1.0);
         let row_yc: Vec<f64> = (0..n_per_col)
             .map(|r| row_keys(r).map(|i| yc[i]).fold(0.0, f64::max))
             .collect();
@@ -855,7 +841,7 @@ impl<B: Backend> Device<B> {
         // FALSE` only the positions are worked out.
         let plot = opts.plot.unwrap_or(true);
         if plot {
-            self.push_clip_for(self.par.xpd);
+            self.push_clip_region(self.par.xpd);
         }
         if plot && opts.bty.unwrap_or_default() == LegendBty::Box {
             let bg = opts.bg.unwrap_or(ColorSpec::Color(self.par.bg));
@@ -915,9 +901,9 @@ impl<B: Backend> Device<B> {
                 let fill = if opts.fill.is_empty() {
                     Vec::new()
                 } else {
-                    rep(&opts.fill, n, ColorSpec::None)
+                    rep_or(&opts.fill, n, ColorSpec::None)
                 };
-                let border = rep(&opts.border, n, black);
+                let border = rep_or(&opts.border, n, black);
                 let style = ShapeStyle {
                     col: &fill,
                     border: &border,
@@ -934,12 +920,12 @@ impl<B: Backend> Device<B> {
             }
         }
 
-        let col = rep(&opts.col, n, ColorSpec::Color(self.par.col));
-        let lwd = rep_na(&opts.lwd, n, self.par.lwd);
+        let col = rep_or(&opts.col, n, ColorSpec::Color(self.par.col));
+        let lwd = rep_or(&opts.lwd, n, Some(self.par.lwd));
         if do_lines {
             // A key with an `NA` (`None`) `lty` or `lwd`, or a blank `lty`,
             // has no line.
-            let lty = rep_na(&opts.lty, n, LineType::SOLID);
+            let lty = rep_or(&opts.lty, n, Some(LineType::SOLID));
             for i in 0..n {
                 let line = lwd[i].zip(lty[i]).filter(|&(_, l)| l != LineType::Blank);
                 if let (true, Some((lwd, lty)), Some(c)) = (plot, line, self.resolve(col[i])) {
@@ -958,19 +944,19 @@ impl<B: Backend> Device<B> {
         if plot && has_pch {
             // `pt.cex` defaults to each key's `cex`, `pt.lwd` to its `lwd`
             // (`par(lwd)` where that is `NA`: the point is drawn anyway).
-            let pch = rep_na(&opts.pch, n, -1);
+            let pch = rep_or(&opts.pch, n, Some(-1));
             let pt_cex: Vec<Option<f64>> = if opts.pt_cex.is_empty() {
                 cex.iter().copied().map(Some).collect()
             } else {
-                rep_na(&opts.pt_cex, n, 1.0)
+                rep_or(&opts.pt_cex, n, Some(1.0))
             };
-            let pt_bg = rep(&opts.pt_bg, n, ColorSpec::None);
+            let pt_bg = rep_or(&opts.pt_bg, n, ColorSpec::None);
             let pt_lwd: Vec<Option<f64>> = if opts.pt_lwd.is_empty() {
                 lwd.iter()
                     .map(|l| Some(l.unwrap_or(self.par.lwd)))
                     .collect()
             } else {
-                rep_na(&opts.pt_lwd, n, 1.0)
+                rep_or(&opts.pt_lwd, n, Some(1.0))
             };
             for i in 0..n {
                 // An `NA` (`None`) `pch`, `pt.cex` or `pt.lwd` skips the
@@ -999,7 +985,7 @@ impl<B: Backend> Device<B> {
 
         // `text.col` recycled over the keys; the title's colour defaults
         // to the first.
-        let text_col = rep(&opts.text_col, n, ColorSpec::Color(self.par.col));
+        let text_col = rep_or(&opts.text_col, n, ColorSpec::Color(self.par.col));
         // `text(adj = c(title.adj, 0))` and `text(adj = adj)`.
         let clip = self.par.xpd;
         if let (true, Some(t)) = (plot, title) {

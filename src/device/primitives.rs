@@ -30,26 +30,7 @@ use crate::highlevel::PlotType;
 use crate::lty::LineType;
 use crate::par::{AxisStyle, Bty};
 use crate::plotmath::Label;
-use crate::setters::pick_na;
-
-/// `v[i]`, recycling `v`; `default` when `v` is empty.
-pub(super) fn pick<T: Copy>(v: &[T], i: usize, default: T) -> T {
-    if v.is_empty() {
-        default
-    } else {
-        v[i % v.len()]
-    }
-}
-
-/// The number of elements after R's recycling of `lens`: the longest, or
-/// 0 when any is empty.
-fn recycled_len(lens: &[usize]) -> usize {
-    if lens.contains(&0) {
-        0
-    } else {
-        lens.iter().copied().max().unwrap_or(0)
-    }
-}
+use crate::recycle::{pick, pick_na, recycled_len};
 
 crate::setters::options! {
     /// Arguments of `points()` and `lines()`, both R's `plot.xy()`.
@@ -482,10 +463,6 @@ crate::setters::options! {
 }
 
 impl<B: Backend> Device<B> {
-    fn clip_for(&self, xpd: Option<Xpd>) -> Xpd {
-        xpd.unwrap_or(self.par.xpd)
-    }
-
     /// Draws R's `plot_window()`; the public entry is
     /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window), whose docs
     /// describe it.
@@ -590,39 +567,44 @@ impl<B: Backend> Device<B> {
         let clip = self.clip_for(opts.xpd);
         // The lines use the first `col` and `lwd`; an `NA` `lwd` (`None`)
         // is `par(lwd)` there, as in R.
-        let line = || {
-            let col = pick(&opts.col, 0, ColorSpec::Color(self.par.col));
-            let lwd = pick_na(&opts.lwd, 0, self.par.lwd).unwrap_or(self.par.lwd);
-            (col, lwd, opts.lty.unwrap_or(self.par.lty))
+        let lwd = pick_na(&opts.lwd, 0, self.par.lwd).unwrap_or(self.par.lwd);
+        let lty = opts.lty.unwrap_or(self.par.lty);
+        // `None`: no lines, or an `NA` colour.
+        let has_lines = !matches!(
+            type_,
+            PlotType::Points | PlotType::Histogram | PlotType::None
+        );
+        let stroke = if has_lines {
+            self.resolve(pick(&opts.col, 0, ColorSpec::Color(self.par.col)))
+                .map(|c| self.stroke_of(c, lwd, lty))
+        } else {
+            None
         };
+        let stroke = stroke.as_ref();
         match type_ {
             PlotType::Points => self.xy_points(x, y, opts, clip),
-            PlotType::Lines => {
-                let (col, lwd, lty) = line();
-                self.polyline_xy(x, y, col, lwd, lty, clip);
+            PlotType::Lines | PlotType::Overplotted => {
+                if let Some(stroke) = stroke {
+                    self.polyline_xy(x, y, stroke, clip);
+                }
+                if type_ == PlotType::Overplotted {
+                    self.xy_points(x, y, opts, clip);
+                }
             }
-            PlotType::BrokenLines => {
-                let (col, lwd, lty) = line();
-                self.broken_lines_xy(x, y, col, lwd, lty, clip);
+            PlotType::BrokenLines | PlotType::Both => {
+                if let Some(stroke) = stroke {
+                    self.broken_lines_xy(x, y, stroke, clip);
+                }
+                if type_ == PlotType::Both {
+                    self.xy_points(x, y, opts, clip);
+                }
             }
-            PlotType::Both => {
-                let (col, lwd, lty) = line();
-                self.broken_lines_xy(x, y, col, lwd, lty, clip);
-                self.xy_points(x, y, opts, clip);
-            }
-            PlotType::Overplotted => {
-                let (col, lwd, lty) = line();
-                self.polyline_xy(x, y, col, lwd, lty, clip);
-                self.xy_points(x, y, opts, clip);
-            }
-            PlotType::Histogram => {
-                let (_, lwd, lty) = line();
-                self.histogram_xy(x, y, &opts.col, lwd, lty, clip);
-            }
+            PlotType::Histogram => self.histogram_xy(x, y, &opts.col, lwd, lty, clip),
             PlotType::Steps | PlotType::StepsVerticalFirst => {
-                let (col, lwd, lty) = line();
-                let vertical_first = type_ == PlotType::StepsVerticalFirst;
-                self.steps_xy(x, y, vertical_first, col, lwd, lty, clip);
+                if let Some(stroke) = stroke {
+                    let vertical_first = type_ == PlotType::StepsVerticalFirst;
+                    self.steps_xy(x, y, vertical_first, stroke, clip);
+                }
             }
             PlotType::None => {}
         }
@@ -640,10 +622,9 @@ impl<B: Backend> Device<B> {
         for (i, (&x, &y)) in x.iter().zip(y).enumerate() {
             // Checked after conversion, like R, so values <= 0 on a log
             // axis are skipped too.
-            let p = self.data_to_inches(x, y);
-            if !p.x.is_finite() || !p.y.is_finite() {
+            let Some(p) = self.finite_point(x, y) else {
                 continue;
-            }
+            };
             let Some(c) = col[i % col.len()] else {
                 continue;
             };
@@ -697,11 +678,12 @@ impl<B: Backend> Device<B> {
         let (lty, lwd) = (self.par.lty, self.par.lwd);
         self.push_clip_region(self.clip_for(opts.xpd));
         for i in 0..n {
-            let p0 = self.data_to_inches(x0[i % x0.len()], y0[i % y0.len()]);
-            let p1 = self.data_to_inches(x1[i % x1.len()], y1[i % y1.len()]);
-            if ![p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
+            let (Some(p0), Some(p1)) = (
+                self.finite_point(x0[i % x0.len()], y0[i % y0.len()]),
+                self.finite_point(x1[i % x1.len()], y1[i % y1.len()]),
+            ) else {
                 continue;
-            }
+            };
             // An `NA` colour, `lwd` or `lty` skips the segment.
             let (Some(c), Some(lwd), Some(lty)) = (
                 self.resolve(pick(&opts.col, i, fg)),
@@ -754,11 +736,9 @@ impl<B: Backend> Device<B> {
                 x1[i % x1.len()],
                 y1[i % y1.len()],
             );
-            let from = self.data_to_inches(a, b);
-            let to = self.data_to_inches(c, d);
-            if ![from.x, from.y, to.x, to.y].iter().all(|v| v.is_finite()) {
+            let (Some(from), Some(to)) = (self.finite_point(a, b), self.finite_point(c, d)) else {
                 continue;
-            }
+            };
             // An `NA` colour, `lwd` or `lty` skips the arrow.
             let (Some(color), Some(lwd), Some(lty)) = (
                 self.resolve(pick(&opts.col, i, fg)),
@@ -853,11 +833,12 @@ impl<B: Backend> Device<B> {
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
         for i in 0..n {
-            let p0 = self.data_to_inches(x0[i % x0.len()], y0[i % y0.len()]);
-            let p1 = self.data_to_inches(x1[i % x1.len()], y1[i % y1.len()]);
-            if ![p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
+            let (Some(p0), Some(p1)) = (
+                self.finite_point(x0[i % x0.len()], y0[i % y0.len()]),
+                self.finite_point(x1[i % x1.len()], y1[i % y1.len()]),
+            ) else {
                 continue;
-            }
+            };
             // An `NA` `lwd` or `lty` leaves out the border (R does this for
             // `lwd`), as an `NA` border colour does; the fill is drawn.
             let fill = self.resolve(pick(s.col, i, ColorSpec::None));
@@ -931,12 +912,11 @@ impl<B: Backend> Device<B> {
                     None => continue,
                 }
             };
-            let p = self.data_to_inches(x[i % x.len()], y[i % y.len()]);
             // As `C_text`: a label at a non-finite position (`NA`, or <= 0
             // on a log axis) is skipped; the others keep their index.
-            if !(p.x.is_finite() && p.y.is_finite()) {
+            let Some(p) = self.finite_point(x[i % x.len()], y[i % y.len()]) else {
                 continue;
-            }
+            };
             let (p, hadj, vadj) = match opts.pos.get(i % opts.pos.len().max(1)) {
                 Some(1) => (
                     Point::new(p.x, p.y - offset),

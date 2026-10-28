@@ -29,7 +29,7 @@ use crate::lty::LineType;
 use crate::par::AxisType;
 use crate::plotmath::Label;
 
-use super::{Device, Side, Xpd, format_axis_labels};
+use super::{Device, Side, Xpd, default_padj, format_axis_labels, las_perpendicular, las_rotation};
 
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
@@ -199,17 +199,6 @@ impl Default for AxisOptions {
     }
 }
 
-/// `ComputePAdjValue()`: the default `padj` for `side` and `las`.
-fn default_padj(side: Side, las: i32) -> f64 {
-    let x_axis = side.is_horizontal();
-    match las {
-        1 if !x_axis => 0.5,
-        2 => 0.5,
-        3 if x_axis => 0.5,
-        _ => 0.0,
-    }
-}
-
 impl<B: Backend> Device<B> {
     /// Draws R's `axis()`; the public entry is
     /// [`Graphics::axis`](crate::graphics::Graphics::axis), whose docs
@@ -232,11 +221,7 @@ impl<B: Backend> Device<B> {
         let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);
         let mgp = opts.mgp.unwrap_or(self.par.mgp);
-        let perpendicular = if x_axis {
-            las == 2 || las == 3
-        } else {
-            las == 1 || las == 2
-        };
+        let perpendicular = las_perpendicular(side, las);
 
         // `line` = NA: the axis line sits at `mgp[2]`, and the labels'
         // `mgp[1]` is not taken relative to it.
@@ -296,12 +281,9 @@ impl<B: Backend> Device<B> {
         // `getxlimits`/`getylimits` (from the caller's `xpd`, before
         // `C_axis` forces it to NA) widened by `GetAxisLimits`, in `usr`
         // units: ticks outside are skipped.
-        let (u0, u1) = if x_axis {
-            (self.usr.0, self.usr.1)
-        } else {
-            (self.usr.2, self.usr.3)
-        };
-        let (left, right) = self.xpd_limits(x_axis, opts.xpd.unwrap_or(self.par.xpd));
+        let map = self.axis_map(x_axis);
+        let (u0, u1) = (map.u0, map.u1);
+        let (left, right) = self.xpd_limits(x_axis, self.clip_for(opts.xpd));
         let (left, right) = (left.min(right), left.max(right));
         let eps = if right == left {
             0.5 * FLT_EPSILON
@@ -311,12 +293,7 @@ impl<B: Backend> Device<B> {
         let (low, high) = (left - eps, right + eps);
 
         // Device position (inches) along the axis of a `usr` value.
-        let (d0, d1) = if x_axis {
-            (self.plt.x0, self.plt.x1)
-        } else {
-            (self.plt.y0, self.plt.y1)
-        };
-        let along = move |v: f64| d0 + (v - u0) / (u1 - u0) * (d1 - d0);
+        let along = move |v: f64| map.inches(v);
         let point = |perp: f64, along: f64| {
             if x_axis {
                 Point::new(along, perp)
@@ -411,14 +388,14 @@ impl<B: Backend> Device<B> {
         let col_axis = opts.col_axis.unwrap_or(ColorSpec::Color(self.par.col_axis));
         let face = font;
         let size_pt = self.font_size_pt(cex);
-        let m_h = afm::m_height_inches(face, size_pt, 1.0);
+        let m_h = afm::m_height_inches(face, size_pt);
         let gap = opts
             .gap_axis
             .unwrap_or(if perpendicular { 0.25 } else { 1.0 })
             * if perpendicular {
                 m_h
             } else {
-                afm::str_width_inches("m", face, size_pt, 1.0)
+                afm::str_width_inches("m", face, size_pt)
             };
         let hadj = opts
             .hadj
@@ -429,7 +406,7 @@ impl<B: Backend> Device<B> {
                 0.5
             });
         // `GMtext()`'s rotation and `yLineBias` nudge.
-        let angle = if x_axis == perpendicular { 90.0 } else { 0.0 };
+        let angle = las_rotation(side, las);
         let bias = self.line_bias(side, !perpendicular);
         let label_perp = axis_base + outward * (mgp[1] - lineoff + bias) * lh;
 
@@ -473,7 +450,7 @@ impl<B: Backend> Device<B> {
             let labw = if perpendicular {
                 m_h
             } else {
-                afm::str_width_inches(label, face, size_pt, 1.0)
+                afm::str_width_inches(label, face, size_pt)
             };
             let tnew = temp - 0.5 * labw;
             if tnew - tlast >= gap {

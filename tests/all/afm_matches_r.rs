@@ -54,7 +54,7 @@ fn str_width_matches_r() {
     for &(s, ps, cex, font) in cases {
         let expected = r_strwidth(s, ps, cex, font);
         let face = FontFace::try_from(font).unwrap();
-        let actual = str_width_inches(s, face, ps, cex);
+        let actual = str_width_inches(s, face, ps * cex);
         // R's PostScript/PDF kern-pair lookup has an internal indexing quirk
         // (`devPS.c`'s `KPstart`/`KPend` construction silently drops the
         // last-in-file kerning pair for some first characters). We

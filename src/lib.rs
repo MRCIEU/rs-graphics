@@ -198,6 +198,7 @@ pub mod prelude;
 #[doc(hidden)]
 pub mod pretty;
 pub mod recording;
+mod recycle;
 pub mod setters;
 
 pub use error::{Error, ErrorKind};

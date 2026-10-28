@@ -23,6 +23,7 @@ use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::par::Xpd;
 use crate::plotmath::Label;
+use crate::recycle::nth;
 
 /// R's default pie slice color cycle (used when neither `col` nor
 /// `density` is given).
@@ -279,9 +280,5 @@ pub(crate) fn check_pie(x: &[f64]) -> Result<(), Error> {
 /// `v[i]` (recycled) as a one-element vector; empty stays empty (R's
 /// `NULL`, the default).
 fn each<T: Copy>(v: &[T], i: usize) -> Vec<T> {
-    if v.is_empty() {
-        Vec::new()
-    } else {
-        vec![v[i % v.len()]]
-    }
+    nth(v, i).into_iter().collect()
 }

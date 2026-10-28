@@ -159,7 +159,7 @@ impl<B: Backend> Device<B> {
     /// [`par(cex)`]: crate::par::Par::cex
     pub(super) fn label_width(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(t) => afm::str_width_inches(t, font, self.font_size_pt(cex), 1.0),
+            Label::Text(t) => afm::str_width_inches(t, font, self.font_size_pt(cex)),
             Label::Math(e) => self.expression_metrics(e, self.par.cex * cex).2,
         }
     }
@@ -168,7 +168,7 @@ impl<B: Backend> Device<B> {
     /// "M" for single-line text, height + depth for an expression.
     pub(super) fn label_height(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(_) => afm::m_height_inches(font, self.font_size_pt(cex), 1.0),
+            Label::Text(_) => afm::m_height_inches(font, self.font_size_pt(cex)),
             Label::Math(e) => {
                 let (h, d, _) = self.expression_metrics(e, self.par.cex * cex);
                 h + d
@@ -640,7 +640,7 @@ impl<'d, B: Backend> Math<'d, B> {
         }
         if n > 1 {
             // Kerning makes the sum of the glyphs' widths wrong.
-            result.width = afm::str_width_inches(s, self.face(), self.size_pt(), 1.0);
+            result.width = afm::str_width_inches(s, self.face(), self.size_pt());
         }
         if draw {
             self.text(s);

@@ -29,6 +29,7 @@ use crate::lty::LineType;
 use crate::numbers::Numbers;
 use crate::par::AxisType;
 use crate::plotmath::Label;
+use crate::recycle::nth;
 
 use super::InlineAxis;
 
@@ -513,11 +514,6 @@ pub(crate) fn boxplot_all_stats(
         .collect())
 }
 
-/// R's `pcycle()`: `v`'s `i`-th value, recycled, or `None` if `v` is empty.
-fn cycle<T: Copy>(v: &[T], i: usize) -> Option<T> {
-    (!v.is_empty()).then(|| v[i % v.len()])
-}
-
 impl<B: Backend> Device<B> {
     /// Draws R's `boxplot()`; the public entry is
     /// [`Graphics::boxplot`](crate::graphics::Graphics::boxplot), whose docs
@@ -584,7 +580,7 @@ impl<B: Backend> Device<B> {
 
         // `boxplot()` passes `bxp()` `pars = list(boxwex = 0.8, ...)`, so
         // `bxp()`'s own default (from the gaps between `at`) never applies.
-        let boxwex = |i: usize| cycle(&opts.boxwex, i).unwrap_or(0.8);
+        let boxwex = |i: usize| nth(&opts.boxwex, i).unwrap_or(0.8);
         let max_n = stats.iter().map(|s| s.n).max().unwrap_or(0) as f64;
         let widths: Vec<f64> = (0..n)
             .map(|i| match &opts.width {
@@ -620,11 +616,11 @@ impl<B: Backend> Device<B> {
         let par_bg = ColorSpec::Color(self.par.bg);
         let fg = ColorSpec::Color(self.par.fg);
         let lightgray = ColorSpec::Color(Color::parse("lightgray").unwrap());
-        let lty = |i| cycle(&opts.lty, i);
-        let lwd = |i| cycle(&opts.lwd, i).unwrap_or(Some(par_lwd));
-        let cex = |i| cycle(&opts.cex, i).unwrap_or(Some(1.0));
-        let bg = |i| cycle(&opts.bg, i).unwrap_or(par_bg);
-        let border = |i| cycle(&opts.border, i).unwrap_or(fg);
+        let lty = |i| nth(&opts.lty, i);
+        let lwd = |i| nth(&opts.lwd, i).unwrap_or(Some(par_lwd));
+        let cex = |i| nth(&opts.cex, i).unwrap_or(Some(1.0));
+        let bg = |i| nth(&opts.bg, i).unwrap_or(par_bg);
+        let border = |i| nth(&opts.border, i).unwrap_or(fg);
         let notch_frac = if opts.notch { 0.5 } else { 1.0 };
         for (i, s) in stats.iter().enumerate() {
             let x = at[i];
@@ -662,7 +658,7 @@ impl<B: Backend> Device<B> {
             };
             let (bx, by) = xy(&box_pos, &box_val);
             let box_fill = PolygonOptions {
-                col: vec![cycle(&opts.col, i).unwrap_or(lightgray)],
+                col: vec![nth(&opts.col, i).unwrap_or(lightgray)],
                 border: vec![ColorSpec::None],
                 lty: vec![Some(LineType::BLANK)],
                 ..PolygonOptions::default()
@@ -672,25 +668,25 @@ impl<B: Backend> Device<B> {
             // The median, with `lend = 1` (butt), "to avoid overlap": round
             // ends would reach past the box sides. With a notch it spans
             // only the notch.
-            let medcol = cycle(&opts.medcol, i).unwrap_or(border(i));
+            let medcol = nth(&opts.medcol, i).unwrap_or(border(i));
             let wntch = notch_frac * wid;
             let (mx, my) = xy(&[xp(x, -wntch), xp(x, wntch)], &[s.median, s.median]);
             let median = SegmentsOptions {
                 lend: Some(LineEnd::Butt),
                 ..line(
                     medcol,
-                    cycle(&opts.medlty, i).or(lty(i)).unwrap_or(Some(par_lty)),
-                    cycle(&opts.medlwd, i).unwrap_or(lwd(i).map(|l| 3.0 * l)),
+                    nth(&opts.medlty, i).or(lty(i)).unwrap_or(Some(par_lty)),
+                    nth(&opts.medlwd, i).unwrap_or(lwd(i).map(|l| 3.0 * l)),
                 )
             };
             self.segments_impl(&mx[..1], &my[..1], &mx[1..], &my[1..], &median)?;
-            if let Some(pch) = cycle(&opts.medpch, i) {
+            if let Some(pch) = nth(&opts.medpch, i) {
                 let (px, py) = xy(&[x], &[s.median]);
                 let symbol = XyOptions {
                     pch: vec![pch],
-                    cex: vec![cycle(&opts.medcex, i).unwrap_or(cex(i))],
+                    cex: vec![nth(&opts.medcex, i).unwrap_or(cex(i))],
                     col: vec![medcol],
-                    bg: vec![cycle(&opts.medbg, i).unwrap_or(bg(i))],
+                    bg: vec![nth(&opts.medbg, i).unwrap_or(bg(i))],
                     ..XyOptions::default()
                 };
                 self.points_impl(&px, &py, &symbol)?;
@@ -700,33 +696,31 @@ impl<B: Backend> Device<B> {
             // where the dashes fall), then the staples.
             let ends = [(s.lower_whisker, s.q1), (s.upper_whisker, s.q3)];
             let whisker = line(
-                cycle(&opts.whiskcol, i).unwrap_or(border(i)),
-                cycle(&opts.whisklty, i)
+                nth(&opts.whiskcol, i).unwrap_or(border(i)),
+                nth(&opts.whisklty, i)
                     .or(lty(i))
                     .unwrap_or(Some(LineType::DASHED)),
-                cycle(&opts.whisklwd, i).unwrap_or(lwd(i)),
+                nth(&opts.whisklwd, i).unwrap_or(lwd(i)),
             );
             for &(w, h) in &ends {
                 let (sx, sy) = xy(&[x, x], &[w, h]);
                 self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &whisker)?;
             }
-            let cap = wid * cycle(&opts.staplewex, i).unwrap_or(0.5);
+            let cap = wid * nth(&opts.staplewex, i).unwrap_or(0.5);
             let staple = line(
-                cycle(&opts.staplecol, i).unwrap_or(border(i)),
-                cycle(&opts.staplelty, i)
-                    .or(lty(i))
-                    .unwrap_or(Some(par_lty)),
-                cycle(&opts.staplelwd, i).unwrap_or(lwd(i)),
+                nth(&opts.staplecol, i).unwrap_or(border(i)),
+                nth(&opts.staplelty, i).or(lty(i)).unwrap_or(Some(par_lty)),
+                nth(&opts.staplelwd, i).unwrap_or(lwd(i)),
             );
             for &(w, _) in &ends {
                 let (sx, sy) = xy(&[xp(x, -cap), xp(x, cap)], &[w, w]);
                 self.segments_impl(&sx[..1], &sy[..1], &sx[1..], &sy[1..], &staple)?;
             }
-            if let Some(boxlwd) = cycle(&opts.boxlwd, i).unwrap_or(lwd(i)) {
+            if let Some(boxlwd) = nth(&opts.boxlwd, i).unwrap_or(lwd(i)) {
                 let box_border = PolygonOptions {
                     col: vec![ColorSpec::None],
-                    border: vec![cycle(&opts.boxcol, i).unwrap_or(border(i))],
-                    lty: vec![cycle(&opts.boxlty, i).or(lty(i)).unwrap_or(Some(par_lty))],
+                    border: vec![nth(&opts.boxcol, i).unwrap_or(border(i))],
+                    lty: vec![nth(&opts.boxlty, i).or(lty(i)).unwrap_or(Some(par_lty))],
                     lwd: Some(boxlwd),
                     ..PolygonOptions::default()
                 };
@@ -734,14 +728,14 @@ impl<B: Backend> Device<B> {
             }
 
             if opts.outline && !s.outliers.is_empty() {
-                let outcol = cycle(&opts.outcol, i).unwrap_or(border(i));
-                let outlwd = cycle(&opts.outlwd, i).unwrap_or(lwd(i));
+                let outcol = nth(&opts.outcol, i).unwrap_or(border(i));
+                let outlwd = nth(&opts.outlwd, i).unwrap_or(lwd(i));
                 // A line across each outlier; blank (nothing) by default. R
                 // computes its ends as `x -/+ w` even on a log position axis;
                 // we use `xP()`, as for every other part.
-                let outlty = cycle(&opts.outlty, i).unwrap_or(Some(LineType::BLANK));
+                let outlty = nth(&opts.outlty, i).unwrap_or(Some(LineType::BLANK));
                 if let Some(outlty) = outlty.filter(|&l| l != LineType::BLANK) {
-                    let half = wid * cycle(&opts.outwex, i).unwrap_or(0.5);
+                    let half = wid * nth(&opts.outwex, i).unwrap_or(0.5);
                     let k = s.outliers.len();
                     let (x0, y0) = xy(&vec![xp(x, -half); k], &s.outliers);
                     let (x1, y1) = xy(&vec![xp(x, half); k], &s.outliers);
@@ -754,13 +748,13 @@ impl<B: Backend> Device<B> {
                 // point.
                 let outliers = XyOptions {
                     pch: vec![
-                        cycle(&opts.outpch, i)
-                            .or(cycle(&opts.pch, i))
+                        nth(&opts.outpch, i)
+                            .or(nth(&opts.pch, i))
                             .unwrap_or(Some(par_pch)),
                     ],
-                    cex: vec![cycle(&opts.outcex, i).unwrap_or(cex(i))],
+                    cex: vec![nth(&opts.outcex, i).unwrap_or(cex(i))],
                     col: vec![outcol],
-                    bg: vec![cycle(&opts.outbg, i).unwrap_or(bg(i))],
+                    bg: vec![nth(&opts.outbg, i).unwrap_or(bg(i))],
                     lwd: vec![outlwd],
                     ..XyOptions::default()
                 };

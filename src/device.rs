@@ -46,6 +46,7 @@ use crate::par::{AxisStyle, Par, Pty, Sides, Xpd};
 use crate::pch;
 use crate::plotmath::Label;
 use crate::pretty::{axis_pars, create_at_vector};
+use crate::recycle::pick;
 use crate::setters::IntoArg;
 
 mod abline;
@@ -1496,52 +1497,59 @@ impl<B: Backend> Device<B> {
 
     /// Map a point in device inches to `usr` units (log10 on a log axis).
     pub(crate) fn inches_to_usr(&self, p: Point) -> (f64, f64) {
-        let (x0, x1, y0, y1) = self.usr;
-        let ux = x0 + (p.x - self.plt.x0) / self.plt.width() * (x1 - x0);
-        let uy = y0 + (p.y - self.plt.y0) / self.plt.height() * (y1 - y0);
-        (ux, uy)
+        (self.axis_map(true).usr(p.x), self.axis_map(false).usr(p.y))
     }
 
     /// Map a point in `usr` units (log10 on a log axis) to device inches.
     fn usr_to_inches(&self, ux: f64, uy: f64) -> Point {
+        Point::new(
+            self.axis_map(true).inches(ux),
+            self.axis_map(false).inches(uy),
+        )
+    }
+
+    /// The x (`x_axis`) or y axis's map between `usr` units and inches.
+    pub(crate) fn axis_map(&self, x_axis: bool) -> AxisMap {
         let (x0, x1, y0, y1) = self.usr;
-        let px = self.plt.x0 + (ux - x0) / (x1 - x0) * self.plt.width();
-        let py = self.plt.y0 + (uy - y0) / (y1 - y0) * self.plt.height();
-        Point::new(px, py)
+        let plt = self.plt;
+        if x_axis {
+            AxisMap {
+                u0: x0,
+                u1: x1,
+                d0: plt.x0,
+                d1: plt.x1,
+            }
+        } else {
+            AxisMap {
+                u0: y0,
+                u1: y1,
+                d0: plt.y0,
+                d1: plt.y1,
+            }
+        }
+    }
+
+    /// A data value on the x (`x_axis`) or y axis in inches along it.
+    pub(crate) fn data_to_inches_along(&self, x_axis: bool, v: f64) -> f64 {
+        let log = if x_axis { self.xlog } else { self.ylog };
+        self.axis_map(x_axis)
+            .inches(if log { v.log10() } else { v })
     }
 
     /// R's `getxlimits()`/`getylimits()` in `usr` units: the `usr` range
     /// for `xpd = FALSE`, else the figure region's (`TRUE`) or the
     /// device's (`NA`) extent along the axis.
     fn xpd_limits(&self, x_axis: bool, xpd: Xpd) -> (f64, f64) {
-        let (u0, u1, p0, p1, f0, f1, d1) = if x_axis {
-            let (u0, u1, ..) = self.usr;
-            (
-                u0,
-                u1,
-                self.plt.x0,
-                self.plt.x1,
-                self.fig.x0,
-                self.fig.x1,
-                self.width_in,
-            )
+        let map = self.axis_map(x_axis);
+        let (f0, f1, d1) = if x_axis {
+            (self.fig.x0, self.fig.x1, self.width_in)
         } else {
-            let (.., u0, u1) = self.usr;
-            (
-                u0,
-                u1,
-                self.plt.y0,
-                self.plt.y1,
-                self.fig.y0,
-                self.fig.y1,
-                self.height_in,
-            )
+            (self.fig.y0, self.fig.y1, self.height_in)
         };
-        let to_usr = |d: f64| u0 + (d - p0) / (p1 - p0) * (u1 - u0);
         match xpd {
-            Xpd::Plot => (u0, u1),
-            Xpd::Figure => (to_usr(f0), to_usr(f1)),
-            Xpd::Device => (to_usr(0.0), to_usr(d1)),
+            Xpd::Plot => (map.u0, map.u1),
+            Xpd::Figure => (map.usr(f0), map.usr(f1)),
+            Xpd::Device => (map.usr(0.0), map.usr(d1)),
         }
     }
 
@@ -1657,20 +1665,23 @@ impl<B: Backend> Device<B> {
     // always use the device, as R).
     // ---------------------------------------------------------------
 
+    /// Where a call with an inline `xpd` clips: that, else [`par(xpd)`].
+    ///
+    /// [`par(xpd)`]: crate::par::Par::xpd
+    pub(crate) fn clip_for(&self, xpd: Option<Xpd>) -> Xpd {
+        xpd.unwrap_or(self.par.xpd)
+    }
+
     /// Where margin text (`title()`, `mtext()`) clips: R raises `xpd` (the
     /// inline one, else [`par(xpd)`]) to at least `TRUE`, the figure region
     /// (`NA`, the device, stays), and `outer` text clips to the device.
     ///
     /// [`par(xpd)`]: crate::par::Par::xpd
     fn margin_clip(&self, xpd: Option<Xpd>, outer: bool) -> Xpd {
-        match (outer, xpd.unwrap_or(self.par.xpd)) {
+        match (outer, self.clip_for(xpd)) {
             (true, _) | (_, Xpd::Device) => Xpd::Device,
             _ => Xpd::Figure,
         }
-    }
-
-    fn push_clip_for(&mut self, xpd: Xpd) {
-        self.push_clip_region(xpd);
     }
 
     /// Marks the current plot as drawn on, which resets [`par(new)`] (R's
@@ -1778,8 +1789,8 @@ impl<B: Backend> Device<B> {
                 return;
             }
             let style = TextStyle::new(col, face, size_pt);
-            let w = afm::str_width_inches(&ch, face, size_pt, 1.0);
-            let (asc, desc) = afm::glyph_ascent_descent_inches(&ch, face, size_pt, 1.0);
+            let w = afm::str_width_inches(&ch, face, size_pt);
+            let (asc, desc) = afm::glyph_ascent_descent_inches(&ch, face, size_pt);
             let origin = Point::new(p.x - 0.5 * w, p.y - 0.5 * (asc - desc));
             self.backend.draw_text(origin, &ch, &style);
         }
@@ -1804,34 +1815,11 @@ impl<B: Backend> Device<B> {
 
     /// `lines()`: a polyline, broken into separate pieces at non-finite
     /// (`NA`) coordinates, and at values <= 0 on a log axis, matching R.
-    fn polyline_xy(
-        &mut self,
-        xs: &[f64],
-        ys: &[f64],
-        col: ColorSpec,
-        lwd: f64,
-        lty: LineType,
-        clip: Xpd,
-    ) {
-        let Some(col) = self.resolve(col) else {
-            return;
-        };
-        let stroke = self.stroke_of(col, lwd, lty);
+    fn polyline_xy(&mut self, xs: &[f64], ys: &[f64], stroke: &Stroke, clip: Xpd) {
+        let runs = self.finite_runs(xs, ys);
         self.push_clip_region(clip);
-        let mut run: Vec<Point> = Vec::new();
-        for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.data_to_inches(x, y);
-            if p.x.is_finite() && p.y.is_finite() {
-                run.push(p);
-            } else if run.len() >= 2 {
-                self.backend.draw_polyline(&run, &stroke);
-                run.clear();
-            } else {
-                run.clear();
-            }
-        }
-        if run.len() >= 2 {
-            self.backend.draw_polyline(&run, &stroke);
+        for (_, run) in runs.iter().filter(|(_, run)| run.len() >= 2) {
+            self.backend.draw_polyline(run, stroke);
         }
         self.pop_clip();
     }
@@ -1841,35 +1829,21 @@ impl<B: Backend> Device<B> {
     /// height (`0.5 * par(cex) * 1.2 * startps / 72` inches) so the points stand
     /// clear, and left out when shorter than twice that. A port of
     /// `C_plotXY`'s `case 'b'`.
-    fn broken_lines_xy(
-        &mut self,
-        xs: &[f64],
-        ys: &[f64],
-        col: ColorSpec,
-        lwd: f64,
-        lty: LineType,
-        clip: Xpd,
-    ) {
-        let Some(col) = self.resolve(col) else {
-            return;
-        };
-        let stroke = self.stroke_of(col, lwd, lty);
+    fn broken_lines_xy(&mut self, xs: &[f64], ys: &[f64], stroke: &Stroke, clip: Xpd) {
         let d = 0.5 * self.par.cex * 1.2 * self.start_ps / 72.0;
+        let runs = self.finite_runs(xs, ys);
         self.push_clip_region(clip);
-        let mut old: Option<Point> = None;
-        for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.data_to_inches(x, y);
-            let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
-            if let (Some(a), Some(b)) = (old, p) {
+        for (_, run) in &runs {
+            for w in run.windows(2) {
+                let (a, b) = (w[0], w[1]);
                 let len = (b.x - a.x).hypot(b.y - a.y);
                 if d < 0.5 * len {
                     let f = d / len;
                     let from = Point::new(a.x + f * (b.x - a.x), a.y + f * (b.y - a.y));
                     let to = Point::new(b.x + f * (a.x - b.x), b.y + f * (a.y - b.y));
-                    self.backend.draw_line(from, to, &stroke);
+                    self.backend.draw_line(from, to, stroke);
                 }
             }
-            old = p;
         }
         self.pop_clip();
     }
@@ -1887,8 +1861,7 @@ impl<B: Backend> Device<B> {
         lty: LineType,
         clip: Xpd,
     ) {
-        let default = [ColorSpec::Color(self.par.col)];
-        let col = if col.is_empty() { &default[..] } else { col };
+        let default = ColorSpec::Color(self.par.col);
         // R keeps `usr` in data units internally, so on a log axis its
         // lower y limit is the bottom of the plot.
         let (ux0, _, uy0, _) = self.usr;
@@ -1899,11 +1872,10 @@ impl<B: Backend> Device<B> {
         };
         self.push_clip_region(clip);
         for (i, (&x, &y)) in xs.iter().zip(ys).enumerate() {
-            let p = self.data_to_inches(x, y);
-            if !p.x.is_finite() || !p.y.is_finite() {
+            let Some(p) = self.finite_point(x, y) else {
                 continue;
-            }
-            let Some(c) = self.resolve(col[i % col.len()]) else {
+            };
+            let Some(c) = self.resolve(pick(col, i, default)) else {
                 continue;
             };
             let stroke = self.stroke_of(c, lwd, lty);
@@ -1916,51 +1888,53 @@ impl<B: Backend> Device<B> {
     /// `"S"` (up or down, then across): a staircase through the points,
     /// one polyline per run of finite points. A port of `C_plotXY`'s
     /// `case 's'` and `case 'S'`.
-    #[allow(clippy::too_many_arguments)]
     fn steps_xy(
         &mut self,
         xs: &[f64],
         ys: &[f64],
         vertical_first: bool,
-        col: ColorSpec,
-        lwd: f64,
-        lty: LineType,
+        stroke: &Stroke,
         clip: Xpd,
     ) {
-        let Some(col) = self.resolve(col) else {
-            return;
-        };
-        let stroke = self.stroke_of(col, lwd, lty);
+        let runs = self.finite_runs(xs, ys);
         self.push_clip_region(clip);
-        let mut run: Vec<Point> = Vec::new();
-        let mut old: Option<Point> = None;
-        for (&x, &y) in xs.iter().zip(ys) {
-            let p = self.data_to_inches(x, y);
-            let p = (p.x.is_finite() && p.y.is_finite()).then_some(p);
-            match (old, p) {
-                (Some(a), Some(b)) => {
-                    if run.is_empty() {
-                        run.push(a);
-                    }
-                    run.push(if vertical_first {
-                        Point::new(a.x, b.y)
-                    } else {
-                        Point::new(b.x, a.y)
-                    });
-                    run.push(b);
-                }
-                (_, None) if !run.is_empty() => {
-                    self.backend.draw_polyline(&run, &stroke);
-                    run.clear();
-                }
-                _ => {}
+        for (_, run) in runs.iter().filter(|(_, run)| run.len() >= 2) {
+            let mut steps = vec![run[0]];
+            for w in run.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                steps.push(if vertical_first {
+                    Point::new(a.x, b.y)
+                } else {
+                    Point::new(b.x, a.y)
+                });
+                steps.push(b);
             }
-            old = p;
-        }
-        if !run.is_empty() {
-            self.backend.draw_polyline(&run, &stroke);
+            self.backend.draw_polyline(&steps, stroke);
         }
         self.pop_clip();
+    }
+
+    /// `(x, y)` in device inches, or `None` when that isn't finite (`NA`,
+    /// or a value <= 0 on a log axis): R's drawing skips such points.
+    pub(crate) fn finite_point(&self, x: f64, y: f64) -> Option<Point> {
+        Some(self.data_to_inches(x, y)).filter(|p| p.is_finite())
+    }
+
+    /// The runs of consecutive points of `xs`/`ys` that are finite in
+    /// device inches (see [`Device::finite_point`]), each with the index
+    /// of its first point.
+    pub(crate) fn finite_runs(&self, xs: &[f64], ys: &[f64]) -> Vec<(usize, Vec<Point>)> {
+        let mut runs = Vec::new();
+        let mut run: Vec<Point> = Vec::new();
+        let n = xs.len().min(ys.len());
+        for i in 0..=n {
+            match (i < n).then(|| self.finite_point(xs[i], ys[i])).flatten() {
+                Some(p) => run.push(p),
+                None if !run.is_empty() => runs.push((i - run.len(), std::mem::take(&mut run))),
+                None => {}
+            }
+        }
+        runs
     }
 
     fn stroke_of(&self, color: Color, lwd: f64, lty: LineType) -> Stroke {
@@ -1975,7 +1949,7 @@ impl<B: Backend> Device<B> {
     }
 
     fn draw_line_if_finite(&mut self, from: Point, to: Point, stroke: &Stroke) {
-        if [from.x, from.y, to.x, to.y].iter().all(|v| v.is_finite()) {
+        if from.is_finite() && to.is_finite() {
             self.backend.draw_line(from, to, stroke);
         }
     }
@@ -2041,14 +2015,11 @@ impl<B: Backend> Device<B> {
         let size = self.font_size_pt(cex);
         let width = text
             .split('\n')
-            .map(|line| afm::str_width_inches(line, face, size, 1.0))
+            .map(|line| afm::str_width_inches(line, face, size))
             .fold(0.0, f64::max);
         let newlines = text.matches('\n').count() as f64;
         let line = self.par.lheight * 1.2 * self.par.ps * self.par.cex * cex / 72.0;
-        (
-            width,
-            newlines * line + afm::m_height_inches(face, size, 1.0),
-        )
+        (width, newlines * line + afm::m_height_inches(face, size))
     }
 
     /// Draws one line of text at `anchor` (device inches), clipped to
@@ -2081,11 +2052,11 @@ impl<B: Backend> Device<B> {
         if size_pt <= 0.0 {
             return;
         }
-        let width = afm::str_width_inches(label, face, size_pt, 1.0);
+        let width = afm::str_width_inches(label, face, size_pt);
         let dy = match vadj {
-            Some(yc) => -yc * afm::m_height_inches(face, size_pt, 1.0),
+            Some(yc) => -yc * afm::m_height_inches(face, size_pt),
             None => {
-                let (asc, desc) = afm::glyph_ascent_descent_inches(label, face, size_pt, 1.0);
+                let (asc, desc) = afm::glyph_ascent_descent_inches(label, face, size_pt);
                 -0.5 * (asc - desc)
             }
         };
@@ -2371,6 +2342,62 @@ fn region_error(fig: [f64; 4], plt: [f64; 4]) -> Option<&'static str> {
         Some("plot region too large")
     } else {
         None
+    }
+}
+
+/// The linear map between one axis's `usr` range (`u0..u1`, log10 units
+/// on a log axis) and the plot region's extent along it in device inches
+/// (`d0..d1`).
+#[derive(Clone, Copy)]
+pub(crate) struct AxisMap {
+    pub u0: f64,
+    pub u1: f64,
+    pub d0: f64,
+    pub d1: f64,
+}
+
+impl AxisMap {
+    /// A `usr` value in inches.
+    pub(crate) fn inches(self, u: f64) -> f64 {
+        self.d0 + (u - self.u0) / (self.u1 - self.u0) * (self.d1 - self.d0)
+    }
+
+    /// A position in inches in `usr` units.
+    pub(crate) fn usr(self, d: f64) -> f64 {
+        self.u0 + (d - self.d0) / (self.d1 - self.d0) * (self.u1 - self.u0)
+    }
+}
+
+/// Whether text drawn with `las` on `side` is perpendicular to the side,
+/// as R's `GMtext()` decides: `las` 2 always, 1 (horizontal text) on the
+/// left and right, 3 (vertical text) at the bottom and top. Shared by
+/// `axis()` and `mtext()`.
+pub(crate) fn las_perpendicular(side: Side, las: i32) -> bool {
+    match las {
+        1 => !side.is_horizontal(),
+        2 => true,
+        3 => side.is_horizontal(),
+        _ => false,
+    }
+}
+
+/// The rotation, in degrees, of text drawn with `las` on `side`: 90 for
+/// vertical text.
+pub(crate) fn las_rotation(side: Side, las: i32) -> f64 {
+    if side.is_horizontal() == las_perpendicular(side, las) {
+        90.0
+    } else {
+        0.0
+    }
+}
+
+/// `ComputePAdjValue()`: the default `padj` for `side` and `las`, 0.5
+/// (centred) for text perpendicular to the side, else 0.
+pub(crate) fn default_padj(side: Side, las: i32) -> f64 {
+    if las_perpendicular(side, las) {
+        0.5
+    } else {
+        0.0
     }
 }
 

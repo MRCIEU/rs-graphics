@@ -23,7 +23,7 @@ use crate::error::Error;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::Xpd;
-use crate::setters::pick_na;
+use crate::recycle::pick_na;
 
 use super::Device;
 
@@ -151,8 +151,8 @@ impl<B: Backend> Device<B> {
             let lwd = pick_na(&opts.lwd, n, dev.par.lwd)?;
             dev.resolve(col).map(|c| dev.stroke_of(c, lwd, lty))
         };
-        let xpd = opts.xpd.unwrap_or(self.par.xpd);
-        self.push_clip_for(xpd);
+        let xpd = self.clip_for(opts.xpd);
+        self.push_clip_region(xpd);
         let (x0, x1) = self.xpd_limits(true, xpd);
         let (y0, y1) = self.xpd_limits(false, xpd);
         for &(a, b) in &lines {
@@ -229,8 +229,6 @@ impl<B: Backend> Device<B> {
         let pts: Vec<Point> = (start..=stop)
             .map(|i| self.data_to_inches(xx[i], yy[i]))
             .collect();
-        pts.iter()
-            .all(|p| p.x.is_finite() && p.y.is_finite())
-            .then_some(pts)
+        pts.iter().all(|p| p.is_finite()).then_some(pts)
     }
 }

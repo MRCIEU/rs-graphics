@@ -1621,7 +1621,7 @@ impl Backend for RasterBackend {
         // this is what actually determines each glyph's position, so
         // multi-character strings line up exactly where the SVG/PDF
         // backends would place them.
-        let offsets = afm::char_x_offsets_inches(text, style.face, style.size_pt, 1.0);
+        let offsets = afm::char_x_offsets_inches(text, style.face, style.size_pt);
         let theta = style.rotation_deg.to_radians();
         let (cos_t, sin_t) = (theta.cos(), theta.sin());
         let dpi = self.dpi;

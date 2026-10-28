@@ -206,8 +206,6 @@ pub(crate) struct FontMetrics {
     /// Per-glyph bounding-box `lly`; `PostScriptMetricInfo()` reports
     /// `-lly` as the glyph's descent.
     bbox_lly: [i16; 256],
-    pub ascent_units: f64,
-    pub descent_units: f64,
     default_width: u16,
     kerning: HashMap<(u8, u8), i16>,
 }
@@ -216,8 +214,6 @@ impl FontMetrics {
     /// `symbol`: index glyphs by the AFM's own codes (the font-specific
     /// Symbol encoding) instead of R's ISOLatin1 text encoding.
     fn parse(afm: &str, symbol: bool) -> Self {
-        let mut ascent_units = 718.0;
-        let mut descent_units = -207.0;
         // Every glyph's (WX, lly, ury) by name, including the ones the AFM
         // leaves unencoded (`C -1`), and the names of the ASCII codes.
         let mut glyphs: HashMap<String, (u16, i16, i16)> = HashMap::new();
@@ -226,15 +222,7 @@ impl FontMetrics {
 
         for line in afm.lines() {
             let line = line.trim();
-            if let Some(rest) = line.strip_prefix("Ascender ") {
-                if let Ok(v) = rest.trim().parse::<f64>() {
-                    ascent_units = v;
-                }
-            } else if let Some(rest) = line.strip_prefix("Descender ") {
-                if let Ok(v) = rest.trim().parse::<f64>() {
-                    descent_units = v;
-                }
-            } else if line.starts_with("C ") {
+            if line.starts_with("C ") {
                 // "C 32 ; WX 278 ; N space ; B 0 0 0 0 ;"
                 let mut code: Option<i64> = None;
                 let mut wx: Option<u16> = None;
@@ -329,8 +317,6 @@ impl FontMetrics {
             widths,
             bbox_ury,
             bbox_lly,
-            ascent_units,
-            descent_units,
             default_width,
             kerning,
         }
@@ -387,15 +373,18 @@ impl FontMetrics {
     /// adjustments between adjacent characters (matching
     /// `PostScriptStringWidth()`'s `useKerning = true` default).
     pub fn str_width_units(&self, s: &str) -> f64 {
-        let chars: Vec<char> = s.chars().collect();
-        let mut total = 0.0;
-        for i in 0..chars.len() {
-            total += self.char_width_units(chars[i]);
-            if i + 1 < chars.len() {
-                total += self.kern_units(chars[i], chars[i + 1]);
-            }
-        }
-        total
+        self.advances(s).sum()
+    }
+
+    /// How far each character of `s` moves the pen, in 1/1000 em: its
+    /// width plus the kerning with the next character.
+    fn advances<'a>(&'a self, s: &'a str) -> impl Iterator<Item = f64> + 'a {
+        let mut chars = s.chars().peekable();
+        std::iter::from_fn(move || {
+            let c = chars.next()?;
+            let kern = chars.peek().map_or(0.0, |&d| self.kern_units(c, d));
+            Some(self.char_width_units(c) + kern)
+        })
     }
 }
 
@@ -415,12 +404,11 @@ fn metrics_table(face: FontFace) -> &'static FontMetrics {
     cell.get_or_init(|| FontMetrics::parse(afm_source(face), face == FontFace::Symbol))
 }
 
-/// Width of `s`, in inches, set in `face` at `pointsize * cex` points -
+/// Width of `s`, in inches, set in `face` at `pointsize` points -
 /// exactly analogous to R's `strwidth(s, units = "inches")` with the
 /// `pdf`/`postscript` Helvetica metrics.
-pub fn str_width_inches(s: &str, face: FontFace, pointsize: f64, cex: f64) -> f64 {
-    let pt = pointsize * cex;
-    metrics_table(face).str_width_units(s) / 1000.0 * pt / 72.0
+pub fn str_width_inches(s: &str, face: FontFace, pointsize: f64) -> f64 {
+    metrics_table(face).str_width_units(s) / 1000.0 * pointsize / 72.0
 }
 
 /// The kerning between each character of `s` and the next, in 1/1000 em
@@ -442,52 +430,23 @@ pub(crate) fn kerning_units(s: &str, face: FontFace) -> Vec<f64> {
 /// backends that must position individual glyphs themselves (currently
 /// only the raster/PNG backend) while keeping the exact same layout math
 /// used everywhere else.
-pub fn char_x_offsets_inches(s: &str, face: FontFace, pointsize: f64, cex: f64) -> Vec<f64> {
-    let pt = pointsize * cex;
-    let scale = pt / 72.0 / 1000.0;
-    let m = metrics_table(face);
-    let chars: Vec<char> = s.chars().collect();
-    let mut offsets = Vec::with_capacity(chars.len() + 1);
+pub fn char_x_offsets_inches(s: &str, face: FontFace, pointsize: f64) -> Vec<f64> {
+    let scale = pointsize / 72.0 / 1000.0;
     let mut total = 0.0;
-    offsets.push(0.0);
-    for i in 0..chars.len() {
-        total += m.char_width_units(chars[i]);
-        if i + 1 < chars.len() {
-            total += m.kern_units(chars[i], chars[i + 1]);
-        }
-        offsets.push(total * scale);
-    }
-    offsets
-}
-
-/// Nominal font height in inches: the AFM's `Ascender - Descender`. This
-/// is not R's `strheight()`, which is the ascent of `M` (see
-/// [`m_height_inches`]).
-pub fn str_height_inches(face: FontFace, pointsize: f64, cex: f64) -> f64 {
-    let m = metrics_table(face);
-    let pt = pointsize * cex;
-    (m.ascent_units - m.descent_units) / 1000.0 * pt / 72.0
-}
-
-/// `(ascent, descent)` in inches - the distances the font's nominal
-/// bounding box extends above and below the baseline, respectively (both
-/// non-negative), from the AFM's `Ascender`/`Descender`. R's text
-/// placement doesn't use these: see [`m_height_inches`] and
-/// [`glyph_ascent_descent_inches`].
-pub fn ascent_descent_inches(face: FontFace, pointsize: f64, cex: f64) -> (f64, f64) {
-    let m = metrics_table(face);
-    let pt = pointsize * cex;
-    let scale = pt / 72.0 / 1000.0;
-    (m.ascent_units * scale, -m.descent_units * scale)
+    let advances = metrics_table(face).advances(s).map(|a| {
+        total += a;
+        total * scale
+    });
+    std::iter::once(0.0).chain(advances).collect()
 }
 
 /// Height in inches of the glyph `M` - what R's `strheight()` returns for
 /// a single-line string (`GEStrHeight()` uses the ascent of `M`, not the
 /// string's own ink). This is the `height` R's `GEText()` multiplies `yc`
 /// by when positioning text with a finite vertical adjustment.
-pub fn m_height_inches(face: FontFace, pointsize: f64, cex: f64) -> f64 {
+pub fn m_height_inches(face: FontFace, pointsize: f64) -> f64 {
     let m = metrics_table(face);
-    m.glyph_ascent_units('M') / 1000.0 * pointsize * cex / 72.0
+    m.glyph_ascent_units('M') / 1000.0 * pointsize / 72.0
 }
 
 /// `(ascent, descent, width)` of one glyph in inches, as R's
@@ -508,14 +467,9 @@ pub fn glyph_metric_inches(c: char, face: FontFace, pointsize: f64) -> (f64, f64
 /// the minimum glyph `lly` (so descent is positive below the baseline).
 /// `GEText()` uses these to centre text vertically when `adj[2]` is `NA`
 /// (e.g. character `pch`).
-pub fn glyph_ascent_descent_inches(
-    s: &str,
-    face: FontFace,
-    pointsize: f64,
-    cex: f64,
-) -> (f64, f64) {
+pub fn glyph_ascent_descent_inches(s: &str, face: FontFace, pointsize: f64) -> (f64, f64) {
     let m = metrics_table(face);
-    let scale = pointsize * cex / 72.0 / 1000.0;
+    let scale = pointsize / 72.0 / 1000.0;
     let mut chars = s.chars();
     let Some(first) = chars.next() else {
         return (0.0, 0.0);
@@ -544,7 +498,7 @@ mod tests {
 
     #[test]
     fn m_height_is_718_units() {
-        let h = m_height_inches(FontFace::Plain, 72.0, 1.0);
+        let h = m_height_inches(FontFace::Plain, 72.0);
         assert!((h - 0.718).abs() < 1e-9);
     }
 
@@ -556,8 +510,8 @@ mod tests {
 
     #[test]
     fn width_scales_with_pointsize() {
-        let w12 = str_width_inches("Hello", FontFace::Plain, 12.0, 1.0);
-        let w24 = str_width_inches("Hello", FontFace::Plain, 24.0, 1.0);
+        let w12 = str_width_inches("Hello", FontFace::Plain, 12.0);
+        let w24 = str_width_inches("Hello", FontFace::Plain, 24.0);
         assert!((w24 - 2.0 * w12).abs() < 1e-12);
     }
 

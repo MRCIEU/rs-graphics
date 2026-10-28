@@ -46,6 +46,7 @@ use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
 use crate::par::{AxisStyle, Xpd};
 use crate::plotmath::Label;
+use crate::recycle::rep_len;
 
 use super::InlineAxis;
 
@@ -448,10 +449,6 @@ impl<T: Num, const N: usize> From<&[Vec<T>; N]> for BarHeights {
     }
 }
 
-fn recycle<T: Copy>(v: &[T], n: usize) -> Vec<T> {
-    (0..n).map(|k| v[k % v.len()]).collect()
-}
-
 /// Everything `barplot()` works out before drawing: bar positions, the
 /// bars themselves, colours, axis limits and where the names go. Needs no
 /// device, so a recorded figure can return the same bar centres as
@@ -524,7 +521,7 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
             .flat_map(|_| std::iter::once(space[1]).chain(std::iter::repeat_n(space[0], nr - 1)))
             .collect()
     } else {
-        recycle(&space, nbars)
+        rep_len(&space, nbars)
     };
     let base_n = if beside { nr } else { nc };
     let width_v: Vec<f64> = (0..nbars)
@@ -547,7 +544,7 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
     let offset = if opts.offset.is_empty() {
         vec![0.0]
     } else {
-        recycle(&opts.offset, base_n)
+        rep_len(&opts.offset, base_n)
     };
     let offset_of = |i: usize, j: usize| {
         let k = if beside { i } else { j };
@@ -842,16 +839,8 @@ impl<B: Backend> Device<B> {
             let mut fill: Vec<ColorSpec> = (0..labels.len())
                 .map(|i| colors[i % colors.len()])
                 .collect();
-            let mut density: Vec<Option<f64>> = if opts.density.is_empty() {
-                Vec::new()
-            } else {
-                recycle(&opts.density, labels.len())
-            };
-            let mut angle: Vec<f64> = if opts.angle.is_empty() {
-                Vec::new()
-            } else {
-                recycle(&opts.angle, labels.len())
-            };
+            let mut density = rep_len(&opts.density, labels.len());
+            let mut angle = rep_len(&opts.angle, labels.len());
             // (R reverses `density` and `angle` before `legend()` recycles
             // them, so with fewer values than labels they don't follow
             // the reversed labels; we recycle first, as for `fill`.)

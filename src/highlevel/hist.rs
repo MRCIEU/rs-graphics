@@ -31,7 +31,7 @@ use crate::numbers::Num;
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
-use super::InlineAxis;
+use super::{InlineAxis, data_range};
 
 /// Sturges' rule (`nclass.Sturges()`): `ceiling(log2(length(x)) + 1)`.
 fn nclass_sturges(n: usize) -> f64 {
@@ -707,24 +707,12 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> Result<HistResult, Err
             // R caps it (with a warning) so that pretty() gets an integer;
             // pretty() truncates it.
             let nclass = k.min(1e6) as i32;
-            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
-            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
-                (lo, hi)
-            } else {
-                (0.0, 1.0)
-            };
+            let (lo, hi) = data_range(&data);
             (pretty_r(lo, hi, nclass, 1), false)
         }
         // Fewer than two edges (none given): Sturges.
         _ => {
-            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
-            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
-                (lo, hi)
-            } else {
-                (0.0, 1.0)
-            };
+            let (lo, hi) = data_range(&data);
             (pretty_r(lo, hi, nclass_sturges(n) as i32, 1), false)
         }
     };

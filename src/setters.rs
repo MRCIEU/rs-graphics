@@ -262,16 +262,6 @@ na_values!(i32: |c: char| Ok::<i32, Error>(char_pch(c)); char);
 na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
 na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
 
-/// Element `i` of a recycled [`NaValues`] vector: `Some(default)` when
-/// the vector is empty (R's default), `None` for an `NA` element.
-pub(crate) fn pick_na<T: Copy>(v: &[Option<T>], i: usize, default: T) -> Option<T> {
-    if v.is_empty() {
-        Some(default)
-    } else {
-        v[i % v.len()]
-    }
-}
-
 /// A character's `pch` code, as R's `GEstring_to_pch()` in a UTF-8 locale:
 /// its ASCII code, or minus its Unicode code point for any other character
 /// (`'é'` is -233).
@@ -581,13 +571,6 @@ mod tests {
             seg.col,
             vec![ColorSpec::try_from("red").unwrap(), ColorSpec::None]
         );
-        // `None` survives recycling; an empty vector gives the default.
-        let v = [Some(1.0), None];
-        assert_eq!(
-            (0..4).map(|i| pick_na(&v, i, 9.0)).collect::<Vec<_>>(),
-            vec![Some(1.0), None, Some(1.0), None]
-        );
-        assert_eq!(pick_na(&[], 3, 9.0), Some(9.0));
     }
 
     #[test]
