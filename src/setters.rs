@@ -134,9 +134,11 @@ impl<T, U: IntoArg<T>> OptionArg<T, markers::OptionOf> for Option<U> {
     }
 }
 
-/// A number of any type ([`Num`](crate::numbers::Num)), or an `Option` of
-/// one (`None`: the setting's default), for a numeric setting R may leave
-/// unset. The marker `M` is inferred.
+/// A number of any type ([`Num`](crate::numbers::Num)), or an
+/// `Option<f64>` (`None`: the setting's default, or R's `NA` where the
+/// setting has one), for a numeric setting R may leave unset. A bare `None`
+/// works; `Some(..)` holds an `f64` (`Some(2.0)`). The marker `M` is
+/// inferred.
 ///
 /// # Examples
 ///
@@ -158,9 +160,9 @@ impl<N: crate::numbers::Num> OptionNum<markers::Value> for N {
     }
 }
 
-impl<N: crate::numbers::Num> OptionNum<markers::OptionOf> for Option<N> {
+impl OptionNum<markers::OptionOf> for Option<f64> {
     fn into_option_num(self) -> Option<f64> {
-        self.map(crate::numbers::Num::to_f64)
+        self
     }
 }
 
@@ -652,7 +654,7 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// numbers), `option_pair` (`Option<(f64, f64)>` from one
 /// [`Pair`](crate::numbers::Pair) tuple), `array` (`Option<[f64; N]>`
 /// from an array of any numbers), `na` (`Option<Option<f64>>`, R's
-/// `NA`-able number, from one number; `f64::NAN` is `NA`), `count`
+/// `NA`-able number, from a number or `None` for `NA`), `count`
 /// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
 /// [`Pch`]) and `legend_pch` (the same, read as `legend()` does).
 ///
@@ -887,10 +889,11 @@ macro_rules! options {
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident na $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "`f64::NAN` is R's `NA`."]
-        pub fn $field(mut self, value: impl $crate::numbers::Num) -> Self {
-            let v = value.to_f64();
-            self$(.$p)?.$field = Some(v.is_finite().then_some(v));
+        #[doc = "Takes any number, or `None` for R's `NA` (see [`OptionNum`](crate::setters::OptionNum))."]
+        pub fn $field<M>(mut self, value: impl $crate::setters::OptionNum<M>) -> Self {
+            // A non-finite number is `NA` too, as in R.
+            let v = value.into_option_num().filter(|v| v.is_finite());
+            self$(.$p)?.$field = Some(v);
             self
         }
     };
@@ -982,18 +985,20 @@ mod tests {
         assert!(t.main.is_none());
         // Numbers, and enums from R's strings, the same way.
         let a = AxisOptions::default()
-            .line(Some(2_u8))
+            .line(Some(2.0))
             .las(Some(1))
             .lend(Some("butt"));
         assert_eq!((a.line, a.las), (Some(2.0), Some(1)));
         assert_eq!(a.lend, Some(crate::backend::LineEnd::Butt));
-        assert!(
-            AxisOptions::default()
-                .line(2)
-                .line(None::<f64>)
-                .line
-                .is_none()
-        );
+        // A bare `None` resets a number.
+        assert!(AxisOptions::default().line(2).line(None).line.is_none());
+        // Where R has an `NA` (`par(tck)`, legend `vadj`), `None` is it.
+        let p = ParOptions::default().tck(0.02);
+        assert_eq!(p.tck, Some(Some(0.02)));
+        assert_eq!(p.tck(None).tck, Some(None));
+        let l = crate::device::LegendOptions::default().vadj(None);
+        assert_eq!(l.vadj, Some(None));
+        assert_eq!(ParOptions::default().tck(f64::NAN).tck, Some(None));
         assert_eq!(ParOptions::default().cex(Some(1.5)).cex, Some(1.5));
         // A failed conversion inside the `Option` is kept for `try_draw()`.
         assert!(

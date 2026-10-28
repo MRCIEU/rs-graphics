@@ -625,8 +625,8 @@ par_options! {
         /// Tick mark length as a fraction of the plot region (if above 0.5,
         /// of its height for an x axis, so `1` draws grid lines; else of its
         /// smaller side); positive points inwards. Overrides `tcl`. `None`
-        /// (the default, R's `NA`): use `tcl`. The `par()` setter takes a
-        /// number; `f64::NAN` sets it back to `None`.
+        /// (the default, R's `NA`): use `tcl`; `par().tck(None)` sets it
+        /// back.
         pub tck: Option<f64> => na Option<f64>,
         /// Default rotation of `text()` labels, in degrees anticlockwise; also
         /// applies to `legend()` and `pie()` labels, which R draws with

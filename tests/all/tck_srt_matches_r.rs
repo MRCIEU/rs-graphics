@@ -70,7 +70,7 @@ fn cases() -> Vec<Case> {
             r: "par(tck = 0.1); par(tck = NA); plot(x, y, ann = FALSE)",
             ours: |d| {
                 d.par().tck(0.1).draw();
-                d.par().tck(f64::NAN).draw();
+                d.par().tck(None).draw();
                 d.plot().x(X).y(Y).draw();
             },
         },

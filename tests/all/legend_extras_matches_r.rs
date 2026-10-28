@@ -330,7 +330,7 @@ fn cases() -> Vec<Case> {
                     .labels(["mmm", "g"])
                     .pch([1, 2])
                     .adj(0.3)
-                    .vadj(f64::NAN)
+                    .vadj(None)
                     .draw()
             },
         },

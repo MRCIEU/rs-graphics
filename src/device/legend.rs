@@ -356,9 +356,9 @@ crate::setters::options! {
         /// Horizontal adjustment of the labels. `None`: 0 (left). R's
         /// `adj[1]`.
         pub adj: Option<f64> => number f64,
-        /// Vertical adjustment of the labels. `None`: 0.5. `Some(None)` (the
-        /// setter's `f64::NAN`, R's `NA`) centres each label's ink, as R's
-        /// one-value `adj = x` does. R's `adj[2]`.
+        /// Vertical adjustment of the labels. Default 0.5; `None` (R's `NA`)
+        /// centres each label's ink, as R's one-value `adj = x` does. R's
+        /// `adj[2]`.
         pub vadj: Option<Option<f64>> => na f64,
         /// Whether to draw each point in the middle of its line. `None`: R's
         /// default, `true` when the keys have both lines and points.
