@@ -652,8 +652,7 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// R, from [`Numbers`](crate::numbers::Numbers)), `na_values`
 /// (`Vec<Option<T>>` recycled by R, `None` = `NA`), `option_values`
 /// (`Option<Vec<T>>`), `option_numbers` (`Option<Vec<f64>>` from
-/// [`Numbers`](crate::numbers::Numbers)), `list` (`Option<Vec<Label>>` from one label or
-/// several, [`LabelValues`](crate::plotmath::LabelValues)), `labels`
+/// [`Numbers`](crate::numbers::Numbers)), `labels`
 /// (`Option<Vec<Option<Label>>>` from [`Labels`](crate::plotmath::Labels),
 /// `None` = `NA`), `pair` (`Option<(f64, f64)>` from two
 /// numbers), `option_pair` (`Option<(f64, f64)>` from one
@@ -852,15 +851,6 @@ macro_rules! options {
                 Ok(v) => self$(.$p)?.$field = Some(v),
                 Err(e) => self$(.$p)?.defer(e),
             }
-            self
-        }
-    };
-    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident list $t:ty) => {
-        $($a)*
-        #[doc = ""]
-        #[doc = "Takes one label or several (see [`LabelValues`](crate::plotmath::LabelValues))."]
-        pub fn $field(mut self, values: impl $crate::plotmath::LabelValues) -> Self {
-            self$(.$p)?.$field = Some(values.into_label_values());
             self
         }
     };
@@ -1078,13 +1068,19 @@ mod tests {
         let bars = BarplotOptions::default()
             .names("A")
             .legend_text(String::from("A"));
-        assert_eq!(bars.names, Some(vec![a.clone()]));
-        assert_eq!(bars.legend_text, Some(vec![a.clone()]));
+        assert_eq!(bars.names, Some(vec![Some(a.clone())]));
+        assert_eq!(bars.legend_text, Some(vec![Some(a.clone())]));
         let names = vec!["A".to_string(), "B".to_string()];
         let boxes = BoxplotOptions::default().names(&names);
-        assert_eq!(boxes.names, Some(vec![a.clone(), Label::from("B")]));
+        assert_eq!(
+            boxes.names,
+            Some(vec![Some(a.clone()), Some(Label::from("B"))])
+        );
         let pie = PieOptions::default().labels(Label::math("x^2"));
-        assert_eq!(pie.labels, Some(vec![Label::math("x^2")]));
+        assert_eq!(pie.labels, Some(vec![Some(Label::math("x^2"))]));
+        // Every label list may hold R's `NA`.
+        let bars = BarplotOptions::default().names([Some("a"), None]);
+        assert_eq!(bars.names, Some(vec![Some(Label::from("a")), None]));
         // Axis labels may hold R's `NA`.
         let axis = AxisOptions::default().labels("A");
         assert_eq!(axis.labels, Some(vec![Some(a.clone())]));
@@ -1135,7 +1131,10 @@ mod tests {
         assert!(!plot.axes);
 
         let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
-        assert_eq!(bars.names, Some(vec![Label::from("a"), Label::from("b")]));
+        assert_eq!(
+            bars.names,
+            Some(vec![Some(Label::from("a")), Some(Label::from("b"))])
+        );
         assert_eq!(bars.col, vec![ColorSpec::try_from("grey").unwrap()]);
 
         assert_eq!(TextOptions::default().srt(45.0).srt, Some(45.0));

@@ -58,10 +58,10 @@ crate::setters::options! {
     pub struct BarplotOptions => [BarplotCall] {
         /// Labels under the bars, or beside them if `horiz`. For a `beside`
         /// matrix, either one name per bar or one per column (centred under
-        /// each group). `None`: no names (R takes them from
+        /// each group). Unset: no names (R takes them from
         /// `names(height)`/`colnames(height)`, which Rust data doesn't have).
-        /// R's `names.arg`.
-        pub names: Option<Vec<Label>> => list Label,
+        /// A `None` element (R's `NA`) leaves that name out. R's `names.arg`.
+        pub names: Option<Vec<Option<Label>>> => labels Label,
         /// Fill colours, recycled over the bars of a vector or the rows of a
         /// matrix. Empty: `"grey"` for a vector, `gray.colors(nrow)` for a
         /// matrix.
@@ -91,8 +91,9 @@ crate::setters::options! {
         /// Draws horizontal bars. Default `false`.
         pub horiz: bool => value bool,
         /// Legend labels, one per row of a matrix or per bar of a vector,
-        /// filled with `col`. `None`: no legend. R's `legend.text`.
-        pub legend_text: Option<Vec<Label>> => list Label,
+        /// filled with `col`. Unset: no legend. A `None` element (R's `NA`)
+        /// keeps its key, without a label. R's `legend.text`.
+        pub legend_text: Option<Vec<Option<Label>>> => labels Label,
         /// Position of the legend, e.g. `"topleft"` or `(x, y)`. `None`: 0.1
         /// inch in from the top-right corner of the plot region, as R. R's
         /// `args.legend = list(x = .., y = ..)`.
@@ -825,7 +826,7 @@ impl<B: Backend> Device<B> {
             let lty = opts.axis_lty.filter(|&l| l != LineType::BLANK);
             let names = AxisOptions {
                 at: Some(at),
-                labels: Some(names.iter().cloned().map(Some).collect()),
+                labels: Some(names.clone()),
                 tick: lty.is_some(),
                 lty,
                 cex_axis: opts.cex_names,
@@ -875,7 +876,6 @@ impl<B: Backend> Device<B> {
             if lopts.angle.is_empty() {
                 lopts.angle = angle;
             }
-            let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
             self.legend_impl(pos, &labels, &lopts)?;
         }
 

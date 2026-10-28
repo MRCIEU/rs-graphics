@@ -187,9 +187,10 @@ crate::setters::options! {
     #[derive(Clone, Debug)]
     pub struct BoxplotOptions => [BoxplotCall] {
         /// Group labels on the name axis (side 1, or 2 if `horizontal`).
-        /// `None`: `1, 2, ...`. Drawn only when there's more than one box,
-        /// unless `show_names` says otherwise.
-        pub names: Option<Vec<Label>> => list Label,
+        /// Unset: `1, 2, ...`; a `None` element (R's `NA`) leaves that label
+        /// out. Drawn only when there's more than one box, unless
+        /// `show_names` says otherwise.
+        pub names: Option<Vec<Option<Label>>> => labels Label,
         /// Box fill colours, recycled over the boxes. Empty: `"lightgray"`.
         /// Passed to R's `bxp()` as `boxfill`.
         pub col: Vec<ColorSpec> => values ColorSpec,
@@ -791,10 +792,10 @@ impl<B: Backend> Device<B> {
                 let labels = opts
                     .names
                     .clone()
-                    .unwrap_or_else(|| (1..=n).map(|i| Label::from(i.to_string())).collect());
+                    .unwrap_or_else(|| (1..=n).map(|i| Some(Label::from(i.to_string()))).collect());
                 let names = AxisOptions {
                     at: Some(at.clone()),
-                    labels: Some(labels.into_iter().map(Some).collect()),
+                    labels: Some(labels),
                     ..side_pars(name_side)
                 };
                 self.axis_impl(name_side, &inline.apply(names))?;

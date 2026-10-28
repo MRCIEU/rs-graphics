@@ -41,10 +41,10 @@ crate::setters::options! {
     /// crate implements. Settings left unset are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct PieOptions => [PieCall] {
-        /// Slice labels (text or plotmath expressions). `None`: `1, 2, ...`.
-        /// An empty text label, or a missing one (fewer labels than slices,
-        /// R's `NA`), draws no label or tick for its slice.
-        pub labels: Option<Vec<Label>> => list Label,
+        /// Slice labels (text or plotmath expressions). Unset: `1, 2, ...`.
+        /// An empty text label, a `None` element (R's `NA`) or a missing one
+        /// (fewer labels than slices) draws no label or tick for its slice.
+        pub labels: Option<Vec<Option<Label>>> => labels Label,
         /// Rotation of the labels in degrees, counterclockwise. `None`:
         /// [`par(srt)`].
         ///
@@ -150,10 +150,10 @@ impl<B: Backend> Device<B> {
         let nx = x.len();
         let total: f64 = x.iter().sum();
 
-        let labels: Vec<Label> = opts
+        let labels: Vec<Option<Label>> = opts
             .labels
             .clone()
-            .unwrap_or_else(|| (1..=nx).map(|i| Label::from(i.to_string())).collect());
+            .unwrap_or_else(|| (1..=nx).map(|i| Some(Label::from(i.to_string()))).collect());
 
         self.plot_new_impl()?;
 
@@ -236,8 +236,10 @@ impl<B: Backend> Device<B> {
 
             let mid = 0.5 * (cum[i] + cum[i + 1]);
             let (px, py) = t2xy(mid);
-            // `labels[i]` is NA past the end of `labels`: no label.
-            let Some(label) = labels.get(i) else {
+            // `labels[i]` is NA past the end of `labels`, or an `NA` (`None`)
+            // element: no label and no tick line, as `pie.R`'s
+            // `!is.na(lab) && nzchar(lab)`.
+            let Some(Some(label)) = labels.get(i) else {
                 continue;
             };
             if !matches!(label, Label::Text(t) if t.is_empty()) {

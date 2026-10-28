@@ -260,15 +260,19 @@ impl From<Expression> for Label {
 ///
 /// Takes one label (`&str`, `String`, [`Label`], an [`Expression`]) or
 /// several (a slice, array or `Vec` of them, or of `Option`s of them).
-/// Used for the labels of [`text()`](crate::graphics::Graphics::text),
-/// the text of [`mtext()`](crate::graphics::Graphics::mtext) (recycled
-/// with its other arguments), the labels of
-/// [`legend()`](crate::graphics::Graphics::legend) (one per key), and
-/// [`axis()`](crate::graphics::Graphics::axis)'s `labels`.
+/// Used for every list of labels: those of
+/// [`text()`](crate::graphics::Graphics::text), the text of
+/// [`mtext()`](crate::graphics::Graphics::mtext) (recycled with its other
+/// arguments), the labels of [`legend()`](crate::graphics::Graphics::legend)
+/// (one per key), [`axis()`](crate::graphics::Graphics::axis)'s `labels`,
+/// `barplot()`'s `names` and `legend_text`, `boxplot()`'s `names` and
+/// `pie()`'s `labels`. As in R, one label is a list of one (`.names("A")`).
 ///
 /// A `None` element is R's `NA`: no text there. `text()` and `mtext()`
-/// skip it; in `legend()` the key is drawn and the label takes no room; in
-/// `axis()` the tick is drawn without a label; all as in R.
+/// skip it; in a legend the key is drawn and the label takes no room; on
+/// an axis (and so for `barplot()` and `boxplot()` names) the tick is
+/// drawn without a label; `pie()` draws neither label nor tick line for
+/// that slice; all as in R.
 ///
 /// # Examples
 ///
@@ -353,70 +357,6 @@ impl<L: Clone + LabelElement> Labels for Vec<L> {
 impl<L: Clone + LabelElement> Labels for &Vec<L> {
     fn into_labels(self) -> Vec<Option<Label>> {
         self.iter().cloned().map(LabelElement::into_label).collect()
-    }
-}
-
-/// One label or several, with no missing elements.
-///
-/// Takes one label (`&str`, `String`, [`Label`], an [`Expression`]) or
-/// several (a slice, array or `Vec` of them). Used for the label lists
-/// that have no `NA`: `barplot()`'s `names` and `legend_text`,
-/// `boxplot()`'s `names` and `pie()`'s `labels`. As in R, one label is a
-/// list of one (`.names("A")`).
-///
-/// # Examples
-///
-/// ```
-/// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::null().open().unwrap();
-/// assert_eq!("A".into_label_values(), vec![Label::from("A")]);
-/// dev.barplot().height([3, 5]).names(["A", "B"]).draw();
-/// ```
-pub trait LabelValues {
-    /// The labels, in order.
-    fn into_label_values(self) -> Vec<Label>;
-}
-
-macro_rules! one_label_value {
-    ($($t:ty),*) => {
-        $(
-            impl LabelValues for $t {
-                fn into_label_values(self) -> Vec<Label> {
-                    vec![self.into()]
-                }
-            }
-        )*
-    };
-}
-one_label_value!(&str, &&str, String, &String, Label, Expression);
-
-impl<L: Clone + Into<Label>> LabelValues for &[L] {
-    fn into_label_values(self) -> Vec<Label> {
-        self.iter().cloned().map(Into::into).collect()
-    }
-}
-
-impl<L: Into<Label>, const N: usize> LabelValues for [L; N] {
-    fn into_label_values(self) -> Vec<Label> {
-        self.into_iter().map(Into::into).collect()
-    }
-}
-
-impl<L: Clone + Into<Label>, const N: usize> LabelValues for &[L; N] {
-    fn into_label_values(self) -> Vec<Label> {
-        self.iter().cloned().map(Into::into).collect()
-    }
-}
-
-impl<L: Into<Label>> LabelValues for Vec<L> {
-    fn into_label_values(self) -> Vec<Label> {
-        self.into_iter().map(Into::into).collect()
-    }
-}
-
-impl<L: Clone + Into<Label>> LabelValues for &Vec<L> {
-    fn into_label_values(self) -> Vec<Label> {
-        self.iter().cloned().map(Into::into).collect()
     }
 }
 
