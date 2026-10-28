@@ -113,14 +113,12 @@ fn pie_matches_r() {
             par.xaxs = AxisStyle::Exact;
             par.yaxs = AxisStyle::Exact;
         }
-        let opts = PieOptions {
-            labels: Some(LABELS.iter().map(|&s| s.into()).collect()),
-            main: Some("pie()".into()),
-            clockwise: c.clockwise,
-            init_angle: c.init_angle,
-            radius: Some(c.radius),
-            ..PieOptions::default()
-        };
+        let opts = PieOptions::default()
+            .labels(LABELS)
+            .main("pie()")
+            .clockwise(c.clockwise)
+            .init_angle(c.init_angle)
+            .radius(c.radius);
         let (ours, ()) = r::ours_with((c.width, c.height), par, |dev| {
             dev.pie().x(VALUES).with(&opts).draw();
         });

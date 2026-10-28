@@ -43,14 +43,12 @@ const R_PRELUDE: &str = "x <- 1:10\n\
 
 /// Ours: as `pl()` above.
 fn pl(dev: &mut Dev, y: &[f64], main: Option<&str>, axes: bool) {
-    let opts = PlotOptions {
-        type_: Some(PlotType::Lines),
-        main: main.map(Into::into),
-        axes,
-        xlab: axes.then(|| "x".into()),
-        ylab: axes.then(|| "y".into()),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .type_(PlotType::Lines)
+        .main(main)
+        .axes(axes)
+        .xlab(axes.then_some("x"))
+        .ylab(axes.then_some("y"));
     dev.plot().x(xs()).y(y).with(&opts).draw();
 }
 
@@ -84,18 +82,13 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 pl(d, &squares(), Some("Two scales"), true);
                 d.par().new(true).draw();
-                let opts = PlotOptions {
-                    type_: Some(PlotType::Lines),
-                    axes: false,
-                    col: vec![ColorSpec::Color(Color::parse("red").unwrap())],
-                    ..PlotOptions::default()
-                };
+                let opts = PlotOptions::default()
+                    .type_(PlotType::Lines)
+                    .axes(false)
+                    .col(vec![ColorSpec::Color(Color::parse("red").unwrap())]);
                 d.plot().x(xs()).y(roots()).with(&opts).draw();
                 d.axis().side(4).draw();
-                let o = MtextOptions {
-                    line: vec![3.0],
-                    ..Default::default()
-                };
+                let o = MtextOptions::default().line(vec![3.0]);
                 d.mtext().text("sqrt").side(4).with(&o).draw();
             },
         },
@@ -147,11 +140,7 @@ fn cases() -> Vec<Case> {
                 d.points()
                     .x([5.0])
                     .y([50.0])
-                    .with(&XyOptions {
-                        pch: vec![Some(19)],
-                        col: vec![black],
-                        ..XyOptions::default()
-                    })
+                    .with(&XyOptions::default().pch(vec![Some(19)]).col(vec![black]))
                     .draw();
                 assert!(!d.is_new());
                 pl(d, &falling(), Some("B"), true);
@@ -167,10 +156,7 @@ fn cases() -> Vec<Case> {
                 d.par().mfrow(1, 2).draw();
                 pl(d, &squares(), Some("A"), true);
                 d.par().new(true).draw();
-                let o = MtextOptions {
-                    outer: true,
-                    ..Default::default()
-                };
+                let o = MtextOptions::default().outer(true);
                 d.mtext().text("Outer").side(3).with(&o).draw();
                 assert!(d.is_new());
                 pl(d, &falling(), None, false);

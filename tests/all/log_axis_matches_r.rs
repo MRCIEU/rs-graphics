@@ -109,24 +109,21 @@ fn r_code(c: &Case) -> String {
 }
 
 fn draw_ours(c: &Case, dev: &mut Device<PdfBackend>) {
-    let opts = PlotOptions {
-        xlog: c.xlog,
-        ylog: c.ylog,
-        xlim: c.xlim,
-        xlab: Some("x".into()),
-        ylab: Some("y".into()),
-        ..PlotOptions::default()
-    };
+    let mut opts = PlotOptions::default()
+        .xlog(c.xlog)
+        .ylog(c.ylog)
+        .xlab("x")
+        .ylab("y");
+    if let Some((a, b)) = c.xlim {
+        opts = opts.xlim(a, b);
+    }
     dev.plot()
         .x(values(c.x, c.xlog))
         .y(values(c.y, c.ylog))
         .with(&opts)
         .draw();
     if let Some(at) = c.at3 {
-        let o = AxisOptions {
-            at: Some(at.to_vec()),
-            ..Default::default()
-        };
+        let o = AxisOptions::default().at(at.to_vec());
         dev.axis().side(3).with(&o).draw();
     }
 }

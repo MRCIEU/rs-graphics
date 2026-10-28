@@ -127,15 +127,13 @@ fn r_code(c: &Case) -> String {
 
 fn draw_ours(c: &Case, dev: &mut Device<PdfBackend>) {
     dev.par().lwd(c.lwd).draw();
-    let opts = BoxplotOptions {
-        col: vec![ColorSpec::Color(Color::parse(c.col).unwrap())],
-        border: vec![ColorSpec::Color(Color::parse(c.border).unwrap())],
-        axes: false,
-        notch: c.notch,
-        varwidth: c.varwidth,
-        horizontal: c.horizontal,
-        ..Default::default()
-    };
+    let opts = BoxplotOptions::default()
+        .col(vec![ColorSpec::Color(Color::parse(c.col).unwrap())])
+        .border(vec![ColorSpec::Color(Color::parse(c.border).unwrap())])
+        .axes(false)
+        .notch(c.notch)
+        .varwidth(c.varwidth)
+        .horizontal(c.horizontal);
     dev.boxplot().x(groups()).with(&opts).draw();
 }
 

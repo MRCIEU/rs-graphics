@@ -67,11 +67,7 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim(1.0, 100.0)
                     .ylim(1.0, 100.0)
-                    .with(&PlotWindowOptions {
-                        xlog: true,
-                        ylog: true,
-                        ..PlotWindowOptions::default()
-                    })
+                    .with(&PlotWindowOptions::default().xlog(true).ylog(true))
                     .draw();
                 let nan = f64::NAN;
                 d.segments()
@@ -79,12 +75,12 @@ fn cases() -> Vec<Case> {
                     .y0([1.0, 10.0, 50.0, 5.0, 3.0, 5.0, 2.0])
                     .x1([10.0, 50.0, 100.0, 20.0, 0.0, 9.0, 80.0])
                     .y1([5.0, 20.0, 0.5, 30.0, 30.0, 9.0, 0.0])
-                    .with(&SegmentsOptions {
-                        col: vec![red()],
-                        lty: vec![Some(solid())],
-                        lwd: vec![Some(1.0)],
-                        ..SegmentsOptions::default()
-                    })
+                    .with(
+                        &SegmentsOptions::default()
+                            .col(vec![red()])
+                            .lty(vec![Some(solid())])
+                            .lwd(vec![Some(1.0)]),
+                    )
                     .draw();
             },
         },
@@ -95,73 +91,71 @@ fn cases() -> Vec<Case> {
                 abline(a = 5, b = 2, untf = TRUE, lty = 2)\n\
                 abline(h = -1); abline(a = -50, b = 3, untf = TRUE, col = 'red')",
             draw: |d| {
-                let opts = PlotOptions {
-                    xlog: true,
-                    ylog: true,
-                    xlab: Some("x".into()),
-                    ylab: Some("y".into()),
-                    ..PlotOptions::default()
-                };
+                let opts = PlotOptions::default()
+                    .xlog(true)
+                    .ylog(true)
+                    .xlab("x")
+                    .ylab("y");
                 d.plot().x([1.0, 1000.0]).y([1.0, 1e4]).with(&opts).draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
-                    .with(&AblineOptions {
-                        h: vec![10.0],
-                        col: vec![black],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .h(vec![10.0])
+                            .col(vec![black])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        v: vec![100.0],
-                        col: vec![red()],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .v(vec![100.0])
+                            .col(vec![red()])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        a: vec![0.0],
-                        b: vec![1.0],
-                        col: vec![black],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .a(vec![0.0])
+                            .b(vec![1.0])
+                            .col(vec![black])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        a: vec![5.0],
-                        b: vec![2.0],
-                        untf: true,
-                        col: vec![black],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(LineType::from_code(2).unwrap())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .a(vec![5.0])
+                            .b(vec![2.0])
+                            .untf(true)
+                            .col(vec![black])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(LineType::from_code(2).unwrap())]),
+                    )
                     .draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        h: vec![-1.0],
-                        col: vec![black],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .h(vec![-1.0])
+                            .col(vec![black])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        a: vec![-50.0],
-                        b: vec![3.0],
-                        untf: true,
-                        col: vec![red()],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .a(vec![-50.0])
+                            .b(vec![3.0])
+                            .untf(true)
+                            .col(vec![red()])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
             },
         },
@@ -171,45 +165,40 @@ fn cases() -> Vec<Case> {
                 abline(1, 2); abline(a = 1, b = 0.01, untf = TRUE)\n\
                 par(xpd = TRUE); abline(h = 5, v = 10, col = 'red')",
             draw: |d| {
-                let opts = PlotOptions {
-                    xlog: true,
-                    xlab: Some("x".into()),
-                    ylab: Some("y".into()),
-                    ..PlotOptions::default()
-                };
+                let opts = PlotOptions::default().xlog(true).xlab("x").ylab("y");
                 d.plot().x([1.0, 1000.0]).y([0.0, 10.0]).with(&opts).draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
-                    .with(&AblineOptions {
-                        a: vec![1.0],
-                        b: vec![2.0],
-                        col: vec![black],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .a(vec![1.0])
+                            .b(vec![2.0])
+                            .col(vec![black])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        a: vec![1.0],
-                        b: vec![0.01],
-                        untf: true,
-                        col: vec![black],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .a(vec![1.0])
+                            .b(vec![0.01])
+                            .untf(true)
+                            .col(vec![black])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
                 d.par().xpd(Xpd::Figure).draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        h: vec![5.0],
-                        v: vec![10.0],
-                        col: vec![red()],
-                        lwd: vec![Some(1.0)],
-                        lty: vec![Some(solid())],
-                        ..AblineOptions::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .h(vec![5.0])
+                            .v(vec![10.0])
+                            .col(vec![red()])
+                            .lwd(vec![Some(1.0)])
+                            .lty(vec![Some(solid())]),
+                    )
                     .draw();
             },
         },
@@ -217,7 +206,11 @@ fn cases() -> Vec<Case> {
             name: "hist_logx",
             r: "hist(hx, log = 'x', ylab = 'n')",
             draw: |d| {
-                let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
+                let o = HistOptions::default()
+                    .xlog(true)
+                    .main("Histogram of hx")
+                    .xlab("hx")
+                    .ylab("n");
                 d.hist().x(hist_data()).with(&o).draw();
             },
         },
@@ -225,7 +218,11 @@ fn cases() -> Vec<Case> {
             name: "hist_logy",
             r: "suppressWarnings(hist(hx, log = 'y', ylab = 'n'))",
             draw: |d| {
-                let o = HistOptions { ylog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
+                let o = HistOptions::default()
+                    .ylog(true)
+                    .main("Histogram of hx")
+                    .xlab("hx")
+                    .ylab("n");
                 d.hist().x(hist_data()).with(&o).draw();
             },
         },
@@ -234,15 +231,17 @@ fn cases() -> Vec<Case> {
             r: "hist(hx, log = 'x', ylab = 'n')\n\
                 hist(hx * 1.05, add = TRUE, col = 'pink', border = 'red')",
             draw: |d| {
-                let o = HistOptions { xlog: true, main: Some("Histogram of hx".into()), xlab: Some("hx".into()), ylab: Some("n".into()), ..Default::default() };
+                let o = HistOptions::default()
+                    .xlog(true)
+                    .main("Histogram of hx")
+                    .xlab("hx")
+                    .ylab("n");
                 d.hist().x(hist_data()).with(&o).draw();
                 let more: Vec<f64> = hist_data().iter().map(|v| v * 1.05).collect();
-                let o = HistOptions {
-                    add: true,
-                    col: vec![ColorSpec::Color(Color::parse("pink").unwrap())],
-                    border: vec![red()],
-                    ..Default::default()
-                };
+                let o = HistOptions::default()
+                    .add(true)
+                    .col(vec![ColorSpec::Color(Color::parse("pink").unwrap())])
+                    .border(vec![red()]);
                 d.hist().x(&more).with(&o).draw();
             },
         },
@@ -250,11 +249,9 @@ fn cases() -> Vec<Case> {
             name: "barplot_logy",
             r: "barplot(c(3, 40, 700, 12), names.arg = c('a', 'b', 'c', 'd'), log = 'y')",
             draw: |d| {
-                let o = BarplotOptions {
-                    names: Some(["a", "b", "c", "d"].map(Label::from).to_vec()),
-                    ylog: true,
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default()
+                    .names(["a", "b", "c", "d"].map(Label::from).to_vec())
+                    .ylog(true);
                 d.barplot().height([3.0, 40.0, 700.0, 12.0]).with(&o).draw();
             },
         },
@@ -264,10 +261,7 @@ fn cases() -> Vec<Case> {
             // used as data), which we deliberately don't copy.
             r: "barplot(cbind(c(2, 5), c(30, 60), c(400, 100)), log = 'y')",
             draw: |d| {
-                let o = BarplotOptions {
-                    ylog: true,
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default().ylog(true);
                 d.barplot()
                     .height(&[vec![2.0, 5.0], vec![30.0, 60.0], vec![400.0, 100.0]])
                     .with(&o)
@@ -279,13 +273,11 @@ fn cases() -> Vec<Case> {
             r: "barplot(cbind(c(2, 5), c(30, 60)), beside = TRUE, horiz = TRUE, \
                         log = 'x', xlim = c(1, 100))",
             draw: |d| {
-                let o = BarplotOptions {
-                    beside: true,
-                    horiz: true,
-                    xlog: true,
-                    xlim: Some((1.0, 100.0)),
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default()
+                    .beside(true)
+                    .horiz(true)
+                    .xlog(true)
+                    .xlim(1.0, 100.0);
                 d.barplot()
                     .height(&[vec![2.0, 5.0], vec![30.0, 60.0]])
                     .with(&o)
@@ -298,31 +290,25 @@ fn cases() -> Vec<Case> {
                 axis(1, at = c(2, 5, 8), labels = c('a', 'b', 'c'))",
             draw: |d| {
                 let x: Vec<f64> = (1..=10).map(f64::from).collect();
-                let o = PlotOptions {
-                    xaxt: Some(AxisType::None),
-                    xlab: Some("x".into()),
-                    ylab: Some("y".into()),
-                    ..Default::default()
-                };
+                let o = PlotOptions::default()
+                    .xaxt(AxisType::None)
+                    .xlab("x")
+                    .ylab("y");
                 d.plot().x(&x).y(&x).with(&o).draw();
                 let fg = ColorSpec::Index(1);
                 let labels = ["a", "b", "c"].map(String::from).to_vec();
                 d.axis()
                     .side(1)
-                    .with(&AxisOptions {
-                        at: Some(vec![2.0, 5.0, 8.0]),
-                        labels: Some(labels).map(|v| {
-                            v.into_iter()
-                                .map(|t| Some(rs_graphics::plotmath::Label::from(t)))
-                                .collect()
-                        }),
-                        col: Some(fg),
-                        col_axis: Some(fg),
-                        cex_axis: Some(1.0),
-                        font: Some(FontFace::Plain),
-                        las: Some(0),
-                        ..AxisOptions::default()
-                    })
+                    .with(
+                        &AxisOptions::default()
+                            .at(vec![2.0, 5.0, 8.0])
+                            .labels(labels.iter().map(String::as_str).collect::<Vec<_>>())
+                            .col(fg)
+                            .col_axis(fg)
+                            .cex_axis(1.0)
+                            .font(FontFace::Plain)
+                            .las(0),
+                    )
                     .draw();
             },
         },
@@ -331,13 +317,11 @@ fn cases() -> Vec<Case> {
             r: "boxplot(list(c(1, 2, 2.5, 3, 7), c(2, 3, 3.5, 4, 4.2, 5)), horizontal = TRUE, \
                         names = c('a', 'b'), main = 'H', xlab = 'value')",
             draw: |d| {
-                let o = BoxplotOptions {
-                    horizontal: true,
-                    names: Some(vec!["a".into(), "b".into()]),
-                    main: Some("H".into()),
-                    xlab: Some("value".into()),
-                    ..Default::default()
-                };
+                let o = BoxplotOptions::default()
+                    .horizontal(true)
+                    .names(["a", "b"])
+                    .main("H")
+                    .xlab("value");
                 d.boxplot()
                     .x(&[
                         vec![1.0, 2.0, 2.5, 3.0, 7.0],
@@ -355,34 +339,34 @@ fn cases() -> Vec<Case> {
                 axis(3); axis(4)",
             draw: |d| {
                 d.par().lab([10, 3, 7]).draw();
-                let o = PlotOptions { xlab: Some("x".into()), ylab: Some("y".into()), ..Default::default() };
+                let o = PlotOptions::default().xlab("x").ylab("y");
                 d.plot().x([0.0, 1.0]).y([0.0, 1.0]).with(&o).draw();
                 d.par().new(true).draw();
                 d.par().lab([2, 12, 7]).draw();
-                let o = PlotOptions { xlog: true, ylog: true, axes: false, ..Default::default() };
+                let o = PlotOptions::default().xlog(true).ylog(true).axes(false);
                 d.plot().x([1.0, 1e6]).y([1.0, 50.0]).with(&o).draw();
                 let fg = ColorSpec::Index(1);
                 d.axis()
                     .side(3)
-                    .with(&AxisOptions {
-                        col: Some(fg),
-                        col_axis: Some(fg),
-                        cex_axis: Some(1.0),
-                        font: Some(FontFace::Plain),
-                        las: Some(0),
-                        ..AxisOptions::default()
-                    })
+                    .with(
+                        &AxisOptions::default()
+                            .col(fg)
+                            .col_axis(fg)
+                            .cex_axis(1.0)
+                            .font(FontFace::Plain)
+                            .las(0),
+                    )
                     .draw();
                 d.axis()
                     .side(4)
-                    .with(&AxisOptions {
-                        col: Some(fg),
-                        col_axis: Some(fg),
-                        cex_axis: Some(1.0),
-                        font: Some(FontFace::Plain),
-                        las: Some(0),
-                        ..AxisOptions::default()
-                    })
+                    .with(
+                        &AxisOptions::default()
+                            .col(fg)
+                            .col_axis(fg)
+                            .cex_axis(1.0)
+                            .font(FontFace::Plain)
+                            .las(0),
+                    )
                     .draw();
             },
         },

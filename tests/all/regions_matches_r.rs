@@ -29,12 +29,7 @@ const R_PRELUDE: &str = "pl <- function(n, main) plot(1:n, main = main, xlab = '
 
 fn pl(d: &mut Dev, n: usize, main: &'static str) {
     let x: Vec<f64> = (1..=n).map(|i| i as f64).collect();
-    let o = PlotOptions {
-        main: Some(main.into()),
-        xlab: Some("x".into()),
-        ylab: Some("y".into()),
-        ..PlotOptions::default()
-    };
+    let o = PlotOptions::default().main(main).xlab("x").ylab("y");
     d.plot().x(&x).y(&x).with(&o).draw();
 }
 

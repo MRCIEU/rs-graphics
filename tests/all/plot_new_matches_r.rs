@@ -49,11 +49,11 @@ fn cases() -> Vec<Case> {
                 d.points()
                     .x(v)
                     .y(v)
-                    .with(&XyOptions {
-                        pch: vec![Some(1)],
-                        col: vec![ColorSpec::Index(1)],
-                        ..XyOptions::default()
-                    })
+                    .with(
+                        &XyOptions::default()
+                            .pch(vec![Some(1)])
+                            .col(vec![ColorSpec::Index(1)]),
+                    )
                     .draw();
                 axes(d, &[1, 2]);
             },
@@ -67,11 +67,7 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim(1.0, 1000.0)
                     .ylim(1.0, 1000.0)
-                    .with(&PlotWindowOptions {
-                        xlog: true,
-                        ylog: true,
-                        ..PlotWindowOptions::default()
-                    })
+                    .with(&PlotWindowOptions::default().xlog(true).ylog(true))
                     .draw();
                 axes(d, &[1, 2]);
                 d.par().new(true).draw();
@@ -89,11 +85,11 @@ fn cases() -> Vec<Case> {
                 d.points()
                     .x([0.25])
                     .y([0.75])
-                    .with(&XyOptions {
-                        pch: vec![Some(1)],
-                        col: vec![ColorSpec::Index(1)],
-                        ..XyOptions::default()
-                    })
+                    .with(
+                        &XyOptions::default()
+                            .pch(vec![Some(1)])
+                            .col(vec![ColorSpec::Index(1)]),
+                    )
                     .draw();
                 axes(d, &[1, 2]);
             },

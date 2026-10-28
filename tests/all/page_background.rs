@@ -68,22 +68,22 @@ fn two_pages<B: Backend>(backend: B) -> B {
     dev.points()
         .x([0.5])
         .y([0.5])
-        .with(&XyOptions {
-            pch: vec![Some(0)],
-            col: vec![ColorSpec::Index(2)],
-            ..XyOptions::default()
-        })
+        .with(
+            &XyOptions::default()
+                .pch(vec![Some(0)])
+                .col(vec![ColorSpec::Index(2)]),
+        )
         .draw();
     dev.plot_new();
     dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
     dev.points()
         .x([0.5])
         .y([0.5])
-        .with(&XyOptions {
-            pch: vec![Some(0)],
-            col: vec![ColorSpec::Index(4)],
-            ..XyOptions::default()
-        })
+        .with(
+            &XyOptions::default()
+                .pch(vec![Some(0)])
+                .col(vec![ColorSpec::Index(4)]),
+        )
         .draw();
     dev.into_backend()
 }

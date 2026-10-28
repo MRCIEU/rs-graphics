@@ -9,13 +9,16 @@
 //! Chainable setters for the options structs, and the traits ([`Values`],
 //! [`NaValues`]) that let them take one value or several.
 //!
-//! Setting fields through the setters is the same as filling them in:
+//! The fields are private: setters are the one way to fill an options
+//! struct, so every value goes through the setter's conversion and checks.
+//! A struct is built once and reused with `.with(&opts)`:
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
+//! # let mut dev = Device::null().open().unwrap();
+//! # dev.plot_new();
 //! let opts = XyOptions::default().pch(19).col(["red", "blue"]).cex(1.5);
-//! assert_eq!(opts.pch, vec![Some(19)]);
-//! assert_eq!(opts.col.len(), 2);
+//! dev.points().x([0.2, 0.8]).y([0.5, 0.5]).with(&opts).draw();
 //! ```
 //!
 //! Each setter is named after its
@@ -106,9 +109,9 @@ pub mod markers {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let title: Option<&str> = None;
-/// let opts = PlotOptions::default().main(title).xlab("x");
-/// assert!(opts.main.is_none() && opts.xlab.is_some());
+/// # let mut dev = Device::null().open().unwrap();
+/// let title: Option<&str> = None; // no title
+/// dev.plot().x([1, 2, 3]).main(title).xlab("x").draw();
 /// ```
 pub trait OptionArg<T, M> {
     /// The value, `None`, or why it isn't one.
@@ -139,8 +142,10 @@ impl<T, U: IntoArg<T>> OptionArg<T, markers::OptionOf> for Option<U> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let opts = AxisOptions::default().tck(Some(0.02)).line(2);
-/// assert_eq!((opts.tck, opts.line), (Some(0.02), Some(2.0)));
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot_new();
+/// let tck: Option<f64> = Some(0.02);
+/// dev.axis().side(1).tck(tck).line(2).draw();
 /// ```
 pub trait OptionNum<M> {
     /// The number as an `f64`, or `None`.
@@ -156,6 +161,37 @@ impl<N: crate::numbers::Num> OptionNum<markers::Value> for N {
 impl<N: crate::numbers::Num> OptionNum<markers::OptionOf> for Option<N> {
     fn into_option_num(self) -> Option<f64> {
         self.map(crate::numbers::Num::to_f64)
+    }
+}
+
+/// Numbers ([`Numbers`](crate::numbers::Numbers)), or an `Option` of
+/// them (`None`: the setting's default), for a numeric vector R may leave
+/// unset. The marker `M` is inferred.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let at: Option<Vec<f64>> = Some(vec![1.0, 2.0]);
+/// let mut dev = Device::null().open().unwrap();
+/// dev.plot_new();
+/// let ticks = dev.axis().side(1).at(at).draw();
+/// assert_eq!(ticks, [1.0, 2.0]);
+/// ```
+pub trait OptionNumbers<'a, M> {
+    /// The numbers as `f64`s, or `None`.
+    fn into_option_numbers(self) -> Option<Vec<f64>>;
+}
+
+impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::Value> for N {
+    fn into_option_numbers(self) -> Option<Vec<f64>> {
+        Some(self.into_numbers().into_owned())
+    }
+}
+
+impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::OptionOf> for Option<N> {
+    fn into_option_numbers(self) -> Option<Vec<f64>> {
+        self.map(|n| n.into_numbers().into_owned())
     }
 }
 
@@ -265,10 +301,12 @@ impl Values<i32> for char {
 /// ```
 /// use rs_graphics::setters::NaValues;
 /// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot_new();
 /// let pch: Vec<Option<i32>> = [Some(19_i32), None].into_na_values().unwrap();
 /// assert_eq!(pch, [Some(19), None]);
-/// let opts = XyOptions::default().pch([Some(19), None]);
-/// assert_eq!(opts.pch, pch);
+/// // The second point has no symbol.
+/// dev.points().x([0.2, 0.8]).y([0.5, 0.5]).pch([Some(19), None]).draw();
 /// ```
 pub trait NaValues<T> {
     /// The values, in order (`None`: R's `NA`).
@@ -444,7 +482,8 @@ pub(crate) fn char_pch(c: char) -> i32 {
 ///
 /// gives the struct, a setter per field on it, and the same setters on
 /// each listed builder in [`crate::graphics`] (writing to its `opts`),
-/// plus `with(&Struct)` there. Each setter's doc is the field's own doc,
+/// plus `with(&Struct)` there. Fields are `pub(crate)` (whatever the
+/// declaration says), so outside the crate the setters are the one way in. Each setter's doc is the field's own doc,
 /// then (for kinds that take several forms) a line on what it takes.
 /// Field docs should therefore have no headings (`# Panics`): that line
 /// would land under them. Every field
@@ -492,11 +531,10 @@ macro_rules! options {
     }) => {
         $($sattr)*
         $($svis)* struct $ty {
-            $( $(#[$fattr])* $fvis $field: $fty, )*
+            $( $(#[$fattr])* pub(crate) $field: $fty, )*
             /// The first value a setter couldn't convert, returned by the
             /// call's `try_draw()`.
-            #[doc(hidden)]
-            pub deferred_error: Option<$crate::error::Error>,
+            pub(crate) deferred_error: Option<$crate::error::Error>,
         }
     };
     (@opts $ty:ident {
@@ -589,9 +627,9 @@ macro_rules! options {
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_numbers $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes one number or several, of any number type (see [`Numbers`](crate::numbers::Numbers))."]
-        pub fn $field<'n>(mut self, values: impl $crate::numbers::Numbers<'n>) -> Self {
-            self$(.$p)?.$field = Some(values.into_numbers().into_owned());
+        #[doc = "Takes one number or several, of any number type, or an `Option` of them; `None` leaves the default (see [`OptionNumbers`](crate::setters::OptionNumbers))."]
+        pub fn $field<'n, M>(mut self, values: impl $crate::setters::OptionNumbers<'n, M>) -> Self {
+            self$(.$p)?.$field = values.into_option_numbers();
             self
         }
     };

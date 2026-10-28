@@ -45,12 +45,10 @@ fn draw_ours(start: f64, ps: f64) -> Vec<u8> {
     };
     let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
     dev.par().ps(ps).draw();
-    let opts = PlotOptions {
-        type_: Some(PlotType::Both),
-        xlab: Some("x".into()),
-        ylab: Some("y".into()),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .type_(PlotType::Both)
+        .xlab("x")
+        .ylab("y");
     dev.plot()
         .x([1.0, 2.0, 3.0, 4.0])
         .y([1.0, 3.0, 2.0, 4.0])

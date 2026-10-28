@@ -22,17 +22,15 @@ use rs_graphics::highlevel::BarplotOptions;
 use rs_graphics::plotmath::Label;
 use rs_graphics::graphics::Graphics;
 
-fn names(n: &[&str]) -> Option<Vec<Label>> {
-    Some(n.iter().map(|&s| s.into()).collect())
+fn names(n: &[&str]) -> Vec<Label> {
+    n.iter().map(|&s| s.into()).collect()
 }
 
-fn red_green_blue() -> Option<Vec<ColorSpec>> {
-    Some(
-        ["red", "green", "blue"]
-            .iter()
-            .map(|c| ColorSpec::Color(Color::parse(c).unwrap()))
-            .collect(),
-    )
+fn red_green_blue() -> Vec<ColorSpec> {
+    ["red", "green", "blue"]
+        .iter()
+        .map(|c| ColorSpec::Color(Color::parse(c).unwrap()))
+        .collect()
 }
 
 /// The 3 x 4 matrix used by the matrix scenarios, as columns.
@@ -59,12 +57,10 @@ fn cases() -> Vec<Case> {
             name: "vector",
             r: r#"barplot(c(23, 41, 12, -5), names.arg = c("A","B","C","D"), main = "Vec", ylab = "v")"#,
             run: |d| {
-                let o = BarplotOptions {
-                    names: names(&["A", "B", "C", "D"]),
-                    main: Some("Vec".into()),
-                    ylab: Some("v".into()),
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default()
+                    .names(names(&["A", "B", "C", "D"]))
+                    .main("Vec")
+                    .ylab("v");
                 d.barplot().height([23.0, 41.0, 12.0, -5.0]).with(&o).draw();
             },
         },
@@ -72,11 +68,9 @@ fn cases() -> Vec<Case> {
             name: "stacked_legend",
             r: r#"barplot(m, names.arg = c("a","b","c","d"), legend.text = c("r1","r2","r3"))"#,
             run: |d| {
-                let o = BarplotOptions {
-                    names: names(&["a", "b", "c", "d"]),
-                    legend_text: names(&["r1", "r2", "r3"]),
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default()
+                    .names(names(&["a", "b", "c", "d"]))
+                    .legend_text(names(&["r1", "r2", "r3"]));
                 d.barplot().height(mat()).with(&o).draw();
             },
         },
@@ -84,12 +78,10 @@ fn cases() -> Vec<Case> {
             name: "beside_col",
             r: r#"barplot(m, beside = TRUE, names.arg = c("a","b","c","d"), col = c("red","green","blue"))"#,
             run: |d| {
-                let o = BarplotOptions {
-                    names: names(&["a", "b", "c", "d"]),
-                    beside: true,
-                    col: red_green_blue().expect("REASON"),
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default()
+                    .names(names(&["a", "b", "c", "d"]))
+                    .beside(true)
+                    .col(red_green_blue());
                 d.barplot().height(mat()).with(&o).draw();
             },
         },
@@ -97,11 +89,9 @@ fn cases() -> Vec<Case> {
             name: "horiz_stacked",
             r: r#"barplot(m, horiz = TRUE, names.arg = c("a","b","c","d"))"#,
             run: |d| {
-                let o = BarplotOptions {
-                    names: names(&["a", "b", "c", "d"]),
-                    horiz: true,
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default()
+                    .names(names(&["a", "b", "c", "d"]))
+                    .horiz(true);
                 d.barplot().height(mat()).with(&o).draw();
             },
         },
@@ -109,14 +99,12 @@ fn cases() -> Vec<Case> {
             name: "horiz_beside_space_width_legend",
             r: r#"barplot(m, horiz = TRUE, beside = TRUE, space = c(0.1, 0.5), width = c(1, 2, 1), legend.text = c("r1","r2","r3"))"#,
             run: |d| {
-                let o = BarplotOptions {
-                    horiz: true,
-                    beside: true,
-                    space: Some(vec![0.1, 0.5]),
-                    width: vec![1.0, 2.0, 1.0],
-                    legend_text: names(&["r1", "r2", "r3"]),
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default()
+                    .horiz(true)
+                    .beside(true)
+                    .space(vec![0.1, 0.5])
+                    .width(vec![1.0, 2.0, 1.0])
+                    .legend_text(names(&["r1", "r2", "r3"]));
                 d.barplot().height(mat()).with(&o).draw();
             },
         },
@@ -128,10 +116,7 @@ fn cases() -> Vec<Case> {
                     .iter()
                     .map(|c| c.iter().map(|v| v - 3.0).collect())
                     .collect();
-                let o = BarplotOptions {
-                    ylim: Some((-8.0, 12.0)),
-                    ..Default::default()
-                };
+                let o = BarplotOptions::default().ylim(-8.0, 12.0);
                 d.barplot().height(&cols).with(&o).draw();
             },
         },

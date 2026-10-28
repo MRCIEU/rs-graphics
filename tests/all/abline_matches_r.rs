@@ -53,16 +53,18 @@ fn cases() -> Vec<Case> {
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
                 d.abline()
-                    .with(&AblineOptions {
-                        h: vec![2.0, 5.0, 8.0],
-                        v: vec![3.0, 7.0],
-                        col: col(&["red", "blue"]),
-                        lty: (1..=3)
-                            .map(|c| Some(LineType::from_code(c).unwrap()))
-                            .collect(),
-                        lwd: vec![Some(1.0), Some(2.0)],
-                        ..Default::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .h(vec![2.0, 5.0, 8.0])
+                            .v(vec![3.0, 7.0])
+                            .col(col(&["red", "blue"]))
+                            .lty(
+                                (1..=3)
+                                    .map(|c| Some(LineType::from_code(c).unwrap()))
+                                    .collect::<Vec<_>>(),
+                            )
+                            .lwd(vec![Some(1.0), Some(2.0)]),
+                    )
                     .draw();
             },
         },
@@ -74,15 +76,15 @@ fn cases() -> Vec<Case> {
             lims: ((0.0, 10.0), (0.0, 10.0)),
             draw: |d| {
                 d.abline()
-                    .with(&AblineOptions {
-                        a: vec![1.0],
-                        b: vec![0.5],
-                        h: vec![4.0, 6.0],
-                        v: vec![9.0],
-                        col: col(&["darkgreen", "orange", "purple"]),
-                        lwd: vec![Some(3.0)],
-                        ..Default::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .a(vec![1.0])
+                            .b(vec![0.5])
+                            .h(vec![4.0, 6.0])
+                            .v(vec![9.0])
+                            .col(col(&["darkgreen", "orange", "purple"]))
+                            .lwd(vec![Some(3.0)]),
+                    )
                     .draw();
             },
         },
@@ -103,12 +105,10 @@ fn cases() -> Vec<Case> {
                 let sxx: f64 = x.iter().map(|a| (a - mx) * (a - mx)).sum();
                 let slope = sxy / sxx;
                 let red = col(&["red"])[0];
-                let fit = AblineOptions {
-                    a: vec![my - slope * mx],
-                    b: vec![slope],
-                    col: vec![red],
-                    ..AblineOptions::default()
-                };
+                let fit = AblineOptions::default()
+                    .a(vec![my - slope * mx])
+                    .b(vec![slope])
+                    .col(vec![red]);
                 d.abline().with(&fit).draw();
                 d.abline().a(2).b(-0.3).lty("dashed").draw();
             },
@@ -122,27 +122,27 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.par().lend(LineEnd::Square).draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        h: vec![2.0, 4.0],
-                        lty: vec![
-                            Some(LineType::from_code(2).unwrap()),
-                            Some(LineType::from_code(3).unwrap()),
-                        ],
-                        lwd: vec![Some(1.0), Some(3.0)],
-                        ..Default::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .h(vec![2.0, 4.0])
+                            .lty(vec![
+                                Some(LineType::from_code(2).unwrap()),
+                                Some(LineType::from_code(3).unwrap()),
+                            ])
+                            .lwd(vec![Some(1.0), Some(3.0)]),
+                    )
                     .draw();
                 d.par().lend(LineEnd::Butt).draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        h: vec![6.0, 8.0],
-                        lty: vec![
-                            Some(LineType::from_code(4).unwrap()),
-                            Some(LineType::parse("42").unwrap()),
-                        ],
-                        lwd: vec![Some(2.0)],
-                        ..Default::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .h(vec![6.0, 8.0])
+                            .lty(vec![
+                                Some(LineType::from_code(4).unwrap()),
+                                Some(LineType::parse("42").unwrap()),
+                            ])
+                            .lwd(vec![Some(2.0)]),
+                    )
                     .draw();
             },
         },
@@ -193,21 +193,21 @@ fn cases() -> Vec<Case> {
                 d.par().lty(LineType::from_code(2).unwrap()).draw();
                 d.par().lwd(2.0).draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        h: vec![1.0, 10.0, 100.0],
-                        v: vec![2.0, 20.0],
-                        ..Default::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .h(vec![1.0, 10.0, 100.0])
+                            .v(vec![2.0, 20.0]),
+                    )
                     .draw();
                 d.abline()
-                    .with(&AblineOptions {
-                        a: vec![1.0],
-                        b: vec![1.0],
-                        untf: true,
-                        h: vec![50.0],
-                        col: col(&["red", "blue"]),
-                        ..Default::default()
-                    })
+                    .with(
+                        &AblineOptions::default()
+                            .a(vec![1.0])
+                            .b(vec![1.0])
+                            .untf(true)
+                            .h(vec![50.0])
+                            .col(col(&["red", "blue"])),
+                    )
                     .draw();
             },
         },

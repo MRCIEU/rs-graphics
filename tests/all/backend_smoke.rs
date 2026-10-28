@@ -225,12 +225,10 @@ fn raster_output_is_independent_of_thread_count() {
 fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
     use rs_graphics::prelude::*;
     let x = [1.0, 2.5, 4.0];
-    let opts = PlotOptions {
-        pch: vec![Some(21)],
-        cex: vec![Some(1.3)],
-        main: Some(Label::math("alpha^2")),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .pch(vec![Some(21)])
+        .cex(vec![Some(1.3)])
+        .main(Label::math("alpha^2"));
     dev.plot().x(x).y(x).with(&opts).draw();
     dev.legend()
         .pos(LegendPos::Keyword(LegendKeyword::TopLeft))
@@ -239,11 +237,9 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         .pch(46)
         .draw();
     // `pch = "."` small enough that its one-device-unit minimum applies.
-    let dots = PlotOptions {
-        pch: vec![Some(46)],
-        cex: vec![Some(0.5)],
-        ..PlotOptions::default()
-    };
+    let dots = PlotOptions::default()
+        .pch(vec![Some(46)])
+        .cex(vec![Some(0.5)]);
     dev.plot().x(x).y([3.0, 1.0, 2.0]).with(&dots).draw();
 }
 

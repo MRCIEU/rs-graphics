@@ -368,9 +368,9 @@ impl<L: Clone + LabelElement> Labels for &Vec<L> {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
 /// assert_eq!("A".into_label_values(), vec![Label::from("A")]);
-/// let opts = BarplotOptions::default().names(["A", "B"]);
-/// assert_eq!(opts.names.unwrap().len(), 2);
+/// dev.barplot().height([3, 5]).names(["A", "B"]).draw();
 /// ```
 pub trait LabelValues {
     /// The labels, in order.

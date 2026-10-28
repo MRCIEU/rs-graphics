@@ -62,11 +62,7 @@ fn draw_ours(c: &Case) -> Vec<u8> {
     d.points()
         .x([0.5])
         .y([0.5])
-        .with(&XyOptions {
-            pch: vec![Some(19)],
-            col: vec![zero],
-            ..XyOptions::default()
-        })
+        .with(&XyOptions::default().pch(vec![Some(19)]).col(vec![zero]))
         .draw();
     let solid = LineType::from_code(1).unwrap();
     d.rect()
@@ -74,32 +70,30 @@ fn draw_ours(c: &Case) -> Vec<u8> {
         .ybottom([0.1])
         .xright([0.3])
         .ytop([0.3])
-        .with(&RectOptions {
-            col: vec![zero],
-            border: vec![ColorSpec::Index(2)],
-            lwd: vec![Some(1.0)],
-            lty: vec![Some(solid)],
-            ..RectOptions::default()
-        })
+        .with(
+            &RectOptions::default()
+                .col(vec![zero])
+                .border(vec![ColorSpec::Index(2)])
+                .lwd(vec![Some(1.0)])
+                .lty(vec![Some(solid)]),
+        )
         .draw();
     d.text()
         .x([0.7])
         .y([0.7])
         .labels(["z"])
-        .with(&TextOptions {
-            adj: Some(0.5),
-            col: vec![zero],
-            cex: vec![Some(1.0)],
-            font: vec![Some(FontFace::Plain)],
-            ..TextOptions::default()
-        })
+        .with(
+            &TextOptions::default()
+                .adj(0.5)
+                .col(vec![zero])
+                .cex(vec![Some(1.0)])
+                .font(vec![Some(FontFace::Plain)]),
+        )
         .draw();
-    let line = SegmentsOptions {
-        col: vec![zero],
-        lty: vec![Some(solid)],
-        lwd: vec![Some(3.0)],
-        ..SegmentsOptions::default()
-    };
+    let line = SegmentsOptions::default()
+        .col(vec![zero])
+        .lty(vec![Some(solid)])
+        .lwd(vec![Some(3.0)]);
     d.segments()
         .x0([0.0])
         .y0([1.0])

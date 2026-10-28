@@ -85,12 +85,10 @@ fn draw_ours(c: &Case) -> Vec<u8> {
         cex: c.cex,
         ..Par::default()
     };
-    let opts = PlotOptions {
-        type_: Some(PlotType::parse(c.type_).unwrap()),
-        ylog: c.ylog,
-        axes: false,
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .type_(PlotType::parse(c.type_).unwrap())
+        .ylog(c.ylog)
+        .axes(false);
     r::ours_with((PAGE_W, PAGE_H), par, |dev| {
         dev.plot().x(X).y(Y).with(&opts).draw();
     })

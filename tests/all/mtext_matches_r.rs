@@ -18,7 +18,6 @@ use crate::common;
 use crate::common::{pdf, r};
 
 
-use rs_graphics::color::ColorSpec;
 use rs_graphics::device::MtextOptions;
 use rs_graphics::par::{Par, Sides};
 use rs_graphics::prelude::*;
@@ -122,23 +121,22 @@ fn mtext_placement_matches_r() {
             dev.mtext()
                 .text(c.text)
                 .side(c.side)
-                .with(&MtextOptions {
-                    line: vec![c.line],
-                    outer: c.outer,
-                    at: c.at.into_iter().collect(),
-                    adj: c.adj.into_iter().collect(),
-                    padj: c.padj.into_iter().collect(),
-                    cex: c.cex.into_iter().map(Some).collect(),
-                    col: Vec::<ColorSpec>::new(),
-                    font: c
-                        .font
-                        .into_iter()
-                        .map(|f| Some(FontFace::try_from(f).unwrap()))
-                        .collect(),
-                    las: Some(c.las),
-                    xpd: None,
-                    ..MtextOptions::default()
-                })
+                .with(
+                    &MtextOptions::default()
+                        .line(vec![c.line])
+                        .outer(c.outer)
+                        .at(c.at.into_iter().collect::<Vec<_>>())
+                        .adj(c.adj.into_iter().collect::<Vec<_>>())
+                        .padj(c.padj.into_iter().collect::<Vec<_>>())
+                        .cex(c.cex.into_iter().map(Some).collect::<Vec<_>>())
+                        .font(
+                            c.font
+                                .into_iter()
+                                .map(|f| Some(FontFace::try_from(f).unwrap()))
+                                .collect::<Vec<_>>(),
+                        )
+                        .las(c.las),
+                )
                 .draw();
         }
         assert_eq!(dev.current_par().las, 0);

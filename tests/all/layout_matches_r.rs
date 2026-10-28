@@ -21,6 +21,7 @@ use rs_graphics::highlevel::{BarplotOptions, PlotOptions, PlotType};
 use rs_graphics::backend::svg::SvgBackend;
 use rs_graphics::layout::{LayoutRespect, LayoutSize};
 use rs_graphics::par::{Par, Sides};
+use rs_graphics::plotmath::Label;
 use rs_graphics::graphics::Graphics;
 
 const PAGE_W: f64 = 8.0;
@@ -30,16 +31,14 @@ const PAGE_H: f64 = 6.0;
 const R_PRELUDE: &str = "bp <- function(h, main) barplot(h, names.arg = LETTERS[seq_along(h)], main = main, ylab = 'v')\n";
 
 fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
-    let o = BarplotOptions {
-        names: Some(
+    let o = BarplotOptions::default()
+        .names(
             (0..h.len())
-                .map(|i| ((b'A' + i as u8) as char).to_string().into())
-                .collect(),
-        ),
-        main: Some(main.into()),
-        ylab: Some("v".into()),
-        ..Default::default()
-    };
+                .map(|i| Label::from(((b'A' + i as u8) as char).to_string()))
+                .collect::<Vec<_>>(),
+        )
+        .main(main)
+        .ylab("v");
     d.barplot().height(h).with(&o).draw();
 }
 
@@ -193,13 +192,11 @@ fn cases() -> Vec<Case> {
                 let y: Vec<f64> = x.iter().map(|v| v * v).collect();
                 for k in 1..=4 {
                     let title = format!("p {k}");
-                    let o = PlotOptions {
-                        type_: Some(PlotType::None),
-                        main: Some(title.as_str().into()),
-                        xlab: Some("x".into()),
-                        ylab: Some("y".into()),
-                        ..Default::default()
-                    };
+                    let o = PlotOptions::default()
+                        .type_(PlotType::None)
+                        .main(title.as_str())
+                        .xlab("x")
+                        .ylab("y");
                     d.plot().x(&x).y(&y).with(&o).draw();
                 }
             },

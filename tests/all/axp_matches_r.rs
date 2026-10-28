@@ -82,11 +82,11 @@ fn axp_values_match_r() {
         dev.plot_window()
             .xlim(xlim.0, xlim.1)
             .ylim(ylim.0, ylim.1)
-            .with(&PlotWindowOptions {
-                xlog: log.contains('x'),
-                ylog: log.contains('y'),
-                ..PlotWindowOptions::default()
-            })
+            .with(
+                &PlotWindowOptions::default()
+                    .xlog(log.contains('x'))
+                    .ylog(log.contains('y')),
+            )
             .draw();
         let p = dev.current_par();
         let ours: Vec<f64> = p.xaxp.iter().chain(&p.yaxp).copied().collect();
@@ -116,18 +116,15 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim(0.0, 10.0)
                     .ylim(1.0, 1000.0)
-                    .with(&PlotWindowOptions {
-                        ylog: true,
-                        ..PlotWindowOptions::default()
-                    })
+                    .with(&PlotWindowOptions::default().ylog(true))
                     .draw();
                 d.par().xaxp([0.0, 10.0, 2.0]).draw();
                 d.par().yaxp([1.0, 1000.0, 2.0]).draw();
                 d.axis().side(1).draw();
                 d.axis().side(2).draw();
-                let o = AxisOptions { axp: Some([2.0, 8.0, 3.0]), ..Default::default() };
+                let o = AxisOptions::default().axp([2.0, 8.0, 3.0]);
                 d.axis().side(3).with(&o).draw();
-                let o = AxisOptions { axp: Some([1.0, 100.0, 3.0]), ..Default::default() };
+                let o = AxisOptions::default().axp([1.0, 100.0, 3.0]);
                 d.axis().side(4).with(&o).draw();
             },
         },
@@ -136,13 +133,11 @@ fn cases() -> Vec<Case> {
             r: "plot(1:10, xaxp = c(1, 10, 3), yaxp = c(2, 8, 6), xlab = 'x', ylab = 'y')",
             draw: |d| {
                 let x: Vec<f64> = (1..=10).map(f64::from).collect();
-                let o = PlotOptions {
-                    xaxp: Some([1.0, 10.0, 3.0]),
-                    yaxp: Some([2.0, 8.0, 6.0]),
-                    xlab: Some("x".into()),
-                    ylab: Some("y".into()),
-                    ..Default::default()
-                };
+                let o = PlotOptions::default()
+                    .xaxp([1.0, 10.0, 3.0])
+                    .yaxp([2.0, 8.0, 6.0])
+                    .xlab("x")
+                    .ylab("y");
                 d.plot().x(&x).y(&x).with(&o).draw();
                 // Like R, `par()` keeps what `plot.window()` computed.
                 assert_eq!(d.current_par().xaxp, [2.0, 10.0, 4.0]);
