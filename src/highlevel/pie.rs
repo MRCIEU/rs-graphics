@@ -99,7 +99,7 @@ crate::setters::options! {
         /// Colour of the title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
-        pub col_main: Option<ColorSpec> => option ColorSpec,
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the title (a [`FontFace`]). `None`: [`par(font.main)`].
         /// R's `font.main`.
         ///

@@ -89,9 +89,9 @@ crate::setters::options! {
         /// Colour of the axis line. `None`: [`par(fg)`].
         ///
         /// [`par(fg)`]: crate::par::Par::fg
-        pub col: Option<ColorSpec> => option ColorSpec,
+        pub col: Option<ColorSpec> => option_value ColorSpec,
         /// Colour of the tick marks. `None`: `col`. R's `col.ticks`.
-        pub col_ticks: Option<ColorSpec> => option ColorSpec,
+        pub col_ticks: Option<ColorSpec> => option_value ColorSpec,
         /// Justification of every label along its reading direction. `None`:
         /// centred for labels parallel to the axis, otherwise right-justified
         /// on sides 1 and 2 and left-justified on 3 and 4.
@@ -114,7 +114,7 @@ crate::setters::options! {
         /// this call only.
         ///
         /// [`par(col.axis)`]: crate::par::Par::col_axis
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
         /// Orientation of the labels. `None`: [`par(las)`]; overrides it for
         /// this call only.
         ///

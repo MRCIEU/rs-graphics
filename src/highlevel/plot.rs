@@ -186,7 +186,7 @@ crate::setters::options! {
         /// `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
-        pub col_main: Option<ColorSpec> => option ColorSpec,
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the main title (a [`FontFace`]). `None`:
         /// [`par(font.main)`]. R's `font.main`.
         ///
@@ -201,7 +201,7 @@ crate::setters::options! {
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
-        pub col_sub: Option<ColorSpec> => option ColorSpec,
+        pub col_sub: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the subtitle (a [`FontFace`]). `None`: [`par(font.sub)`].
         /// R's `font.sub`.
         ///
@@ -217,7 +217,7 @@ crate::setters::options! {
         /// [`par(col.lab)`]. R's `col.lab`.
         ///
         /// [`par(col.lab)`]: crate::par::Par::col_lab
-        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        pub col_lab: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the axis titles (`xlab` and `ylab`; a [`FontFace`]).
         /// `None`: [`par(font.lab)`]. R's `font.lab`.
         ///
@@ -262,7 +262,7 @@ crate::setters::options! {
         /// `col.axis`.
         ///
         /// [`par(col.axis)`]: crate::par::Par::col_axis
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the axis labels. `None`: [`par(font.axis)`]. R's
         /// `font.axis`.
         ///
@@ -320,7 +320,7 @@ crate::setters::options! {
         ///
         /// [`par(col)`]: crate::par::Par::col
         /// [`par(fg)`]: crate::par::Par::fg
-        pub fg: Option<ColorSpec> => option ColorSpec,
+        pub fg: Option<ColorSpec> => option_value ColorSpec,
         /// Position of the titles along their sides (0 left, 1 right).
         /// `None`: [`par(adj)`].
         ///

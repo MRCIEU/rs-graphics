@@ -245,7 +245,7 @@ crate::setters::options! {
         /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
-        pub col_main: Option<ColorSpec> => option ColorSpec,
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
         /// Size of the subtitle, relative to [`par(cex)`]. `None`:
         /// [`par(cex.sub)`]. R's `cex.sub`.
         ///
@@ -255,7 +255,7 @@ crate::setters::options! {
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
-        pub col_sub: Option<ColorSpec> => option ColorSpec,
+        pub col_sub: Option<ColorSpec> => option_value ColorSpec,
         /// Size of the axis labels `xlab` and `ylab`, relative to
         /// [`par(cex)`]. `None`: [`par(cex.lab)`]. R's `cex.lab`.
         ///
@@ -266,7 +266,7 @@ crate::setters::options! {
         /// `col.lab`.
         ///
         /// [`par(col.lab)`]: crate::par::Par::col_lab
-        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        pub col_lab: Option<ColorSpec> => option_value ColorSpec,
         /// Whether to draw the titles. `None`: unless `add` (R's default
         /// `ann = !add`, not [`par(ann)`]).
         ///
@@ -383,7 +383,7 @@ crate::setters::options! {
         /// `col.axis`.
         ///
         /// [`par(col.axis)`]: crate::par::Par::col_axis
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
         /// Minimum gap between axis labels. `None`: R's default. R's
         /// `gap.axis`.
         pub gap_axis: Option<f64> => number f64,

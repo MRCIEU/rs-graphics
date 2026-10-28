@@ -600,7 +600,7 @@ crate::setters::options! {
         /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
-        pub col_main: Option<ColorSpec> => option ColorSpec,
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
         /// Font face of the main title ([`FontFace`]). `None`:
         /// [`par(font.main)`]. R's `font.main`.
         ///
@@ -615,7 +615,7 @@ crate::setters::options! {
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
-        pub col_sub: Option<ColorSpec> => option ColorSpec,
+        pub col_sub: Option<ColorSpec> => option_value ColorSpec,
         /// Font face of the subtitle ([`FontFace`]). `None`: [`par(font.sub)`].
         /// R's `font.sub`.
         ///
@@ -631,7 +631,7 @@ crate::setters::options! {
         /// R's `col.lab`.
         ///
         /// [`par(col.lab)`]: crate::par::Par::col_lab
-        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        pub col_lab: Option<ColorSpec> => option_value ColorSpec,
         /// Font face of the axis labels (`xlab`, `ylab`; [`FontFace`]).
         /// `None`: [`par(font.lab)`]. R's `font.lab`.
         ///

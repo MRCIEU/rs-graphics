@@ -512,7 +512,7 @@ par_options! {
         /// instead of the figure less `mar`. `None` (the default): use `mar`
         /// and `pty`. A `par()` call setting `mar`, `mai` or `pty` resets it
         /// to `None`, as in R. Applied at the next `plot_new()`.
-        pub plt: Option<[f64; 4]> => option Option<[f64; 4]>,
+        pub plt: Option<[f64; 4]> => option_value Option<[f64; 4]>,
         /// Plot region size in inches, `[width, height]`, centred in the
         /// figure, instead of the figure less `mar`. `None` (the default): use
         /// `plt`, or `mar` and `pty`; takes precedence over `plt`. A `par()`

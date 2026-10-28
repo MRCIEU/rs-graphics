@@ -480,7 +480,7 @@ crate::setters::options! {
         /// unfilled, on PDF by default: see [`Backend::default_bg`]).
         ///
         /// [`par("bg")`]: crate::par::Par::bg
-        pub bg: Option<ColorSpec> => option ColorSpec,
+        pub bg: Option<ColorSpec> => option_value ColorSpec,
         /// Size of each key's text and symbol, times [`par(cex)`]. Empty and
         /// `None`: 1.
         ///
@@ -526,7 +526,7 @@ crate::setters::options! {
         /// Size of the title. `None`: the first `cex`. R's `title.cex`.
         pub title_cex: Option<f64> => number f64,
         /// Colour of the title. `None`: the first `text_col`. R's `title.col`.
-        pub title_col: Option<ColorSpec> => option ColorSpec,
+        pub title_col: Option<ColorSpec> => option_value ColorSpec,
         /// Where the title sits across the box (0 left, 1 right) and its
         /// justification there. `None`: 0.5 (centred). R's `title.adj`.
         pub title_adj: Option<f64> => number f64,
@@ -557,7 +557,7 @@ crate::setters::options! {
         /// `None`: [`par("fg")`]. R's `box.col`.
         ///
         /// [`par("fg")`]: crate::par::Par::fg
-        pub box_col: Option<ColorSpec> => option ColorSpec,
+        pub box_col: Option<ColorSpec> => option_value ColorSpec,
         /// How far drawing may reach ([`Xpd`]; the setter also takes
         /// `false`/`true`). `None`: [`par(xpd)`]; overrides it for this call
         /// only.

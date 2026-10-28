@@ -85,6 +85,80 @@ where
     }
 }
 
+/// Marker types that let a setter take a value or an `Option` of one
+/// ([`OptionArg`], [`OptionNum`]); they are inferred, never written.
+pub mod markers {
+    /// A value (the field is set to `Some` of it).
+    pub struct Value;
+    /// An `Option` of a value (`None` leaves the field unset).
+    pub struct OptionOf;
+}
+
+/// A value, or an `Option` of one, for a setting R may leave unset.
+///
+/// Takes anything that converts to the field's type ([`IntoArg`]), or an
+/// `Option` of it: `None` leaves the setting at its default (for
+/// [`par()`](crate::graphics::Graphics::par), unchanged), so an
+/// `Option` held in a variable can be passed as it is. A bare `None`
+/// needs its type (`None::<&str>`). The marker `M` is inferred.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let title: Option<&str> = None;
+/// let opts = PlotOptions::default().main(title).xlab("x");
+/// assert!(opts.main.is_none() && opts.xlab.is_some());
+/// ```
+pub trait OptionArg<T, M> {
+    /// The value, `None`, or why it isn't one.
+    ///
+    /// # Errors
+    ///
+    /// If the conversion fails; see [`IntoArg`].
+    fn into_option_arg(self) -> Result<Option<T>, Error>;
+}
+
+impl<T, U: IntoArg<T>> OptionArg<T, markers::Value> for U {
+    fn into_option_arg(self) -> Result<Option<T>, Error> {
+        self.into_arg().map(Some)
+    }
+}
+
+impl<T, U: IntoArg<T>> OptionArg<T, markers::OptionOf> for Option<U> {
+    fn into_option_arg(self) -> Result<Option<T>, Error> {
+        self.map(IntoArg::into_arg).transpose()
+    }
+}
+
+/// A number of any type ([`Num`](crate::numbers::Num)), or an `Option` of
+/// one (`None`: the setting's default), for a numeric setting R may leave
+/// unset. The marker `M` is inferred.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let opts = AxisOptions::default().tck(Some(0.02)).line(2);
+/// assert_eq!((opts.tck, opts.line), (Some(0.02), Some(2.0)));
+/// ```
+pub trait OptionNum<M> {
+    /// The number as an `f64`, or `None`.
+    fn into_option_num(self) -> Option<f64>;
+}
+
+impl<N: crate::numbers::Num> OptionNum<markers::Value> for N {
+    fn into_option_num(self) -> Option<f64> {
+        Some(self.to_f64())
+    }
+}
+
+impl<N: crate::numbers::Num> OptionNum<markers::OptionOf> for Option<N> {
+    fn into_option_num(self) -> Option<f64> {
+        self.map(crate::numbers::Num::to_f64)
+    }
+}
+
 /// One value or several, for a field R recycles per element.
 ///
 /// Takes a single value or a `Vec`, array or slice of them, by value or
@@ -378,8 +452,13 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// by mistake; one set by a constructor is marked `=> no_setter`. The
 /// builder list `=> [..]` may be left out.
 ///
-/// Setter kinds: `value` (plain field), `option` (`Option<T>`, set to
-/// `Some`), `number` (`Option<f64>` from any [`Num`](crate::numbers::Num)),
+/// Setter kinds: `value` (plain field), `option` (`Option<T>` from a
+/// value or an `Option`, [`OptionArg`]), `option_value`
+/// (`Option<T>` from a value only, for types where an `Option` is a value
+/// itself: a colour's `None` is R's `NA`, as in colour vectors, and
+/// [`par(plt)`]'s `None` is the `mar`-based region),
+/// `number` (`Option<f64>` from any [`Num`](crate::numbers::Num) or an
+/// `Option` of one, [`OptionNum`]),
 /// `values` (`Vec<T>` recycled by R), `numbers` (`Vec<f64>` recycled by
 /// R, from [`Numbers`](crate::numbers::Numbers)), `na_values`
 /// (`Vec<Option<T>>` recycled by R, `None` = `NA`), `option_values`
@@ -394,6 +473,8 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// `NA`-able number, from one number; `f64::NAN` is `NA`), `count`
 /// (`Option<usize>` from any integer) and `legend_pch` (`legend()`'s `pch`, a `Vec<i32>` from
 /// [`LegendPch`](crate::device::LegendPch)).
+///
+/// [`par(plt)`]: crate::par::Par::plt
 macro_rules! options {
     (
         $(#[$sattr:meta])*
@@ -467,6 +548,18 @@ macro_rules! options {
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option $t:ty) => {
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes a value or an `Option` of one; `None` leaves the default (see [`OptionArg`](crate::setters::OptionArg))."]
+        pub fn $field<M>(mut self, value: impl $crate::setters::OptionArg<$t, M>) -> Self {
+            match value.into_option_arg() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_value $t:ty) => {
+        $($a)*
         pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
             match value.into_arg() {
                 Ok(v) => self$(.$p)?.$field = Some(v),
@@ -477,8 +570,10 @@ macro_rules! options {
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident number $t:ty) => {
         $($a)*
-        pub fn $field(mut self, value: impl $crate::numbers::Num) -> Self {
-            self$(.$p)?.$field = Some(value.to_f64());
+        #[doc = ""]
+        #[doc = "Takes any number, or an `Option` of one; `None` leaves the default (see [`OptionNum`](crate::setters::OptionNum))."]
+        pub fn $field<M>(mut self, value: impl $crate::setters::OptionNum<M>) -> Self {
+            self$(.$p)?.$field = value.into_option_num();
             self
         }
     };
@@ -663,6 +758,45 @@ mod tests {
         let xy = XyOptions::default().pch(&[1, 2]).lwd(&[Some(1.0), None]);
         assert_eq!(xy.pch, vec![Some(1), Some(2)]);
         assert_eq!(xy.lwd, vec![Some(1.0), None]);
+    }
+
+    #[test]
+    fn option_setters_take_a_value_or_an_option() {
+        use crate::device::{AxisOptions, TitleOptions};
+        use crate::par::ParOptions;
+        use crate::plotmath::Label;
+        let main: Option<String> = Some("Title".into());
+        let t = TitleOptions::default().main(main).xlab(None::<&str>);
+        assert_eq!(t.main, Some(Label::from("Title")));
+        assert!(t.xlab.is_none());
+        // `None` resets a value set before.
+        let t = TitleOptions::default().main("a").main(None::<Label>);
+        assert!(t.main.is_none());
+        // Numbers, and enums from R's strings, the same way.
+        let a = AxisOptions::default()
+            .line(Some(2_u8))
+            .las(Some(1))
+            .lend(Some("butt"));
+        assert_eq!((a.line, a.las), (Some(2.0), Some(1)));
+        assert_eq!(a.lend, Some(crate::backend::LineEnd::Butt));
+        assert!(
+            AxisOptions::default()
+                .line(2)
+                .line(None::<f64>)
+                .line
+                .is_none()
+        );
+        assert_eq!(ParOptions::default().cex(Some(1.5)).cex, Some(1.5));
+        // A failed conversion inside the `Option` is kept for `try_draw()`.
+        assert!(
+            AxisOptions::default()
+                .lend(Some("wavy"))
+                .deferred_error
+                .is_some()
+        );
+        // Colours keep `None` as R's `NA` (draw nothing), as colour vectors do.
+        let a = AxisOptions::default().col(None::<&str>);
+        assert_eq!(a.col, Some(ColorSpec::None));
     }
 
     #[test]

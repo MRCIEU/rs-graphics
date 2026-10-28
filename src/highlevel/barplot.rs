@@ -69,7 +69,7 @@ crate::setters::options! {
         /// Colour of the bar borders. `None`: [`par(fg)`].
         ///
         /// [`par(fg)`]: crate::par::Par::fg
-        pub border: Option<ColorSpec> => option ColorSpec,
+        pub border: Option<ColorSpec> => option_value ColorSpec,
         /// Shading lines per inch in the bars, recycled as `col` is; the
         /// lines take the bar's `col`. `None` or a negative value fills the
         /// bar instead, 0 leaves it empty (see [`RectOptions::density`]).
@@ -153,7 +153,7 @@ crate::setters::options! {
         /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
-        pub col_main: Option<ColorSpec> => option ColorSpec,
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the main title. `None`: [`par(font.main)`]. R's `font.main`.
         ///
         /// [`par(font.main)`]: crate::par::Par::font_main
@@ -167,7 +167,7 @@ crate::setters::options! {
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
-        pub col_sub: Option<ColorSpec> => option ColorSpec,
+        pub col_sub: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the subtitle. `None`: [`par(font.sub)`]. R's `font.sub`.
         ///
         /// [`par(font.sub)`]: crate::par::Par::font_sub
@@ -182,7 +182,7 @@ crate::setters::options! {
         /// `col.lab`.
         ///
         /// [`par(col.lab)`]: crate::par::Par::col_lab
-        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        pub col_lab: Option<ColorSpec> => option_value ColorSpec,
         /// Font of `xlab` and `ylab`. `None`: [`par(font.lab)`]. R's
         /// `font.lab`.
         ///
@@ -212,7 +212,7 @@ crate::setters::options! {
         /// `col.axis`.
         ///
         /// [`par(col.axis)`]: crate::par::Par::col_axis
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the axis labels. `None`: [`par(font.axis)`]. R's
         /// `font.axis`.
         ///

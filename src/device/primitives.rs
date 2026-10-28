@@ -396,12 +396,12 @@ crate::setters::options! {
         ///
         /// [`par(col)`]: crate::par::Par::col
         /// [`par(fg)`]: crate::par::Par::fg
-        pub col: Option<ColorSpec> => option ColorSpec,
+        pub col: Option<ColorSpec> => option_value ColorSpec,
         /// Colour of the box when `col` isn't given (or is `None`). `None`
         /// or `ColorSpec::None`: [`par(col)`].
         ///
         /// [`par(col)`]: crate::par::Par::col
-        pub fg: Option<ColorSpec> => option ColorSpec,
+        pub fg: Option<ColorSpec> => option_value ColorSpec,
         /// Line type. `None`: solid, not [`par(lty)`] (R's `box()` passes
         /// `lty = "solid"`).
         ///

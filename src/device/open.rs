@@ -67,7 +67,7 @@ crate::setters::options! {
         /// transparent for PDF, white for SVG and PNG (R's defaults).
         ///
         /// [`par(bg)`]: crate::par::Par::bg
-        pub bg: Option<ColorSpec> => option ColorSpec,
+        pub bg: Option<ColorSpec> => option_value ColorSpec,
         /// Resolution in pixels per inch, PNG only (ignored for PDF and SVG).
         /// `None`: 72. R's `res`.
         pub res: Option<f64> => number f64,
