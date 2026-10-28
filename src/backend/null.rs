@@ -13,6 +13,7 @@
 use super::{Backend, Stroke, TextStyle};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
+use crate::numbers::Num;
 
 /// A backend that draws nothing and produces no output, with the PDF
 /// backend's measurements: text sizes rounded to whole points, a device
@@ -44,10 +45,10 @@ pub struct NullBackend {
 impl NullBackend {
     /// Creates a null backend for a page of `width_in` by `height_in`
     /// inches, with a transparent background (as PDF's).
-    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
+    pub fn new(width_in: impl Num, height_in: impl Num) -> Self {
         NullBackend {
-            width_in: width_in.into(),
-            height_in: height_in.into(),
+            width_in: width_in.to_f64(),
+            height_in: height_in.to_f64(),
             background: Color::TRANSPARENT,
         }
     }

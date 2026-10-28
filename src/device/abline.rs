@@ -45,16 +45,16 @@ crate::setters::options! {
         /// Intercepts of the lines `y = a + b * x`, paired with `b` (either
         /// may have a single value, used for every line). Empty (with `b`):
         /// no such lines.
-        pub a: Vec<f64> => values f64,
+        pub a: Vec<f64> => numbers f64,
         /// Slopes of the lines `y = a + b * x`, paired with `a`.
-        pub b: Vec<f64> => values f64,
+        pub b: Vec<f64> => numbers f64,
         /// On log axes, draws each `y = a + b * x` in data units (a curve)
         /// rather than as a straight line in log units. Default `false`.
         pub untf: bool => value bool,
         /// Horizontal lines at these y values. Empty: none.
-        pub h: Vec<f64> => values f64,
+        pub h: Vec<f64> => numbers f64,
         /// Vertical lines at these x values. Empty: none.
-        pub v: Vec<f64> => values f64,
+        pub v: Vec<f64> => numbers f64,
         /// Line colours, recycled over the lines. Empty: [`par(col)`].
         ///
         /// [`par(col)`]: crate::par::Par::col
@@ -91,7 +91,7 @@ crate::setters::options! {
         /// overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
-        pub lmitre: Option<f64> => option f64,
+        pub lmitre: Option<f64> => number f64,
     }
 }
 

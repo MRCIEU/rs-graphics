@@ -42,6 +42,7 @@ use crate::geometry::{Point, Rect};
 use crate::graphics::Graphics;
 use crate::layout::{Arrangement, Layout, LayoutRespect, LayoutSize};
 use crate::lty::LineType;
+use crate::numbers::Num;
 use crate::par::{AxisStyle, Par, Pty, Sides, Xpd};
 use crate::pch;
 use crate::plotmath::Label;
@@ -479,8 +480,8 @@ impl<'a, B: Backend> StrSizeCall<'a, B> {
     /// Size, relative to [`par(cex)`]. `None`: 1, so [`par(cex)`].
     ///
     /// [`par(cex)`]: crate::par::Par::cex
-    pub fn cex(mut self, cex: impl Into<f64>) -> Self {
-        self.cex = Some(cex.into());
+    pub fn cex(mut self, cex: impl Num) -> Self {
+        self.cex = Some(cex.to_f64());
         self
     }
 
@@ -595,7 +596,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.main)`]: crate::par::Par::cex_main
-        pub cex_main: Option<f64> => option f64,
+        pub cex_main: Option<f64> => number f64,
         /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
@@ -610,7 +611,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.sub)`]: crate::par::Par::cex_sub
-        pub cex_sub: Option<f64> => option f64,
+        pub cex_sub: Option<f64> => number f64,
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
@@ -625,7 +626,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.lab)`]: crate::par::Par::cex_lab
-        pub cex_lab: Option<f64> => option f64,
+        pub cex_lab: Option<f64> => number f64,
         /// Colour of the axis labels (`xlab`, `ylab`). `None`: [`par(col.lab)`].
         /// R's `col.lab`.
         ///
@@ -641,7 +642,7 @@ crate::setters::options! {
         /// right (top). `None`: [`par(adj)`].
         ///
         /// [`par(adj)`]: crate::par::Par::adj
-        pub adj: Option<f64> => option f64,
+        pub adj: Option<f64> => number f64,
         /// Margin lines for the axis labels (`mgp[0]`) and the subtitle
         /// (`mgp[0] + 1`). `None`: [`par(mgp)`].
         ///
@@ -651,7 +652,7 @@ crate::setters::options! {
         /// the top margin for `main`, `mgp[0]` for `xlab`/`ylab`, `mgp[0] + 1`
         /// for `sub`); `main` then sits with its baseline on it. `None` (or
         /// non-finite): the defaults.
-        pub line: Option<f64> => option f64,
+        pub line: Option<f64> => number f64,
         /// Draws in the outer margins ([`par(oma)`]) instead, positioned along
         /// the inner region; `main` defaults to half the top outer margin.
         /// Default `false`.

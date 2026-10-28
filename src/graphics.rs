@@ -70,7 +70,7 @@ use crate::highlevel::{
     PlotOptions,
 };
 use crate::layout::{LayoutRespect, LayoutSize};
-use crate::numbers::{Groups, Numbers};
+use crate::numbers::{Groups, Num, Numbers};
 use crate::par::ParOptions;
 use crate::plotmath::{Label, Labels};
 use crate::setters::IntoArg;
@@ -1395,14 +1395,14 @@ call!(
 impl<G: Graphics> PlotWindowCall<'_, G> {
     /// The x range shown, in data units (also on a log axis); decreasing
     /// for a reversed axis. Required.
-    pub fn xlim(mut self, from: impl Into<f64>, to: impl Into<f64>) -> Self {
-        self.xlim = Some((from.into(), to.into()));
+    pub fn xlim(mut self, from: impl Num, to: impl Num) -> Self {
+        self.xlim = Some((from.to_f64(), to.to_f64()));
         self
     }
 
     /// The y range shown; as [`xlim`](PlotWindowCall::xlim). Required.
-    pub fn ylim(mut self, from: impl Into<f64>, to: impl Into<f64>) -> Self {
-        self.ylim = Some((from.into(), to.into()));
+    pub fn ylim(mut self, from: impl Num, to: impl Num) -> Self {
+        self.ylim = Some((from.to_f64(), to.to_f64()));
         self
     }
 }
@@ -1876,8 +1876,8 @@ impl<G: Graphics> ParCall<'_, G> {
     ///
     /// [`par(cex)`]: crate::par::Par::cex
     /// [`par(oma)`]: crate::par::Par::oma
-    pub fn fig(mut self, fig: [impl Into<f64>; 4]) -> Self {
-        self.page.fig = Some(fig.map(Into::into));
+    pub fn fig(mut self, fig: [impl Num; 4]) -> Self {
+        self.page.fig = Some(fig.map(Num::to_f64));
         self
     }
 
@@ -1899,8 +1899,8 @@ impl<G: Graphics> ParCall<'_, G> {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, unless
     /// both sizes are positive.
-    pub fn fin(mut self, fin: [impl Into<f64>; 2]) -> Self {
-        self.page.fin = Some(fin.map(Into::into));
+    pub fn fin(mut self, fin: [impl Num; 2]) -> Self {
+        self.page.fin = Some(fin.map(Num::to_f64));
         self
     }
 }

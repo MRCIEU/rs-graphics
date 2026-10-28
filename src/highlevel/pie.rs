@@ -49,16 +49,16 @@ crate::setters::options! {
         /// [`par(srt)`].
         ///
         /// [`par(srt)`]: crate::par::Par::srt
-        pub srt: Option<f64> => option f64,
+        pub srt: Option<f64> => number f64,
         /// Size of the labels (the title keeps `cex_main`). `None`: 1.
-        pub cex: Option<f64> => option f64,
+        pub cex: Option<f64> => number f64,
         /// Font of the labels. `None`: [`par(font)`].
         ///
         /// [`par(font)`]: crate::par::Par::font
         pub font: Option<FontFace> => option FontFace,
         /// Pie radius in user units, where the plot region's shorter side
         /// spans `[-1, 1]` before the usual 4% axis extension. `None`: 0.8.
-        pub radius: Option<f64> => option f64,
+        pub radius: Option<f64> => number f64,
         /// Slice fill colours, recycled over the slices. Empty: a cycle of 6
         /// pastel colours, or [`par(fg)`] (the shading lines' colour) when
         /// `density` is given.
@@ -84,7 +84,7 @@ crate::setters::options! {
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled over the slices.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Title, as for `plot()` (text or a plotmath expression). `None`:
         /// none. Drawn whatever [`par(ann)`] is, as in R.
         ///
@@ -95,7 +95,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.main)`]: crate::par::Par::cex_main
-        pub cex_main: Option<f64> => option f64,
+        pub cex_main: Option<f64> => number f64,
         /// Colour of the title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
@@ -112,7 +112,7 @@ crate::setters::options! {
         pub clockwise: bool => value bool,
         /// Starting angle in degrees. `None`: 90 (12 o'clock) when
         /// `clockwise`, else 0 (3 o'clock). R's `init.angle`.
-        pub init_angle: Option<f64> => option f64,
+        pub init_angle: Option<f64> => number f64,
     }
 }
 

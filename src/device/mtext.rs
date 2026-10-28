@@ -42,7 +42,7 @@ crate::setters::options! {
         /// region (or the inner region for `outer`); may be negative or
         /// fractional. Empty: 0. A `NaN` entry leaves its label out (R writes
         /// it with a `nan` coordinate, an invalid PDF: R bug not copied).
-        pub line: Vec<f64> => values f64,
+        pub line: Vec<f64> => numbers f64,
         /// Draws in the outer margins ([`par(oma)`]) rather than the figure's.
         /// Default `false`.
         ///
@@ -52,15 +52,15 @@ crate::setters::options! {
         /// for inner margins, or a fraction (0 to 1) of the inner region for
         /// outer ones. Empty or `NaN`: from `adj` (text parallel to the
         /// side) or centred (perpendicular).
-        pub at: Vec<f64> => values f64,
+        pub at: Vec<f64> => numbers f64,
         /// Justification along the text, recycled per label. Empty or `NaN`:
         /// 0.5 for text parallel to the side, otherwise justified at the end
         /// nearest the plot (1 on sides 1 and 2, 0 on sides 3 and 4).
-        pub adj: Vec<f64> => values f64,
+        pub adj: Vec<f64> => numbers f64,
         /// Justification across the text, recycled per label. Empty or
         /// `NaN`: depends on `side` and `las` (0, i.e. baseline on the line,
         /// for `las = 0`).
-        pub padj: Vec<f64> => values f64,
+        pub padj: Vec<f64> => numbers f64,
         /// Text sizes, recycled per label. Empty, `None` or `NaN`: 1. Unlike
         /// most text, *not* scaled by [`par(cex)`] (so neither by the
         /// multi-panel reduction), as in R. (For an `NA` after a finite

@@ -556,7 +556,7 @@ par_options! {
         pub palette: Vec<Color> => option Vec<Color>,
 
         /// Line width; 1 is 1/96 inch, as in R. Default 1.
-        pub lwd: f64 => option f64,
+        pub lwd: f64 => number f64,
         /// Line type. Default solid.
         pub lty: LineType => option LineType,
         /// Line end style. Default round.
@@ -564,7 +564,7 @@ par_options! {
         /// Line join style. Default round.
         pub ljoin: LineJoin => option LineJoin,
         /// Mitre limit for mitred joins. Default 10.
-        pub lmitre: f64 => option f64,
+        pub lmitre: f64 => number f64,
 
         /// Default plotting symbol. Default 1 (open circle).
         pub pch: i32 => option i32,
@@ -575,24 +575,24 @@ par_options! {
         /// or `ps` passed to `Device::new`; R's `pdf(pointsize = )`), from
         /// which margin lines and symbols are sized; changing it later only
         /// changes text size, as in R.
-        pub ps: f64 => option f64,
+        pub ps: f64 => number f64,
         /// Base magnification of text and symbols; also scales the margin
         /// "line" unit (see [`Device::line_height_inches`](crate::device::Device::line_height_inches)).
         /// Default 1. R's `cexbase`.
-        pub cex: f64 => option f64,
+        pub cex: f64 => number f64,
         /// Expansion factor for margin lines, a multiple of `cex`. Default 1.
-        pub mex: f64 => option f64,
+        pub mex: f64 => number f64,
         /// Size of axis tick labels, relative to `cex`. Default 1. R's
         /// `cex.axis`.
-        pub cex_axis: f64 => option f64,
+        pub cex_axis: f64 => number f64,
         /// Size of the axis titles (`xlab`/`ylab`), relative to `cex`.
         /// Default 1. R's `cex.lab`.
-        pub cex_lab: f64 => option f64,
+        pub cex_lab: f64 => number f64,
         /// Size of the main title, relative to `cex`. Default 1.2. R's
         /// `cex.main`.
-        pub cex_main: f64 => option f64,
+        pub cex_main: f64 => number f64,
         /// Size of the subtitle, relative to `cex`. Default 1. R's `cex.sub`.
-        pub cex_sub: f64 => option f64,
+        pub cex_sub: f64 => number f64,
 
         /// Font face of text ([`FontFace`]; the setter takes R's numbers 1 to
         /// 5, the names or the enum). Default plain.
@@ -621,7 +621,7 @@ par_options! {
         pub yaxt: AxisType => option AxisType,
         /// Tick mark length, in margin lines; negative points outwards.
         /// Default -0.5, as in R. Used when `tck` is `None`.
-        pub tcl: f64 => option f64,
+        pub tcl: f64 => number f64,
         /// Tick mark length as a fraction of the plot region (if above 0.5,
         /// of its height for an x axis, so `1` draws grid lines; else of its
         /// smaller side); positive points inwards. Overrides `tcl`. `None`
@@ -631,7 +631,7 @@ par_options! {
         /// Default rotation of `text()` labels, in degrees anticlockwise; also
         /// applies to `legend()` and `pie()` labels, which R draws with
         /// `text()`. Default 0.
-        pub srt: f64 => option f64,
+        pub srt: f64 => number f64,
         /// Margin lines of the axis title, the tick labels and the axis line.
         /// Default `c(3, 1, 0)`.
         pub mgp: [f64; 3] => array [f64; 3],
@@ -651,16 +651,16 @@ par_options! {
         /// Multiplies the spacing of the lines of text with newlines, when
         /// drawn and in [`Device::strheight`](crate::device::Device::strheight).
         /// Default 1.
-        pub lheight: f64 => option f64,
+        pub lheight: f64 => number f64,
         /// How far text parallel to its side is moved out from its margin
         /// line: `1 - ylbias` lines on sides 1 and 4, `ylbias` on sides 2 and
         /// 3 (divided by `mex`). Used by axis labels, `mtext()` and
         /// `title()`'s `sub`/`xlab`/`ylab`. Default 0.2, as R's pdf, png and
         /// svg devices.
-        pub ylbias: f64 => option f64,
+        pub ylbias: f64 => number f64,
         /// Default text justification: 0 left, 0.5 centred (the default), 1
         /// right.
-        pub adj: f64 => option f64,
+        pub adj: f64 => number f64,
         /// Region drawing is clipped to: [`Xpd::Plot`] (the default; R's
         /// `FALSE`), [`Xpd::Figure`] (`TRUE`) or [`Xpd::Device`] (`NA`). Also
         /// sets how far `abline()` lines, and `axis()` ticks outside the plot

@@ -78,13 +78,13 @@ crate::setters::options! {
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled as `density` is.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Bar widths, recycled. Empty: 1.
-        pub width: Vec<f64> => values f64,
+        pub width: Vec<f64> => numbers f64,
         /// Space before each bar, as a fraction of the mean bar width: one
         /// value, or `[within group, between groups]` for a `beside` matrix.
         /// `None` (or empty): `0.2`, or `[0, 1]` for a `beside` matrix.
-        pub space: Option<Vec<f64>> => option_values f64,
+        pub space: Option<Vec<f64>> => option_numbers f64,
         /// Matrix only: draws the bars side by side instead of stacked.
         /// Default `false`.
         pub beside: bool => value bool,
@@ -118,7 +118,7 @@ crate::setters::options! {
         /// Shifts the bars along the value axis, recycled over the bars of a
         /// vector, the rows of a `beside` matrix, or the columns (stacks) of
         /// a stacked one. Empty: 0.
-        pub offset: Vec<f64> => values f64,
+        pub offset: Vec<f64> => numbers f64,
         /// Stacked bars only: order of the segments within each stack; each
         /// segment keeps its row's colour. Default [`OrderH::None`] (row
         /// order). R's `orderH`.
@@ -149,7 +149,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.main)`]: crate::par::Par::cex_main
-        pub cex_main: Option<f64> => option f64,
+        pub cex_main: Option<f64> => number f64,
         /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
@@ -163,7 +163,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.sub)`]: crate::par::Par::cex_sub
-        pub cex_sub: Option<f64> => option f64,
+        pub cex_sub: Option<f64> => number f64,
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
@@ -177,7 +177,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.lab)`]: crate::par::Par::cex_lab
-        pub cex_lab: Option<f64> => option f64,
+        pub cex_lab: Option<f64> => number f64,
         /// Colour of `xlab` and `ylab`. `None`: [`par(col.lab)`]. R's
         /// `col.lab`.
         ///
@@ -195,7 +195,7 @@ crate::setters::options! {
         /// Size of the names. `None`: [`par(cex.axis)`]. R's `cex.names`.
         ///
         /// [`par(cex.axis)`]: crate::par::Par::cex_axis
-        pub cex_names: Option<f64> => option f64,
+        pub cex_names: Option<f64> => number f64,
         /// Line type of the names axis's line and ticks. `None`: none drawn
         /// (R's 0). R's `axis.lty`.
         pub axis_lty: Option<LineType> => option LineType,
@@ -207,7 +207,7 @@ crate::setters::options! {
         /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
         ///
         /// [`par(cex.axis)`]: crate::par::Par::cex_axis
-        pub cex_axis: Option<f64> => option f64,
+        pub cex_axis: Option<f64> => number f64,
         /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
         ///
@@ -226,17 +226,17 @@ crate::setters::options! {
         /// Tick length as a fraction of the plot region. `None`: [`par(tck)`].
         ///
         /// [`par(tck)`]: crate::par::Par::tck
-        pub tck: Option<f64> => option f64,
+        pub tck: Option<f64> => number f64,
         /// Tick length in margin lines. `None`: [`par(tcl)`].
         ///
         /// [`par(tcl)`]: crate::par::Par::tcl
-        pub tcl: Option<f64> => option f64,
+        pub tcl: Option<f64> => number f64,
         /// Minimum gap between axis labels. `None`: R's default. R's
         /// `gap.axis`.
-        pub gap_axis: Option<f64> => option f64,
+        pub gap_axis: Option<f64> => number f64,
         /// Width of the axes' line and ticks (not the bars' borders, as in
         /// R). `None`: 1, `axis()`'s default.
-        pub lwd: Option<f64> => option f64,
+        pub lwd: Option<f64> => number f64,
         /// Clipping of the bars, names and legend; the setter also takes
         /// `false`/`true`. `None`: [`Xpd::Figure`] (R's `TRUE`).
         pub xpd: Option<Xpd> => option Xpd,

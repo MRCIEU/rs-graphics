@@ -46,9 +46,9 @@ crate::setters::options! {
         file: Option<PathBuf> => no_setter,
         /// Page width in [`units`](DeviceBuilder::units). `None`: 7 inches for
         /// PDF and SVG, 480/72 inches for PNG, whatever the units.
-        pub width: Option<f64> => option f64,
+        pub width: Option<f64> => number f64,
         /// Page height in [`units`](DeviceBuilder::units). `None`: as `width`.
-        pub height: Option<f64> => option f64,
+        pub height: Option<f64> => number f64,
         /// Units of `width` and `height`. `None`: inches. Inches, centimetres
         /// and millimetres work for every format; pixels only for PNG, where
         /// they are divided by `res` (so `.width(1200).units("px").res(300)` is
@@ -61,7 +61,7 @@ crate::setters::options! {
         /// 12.
         ///
         /// [`par(ps)`]: crate::par::Par::ps
-        pub pointsize: Option<f64> => option f64,
+        pub pointsize: Option<f64> => number f64,
         /// Page background, and the starting [`par(bg)`]; a colour that draws
         /// nothing (`ColorSpec::None`, `"transparent"`) is transparent. `None`:
         /// transparent for PDF, white for SVG and PNG (R's defaults).
@@ -70,7 +70,7 @@ crate::setters::options! {
         pub bg: Option<ColorSpec> => option ColorSpec,
         /// Resolution in pixels per inch, PNG only (ignored for PDF and SVG).
         /// `None`: 72. R's `res`.
-        pub res: Option<f64> => option f64,
+        pub res: Option<f64> => number f64,
         /// Compresses the page contents, PDF only (ignored for SVG and PNG).
         /// `None`: `true`.
         pub compress: Option<bool> => option bool,

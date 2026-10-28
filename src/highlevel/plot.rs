@@ -181,7 +181,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.main)`]: crate::par::Par::cex_main
-        pub cex_main: Option<f64> => option f64,
+        pub cex_main: Option<f64> => number f64,
         /// Colour of the main title. `None`: [`par(col.main)`]. R's
         /// `col.main`.
         ///
@@ -197,7 +197,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.sub)`]: crate::par::Par::cex_sub
-        pub cex_sub: Option<f64> => option f64,
+        pub cex_sub: Option<f64> => number f64,
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
@@ -212,7 +212,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.lab)`]: crate::par::Par::cex_lab
-        pub cex_lab: Option<f64> => option f64,
+        pub cex_lab: Option<f64> => number f64,
         /// Colour of the axis titles (`xlab` and `ylab`). `None`:
         /// [`par(col.lab)`]. R's `col.lab`.
         ///
@@ -257,7 +257,7 @@ crate::setters::options! {
         /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
         ///
         /// [`par(cex.axis)`]: crate::par::Par::cex_axis
-        pub cex_axis: Option<f64> => option f64,
+        pub cex_axis: Option<f64> => number f64,
         /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
         ///
@@ -276,14 +276,14 @@ crate::setters::options! {
         /// Tick length as a fraction of the plot region. `None`: [`par(tck)`].
         ///
         /// [`par(tck)`]: crate::par::Par::tck
-        pub tck: Option<f64> => option f64,
+        pub tck: Option<f64> => number f64,
         /// Tick length in margin lines. `None`: [`par(tcl)`].
         ///
         /// [`par(tcl)`]: crate::par::Par::tcl
-        pub tcl: Option<f64> => option f64,
+        pub tcl: Option<f64> => number f64,
         /// Aspect ratio: one x unit is `asp` y units long (1 for equal
         /// scales); ignored on log axes. `None` (R's `NA`): none.
-        pub asp: Option<f64> => option f64,
+        pub asp: Option<f64> => number f64,
         /// Style of the x axis range: `"r"` adds 4% at each end, `"i"`
         /// nothing. `None`: [`par(xaxs)`].
         ///
@@ -325,7 +325,7 @@ crate::setters::options! {
         /// `None`: [`par(adj)`].
         ///
         /// [`par(adj)`]: crate::par::Par::adj
-        pub adj: Option<f64> => option f64,
+        pub adj: Option<f64> => number f64,
         /// Line ends of the lines and symbols, the axes and the frame.
         /// `None`: [`par(lend)`].
         ///

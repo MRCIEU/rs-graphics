@@ -55,6 +55,7 @@ use crate::afm::{self, FontFace};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 struct Fonts {
     plain: FontArc,
@@ -892,13 +893,8 @@ impl RasterBackend {
     ///
     /// A higher `dpi` gives a sharper image with more pixels; R's `png()`
     /// default is 72.
-    pub fn new(
-        width_in: impl Into<f64>,
-        height_in: impl Into<f64>,
-        dpi: impl Into<f64>,
-        background: Color,
-    ) -> Self {
-        let (width_in, height_in, dpi) = (width_in.into(), height_in.into(), dpi.into());
+    pub fn new(width_in: impl Num, height_in: impl Num, dpi: impl Num, background: Color) -> Self {
+        let (width_in, height_in, dpi) = (width_in.to_f64(), height_in.to_f64(), dpi.to_f64());
         let w_px = (width_in * dpi).round().max(1.0) as u32;
         let h_px = (height_in * dpi).round().max(1.0) as u32;
         let mut canvas = Pixmap::new(w_px, h_px).expect("nonzero pixmap size");

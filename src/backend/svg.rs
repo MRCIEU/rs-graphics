@@ -29,6 +29,7 @@ use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 /// A backend writing SVG, with real `<text>` elements that the viewer
 /// renders in its own fonts.
@@ -66,8 +67,8 @@ pub struct SvgBackend {
 
 impl SvgBackend {
     /// Creates an SVG backend for a `width_in` x `height_in` inch page.
-    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
-        let (width_in, height_in) = (width_in.into(), height_in.into());
+    pub fn new(width_in: impl Num, height_in: impl Num) -> Self {
+        let (width_in, height_in) = (width_in.to_f64(), height_in.to_f64());
         SvgBackend {
             width_in,
             height_in,

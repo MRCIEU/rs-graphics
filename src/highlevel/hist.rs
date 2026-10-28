@@ -484,7 +484,7 @@ crate::setters::options! {
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled as `density`.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Labels above the bars: [`HistLabels::Values`] writes each bar's
         /// count (or, with densities, its density to 3 decimals), `Text` the
         /// given labels. Default none.
@@ -498,7 +498,7 @@ crate::setters::options! {
         pub include_lowest: Option<bool> => option bool,
         /// How far, as a fraction of a typical bin width, values on an edge
         /// may stray and still count as on it. `None`: `1e-7`.
-        pub fuzz: Option<f64> => option f64,
+        pub fuzz: Option<f64> => number f64,
         /// Main title, as for `plot()` (text or a plotmath expression).
         /// `None`: "Histogram of x".
         pub main: Option<Label> => option Label,
@@ -511,7 +511,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.main)`]: crate::par::Par::cex_main
-        pub cex_main: Option<f64> => option f64,
+        pub cex_main: Option<f64> => number f64,
         /// Colour of the main title. `None`: [`par(col.main)`]. R's
         /// `col.main`.
         ///
@@ -527,7 +527,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.lab)`]: crate::par::Par::cex_lab
-        pub cex_lab: Option<f64> => option f64,
+        pub cex_lab: Option<f64> => number f64,
         /// Colour of the axis titles (`xlab` and `ylab`). `None`:
         /// [`par(col.lab)`]. R's `col.lab`.
         ///
@@ -563,7 +563,7 @@ crate::setters::options! {
         /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
         ///
         /// [`par(cex.axis)`]: crate::par::Par::cex_axis
-        pub cex_axis: Option<f64> => option f64,
+        pub cex_axis: Option<f64> => number f64,
         /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
         ///
@@ -582,17 +582,17 @@ crate::setters::options! {
         /// Tick length as a fraction of the plot region. `None`: [`par(tck)`].
         ///
         /// [`par(tck)`]: crate::par::Par::tck
-        pub tck: Option<f64> => option f64,
+        pub tck: Option<f64> => number f64,
         /// Tick length in margin lines. `None`: [`par(tcl)`].
         ///
         /// [`par(tcl)`]: crate::par::Par::tcl
-        pub tcl: Option<f64> => option f64,
+        pub tcl: Option<f64> => number f64,
         /// Minimum gap between axis labels. `None`: R's default. R's
         /// `gap.axis`.
-        pub gap_axis: Option<f64> => option f64,
+        pub gap_axis: Option<f64> => number f64,
         /// Width of the axes' line and ticks (only the axes: the bars are
         /// unaffected). `None`: 1, `axis()`'s default.
-        pub lwd: Option<f64> => option f64,
+        pub lwd: Option<f64> => number f64,
         /// Whether to draw: `false` only returns the bins. `None`: `true`.
         pub plot: Option<bool> => option bool,
     }

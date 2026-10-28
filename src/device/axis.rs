@@ -44,7 +44,7 @@ crate::setters::options! {
         /// Tick positions, in user coordinates (data units, also on a log
         /// axis). `None`: the default ticks from `axp` (else
         /// `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
-        pub at: Option<Vec<f64>> => option_values f64,
+        pub at: Option<Vec<f64>> => option_numbers f64,
         /// Labels for the ticks in `at` (requires `at`): text or plotmath
         /// expressions (`Some("a".into())`, `Some(Label::math("10^5"))`).
         /// `None`: `at` formatted like R's `formatReal()`. An inner `None` (a
@@ -59,11 +59,11 @@ crate::setters::options! {
         /// Distance of the axis line from the plot region (inner region for
         /// `outer`), in margin lines; the labels sit `mgp[1]` lines beyond it.
         /// `None`: the axis line at `mgp[2]` and the labels at `mgp[1]` lines.
-        pub line: Option<f64> => option f64,
+        pub line: Option<f64> => number f64,
         /// Where to draw the axis line, as a user coordinate on the other
         /// axis; overrides `line`. The labels sit `mgp[1]` lines beyond it.
         /// `None`: use `line`.
-        pub pos: Option<f64> => option f64,
+        pub pos: Option<f64> => number f64,
         /// Whether to measure `line` from the inner region (inside
         /// [`par(oma)`]) rather than the plot region. Default `false`.
         ///
@@ -82,10 +82,10 @@ crate::setters::options! {
         /// (R's default, not [`par(lwd)`]).
         ///
         /// [`par(lwd)`]: crate::par::Par::lwd
-        pub lwd: Option<f64> => option f64,
+        pub lwd: Option<f64> => number f64,
         /// Width of the tick marks; 0 or less draws no ticks. `None`: `lwd`.
         /// R's `lwd.ticks`.
-        pub lwd_ticks: Option<f64> => option f64,
+        pub lwd_ticks: Option<f64> => number f64,
         /// Colour of the axis line. `None`: [`par(fg)`].
         ///
         /// [`par(fg)`]: crate::par::Par::fg
@@ -95,21 +95,21 @@ crate::setters::options! {
         /// Justification of every label along its reading direction. `None`:
         /// centred for labels parallel to the axis, otherwise right-justified
         /// on sides 1 and 2 and left-justified on 3 and 4.
-        pub hadj: Option<f64> => option f64,
+        pub hadj: Option<f64> => number f64,
         /// Justification across each label, recycled over the ticks in
         /// increasing order of `at`. `NaN` entries and an empty vector mean
         /// the default, which depends on `side` and `las` (0, i.e. baseline
         /// on the line, for `las = 0`).
-        pub padj: Vec<f64> => values f64,
+        pub padj: Vec<f64> => numbers f64,
         /// Minimum gap between labels, in "m" widths (labels parallel to the
         /// axis) or "M" heights (perpendicular); a label closer than that to
         /// the previous one is dropped. `None`: 1 or 0.25. R's `gap.axis`.
-        pub gap_axis: Option<f64> => option f64,
+        pub gap_axis: Option<f64> => number f64,
         /// Size of the labels. `None`: [`par(cex.axis)`]; overrides it for this
         /// call only.
         ///
         /// [`par(cex.axis)`]: crate::par::Par::cex_axis
-        pub cex_axis: Option<f64> => option f64,
+        pub cex_axis: Option<f64> => number f64,
         /// Colour of the labels. `None`: [`par(col.axis)`]; overrides it for
         /// this call only.
         ///
@@ -145,12 +145,12 @@ crate::setters::options! {
         /// default, meaning `tcl` is used.
         ///
         /// [`par(tck)`]: crate::par::Par::tck
-        pub tck: Option<f64> => option f64,
+        pub tck: Option<f64> => number f64,
         /// Tick length in margin lines; negative points outwards. `None`:
         /// [`par(tcl)`].
         ///
         /// [`par(tcl)`]: crate::par::Par::tcl
-        pub tcl: Option<f64> => option f64,
+        pub tcl: Option<f64> => number f64,
         /// How far ticks and labels may reach along the axis: the plot
         /// region, figure region or device, as for [`par(xpd)`]. The axis is
         /// always clipped to the device, as R does. `None`: [`par(xpd)`].

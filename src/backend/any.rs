@@ -18,6 +18,7 @@ use super::svg::SvgBackend;
 use super::{Backend, Stroke, TextStyle};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
+use crate::numbers::Num;
 
 /// An output format: PDF, SVG or PNG.
 ///
@@ -102,13 +103,8 @@ impl AnyBackend {
     /// let backend = AnyBackend::new(Format::Svg, 6, 4, 72);
     /// assert_eq!(backend.format(), Some(Format::Svg));
     /// ```
-    pub fn new(
-        format: Format,
-        width_in: impl Into<f64>,
-        height_in: impl Into<f64>,
-        dpi: impl Into<f64>,
-    ) -> Self {
-        let (width_in, height_in, dpi) = (width_in.into(), height_in.into(), dpi.into());
+    pub fn new(format: Format, width_in: impl Num, height_in: impl Num, dpi: impl Num) -> Self {
+        let (width_in, height_in, dpi) = (width_in.to_f64(), height_in.to_f64(), dpi.to_f64());
         match format {
             Format::Pdf => AnyBackend::Pdf(PdfBackend::new(width_in, height_in)),
             Format::Svg => AnyBackend::Svg(SvgBackend::new(width_in, height_in)),

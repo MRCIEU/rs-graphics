@@ -41,6 +41,7 @@ pub use any::{AnyBackend, Format};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 /// How the ends of a line are drawn: round, butt (flat at the end) or
 /// square (flat, extended by half the line width).
@@ -152,10 +153,10 @@ impl Stroke {
     /// let s = Stroke::simple(Color::BLACK, 2);
     /// assert_eq!(s.width_pt(), 1.5);
     /// ```
-    pub fn simple(color: Color, lwd: impl Into<f64>) -> Self {
+    pub fn simple(color: Color, lwd: impl Num) -> Self {
         Stroke {
             color,
-            lwd: lwd.into(),
+            lwd: lwd.to_f64(),
             lty: LineType::SOLID,
             lend: LineEnd::Round,
             ljoin: LineJoin::Round,
@@ -206,8 +207,8 @@ impl TextStyle {
     /// let style = TextStyle::new(Color::BLACK, FontFace::Bold, 12);
     /// assert_eq!(style.rotation_deg, 0.0);
     /// ```
-    pub fn new(color: Color, face: FontFace, size_pt: impl Into<f64>) -> Self {
-        let size_pt = size_pt.into();
+    pub fn new(color: Color, face: FontFace, size_pt: impl Num) -> Self {
+        let size_pt = size_pt.to_f64();
         TextStyle {
             color,
             face,

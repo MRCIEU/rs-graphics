@@ -465,7 +465,7 @@ crate::setters::options! {
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled over the keys.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Fill colour of `pch` 21 to 25. Empty: none. R's `pt.bg`.
         pub pt_bg: Vec<ColorSpec> => values ColorSpec,
         /// Size of the points. Empty: `cex`; `None`: no point on that key.
@@ -488,10 +488,10 @@ crate::setters::options! {
         pub cex: Vec<Option<f64>> => na_values f64,
         /// Horizontal justification of the box relative to its `x` position.
         /// `None`: 0, or 0.5 for [`LegendPos::Corners`] (R's defaults).
-        pub xjust: Option<f64> => option f64,
+        pub xjust: Option<f64> => number f64,
         /// Vertical justification of the box relative to its `y` position.
         /// `None`: 1, or 0.5 for [`LegendPos::Corners`] (R's defaults).
-        pub yjust: Option<f64> => option f64,
+        pub yjust: Option<f64> => number f64,
         /// Space between each key and its label, in character widths (a
         /// column is as wide as its widest). Empty and `None`: 1. R's
         /// `x.intersp`.
@@ -506,10 +506,10 @@ crate::setters::options! {
         /// column, or one per column; `f64::NAN` (R's `NA`) makes each column
         /// as wide as its own widest label. Empty: every column as wide as the
         /// widest label. R's `text.width`.
-        pub text_width: Vec<f64> => values f64,
+        pub text_width: Vec<f64> => numbers f64,
         /// Horizontal adjustment of the labels. `None`: 0 (left). R's
         /// `adj[1]`.
-        pub adj: Option<f64> => option f64,
+        pub adj: Option<f64> => number f64,
         /// Vertical adjustment of the labels. `None`: 0.5. `Some(None)` (the
         /// setter's `f64::NAN`, R's `NA`) centres each label's ink, as R's
         /// one-value `adj = x` does. R's `adj[2]`.
@@ -524,12 +524,12 @@ crate::setters::options! {
         /// Text or a plotmath expression above the entries. `None`: no title.
         pub title: Option<Label> => option Label,
         /// Size of the title. `None`: the first `cex`. R's `title.cex`.
-        pub title_cex: Option<f64> => option f64,
+        pub title_cex: Option<f64> => number f64,
         /// Colour of the title. `None`: the first `text_col`. R's `title.col`.
         pub title_col: Option<ColorSpec> => option ColorSpec,
         /// Where the title sits across the box (0 left, 1 right) and its
         /// justification there. `None`: 0.5 (centred). R's `title.adj`.
-        pub title_adj: Option<f64> => option f64,
+        pub title_adj: Option<f64> => number f64,
         /// Font of the title. `None`: the first `text_font`. R's
         /// `title.font`.
         pub title_font: Option<FontFace> => option FontFace,
@@ -548,7 +548,7 @@ crate::setters::options! {
         /// Line width of the legend box. `None`: [`par("lwd")`]. R's `box.lwd`.
         ///
         /// [`par("lwd")`]: crate::par::Par::lwd
-        pub box_lwd: Option<f64> => option f64,
+        pub box_lwd: Option<f64> => number f64,
         /// Line type of the legend box. `None`: [`par("lty")`]. R's `box.lty`.
         ///
         /// [`par("lty")`]: crate::par::Par::lty

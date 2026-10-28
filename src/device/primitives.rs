@@ -88,7 +88,7 @@ crate::setters::options! {
         /// overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
-        pub lmitre: Option<f64> => option f64,
+        pub lmitre: Option<f64> => number f64,
         /// Font of character symbols (such as `pch = "a"` or `'é'`). `None`:
         /// [`par(font)`]; overrides it for this call only.
         ///
@@ -135,7 +135,7 @@ crate::setters::options! {
         /// overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
-        pub lmitre: Option<f64> => option f64,
+        pub lmitre: Option<f64> => number f64,
     }
 }
 
@@ -144,10 +144,10 @@ crate::setters::options! {
     #[derive(Clone, Debug, Default)]
     pub struct ArrowsOptions => [ArrowsCall] {
         /// Length of the edges of each head, in inches. `None`: 0.25.
-        pub length: Option<f64> => option f64,
+        pub length: Option<f64> => number f64,
         /// Angle between the shaft and each edge of the head, in degrees (90
         /// gives flat caps, as for error bars). `None`: 30.
-        pub angle: Option<f64> => option f64,
+        pub angle: Option<f64> => number f64,
         /// Where the heads go: at the start (1), the end (2) or both ends
         /// (3). `None`: 2.
         pub code: Option<u8> => option u8,
@@ -185,7 +185,7 @@ crate::setters::options! {
         /// overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
-        pub lmitre: Option<f64> => option f64,
+        pub lmitre: Option<f64> => number f64,
     }
 }
 
@@ -232,7 +232,7 @@ crate::setters::options! {
         /// overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
-        pub lmitre: Option<f64> => option f64,
+        pub lmitre: Option<f64> => number f64,
         /// Shading lines per inch, recycled per rectangle. `None` or a
         /// negative value fills with `col` instead; 0 draws neither lines
         /// nor fill. Empty (or all `None`/negative): no shading. With
@@ -244,7 +244,7 @@ crate::setters::options! {
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, anticlockwise, recycled
         /// per rectangle. Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
     }
 }
 
@@ -271,7 +271,7 @@ crate::setters::options! {
         /// Border line width, one for all polygons. `None`: [`par(lwd)`].
         ///
         /// [`par(lwd)`]: crate::par::Par::lwd
-        pub lwd: Option<f64> => option f64,
+        pub lwd: Option<f64> => number f64,
         /// Where drawing is clipped: [`Xpd::Plot`], [`Xpd::Figure`] or
         /// [`Xpd::Device`] (the setter also takes `false`/`true`). `None`:
         /// [`par(xpd)`]; overrides it for this call only.
@@ -292,7 +292,7 @@ crate::setters::options! {
         /// overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
-        pub lmitre: Option<f64> => option f64,
+        pub lmitre: Option<f64> => number f64,
         /// Shading lines per inch, recycled per polygon. `None` or a
         /// negative value fills with `col` instead; 0 draws neither lines
         /// nor fill. Empty (or all `None`/negative): no shading. With
@@ -304,7 +304,7 @@ crate::setters::options! {
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, anticlockwise, recycled
         /// per polygon. Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Uses the even-odd rule for shading: lines go where the border
         /// encircles a point an odd number of times, rather than a non-zero
         /// number (so a pentagram's centre isn't shaded). Default `false`.
@@ -322,19 +322,19 @@ crate::setters::options! {
         /// [`par(adj)`]. R's `adj[1]`.
         ///
         /// [`par(adj)`]: crate::par::Par::adj
-        pub adj: Option<f64> => option f64,
+        pub adj: Option<f64> => number f64,
         /// Vertical justification. A finite value puts a text's baseline
         /// `vadj * height("M")` below the point, or puts the point that
         /// fraction of an expression's box height above the box's bottom.
         /// `None` (the default) centres the text's ink, or an expression's
         /// box, on the point. For text with newlines it places the block of
         /// lines (`None`: 0.5), each line's baseline as above. R's `adj[2]`.
-        pub vadj: Option<f64> => option f64,
+        pub vadj: Option<f64> => number f64,
         /// Rotation in degrees, anticlockwise. `None`: [`par(srt)`] (0 by
         /// default). R's `srt`.
         ///
         /// [`par(srt)`]: crate::par::Par::srt
-        pub srt: Option<f64> => option f64,
+        pub srt: Option<f64> => number f64,
         /// Text sizes, relative to [`par(cex)`], recycled per label. Empty or
         /// `None`: 1.
         ///
@@ -361,7 +361,7 @@ crate::setters::options! {
         pub pos: Vec<i32> => values i32,
         /// Distance of a label from its point when `pos` is given, in
         /// character widths. `None`: 0.5.
-        pub offset: Option<f64> => option f64,
+        pub offset: Option<f64> => number f64,
     }
 }
 
@@ -410,7 +410,7 @@ crate::setters::options! {
         /// Line width. `None`: [`par(lwd)`].
         ///
         /// [`par(lwd)`]: crate::par::Par::lwd
-        pub lwd: Option<f64> => option f64,
+        pub lwd: Option<f64> => number f64,
         /// Which sides of the plot region to draw. `None`: [`par(bty)`].
         /// Ignored for the other regions, which always get all four sides.
         ///
@@ -430,7 +430,7 @@ crate::setters::options! {
         /// overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
-        pub lmitre: Option<f64> => option f64,
+        pub lmitre: Option<f64> => number f64,
     }
 }
 
@@ -444,7 +444,7 @@ crate::setters::options! {
         pub ylog: bool => value bool,
         /// Aspect ratio: one x unit is `asp` y units long on the page.
         /// Ignored on log axes, as in R. `None`: no constraint.
-        pub asp: Option<f64> => option f64,
+        pub asp: Option<f64> => number f64,
         /// How the x range is extended: `"r"` adds 4% at each end, `"i"`
         /// nothing. `None`: [`par(xaxs)`]; overrides it for this call only.
         ///

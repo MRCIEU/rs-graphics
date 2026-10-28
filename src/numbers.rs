@@ -51,6 +51,53 @@ mod sealed {
 pub trait Num: Copy + sealed::Sealed {
     /// The value as an `f64` (rounded for 64-bit integers beyond 2^53).
     fn to_f64(self) -> f64;
+
+    /// A slice as `f64`s: borrowed for `f64`, else converted.
+    #[doc(hidden)]
+    fn slice_to_f64(s: &[Self]) -> Cow<'_, [f64]> {
+        Cow::Owned(s.iter().map(|v| v.to_f64()).collect())
+    }
+
+    /// A `Vec` as `f64`s: taken over for `f64`, else converted.
+    #[doc(hidden)]
+    fn vec_to_f64(v: Vec<Self>) -> Vec<f64> {
+        v.into_iter().map(Num::to_f64).collect()
+    }
+
+    /// Groups as `f64` vectors: borrowed for `f64`, else converted.
+    #[doc(hidden)]
+    fn groups_to_f64(g: &[Vec<Self>]) -> Cow<'_, [Vec<f64>]> {
+        Cow::Owned(
+            g.iter()
+                .map(|v| Self::slice_to_f64(v).into_owned())
+                .collect(),
+        )
+    }
+
+    /// Owned groups as `f64` vectors: taken over for `f64`, else converted.
+    #[doc(hidden)]
+    fn vecs_to_f64(g: Vec<Vec<Self>>) -> Vec<Vec<f64>> {
+        g.into_iter().map(Self::vec_to_f64).collect()
+    }
+}
+
+impl sealed::Sealed for f64 {}
+impl Num for f64 {
+    fn to_f64(self) -> f64 {
+        self
+    }
+    fn slice_to_f64(s: &[f64]) -> Cow<'_, [f64]> {
+        Cow::Borrowed(s)
+    }
+    fn vec_to_f64(v: Vec<f64>) -> Vec<f64> {
+        v
+    }
+    fn groups_to_f64(g: &[Vec<f64>]) -> Cow<'_, [Vec<f64>]> {
+        Cow::Borrowed(g)
+    }
+    fn vecs_to_f64(g: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+        g
+    }
 }
 
 macro_rules! num {
@@ -65,7 +112,7 @@ macro_rules! num {
         )*
     };
 }
-num!(f64, f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
+num!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 
 /// A data vector, such as the `x` and `y` of a plot.
 ///
@@ -97,86 +144,42 @@ impl<'a> Numbers<'a> for Cow<'a, [f64]> {
     }
 }
 
-impl<'a> Numbers<'a> for &'a [f64] {
+impl<'a, T: Num> Numbers<'a> for &'a [T] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(self)
+        T::slice_to_f64(self)
     }
 }
 
-impl<'a> Numbers<'a> for &'a Vec<f64> {
+impl<'a, T: Num> Numbers<'a> for &'a Vec<T> {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(self)
+        T::slice_to_f64(self)
     }
 }
 
 /// A reference to a slice reference, e.g. from iterating over `&[&[f64]]`.
-impl<'a, 'b: 'a> Numbers<'a> for &'a &'b [f64] {
+impl<'a, 'b: 'a, T: Num> Numbers<'a> for &'a &'b [T] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(*self)
+        T::slice_to_f64(self)
     }
 }
 
-impl<'a, const N: usize> Numbers<'a> for &'a [f64; N] {
+impl<'a, T: Num, const N: usize> Numbers<'a> for &'a [T; N] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(self)
+        T::slice_to_f64(self)
     }
 }
 
-impl<'a> Numbers<'a> for Vec<f64> {
+impl<'a, T: Num> Numbers<'a> for Vec<T> {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Owned(self)
+        Cow::Owned(T::vec_to_f64(self))
     }
 }
 
-impl<'a, const N: usize> Numbers<'a> for [f64; N] {
+impl<'a, T: Num, const N: usize> Numbers<'a> for [T; N] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Owned(self.to_vec())
+        Cow::Owned(T::vec_to_f64(self.into()))
     }
 }
-
-/// Converting impls for the number types other than `f64`.
-macro_rules! converted_numbers {
-    ($($t:ty),*) => {
-        $(
-            impl<'a> Numbers<'a> for &'a [$t] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
-                }
-            }
-
-            impl<'a, 'b: 'a> Numbers<'a> for &'a &'b [$t] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    (*self).into_numbers()
-                }
-            }
-
-            impl<'a> Numbers<'a> for &'a Vec<$t> {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    self.as_slice().into_numbers()
-                }
-            }
-
-            impl<'a, const N: usize> Numbers<'a> for &'a [$t; N] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    self.as_slice().into_numbers()
-                }
-            }
-
-            impl<'a> Numbers<'a> for Vec<$t> {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
-                }
-            }
-
-            impl<'a, const N: usize> Numbers<'a> for [$t; N] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
-                }
-            }
-        )*
-    };
-}
-converted_numbers!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 
 /// One number, as R's length-one vector (`plot(1, 1)` is
 /// `.x(1).y(1)`), by value or by reference.
@@ -242,33 +245,33 @@ pub trait Groups<'a> {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]>;
 }
 
-impl<'a> Groups<'a> for &'a [Vec<f64>] {
+impl<'a, T: Num> Groups<'a> for &'a [Vec<T>] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Borrowed(self)
+        T::groups_to_f64(self)
     }
 }
 
-impl<'a> Groups<'a> for &'a Vec<Vec<f64>> {
+impl<'a, T: Num> Groups<'a> for &'a Vec<Vec<T>> {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Borrowed(self)
+        T::groups_to_f64(self)
     }
 }
 
-impl<'a, const N: usize> Groups<'a> for &'a [Vec<f64>; N] {
+impl<'a, T: Num, const N: usize> Groups<'a> for &'a [Vec<T>; N] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Borrowed(self)
+        T::groups_to_f64(self)
     }
 }
 
-impl<'a> Groups<'a> for Vec<Vec<f64>> {
+impl<'a, T: Num> Groups<'a> for Vec<Vec<T>> {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Owned(self)
+        Cow::Owned(T::vecs_to_f64(self))
     }
 }
 
-impl<'a, const N: usize> Groups<'a> for [Vec<f64>; N] {
+impl<'a, T: Num, const N: usize> Groups<'a> for [Vec<T>; N] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Owned(self.into())
+        Cow::Owned(T::vecs_to_f64(self.into()))
     }
 }
 
@@ -279,53 +282,9 @@ impl<'a, N: Numbers<'a>> Groups<'a> for N {
     }
 }
 
-fn convert_groups<T: Num>(groups: &[Vec<T>]) -> Vec<Vec<f64>> {
-    groups
-        .iter()
-        .map(|g| g.iter().map(|v| v.to_f64()).collect())
-        .collect()
-}
-
-macro_rules! converted_groups {
-    ($($t:ty),*) => {
-        $(
-            impl<'a> Groups<'a> for &'a [Vec<$t>] {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(self))
-                }
-            }
-
-            impl<'a> Groups<'a> for &'a Vec<Vec<$t>> {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(self))
-                }
-            }
-
-            impl<'a, const N: usize> Groups<'a> for &'a [Vec<$t>; N] {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(self))
-                }
-            }
-
-            impl<'a> Groups<'a> for Vec<Vec<$t>> {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(&self))
-                }
-            }
-
-            impl<'a, const N: usize> Groups<'a> for [Vec<$t>; N] {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(&self))
-                }
-            }
-        )*
-    };
-}
-converted_groups!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
-
 /// Two numbers, such as limits `(0, 10)` or a point `(5.0, 20.0)`.
 ///
-/// Implemented for tuples of `f64`s and/or `i32`s.
+/// Implemented for tuples of any two [`Num`] types.
 ///
 /// # Examples
 ///
@@ -339,18 +298,11 @@ pub trait Pair {
     fn into_pair(self) -> (f64, f64);
 }
 
-macro_rules! pair {
-    ($(($a:ty, $b:ty)),*) => {
-        $(
-            impl Pair for ($a, $b) {
-                fn into_pair(self) -> (f64, f64) {
-                    (self.0.to_f64(), self.1.to_f64())
-                }
-            }
-        )*
-    };
+impl<A: Num, B: Num> Pair for (A, B) {
+    fn into_pair(self) -> (f64, f64) {
+        (self.0.to_f64(), self.1.to_f64())
+    }
 }
-pair!((f64, f64), (f64, i32), (i32, f64), (i32, i32));
 
 #[cfg(test)]
 // The tests use the reference forms on purpose; clippy would drop the `&`.

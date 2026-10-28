@@ -11,7 +11,9 @@
 //! arrays (`mar`, `mgp`, `xaxp`), pairs (`plot_window`, legend positions,
 //! `inset`), legend `lwd`/`pt_cex`, `layout()` sizes, `fig()` and the
 //! backend constructors draw byte for byte what the same `f64` values do,
-//! on a device and in a recorded `Figure`. No R needed.
+//! on a device and in a recorded `Figure`, and option setters take every
+//! number type (`i64`, `u8`, `usize`, ...) and ranges as data setters do.
+//! No R needed.
 
 use rs_graphics::prelude::*;
 
@@ -211,6 +213,75 @@ fn integers_draw_the_same_as_floats() {
     let (mut fa, mut fb) = (Figure::new(), Figure::new());
     with_integers(&mut fa);
     with_floats(&mut fb);
+    let (mut a, mut b) = (device(7.0, 6.0), device(7.0, 6.0));
+    a.add_figure(&fa);
+    b.add_figure(&fb);
+    assert!(a.finish() == b.finish(), "figure output differs");
+}
+
+/// Option setters take every number type and ranges, as data does:
+/// `i64`, `u8`, `usize`, ... (not only `i32`/`u32`/`f32`).
+fn with_other_number_types<G: Graphics>(g: &mut G) {
+    g.par().cex(1_u8).mgp([3_i64, 1, 0]).draw();
+    g.plot()
+        .x(1..=4)
+        .y(vec![2_i64, 4, 3, 5])
+        .cex(2_u8)
+        .lwd([Some(2_u16), None])
+        .xlim(0_u64, 5_usize)
+        .ylim(0_i8, 6_i16)
+        .xaxp([0_u64, 5, 5])
+        .draw();
+    g.points().x([2, 3]).y([5, 1]).cex(1..3).draw();
+    g.abline().h(3_i64).v(vec![1_usize, 2]).lwd(2_u8).draw();
+    g.axis().side(3).at(1..=3).tcl(-1_i64).draw();
+    g.legend()
+        .pos((1_u8, 6_i64))
+        .labels(["a", "b"])
+        .pch(1)
+        .inset((0_u8, 0_usize))
+        .draw();
+    g.plot_window().xlim(0_u8, 10_u64).ylim(0_i64, 5_i8).draw();
+}
+
+fn with_other_number_types_as_floats<G: Graphics>(g: &mut G) {
+    g.par().cex(1.0).mgp([3.0, 1.0, 0.0]).draw();
+    g.plot()
+        .x([1.0, 2.0, 3.0, 4.0])
+        .y([2.0, 4.0, 3.0, 5.0])
+        .cex(2.0)
+        .lwd([Some(2.0), None])
+        .xlim(0.0, 5.0)
+        .ylim(0.0, 6.0)
+        .xaxp([0.0, 5.0, 5.0])
+        .draw();
+    g.points()
+        .x([2.0, 3.0])
+        .y([5.0, 1.0])
+        .cex([1.0, 2.0])
+        .draw();
+    g.abline().h(3.0).v([1.0, 2.0]).lwd(2.0).draw();
+    g.axis().side(3).at([1.0, 2.0, 3.0]).tcl(-1.0).draw();
+    g.legend()
+        .pos((1.0, 6.0))
+        .labels(["a", "b"])
+        .pch(1)
+        .inset((0.0, 0.0))
+        .draw();
+    g.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
+}
+
+#[test]
+fn option_setters_take_every_number_type() {
+    let mut a = device(7.0, 6.0);
+    with_other_number_types(&mut a);
+    let mut b = device(7.0, 6.0);
+    with_other_number_types_as_floats(&mut b);
+    assert!(a.finish() == b.finish(), "device output differs");
+
+    let (mut fa, mut fb) = (Figure::new(), Figure::new());
+    with_other_number_types(&mut fa);
+    with_other_number_types_as_floats(&mut fb);
     let (mut a, mut b) = (device(7.0, 6.0), device(7.0, 6.0));
     a.add_figure(&fa);
     b.add_figure(&fb);

@@ -88,9 +88,9 @@ where
 /// One value or several, for a field R recycles per element.
 ///
 /// Takes a single value or a `Vec`, array or slice of them, by value or
-/// by reference: `"red"`, `["red", "blue"]`, `vec![1.0, 2.0]`,
-/// `&cex[..]`, `2`, `[1, 2]`, ... Numeric fields take `f64`, `f32`, `i32`
-/// or `u32` values; colours take anything that converts to a
+/// by reference: `"red"`, `["red", "blue"]`, `[1, 2]`, ... (Numeric
+/// fields take [`Numbers`](crate::numbers::Numbers) instead: any number
+/// type, and ranges.) Colours take anything that converts to a
 /// [`ColorSpec`] (one palette index as an `i32`); line types take a
 /// [`LineType`], R's string or code; a character `pch` is its ASCII code,
 /// or minus its Unicode code point for other characters (`'é'` is -233),
@@ -178,8 +178,9 @@ impl Values<i32> for char {
 /// Takes a single value, an `Option` of one, or an array, `Vec` or slice
 /// of either, by value or by reference: `19`, `[1, 2]`,
 /// `[Some(19), None]`, `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`,
-/// ... Rust arrays hold one element type, so once one element is `None`
-/// the others are written `Some(..)`.
+/// ... Numeric fields take any number type ([`Num`](crate::numbers::Num))
+/// and integer ranges (`1..=3`). Rust arrays hold one element type, so
+/// once one element is `None` the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
 /// (for text sizes and fonts, and `legend()`'s spacing, it means the
@@ -256,7 +257,91 @@ macro_rules! na_values {
     };
 }
 
-na_values!(f64: IntoArg::<f64>::into_arg; f64, f32, i32, u32);
+/// `NaValues<f64>` for one number, or a collection, of any [`Num`] type,
+/// also as `Option`s; integer ranges.
+mod na_numbers {
+    use super::{Error, NaValues};
+    use crate::numbers::{Num, Numbers};
+    use std::ops::{Range, RangeInclusive};
+
+    impl<N: Num> NaValues<f64> for N {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(vec![Some(self.to_f64())])
+        }
+    }
+    impl<N: Num> NaValues<f64> for Option<N> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(vec![self.map(Num::to_f64)])
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for [N; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for [Option<N>; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num> NaValues<f64> for Vec<N> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.into_iter().map(|v| Some(v.to_f64())).collect())
+        }
+    }
+    impl<N: Num> NaValues<f64> for Vec<Option<N>> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.into_iter().map(|v| v.map(Num::to_f64)).collect())
+        }
+    }
+    impl<N: Num> NaValues<f64> for &[N] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.iter().map(|v| Some(v.to_f64())).collect())
+        }
+    }
+    impl<N: Num> NaValues<f64> for &[Option<N>] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.iter().map(|v| v.map(Num::to_f64)).collect())
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for &[N; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for &[Option<N>; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num> NaValues<f64> for &Vec<N> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num> NaValues<f64> for &Vec<Option<N>> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    macro_rules! ranges {
+        ($($t:ty),*) => {
+            $(
+                impl NaValues<f64> for Range<$t> {
+                    fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+                        Ok(self.into_numbers().iter().map(|&v| Some(v)).collect())
+                    }
+                }
+                impl NaValues<f64> for RangeInclusive<$t> {
+                    fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+                        Ok(self.into_numbers().iter().map(|&v| Some(v)).collect())
+                    }
+                }
+            )*
+        };
+    }
+    ranges!(i32, i64, u32, u64, usize);
+}
 na_values!(i32: IntoArg::<i32>::into_arg; i32, i16, u8, u16);
 na_values!(i32: |c: char| Ok::<i32, Error>(char_pch(c)); char);
 na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
@@ -294,9 +379,12 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// builder list `=> [..]` may be left out.
 ///
 /// Setter kinds: `value` (plain field), `option` (`Option<T>`, set to
-/// `Some`), `values` (`Vec<T>` recycled by R), `na_values`
+/// `Some`), `number` (`Option<f64>` from any [`Num`](crate::numbers::Num)),
+/// `values` (`Vec<T>` recycled by R), `numbers` (`Vec<f64>` recycled by
+/// R, from [`Numbers`](crate::numbers::Numbers)), `na_values`
 /// (`Vec<Option<T>>` recycled by R, `None` = `NA`), `option_values`
-/// (`Option<Vec<T>>`), `list` (`Option<Vec<Label>>` from one label or
+/// (`Option<Vec<T>>`), `option_numbers` (`Option<Vec<f64>>` from
+/// [`Numbers`](crate::numbers::Numbers)), `list` (`Option<Vec<Label>>` from one label or
 /// several, [`LabelValues`](crate::plotmath::LabelValues)), `labels`
 /// (`Option<Vec<Option<Label>>>` from [`Labels`](crate::plotmath::Labels),
 /// `None` = `NA`), `pair` (`Option<(f64, f64)>` from two
@@ -387,6 +475,31 @@ macro_rules! options {
             self
         }
     };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident number $t:ty) => {
+        $($a)*
+        pub fn $field(mut self, value: impl $crate::numbers::Num) -> Self {
+            self$(.$p)?.$field = Some(value.to_f64());
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident numbers $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number or several, of any number type (see [`Numbers`](crate::numbers::Numbers))."]
+        pub fn $field<'n>(mut self, values: impl $crate::numbers::Numbers<'n>) -> Self {
+            self$(.$p)?.$field = values.into_numbers().into_owned();
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_numbers $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number or several, of any number type (see [`Numbers`](crate::numbers::Numbers))."]
+        pub fn $field<'n>(mut self, values: impl $crate::numbers::Numbers<'n>) -> Self {
+            self$(.$p)?.$field = Some(values.into_numbers().into_owned());
+            self
+        }
+    };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident values $t:ty) => {
         $($a)*
         #[doc = ""]
@@ -470,8 +583,12 @@ macro_rules! options {
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pair $t:ty) => {
         $($a)*
-        pub fn $field(mut self, a: impl Into<f64>, b: impl Into<f64>) -> Self {
-            self$(.$p)?.$field = Some((a.into(), b.into()));
+        pub fn $field(
+            mut self,
+            a: impl $crate::numbers::Num,
+            b: impl $crate::numbers::Num,
+        ) -> Self {
+            self$(.$p)?.$field = Some((a.to_f64(), b.to_f64()));
             self
         }
     };
@@ -486,19 +603,19 @@ macro_rules! options {
         $($a)*
         #[doc = ""]
         #[doc = "`f64::NAN` is R's `NA`."]
-        pub fn $field(mut self, value: impl Into<f64>) -> Self {
-            let v: f64 = value.into();
+        pub fn $field(mut self, value: impl $crate::numbers::Num) -> Self {
+            let v = value.to_f64();
             self$(.$p)?.$field = Some(v.is_finite().then_some(v));
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident array $t:ty) => {
         $($a)*
-        pub fn $field<U: Into<f64>, const N: usize>(mut self, values: [U; N]) -> Self
+        pub fn $field<U: $crate::numbers::Num, const N: usize>(mut self, values: [U; N]) -> Self
         where
             [f64; N]: Into<$t>,
         {
-            let values: [f64; N] = values.map(Into::into);
+            let values: [f64; N] = values.map($crate::numbers::Num::to_f64);
             self$(.$p)?.$field = Some(values.into());
             self
         }
@@ -546,6 +663,32 @@ mod tests {
         let xy = XyOptions::default().pch(&[1, 2]).lwd(&[Some(1.0), None]);
         assert_eq!(xy.pch, vec![Some(1), Some(2)]);
         assert_eq!(xy.lwd, vec![Some(1.0), None]);
+    }
+
+    #[test]
+    fn numeric_setters_take_any_number_type() {
+        use crate::device::{AblineOptions, AxisOptions, LegendOptions, XyOptions};
+        use crate::par::ParOptions;
+        // Vectors: any number type, ranges, by value or by reference.
+        let ab = AblineOptions::default().h(1_i64).v(vec![2_u64, 3]);
+        assert_eq!((ab.h, ab.v), (vec![1.0], vec![2.0, 3.0]));
+        let axis = AxisOptions::default()
+            .at(1..=3)
+            .tck(1_usize)
+            .mgp([3_u8, 1, 0]);
+        assert_eq!(axis.at, Some(vec![1.0, 2.0, 3.0]));
+        assert_eq!((axis.tck, axis.mgp), (Some(1.0), Some([3.0, 1.0, 0.0])));
+        // `NA`-able vectors: the same, plus `Option`s.
+        let xy = XyOptions::default().cex(2_u8).lwd([Some(1_i64), None]);
+        assert_eq!((xy.cex, xy.lwd), (vec![Some(2.0)], vec![Some(1.0), None]));
+        assert_eq!(XyOptions::default().cex(1..3).cex, [Some(1.0), Some(2.0)]);
+        // Pairs and single values.
+        let legend = LegendOptions::default()
+            .inset((0.1_f32, 1_u8))
+            .cex(&[1_i16][..]);
+        assert_eq!(legend.inset, Some((0.1_f32 as f64, 1.0)));
+        assert_eq!(legend.cex, [Some(1.0)]);
+        assert_eq!(ParOptions::default().cex(2_i64).cex, Some(2.0));
     }
 
     #[test]

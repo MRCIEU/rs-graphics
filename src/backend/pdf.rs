@@ -40,6 +40,7 @@ use crate::afm::{self, FontFace};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 /// A backend writing PDF, using the standard Helvetica (and Symbol) fonts
 /// that every PDF viewer has, so no fonts are embedded.
@@ -99,8 +100,8 @@ struct LineState {
 impl PdfBackend {
     /// Creates a PDF backend for a `width_in` x `height_in` inch page, with a
     /// transparent background and compressed content.
-    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
-        let (width_in, height_in) = (width_in.into(), height_in.into());
+    pub fn new(width_in: impl Num, height_in: impl Num) -> Self {
+        let (width_in, height_in) = (width_in.to_f64(), height_in.to_f64());
         PdfBackend {
             width_in,
             height_in,

@@ -26,7 +26,7 @@ use crate::device::{
 };
 use crate::error::Error;
 use crate::lty::LineType;
-use crate::numbers::Numbers;
+use crate::numbers::{Num, Numbers};
 use crate::par::AxisType;
 use crate::plotmath::Label;
 use crate::recycle::nth;
@@ -115,8 +115,8 @@ pub struct BoxStats {
 /// assert_eq!(s.outliers, [100.0]);
 /// assert_eq!(s.n, 6);
 /// ```
-pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Into<f64>) -> BoxStats {
-    let (x, coef) = (x.into_numbers(), coef.into());
+pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Num) -> BoxStats {
+    let (x, coef) = (x.into_numbers(), coef.to_f64());
     let x: &[f64] = &x;
     let n = x.iter().filter(|v| !v.is_nan()).count();
     let mut sorted: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
@@ -201,14 +201,14 @@ crate::setters::options! {
         /// How far the whiskers reach: to the most extreme point within
         /// `range` times the box length (IQR); points beyond are outliers.
         /// `None`: 1.5.
-        pub range: Option<f64> => option f64,
+        pub range: Option<f64> => number f64,
         /// Box positions on the name axis, one per group. `None`: `1, 2,
         /// ..., n`.
-        pub at: Option<Vec<f64>> => option_values f64,
+        pub at: Option<Vec<f64>> => option_numbers f64,
         /// Relative box widths, one per group, scaled so the widest is
         /// `boxwex`. `None`: equal widths, or by group size with `varwidth`;
         /// a single box is half of `boxwex` wide (as in R).
-        pub width: Option<Vec<f64>> => option_values f64,
+        pub width: Option<Vec<f64>> => option_numbers f64,
         /// Draws on the current plot instead of starting a new one. Default
         /// `false`. R's `add = TRUE`.
         pub add: bool => value bool,
@@ -241,7 +241,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.main)`]: crate::par::Par::cex_main
-        pub cex_main: Option<f64> => option f64,
+        pub cex_main: Option<f64> => number f64,
         /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
         ///
         /// [`par(col.main)`]: crate::par::Par::col_main
@@ -251,7 +251,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.sub)`]: crate::par::Par::cex_sub
-        pub cex_sub: Option<f64> => option f64,
+        pub cex_sub: Option<f64> => number f64,
         /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
         ///
         /// [`par(col.sub)`]: crate::par::Par::col_sub
@@ -261,7 +261,7 @@ crate::setters::options! {
         ///
         /// [`par(cex)`]: crate::par::Par::cex
         /// [`par(cex.lab)`]: crate::par::Par::cex_lab
-        pub cex_lab: Option<f64> => option f64,
+        pub cex_lab: Option<f64> => number f64,
         /// Colour of `xlab` and `ylab`. `None`: [`par(col.lab)`]. R's
         /// `col.lab`.
         ///
@@ -288,12 +288,12 @@ crate::setters::options! {
 
         /// Box widths, in units of the position axis (of its natural log on a
         /// log axis). Empty: 0.8 (R's `boxplot()` default, whatever `at` is).
-        pub boxwex: Vec<f64> => values f64,
+        pub boxwex: Vec<f64> => numbers f64,
         /// Staple width as a fraction of the box width. Empty: 0.5.
-        pub staplewex: Vec<f64> => values f64,
+        pub staplewex: Vec<f64> => numbers f64,
         /// Width of the outlier lines (see `outlty`) as a fraction of the box
         /// width. Empty: 0.5.
-        pub outwex: Vec<f64> => values f64,
+        pub outwex: Vec<f64> => numbers f64,
 
         /// Default line type of the box, median and staples, and of the
         /// whiskers. Empty: [`par(lty)`] (the whiskers: dashed). `None`: that
@@ -378,7 +378,7 @@ crate::setters::options! {
         /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
         ///
         /// [`par(cex.axis)`]: crate::par::Par::cex_axis
-        pub cex_axis: Option<f64> => option f64,
+        pub cex_axis: Option<f64> => number f64,
         /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
         ///
@@ -386,7 +386,7 @@ crate::setters::options! {
         pub col_axis: Option<ColorSpec> => option ColorSpec,
         /// Minimum gap between axis labels. `None`: R's default. R's
         /// `gap.axis`.
-        pub gap_axis: Option<f64> => option f64,
+        pub gap_axis: Option<f64> => number f64,
         /// Type of the x axis: `AxisType::None` leaves it out. `None`:
         /// [`par(xaxt)`].
         ///
