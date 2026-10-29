@@ -79,7 +79,7 @@ match dev.plot().x(&x).y(&y).try_draw() {
 }
 ```
 
-Use `.try_draw()` in programs that draw what users ask for, and `.draw()` in scripts, where a mistake should stop everything, as it does in R. The calls that aren't builders have the same pair: `dev.try_plot_new()`, `dev.try_add_figure(&fig)` and `dev.try_add_figure_at(row, col, &fig)`; `dev.strwidth()`/`strheight()` end in `.try_get()` or `.get()`. Opening and closing a device (`.open()`, `.close()`) return `std::io::Result`, as file operations do. The one exception is `Label::math("...")`, which panics on an expression it can't parse; use `Expression::parse("...")`, which returns a `Result`, for text from users.
+Use `.try_draw()` in programs that draw what users ask for, and `.draw()` in scripts, where a mistake should stop everything, as it does in R. The calls that aren't builders have the same pair: `dev.try_plot_new()`, `dev.try_add_figure(&fig)` and `dev.try_add_figure_at(row, col, &fig)`; `dev.strwidth()`/`strheight()` end in `.try_get()` or `.get()`. Opening and closing a device (`.open()`, `.close()`) return the same `rs_graphics::Error`, named for R's `pdf()`/`svg()`/`png()` and `dev.off()`, with `ErrorKind::Io` when the file itself fails; it converts into a `std::io::Error`, so `?` works in functions returning `std::io::Result`. The one exception is `Label::math("...")`, which panics on an expression it can't parse; use `Expression::parse("...")`, which returns a `Result`, for text from users.
 
 ### R side by side
 

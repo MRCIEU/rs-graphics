@@ -7,22 +7,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The crate's error type, [`Error`]: an R error from a drawing call
-//! (returned by `.try_draw()`), or a string that isn't a valid value
-//! (returned by the string-valued types' `FromStr` and `TryFrom`).
+//! (returned by `.try_draw()`), a string that isn't a valid value
+//! (returned by the string-valued types' `FromStr` and `TryFrom`), or a
+//! device that couldn't be opened or written (`open()`, `close()`).
 
 use std::fmt;
+use std::sync::Arc;
 
 /// An R error from a drawing call: what R would stop with, such as a
 /// missing argument, an invalid value, or regions that don't fit the page.
 ///
 /// Returned by the builders' `try_draw()` (and [`Device`]'s
 /// `try_plot_new()`, `try_add_figure()`, ...); the matching `draw()`
-/// panics with the same text. It prints like R's own errors, the call's
-/// name then R's message: `plot.new(): figure margins too large`.
+/// panics with the same text. Also returned by opening and closing a
+/// device ([`DeviceBuilder::open`], [`Device::close`]); converts into a
+/// [`std::io::Error`], so `?` works in a function returning
+/// `io::Result`. It prints like R's own errors, the call's name then R's
+/// message: `plot.new(): figure margins too large`.
 ///
 /// This is R's `Error in plot.new() : figure margins too large`.
 ///
 /// [`Device`]: crate::device::Device
+/// [`DeviceBuilder::open`]: crate::device::DeviceBuilder::open
+/// [`Device::close`]: crate::device::Device::close
 ///
 /// # Examples
 ///
@@ -35,12 +42,27 @@ use std::fmt;
 /// assert_eq!(err.kind(), ErrorKind::DoesNotFit);
 /// assert_eq!(err.to_string(), "plot.new(): figure margins too large");
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Error {
     call: &'static str,
     kind: ErrorKind,
     message: String,
+    /// The I/O error behind an [`ErrorKind::Io`] error.
+    io: Option<Arc<std::io::Error>>,
 }
+
+impl PartialEq for Error {
+    /// Equal when the call, kind and message are, and, for I/O errors, the
+    /// I/O error's kind.
+    fn eq(&self, other: &Error) -> bool {
+        self.call == other.call
+            && self.kind == other.kind
+            && self.message == other.message
+            && self.io.as_ref().map(|e| e.kind()) == other.io.as_ref().map(|e| e.kind())
+    }
+}
+
+impl Eq for Error {}
 
 /// What kind of R error an [`Error`] is.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -56,6 +78,10 @@ pub enum ErrorKind {
     /// panel, or a figure or plot region larger than allowed. A bigger page,
     /// fewer panels or smaller margins fix it.
     DoesNotFit,
+    /// A device's file couldn't be created or written (`cannot open file
+    /// 'x.pdf': No such file or directory`); [`Error::io_error`] gives the
+    /// underlying [`std::io::Error`].
+    Io,
 }
 
 impl Error {
@@ -65,6 +91,7 @@ impl Error {
             call: "",
             kind: ErrorKind::InvalidArgument,
             message: message.into(),
+            io: None,
         }
     }
 
@@ -74,6 +101,7 @@ impl Error {
             call: "",
             kind: ErrorKind::MissingArgument,
             message: format!("argument \"{name}\" is missing, with no default"),
+            io: None,
         }
     }
 
@@ -83,6 +111,17 @@ impl Error {
             call,
             kind: ErrorKind::DoesNotFit,
             message: message.into(),
+            io: None,
+        }
+    }
+
+    /// A device's file error, from `call` (`"pdf"`, `"dev.off"`, ...).
+    pub(crate) fn io(call: &'static str, e: std::io::Error) -> Error {
+        Error {
+            call,
+            kind: ErrorKind::Io,
+            message: e.to_string(),
+            io: Some(Arc::new(e)),
         }
     }
 
@@ -111,6 +150,23 @@ impl Error {
     pub fn message(&self) -> &str {
         &self.message
     }
+
+    /// Returns the I/O error behind an [`ErrorKind::Io`] error, `None` for
+    /// the other kinds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let err = Device::pdf("/no/such/dir/x.pdf").open().err().unwrap();
+    /// assert_eq!(err.kind(), ErrorKind::Io);
+    /// assert_eq!(err.call(), "pdf");
+    /// let io = err.io_error().unwrap();
+    /// assert_eq!(io.kind(), std::io::ErrorKind::NotFound);
+    /// ```
+    pub fn io_error(&self) -> Option<&std::io::Error> {
+        self.io.as_deref()
+    }
 }
 
 impl fmt::Display for Error {
@@ -123,7 +179,25 @@ impl fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.io
+            .as_deref()
+            .map(|e| e as &(dyn std::error::Error + 'static))
+    }
+}
+
+impl From<Error> for std::io::Error {
+    /// The error as an I/O error, so `?` works in a function returning
+    /// `io::Result`: an [`ErrorKind::Io`] error keeps its I/O error's kind,
+    /// the others are `InvalidInput`. It prints as the `Error` does.
+    fn from(e: Error) -> std::io::Error {
+        let kind = e
+            .io_error()
+            .map_or(std::io::ErrorKind::InvalidInput, |io| io.kind());
+        std::io::Error::new(kind, e)
+    }
+}
 
 /// For conversions that can't fail (`TryFrom` from a `From` impl), so
 /// setters can take either kind ([`IntoArg`](crate::setters::IntoArg)).

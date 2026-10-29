@@ -787,20 +787,26 @@ impl<B: Backend> Device<B> {
     ///
     /// # Errors
     ///
-    /// If writing the file fails, or writing an earlier page's file failed
+    /// The errors are named for R's `dev.off()`: an [`ErrorKind::Io`] error
+    /// if writing the file fails, or writing an earlier page's file failed
     /// (the first such error). A device from [`Device::memory`] or
     /// [`Device::new`] has no file: closing it is an
-    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error; use
-    /// [`finish`](Device::finish) for its bytes.
-    pub fn close(mut self) -> std::io::Result<()> {
+    /// [`ErrorKind::InvalidArgument`] error; use [`finish`](Device::finish)
+    /// for its bytes.
+    ///
+    /// [`ErrorKind::Io`]: crate::ErrorKind::Io
+    /// [`ErrorKind::InvalidArgument`]: crate::ErrorKind::InvalidArgument
+    pub fn close(mut self) -> Result<(), Error> {
         let Some(output) = self.output.take() else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
+            return Err(Error::invalid(
                 "no file to close: the device's output is in memory \
                  (Device::memory or Device::new); use finish()",
-            ));
+            )
+            .in_call("dev.off"));
         };
-        output.close(&self.finish())
+        output
+            .close(&self.finish())
+            .map_err(|e| Error::io("dev.off", e))
     }
 
     /// Returns the page size in inches, `[width, height]`.

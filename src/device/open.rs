@@ -23,6 +23,7 @@ use crate::backend::raster::RasterBackend;
 use crate::backend::svg::SvgBackend;
 use crate::backend::{AnyBackend, Format};
 use crate::color::{Color, ColorSpec};
+use crate::error::Error;
 use crate::par::Par;
 use crate::setters::IntoArg;
 
@@ -139,41 +140,44 @@ impl DeviceBuilder {
     /// A device from [`Device::memory`] or [`Device::null`] has no file, so
     /// opening it creates nothing.
     ///
-    /// If the file can't be created (the error names the file); if `file` has
-    /// any other `%`, or more than one page-number format, an
-    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid 'file'
-    /// argument"); for a format name that names no format, a setter's value
-    /// that isn't one (`.bg("notacolour")`, `.units("ft")`),
-    /// [`units`](DeviceBuilder::units) of pixels on a PDF or SVG device, or a
-    /// negative palette number as `bg`, an `InvalidInput` error, before the
-    /// file is created.
-    pub fn open(self) -> std::io::Result<Device<AnyBackend>> {
+    /// The errors are named for R's device function (`pdf()`, `svg()` or
+    /// `png()`). If the file can't be created, an [`ErrorKind::Io`] error
+    /// naming the file. Before the file is created, an
+    /// [`ErrorKind::InvalidArgument`] error if `file` has any other `%`, or
+    /// more than one page-number format ("invalid 'file' argument"); for a
+    /// format name that names no format, a setter's value that isn't one
+    /// (`.bg("notacolour")`, `.units("ft")`), [`units`](DeviceBuilder::units)
+    /// of pixels on a PDF or SVG device, or a negative palette number as
+    /// `bg`.
+    ///
+    /// [`ErrorKind::Io`]: crate::ErrorKind::Io
+    /// [`ErrorKind::InvalidArgument`]: crate::ErrorKind::InvalidArgument
+    pub fn open(self) -> Result<Device<AnyBackend>, Error> {
+        let call = match self.format {
+            Format::Pdf => "pdf",
+            Format::Svg => "svg",
+            Format::Png => "png",
+        };
         if let Some(e) = &self.deferred_error {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                e.to_string(),
-            ));
+            return Err(e.clone().in_call(call));
         }
         let units = self.units.unwrap_or(Units::Inches);
         if units == Units::Pixels && self.format != Format::Png {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "units = \"px\" needs a PNG device",
-            ));
+            return Err(Error::invalid("units = \"px\" needs a PNG device").in_call(call));
         }
         if let Some(ColorSpec::Index(i)) = self.bg {
             if i < 0 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("numerical color values must be >= 0, found {i}"),
-                ));
+                return Err(Error::invalid(format!(
+                    "numerical color values must be >= 0, found {i}"
+                ))
+                .in_call(call));
             }
         }
         // The file, for a file device.
         let (name, file) = match &self.target {
             Target::File(path) => {
-                let name = FileName::parse(path)?;
-                let file = create(&name.for_page(1))?;
+                let name = FileName::parse(path).map_err(|e| e.in_call(call))?;
+                let file = create(&name.for_page(1)).map_err(|e| Error::io(call, e))?;
                 (Some(name), Some(file))
             }
             Target::Memory | Target::Null => (None, None),
@@ -335,13 +339,8 @@ struct Conversion {
 }
 
 impl FileName {
-    pub(crate) fn parse(path: &Path) -> std::io::Result<FileName> {
-        let invalid = || {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("invalid 'file' argument '{}'", path.display()),
-            )
-        };
+    pub(crate) fn parse(path: &Path) -> Result<FileName, Error> {
+        let invalid = || Error::invalid(format!("invalid 'file' argument '{}'", path.display()));
         // A name that isn't UTF-8 has no `%` to interpret.
         let Some(s) = path.to_str() else {
             return Ok(FileName {

@@ -227,9 +227,10 @@ fn unknown_format_name_fails_at_open() {
     let path = temp("unknown_format.jpg");
     let _ = std::fs::remove_file(&path);
     let e = Device::format("jpg", &path).open().err().unwrap();
-    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(e.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(e.call(), "pdf");
     assert!(
-        e.to_string()
+        e.message()
             .starts_with("\"jpg\" is not a valid output format"),
         "{e}"
     );
@@ -261,7 +262,8 @@ fn close_writes_the_finished_file_whatever_its_extension() {
 fn close_without_a_file_fails() {
     let dev = Device::memory("pdf").width(7.0).height(7.0).open().unwrap();
     let err = dev.close().unwrap_err();
-    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(err.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(err.call(), "dev.off");
 }
 
 #[test]
@@ -287,8 +289,15 @@ fn open_creates_the_file_and_close_fills_it() {
 fn open_fails_on_a_bad_path_and_names_it() {
     let path = temp("no_such_directory").join("plot.pdf");
     let err = Device::pdf(&path).open().err().expect("open should fail");
-    assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(err.kind(), ErrorKind::Io);
+    assert_eq!(err.call(), "pdf");
+    assert_eq!(err.io_error().unwrap().kind(), std::io::ErrorKind::NotFound);
     assert!(err.to_string().contains("no_such_directory"), "{err}");
+    // As an `io::Error` (for `?` in `io::Result` functions) it keeps the
+    // I/O kind and the message.
+    let io: std::io::Error = err.clone().into();
+    assert_eq!(io.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(io.to_string(), err.to_string());
     assert!(!path.exists());
 }
 
@@ -373,7 +382,7 @@ fn pixels_need_a_png_device() {
             .open()
             .err()
             .expect("open should fail");
-        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert_eq!(err.kind(), ErrorKind::InvalidArgument);
         assert!(err.to_string().contains("px"), "{err}");
         assert!(!path.exists());
     }
@@ -395,13 +404,13 @@ fn unknown_units_and_colours_fail_at_open() {
     let path = temp("unknown_units.pdf");
     let _ = std::fs::remove_file(&path);
     let e = Device::pdf(&path).units("pt").open().err().unwrap();
-    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(e.kind(), ErrorKind::InvalidArgument);
     assert!(
-        e.to_string().starts_with("\"pt\" is not a valid units"),
+        e.message().starts_with("\"pt\" is not a valid units"),
         "{e}"
     );
     let e = Device::pdf(&path).bg("notacolour").open().err().unwrap();
-    assert_eq!(e.to_string(), "invalid color name 'notacolour'");
+    assert_eq!(e.to_string(), "pdf(): invalid color name 'notacolour'");
     assert!(!path.exists());
 }
 
@@ -420,10 +429,7 @@ fn memory_devices_give_the_files_bytes() {
     }
     // No file is created, and closing is an error (use `finish()`).
     let dev = Device::memory("png").open().unwrap();
-    assert_eq!(
-        dev.close().unwrap_err().kind(),
-        std::io::ErrorKind::InvalidInput
-    );
+    assert_eq!(dev.close().unwrap_err().kind(), ErrorKind::InvalidArgument);
 }
 
 #[test]

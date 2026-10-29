@@ -263,7 +263,7 @@ fn names_with_other_conversions_are_refused() {
     let d = dir("invalid");
     for bad in ["a%s.png", "a%d%d.png", "a%.png", "a%f.png"] {
         let err = Device::png(d.join(bad)).open().map(|_| ()).unwrap_err();
-        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{bad}");
+        assert_eq!(err.kind(), ErrorKind::InvalidArgument, "{bad}");
         assert!(err.to_string().contains("invalid 'file' argument"), "{err}");
     }
     // `%%` is a `%`.

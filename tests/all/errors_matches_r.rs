@@ -423,6 +423,7 @@ fn negative_bg_fails_when_opening() {
         .open()
         .err()
         .unwrap();
-    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(e.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(e.call(), "png");
     assert!(!path.exists());
 }

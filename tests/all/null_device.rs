@@ -95,5 +95,5 @@ fn takes_pdfs_options() {
     assert_eq!(dev.current_par().bg.a, 0);
     // Pixels need a PNG device.
     let e = Device::null().units("px").open().err().unwrap();
-    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(e.kind(), ErrorKind::InvalidArgument);
 }
