@@ -198,24 +198,23 @@ impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::OptionOf> fo
     }
 }
 
-/// One value or several, for a setting R recycles per element.
+/// One value or several, for a setting R recycles per element: colours,
+/// `text()`'s `pos`, `layout()`'s `widths` and `heights`.
 ///
-/// Takes a single value or a `Vec`, array or slice of them, by value or
-/// by reference: `"red"`, `["red", "blue"]`, `[1, 2]`, ... (Numeric
-/// settings take [`Numbers`](crate::numbers::Numbers) instead: any number
-/// type, and ranges.) Colours take anything that converts to a
-/// [`ColorSpec`] (one palette index as an `i32`); line types take a
-/// [`LineType`], R's string or code; a character `pch` is its ASCII code,
-/// or minus its Unicode code point for other characters (`'é'` is -233),
-/// as in R.
+/// Takes a single value (a colour or a `pos` code) or a `Vec`, array or
+/// slice of them, by value or by reference: `"red"`, `["red", "blue"]`,
+/// `[1, 2]`, ... Colours take anything that converts to a [`ColorSpec`]
+/// (one palette index as an `i32`; a `None` element is R's `NA`, nothing
+/// drawn). Settings whose other elements may be `NA` take [`NaValues`],
+/// numeric data [`Numbers`](crate::numbers::Numbers), and `pch` [`Pch`].
 ///
 /// # Examples
 ///
 /// ```
 /// use rs_graphics::setters::Values;
 /// # use rs_graphics::prelude::*;
-/// let one: Vec<f64> = 2_i32.into_values().unwrap();
-/// assert_eq!(one, [2.0]);
+/// let one: Vec<ColorSpec> = "red".into_values().unwrap();
+/// assert_eq!(one.len(), 1);
 /// let cols: Vec<ColorSpec> = ["red", "blue"].into_values().unwrap();
 /// assert_eq!(cols[1], ColorSpec::Color("blue".parse().unwrap()));
 /// ```
@@ -273,17 +272,7 @@ macro_rules! single_values {
 }
 
 single_values!(ColorSpec: ColorSpec, Color, &str, String, &String, i32);
-single_values!(f64: f64, f32, i32, u32);
 single_values!(i32: i32);
-single_values!(LineType: LineType, &str, String, &String, i32);
-
-/// A character `pch`, e.g. `'.'` or `'+'`: its ASCII code, or minus its
-/// Unicode code point for other characters (`'é'` is -233), as in R.
-impl Values<i32> for char {
-    fn into_values(self) -> Result<Vec<i32>, Error> {
-        Ok(vec![char_pch(self)])
-    }
-}
 
 /// One value or several for a recycled style vector whose elements may be
 /// missing (`None`, R's `NA`).
@@ -309,10 +298,10 @@ impl Values<i32> for char {
 /// # use rs_graphics::prelude::*;
 /// # let mut dev = Device::null().open().unwrap();
 /// # dev.plot_new();
-/// let pch: Vec<Option<i32>> = [Some(19_i32), None].into_na_values().unwrap();
-/// assert_eq!(pch, [Some(19), None]);
-/// // The second point has no symbol.
-/// dev.points().x([0.2, 0.8]).y([0.5, 0.5]).pch([Some(19), None]).draw();
+/// let lwd: Vec<Option<f64>> = [Some(2), None].into_na_values().unwrap();
+/// assert_eq!(lwd, [Some(2.0), None]);
+/// // The second segment isn't drawn.
+/// dev.segments().x0([0.2, 0.2]).y0([0.3, 0.7]).x1(0.8).lwd([Some(2), None]).draw();
 /// ```
 pub trait NaValues<T> {
     /// The values, in order (`None`: R's `NA`).
@@ -462,8 +451,6 @@ mod na_numbers {
     }
     ranges!(i32, i64, u32, u64, usize);
 }
-na_values!(i32: IntoArg::<i32>::into_arg; i32, i16, u8, u16);
-na_values!(i32: |c: char| Ok::<i32, Error>(char_pch(c)); char);
 na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
 na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
 
@@ -935,13 +922,12 @@ mod tests {
         assert_eq!(values::<ColorSpec>(2), vec![ColorSpec::Index(2)]);
         assert_eq!(values::<ColorSpec>(["red", "blue"]).len(), 2);
         assert_eq!(values::<ColorSpec>(vec![red, red]), vec![red, red]);
-        assert_eq!(values::<f64>(1.5), vec![1.5]);
-        assert_eq!(values::<f64>(&[1.0, 2.0][..]), vec![1.0, 2.0]);
-        assert_eq!(values::<i32>('.'), vec![46]);
+        assert_eq!(values::<i32>(3), vec![3]);
+        assert_eq!(values::<i32>(&[1, 2][..]), vec![1, 2]);
         assert_eq!(values::<LineType>([1, 2]).len(), 2);
         // A value that doesn't convert is an error, not a panic.
         assert!(Values::<ColorSpec>::into_values(["red", "notacolour"]).is_err());
-        assert!(Values::<LineType>::into_values(-1).is_err());
+        assert!(Values::<LineType>::into_values([-1]).is_err());
     }
 
     #[test]
