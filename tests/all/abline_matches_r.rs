@@ -58,7 +58,7 @@ fn cases() -> Vec<Case> {
                             .col(col(&["red", "blue"]))
                             .lty(
                                 (1..=3)
-                                    .map(|c| Some(LineType::from_code(c).unwrap()))
+                                    .map(|c| Some(LineType::try_from(c).unwrap()))
                                     .collect::<Vec<_>>(),
                             )
                             .lwd(vec![Some(1.0), Some(2.0)]),
@@ -124,8 +124,8 @@ fn cases() -> Vec<Case> {
                         &AblineOptions::default()
                             .h(vec![2.0, 4.0])
                             .lty(vec![
-                                Some(LineType::from_code(2).unwrap()),
-                                Some(LineType::from_code(3).unwrap()),
+                                Some(LineType::try_from(2).unwrap()),
+                                Some(LineType::try_from(3).unwrap()),
                             ])
                             .lwd(vec![Some(1.0), Some(3.0)]),
                     )
@@ -136,7 +136,7 @@ fn cases() -> Vec<Case> {
                         &AblineOptions::default()
                             .h(vec![6.0, 8.0])
                             .lty(vec![
-                                Some(LineType::from_code(4).unwrap()),
+                                Some(LineType::try_from(4).unwrap()),
                                 Some(LineType::try_from("42").unwrap()),
                             ])
                             .lwd(vec![Some(2.0)]),
@@ -188,7 +188,7 @@ fn cases() -> Vec<Case> {
             lims: ((1.0, 100.0), (0.5, 500.0)),
             draw: |d| {
                 d.par().col(Color::try_from("grey40").unwrap()).draw();
-                d.par().lty(LineType::from_code(2).unwrap()).draw();
+                d.par().lty(LineType::try_from(2).unwrap()).draw();
                 d.par().lwd(2.0).draw();
                 d.abline()
                     .with(

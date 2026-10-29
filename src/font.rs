@@ -26,7 +26,7 @@
 
 /// A font face: plain, bold, italic, bold italic or the Symbol font.
 ///
-/// Convert from a number 1 to 5 ([`FontFace::from_code`], `TryFrom<i32>`)
+/// Convert from a number 1 to 5 (`FontFace::try_from(2)`)
 /// or a name (`"bold".parse::<FontFace>()`, `TryFrom<&str>`): grid's
 /// `fontface` names (`"plain"`, `"bold"`, `"italic"`, `"bold.italic"`), plus
 /// `"symbol"`, case-sensitive, or a number 1 to 5 as a string (`"2"`).
@@ -65,18 +65,9 @@ pub enum FontFace {
 }
 
 impl FontFace {
-    /// Returns the face for a font number 1 to 5, or `None` for any other.
-    ///
-    /// The numbers are R's `font` values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(FontFace::from_code(3), Some(FontFace::Italic));
-    /// assert_eq!(FontFace::from_code(0), None);
-    /// ```
-    pub fn from_code(code: i32) -> Option<FontFace> {
+    /// The face for a font number 1 to 5, `None` for any other; the public
+    /// route is `TryFrom<i32>`.
+    pub(crate) fn from_code(code: i32) -> Option<FontFace> {
         match code {
             1 => Some(FontFace::Plain),
             2 => Some(FontFace::Bold),
@@ -88,7 +79,7 @@ impl FontFace {
     }
 
     /// Returns the face's number, 1 to 5 (the inverse of
-    /// [`FontFace::from_code`]).
+    /// `FontFace::try_from(i32)`).
     ///
     /// The numbers are R's `font` values.
     ///
@@ -125,7 +116,16 @@ impl FontFace {
 impl TryFrom<i32> for FontFace {
     type Error = crate::error::Error;
 
-    /// The face for a font number 1 to 5, as [`FontFace::from_code`].
+    /// The face for a font number 1 to 5, R's `font` values: 1 plain, 2
+    /// bold, 3 italic, 4 bold italic, 5 Symbol.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(FontFace::try_from(3).unwrap(), FontFace::Italic);
+    /// assert!(FontFace::try_from(0).is_err());
+    /// ```
     ///
     /// # Errors
     ///

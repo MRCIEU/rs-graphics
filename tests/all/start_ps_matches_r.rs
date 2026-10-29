@@ -60,7 +60,7 @@ fn draw_ours(start: f64, ps: f64) -> Vec<u8> {
         .labels(["a", "bb"])
         .col(black)
         .pch(1)
-        .lty(LineType::from_code(1).unwrap())
+        .lty(LineType::try_from(1).unwrap())
         .draw();
     dev.finish()
 }

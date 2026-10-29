@@ -120,23 +120,9 @@ impl LineType {
         Some(Self::from_packed_nibbles(code))
     }
 
-    /// Returns the line type for a numeric code.
-    ///
-    /// `0` is blank, `1` solid, `2..=6` the named dash patterns. Codes above
-    /// 6 recycle as R does (`(code - 1) % 6 + 1`: `7` is solid, `8` dashed,
-    /// ...).
-    ///
-    /// These are R's numeric `lty` codes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineType::from_code(3), Some(LineType::DOTTED));
-    /// assert_eq!(LineType::from_code(8), Some(LineType::DASHED));
-    /// assert_eq!(LineType::from_code(-1), None);
-    /// ```
-    pub fn from_code(code: i32) -> Option<LineType> {
+    /// The line type for a numeric code, `None` for a negative one; the
+    /// public route is `TryFrom<i32>`.
+    pub(crate) fn from_code(code: i32) -> Option<LineType> {
         if code < 0 {
             return None;
         }
@@ -229,8 +215,18 @@ impl Default for LineType {
 impl TryFrom<i32> for LineType {
     type Error = crate::error::Error;
 
-    /// The line type for a numeric code, as [`LineType::from_code`] (codes
-    /// above 6 recycle).
+    /// The line type for one of R's numeric `lty` codes: `0` is blank, `1`
+    /// solid, `2..=6` the named dash patterns. Codes above 6 recycle as R
+    /// does (`(code - 1) % 6 + 1`: `7` is solid, `8` dashed, ...).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineType::try_from(3).unwrap(), LineType::DOTTED);
+    /// assert_eq!(LineType::try_from(8).unwrap(), LineType::DASHED);
+    /// assert!(LineType::try_from(-1).is_err());
+    /// ```
     ///
     /// # Errors
     ///

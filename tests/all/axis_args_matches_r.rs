@@ -214,7 +214,7 @@ fn cases() -> Vec<Case> {
                     .font(FontFace::Bold);
                 d.axis().side(1).with(&o).draw();
                 let o = AxisOptions::default()
-                    .lty(LineType::from_code(2).unwrap())
+                    .lty(LineType::try_from(2).unwrap())
                     .draw_labels(false);
                 d.axis().side(2).with(&o).draw();
                 let o = AxisOptions::default()

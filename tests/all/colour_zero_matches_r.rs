@@ -65,7 +65,7 @@ fn draw_ours(c: &Case) -> Vec<u8> {
         .y([0.5])
         .with(&XyOptions::default().pch(vec![Some(19)]).col(vec![zero]))
         .draw();
-    let solid = LineType::from_code(1).unwrap();
+    let solid = LineType::try_from(1).unwrap();
     d.rect()
         .xleft([0.1])
         .ybottom([0.1])

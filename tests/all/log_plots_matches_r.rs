@@ -133,7 +133,7 @@ fn cases() -> Vec<Case> {
                             .untf(true)
                             .col(vec![black])
                             .lwd(vec![Some(1.0)])
-                            .lty(vec![Some(LineType::from_code(2).unwrap())]),
+                            .lty(vec![Some(LineType::try_from(2).unwrap())]),
                     )
                     .draw();
                 d.abline()
