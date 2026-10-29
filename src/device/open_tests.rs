@@ -318,7 +318,7 @@ fn units_convert_sizes_to_inches() {
             Device::png(temp("a.png"))
                 .width(5)
                 .height(4)
-                .units(Units::In)
+                .units(Units::Inches)
         ),
         opened(Device::png(temp("a.png")).width(5).height(4))
     );
@@ -381,13 +381,13 @@ fn pixels_need_a_png_device() {
 
 #[test]
 fn units_parse_like_match_arg() {
-    assert_eq!("px".parse::<Units>().ok(), Some(Units::Px));
-    assert_eq!("i".parse::<Units>().ok(), Some(Units::In));
-    assert_eq!("c".parse::<Units>().ok(), Some(Units::Cm));
-    assert_eq!("m".parse::<Units>().ok(), Some(Units::Mm));
+    assert_eq!("px".parse::<Units>().ok(), Some(Units::Pixels));
+    assert_eq!("i".parse::<Units>().ok(), Some(Units::Inches));
+    assert_eq!("c".parse::<Units>().ok(), Some(Units::Centimetres));
+    assert_eq!("m".parse::<Units>().ok(), Some(Units::Millimetres));
     assert_eq!("".parse::<Units>().ok(), None);
     assert_eq!("pt".parse::<Units>().ok(), None);
-    assert_eq!("mm".parse::<Units>(), Ok(Units::Mm));
+    assert_eq!("mm".parse::<Units>(), Ok(Units::Millimetres));
 }
 
 #[test]

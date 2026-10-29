@@ -154,8 +154,8 @@ impl DeviceBuilder {
                 e.to_string(),
             ));
         }
-        let units = self.units.unwrap_or(Units::In);
-        if units == Units::Px && self.format != Format::Png {
+        let units = self.units.unwrap_or(Units::Inches);
+        if units == Units::Pixels && self.format != Format::Png {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "units = \"px\" needs a PNG device",
@@ -184,10 +184,10 @@ impl DeviceBuilder {
         };
         let res = self.res.unwrap_or(72.0);
         let inches = |size: f64| match units {
-            Units::In => size,
-            Units::Cm => size / 2.54,
-            Units::Mm => size / 25.4,
-            Units::Px => size / res,
+            Units::Inches => size,
+            Units::Centimetres => size / 2.54,
+            Units::Millimetres => size / 25.4,
+            Units::Pixels => size / res,
         };
         let width = self.width.map_or(default_size, inches);
         let height = self.height.map_or(default_size, inches);
@@ -262,20 +262,20 @@ impl DeviceBuilder {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// assert_eq!("c".parse::<Units>().unwrap(), Units::Cm);
+/// assert_eq!("c".parse::<Units>().unwrap(), Units::Centimetres);
 /// assert!("pt".parse::<Units>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Units {
     /// `"in"`: inches (the default here; R's `png()` defaults to pixels).
     #[default]
-    In,
+    Inches,
     /// `"cm"`: centimetres.
-    Cm,
+    Centimetres,
     /// `"mm"`: millimetres.
-    Mm,
+    Millimetres,
     /// `"px"`: pixels, at the device's `res` (PNG only).
-    Px,
+    Pixels,
 }
 
 impl Units {
@@ -283,10 +283,10 @@ impl Units {
     /// otherwise. The public routes are `FromStr`/`TryFrom<&str>`.
     pub(crate) fn parse(s: &str) -> Option<Units> {
         let all = [
-            ("px", Units::Px),
-            ("in", Units::In),
-            ("cm", Units::Cm),
-            ("mm", Units::Mm),
+            ("px", Units::Pixels),
+            ("in", Units::Inches),
+            ("cm", Units::Centimetres),
+            ("mm", Units::Millimetres),
         ];
         let mut hits = all
             .iter()
