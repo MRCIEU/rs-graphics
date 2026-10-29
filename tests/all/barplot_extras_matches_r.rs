@@ -173,7 +173,7 @@ fn cases() -> Vec<Case> {
                     .legend_pos("topleft")
                     .args_legend(
                         LegendOptions::default()
-                            .bty(LegendBty::None)
+                            .bty(Bty::N)
                             .inset((0.05, 0.05))
                             .title("Groups"),
                     )

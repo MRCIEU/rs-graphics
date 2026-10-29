@@ -219,7 +219,7 @@ pub(crate) use from_str_via_try_from;
 mod string_route_tests {
     use crate::backend::{Format, LineEnd, LineJoin};
     use crate::color::{Color, ColorSpec};
-    use crate::device::{LegendBty, LegendKeyword, LegendPos, StrUnits, Units};
+    use crate::device::{LegendKeyword, LegendPos, StrUnits, Units};
     use crate::font::FontFace;
     use crate::highlevel::{HistBreaks, OrderH, PlotType};
     use crate::lty::LineType;
@@ -258,7 +258,6 @@ mod string_route_tests {
         same::<Format>("png", "jpeg");
         same::<LegendKeyword>("topr", "to");
         same::<LegendPos>("topleft", "middle");
-        same::<LegendBty>("n", "x");
         same::<Units>("cm", "pt");
     }
 }

@@ -1188,7 +1188,7 @@ mod tests {
     #[test]
     fn setters_take_r_strings() {
         use crate::backend::{LineEnd, LineJoin};
-        use crate::device::{AxisOptions, LegendBty, LegendOptions, XyOptions};
+        use crate::device::{AxisOptions, LegendOptions, XyOptions};
         use crate::highlevel::{BarplotOptions, BoxplotOptions, OrderH, PlotOptions, PlotType};
         use crate::par::{AxisStyle, AxisType, ParOptions, Pty};
 
@@ -1201,7 +1201,7 @@ mod tests {
             (Some(PlotType::Histogram), Some(AxisType::None))
         );
         assert_eq!(AxisOptions::default().axt("n").axt, Some(AxisType::None));
-        assert_eq!(LegendOptions::default().bty("n").bty, Some(LegendBty::None));
+        assert_eq!(LegendOptions::default().bty("n").bty, Some(Bty::N));
         assert_eq!(
             BarplotOptions::default().order_h("decr").order_h,
             OrderH::Decr

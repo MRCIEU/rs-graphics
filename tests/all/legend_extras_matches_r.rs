@@ -134,6 +134,36 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            // Any `bty` but "n" draws the whole box; "n" draws none.
+            name: "bty_values",
+            r: "plot(x, y, ann = FALSE)\n\
+                legend('topleft', c('a', 'b'), pch = 1:2, bty = 'l')\n\
+                legend('top', c('a', 'b'), pch = 1:2, bty = 'n')\n\
+                l <- legend('topright', c('a', 'b'), pch = 1:2, bty = '7')",
+            ours: |d| {
+                d.plot().x(X).y(Y).draw();
+                let keys = LegendOptions::default().pch([1, 2]);
+                d.legend()
+                    .pos("topleft")
+                    .labels(["a", "b"])
+                    .with(&keys)
+                    .bty("l")
+                    .draw();
+                d.legend()
+                    .pos("top")
+                    .labels(["a", "b"])
+                    .with(&keys)
+                    .bty("n")
+                    .draw();
+                d.legend()
+                    .pos("topright")
+                    .labels(["a", "b"])
+                    .with(&keys)
+                    .bty("7")
+                    .draw()
+            },
+        },
+        Case {
             name: "box_from_par_and_no_border",
             r: "plot(x, y, ann = FALSE); par(lwd = 2, lty = 3, fg = 'red', col = 'black')\n\
                 legend('top', c('a', 'b'), pch = 1:2)\n\

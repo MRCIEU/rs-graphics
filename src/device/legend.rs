@@ -51,7 +51,7 @@ use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
 use crate::numbers::Pair;
-
+use crate::par::Bty;
 use crate::plotmath::Label;
 use crate::recycle::{nth_na, pick_na, rep_or};
 
@@ -233,42 +233,6 @@ crate::error::from_r_string!(
 );
 crate::error::from_str_via_try_from!(LegendPos);
 
-/// Whether a legend has a box around it.
-///
-/// From a string (`"n".parse::<LegendBty>()` or `TryFrom<&str>`): `"o"` or
-/// `"n"`. Anything else is an error.
-///
-/// This is R's `legend(bty = )`.
-///
-/// # Examples
-///
-/// ```
-/// # use rs_graphics::prelude::*;
-/// assert_eq!("n".parse::<LegendBty>().unwrap(), LegendBty::None);
-/// ```
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum LegendBty {
-    /// `"o"` (the default): draw the box.
-    #[default]
-    Box,
-    /// `"n"`: no box.
-    None,
-}
-
-impl LegendBty {
-    /// `"o"` or `"n"`, `None` otherwise; the public routes are
-    /// `FromStr`/`TryFrom<&str>`.
-    pub(crate) fn parse(s: &str) -> Option<LegendBty> {
-        match s {
-            "o" => Some(LegendBty::Box),
-            "n" => Some(LegendBty::None),
-            _ => None,
-        }
-    }
-}
-
-crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
-
 /// The old name of [`Pch`](crate::setters::Pch), the trait every `pch`
 /// setter takes.
 #[doc(hidden)]
@@ -343,8 +307,10 @@ crate::setters::options! {
         /// Line width of the points. Empty: `lwd`; `None`: no point on that
         /// key. R's `pt.lwd`.
         pub pt_lwd: Vec<Option<f64>> => na_values f64,
-        /// Whether to draw the surrounding box. `None`: a box (R's `"o"`).
-        pub bty: Option<LegendBty> => option LegendBty,
+        /// Whether to draw the surrounding box: [`Bty::N`] (`"n"`) draws
+        /// none, any other value the whole box (R's `legend()` draws no
+        /// partial boxes). `None`: a box (R's `"o"`).
+        pub bty: Option<Bty> => option Bty,
         /// Fill colour of the legend box. `None`: [`par("bg")`] (transparent, so
         /// unfilled, on PDF by default: see [`Backend::default_bg`]).
         ///
@@ -717,7 +683,7 @@ impl<B: Backend> Device<B> {
         if plot {
             self.push_clip_region(self.par.xpd);
         }
-        if plot && opts.bty.unwrap_or_default() == LegendBty::Box {
+        if plot && opts.bty != Some(Bty::N) {
             let bg = opts.bg.unwrap_or(ColorSpec::Color(self.par.bg));
             let fill = self.resolve(bg).filter(|c| c.a > 0);
             let box_col = opts.box_col.unwrap_or(ColorSpec::Color(self.par.fg));

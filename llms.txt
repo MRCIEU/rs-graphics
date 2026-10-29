@@ -780,7 +780,7 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `pch` | `.pch()` | Plotting symbols: R's symbol codes, characters or strings; a first string of several characters gives one symbol per key, as R's `legend(pch = "abc")`. |
 | `angle` | `.angle()` | Angle of the shading lines in degrees, recycled over the keys. |
 | `density` | `.density()` | Shading lines per inch in the box keys; giving any draws boxes. |
-| `bty` | `.bty()` | Whether to draw the surrounding box. |
+| `bty` | `.bty()` | Whether to draw the surrounding box: `Bty::N` (`"n"`) draws none, any other value the whole box (R's `legend()` draws no partial boxes). |
 | `bg` | `.bg()` | Fill colour of the legend box. |
 | `box.lwd` | `.box_lwd()` | Line width of the legend box. |
 | `box.lty` | `.box_lty()` | Line type of the legend box. |

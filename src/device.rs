@@ -62,7 +62,7 @@ pub use abline::AblineOptions;
 pub use axis::AxisOptions;
 pub(crate) use axis::check_axis;
 pub(crate) use legend::check_legend;
-pub use legend::{LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos};
+pub use legend::{LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos};
 pub use mtext::MtextOptions;
 pub(crate) use mtext::check_mtext;
 pub use open::{DeviceBuilder, Units};
