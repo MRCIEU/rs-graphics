@@ -566,6 +566,12 @@ painted path and text item per page, with colours, alpha, line style,
 clip and the text matrix) and compares them in order (`assert_same_pdf`,
 with per-file tolerances and exclusions in `Compare`).
 
+Scripts in `tools/` (Python 3; `-h` for usage) help check a change:
+`verify.py` runs the tests with R, rustdoc, clippy, the Rust 1.85 build
+and the gallery against a base revision; `fmt_own.py` runs rustfmt on
+changed lines only; `mutate.py` checks that a test fails when the code
+it covers is broken.
+
 ### Continuous integration
 
 `.github/workflows/rust.yml` runs on pushes and pull requests to `main`
