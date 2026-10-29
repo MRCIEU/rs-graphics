@@ -171,9 +171,9 @@ impl LineType {
     /// segments one `lwd` longer, as `PDFSetLineTexture()` in `devPS.c`
     /// does for round and square caps. Lengths below 0 become 0. `None`
     /// for blank and solid, and when every length is <= 0.01pt (R then
-    /// writes an empty, i.e. solid, dash array).
-    #[doc(hidden)]
-    pub fn dash_lengths_pt(&self, lwd: f64, butt_cap: bool) -> Option<Vec<f64>> {
+    /// writes an empty, i.e. solid, dash array). Backends use it through
+    /// [`Stroke::dash_pt`](crate::backend::Stroke::dash_pt).
+    pub(crate) fn dash_lengths_pt(&self, lwd: f64, butt_cap: bool) -> Option<Vec<f64>> {
         match self {
             LineType::Blank => None,
             LineType::Pattern(p) if p.is_empty() => None,

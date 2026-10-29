@@ -221,10 +221,7 @@ impl PdfBackend {
             self.op(&[stroke.lmitre], 2, "M");
             self.last_line.mitre = Some(stroke.lmitre);
         }
-        let dash = stroke
-            .lty
-            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
-            .unwrap_or_default();
+        let dash = stroke.dash_pt().unwrap_or_default();
         if self.last_line.dash.as_ref() != Some(&dash) {
             self.content.push('[');
             for (i, &d) in dash.iter().enumerate() {

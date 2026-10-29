@@ -1001,13 +1001,10 @@ impl RasterBackend {
             BeLineJoin::Round => tiny_skia::LineJoin::Round,
             BeLineJoin::Bevel => tiny_skia::LineJoin::Bevel,
         };
-        let dash = stroke
-            .lty
-            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
-            .and_then(|pts| {
-                let px: Vec<f32> = pts.iter().map(|d| (d / 72.0 * dpi) as f32).collect();
-                tiny_skia::StrokeDash::new(px, 0.0)
-            });
+        let dash = stroke.dash_pt().and_then(|pts| {
+            let px: Vec<f32> = pts.iter().map(|d| (d / 72.0 * dpi) as f32).collect();
+            tiny_skia::StrokeDash::new(px, 0.0)
+        });
         SkStroke {
             width: width_px.max(0.05),
             miter_limit: stroke.lmitre as f32,

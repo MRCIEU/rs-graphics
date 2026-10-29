@@ -256,10 +256,7 @@ fn push_stroke_attrs(out: &mut String, stroke: &Stroke) {
     if matches!(stroke.ljoin, LineJoin::Mitre) {
         push_attr(out, "stroke-miterlimit", stroke.lmitre);
     }
-    if let Some(dashes) = stroke
-        .lty
-        .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
-    {
+    if let Some(dashes) = stroke.dash_pt() {
         out.push_str(" stroke-dasharray=\"");
         for (i, &d) in dashes.iter().enumerate() {
             if i > 0 {

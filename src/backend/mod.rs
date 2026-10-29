@@ -171,6 +171,34 @@ impl Stroke {
     pub fn width_pt(&self) -> f64 {
         (self.lwd * 0.75).max(0.01)
     }
+
+    /// Returns the dash pattern in points (alternately drawn and skipped
+    /// lengths, starting with a drawn one), or `None` for a solid line.
+    ///
+    /// Each length is the line type's, in `lwd` units, times the line width
+    /// in points. Unless the line ends are butt, drawn lengths are one `lwd`
+    /// shorter and gaps one `lwd` longer, so that the round or square ends
+    /// don't fill the gaps (lengths below 0 become 0). A pattern whose
+    /// lengths are all 0.01pt or less is solid. Blank lines are `None` too:
+    /// a backend draws nothing for them (see [`LineType::BLANK`]).
+    ///
+    /// This is how R's `pdf()` device (`PDFSetLineTexture()`) draws `lty`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # use rs_graphics::backend::{LineEnd, Stroke};
+    /// let mut s = Stroke::simple(Color::BLACK, 1);
+    /// assert_eq!(s.dash_pt(), None);
+    /// s.lty = LineType::DASHED; // 4 on, 4 off; round ends
+    /// assert_eq!(s.dash_pt(), Some(vec![2.25, 3.75]));
+    /// s.lend = LineEnd::Butt;
+    /// assert_eq!(s.dash_pt(), Some(vec![3.0, 3.0]));
+    /// ```
+    pub fn dash_pt(&self) -> Option<Vec<f64>> {
+        self.lty.dash_lengths_pt(self.lwd, self.lend == LineEnd::Butt)
+    }
 }
 
 
