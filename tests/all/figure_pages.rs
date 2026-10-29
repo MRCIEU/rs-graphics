@@ -18,7 +18,7 @@ use rs_graphics::prelude::*;
 /// (so a second page), then a `layout()` page and a `fig` inset.
 fn whole_plot<G: Graphics>(g: &mut G) {
     let x = [1.0, 2.0, 2.5, 3.0, 4.5, 5.0, 6.5];
-    g.par().oma([0, 0, 2, 0]).mfrow(2, 2).draw();
+    g.par().oma([0, 0, 2, 0]).mfrow([2, 2]).draw();
     g.plot().x(x).main("one").draw();
     g.hist().x(x).draw();
     g.boxplot().x(x).draw();
@@ -28,7 +28,7 @@ fn whole_plot<G: Graphics>(g: &mut G) {
     g.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
     g.plot().x(x).type_("l").draw();
     g.pie().x([1, 2, 3]).draw();
-    g.par().mfg(2, 1).draw();
+    g.par().mfg([2, 1]).draw();
     g.plot().x([3, 1, 2]).main("back in panel 2").draw();
     g.par().fig([0.6, 0.95, 0.6, 0.95]).new(true).draw();
     g.plot().x([1, 2]).draw();
@@ -67,7 +67,7 @@ fn layout_errors_are_found_when_recording() {
     let mut fig = Figure::new();
     let message = |e: rs_graphics::Error| (e.call().to_string(), e.message().to_string());
     assert_eq!(
-        message(fig.par().mfrow(0, 2).try_draw().unwrap_err()),
+        message(fig.par().mfrow([0, 2]).try_draw().unwrap_err()),
         (
             "par".into(),
             "invalid value specified for graphical parameter \"mfrow\"".into()
@@ -97,8 +97,8 @@ fn layout_errors_are_found_when_recording() {
 #[test]
 fn mfg_outside_the_grid_is_found_when_added() {
     let mut fig = Figure::new();
-    fig.par().mfrow(2, 2).draw();
-    fig.par().mfg(3, 1).draw(); // recorded: the grid is the device's
+    fig.par().mfrow([2, 2]).draw();
+    fig.par().mfg([3, 1]).draw(); // recorded: the grid is the device's
     fig.plot().x([1, 2]).draw();
     let mut dev = Device::null().open().unwrap();
     let e = dev.try_add_figure(&fig).unwrap_err();
@@ -111,10 +111,10 @@ fn mfg_outside_the_grid_is_found_when_added() {
 #[test]
 fn a_whole_plot_cant_go_into_a_panel() {
     let mut fig = Figure::new();
-    fig.par().mfrow(1, 2).draw();
+    fig.par().mfrow([1, 2]).draw();
     fig.plot().x([1, 2]).draw();
     let mut dev = Device::null().open().unwrap();
-    dev.par().mfrow(2, 2).draw();
+    dev.par().mfrow([2, 2]).draw();
     let e = dev.try_add_figure_at(1, 2, &fig).unwrap_err();
     assert_eq!(e.kind(), ErrorKind::InvalidArgument);
     assert!(e.message().contains("can't be added into a panel"), "{e}");
@@ -134,7 +134,7 @@ fn par_is_restored_after_a_panel_but_kept_after_a_whole_plot() {
     assert_eq!((dev.current_par().las, dev.current_par().cex), (0, 1.0));
 
     let mut whole = Figure::new();
-    whole.par().mfrow(2, 2).las(1).draw();
+    whole.par().mfrow([2, 2]).las(1).draw();
     whole.plot().x([1, 2]).draw();
     let mut dev = Device::null().open().unwrap();
     dev.add_figure(&whole);

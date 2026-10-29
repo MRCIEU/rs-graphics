@@ -90,7 +90,7 @@ fn pages_follow_the_page_layout() {
         .height(3)
         .open()
         .unwrap();
-    dev.par().mfrow(1, 2).draw();
+    dev.par().mfrow([1, 2]).draw();
     for k in 0..3 {
         page(&mut dev, k);
     }

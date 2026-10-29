@@ -131,7 +131,7 @@ fn plotmath_extras_match_r() {
         .unwrap();
     d.par().mar([1, 1, 1, 1]).draw();
     d.plot_new();
-    d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+    d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
     for &(x, y, e, cex, srt) in ITEMS {
         d.text()
             .x([x])

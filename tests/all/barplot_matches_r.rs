@@ -116,7 +116,7 @@ fn cases() -> Vec<Case> {
                     .iter()
                     .map(|c| c.iter().map(|v| v - 3.0).collect())
                     .collect();
-                let o = BarplotOptions::default().ylim(-8.0, 12.0);
+                let o = BarplotOptions::default().ylim([-8.0, 12.0]);
                 d.barplot().height(&cols).with(&o).draw();
             },
         },

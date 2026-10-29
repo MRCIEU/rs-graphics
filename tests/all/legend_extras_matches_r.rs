@@ -44,7 +44,7 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0))\n\
                 l <- legend('topright', c('a', 'b'), pch = 1:2, lty = 1:2, title = 'T', inset = 0.05)",
             ours: |d| {
-                d.plot().x(X).y(Y).xlim(6, 0).draw();
+                d.plot().x(X).y(Y).xlim([6, 0]).draw();
                 d.legend()
                     .pos("topright")
                     .labels(["a", "b"])
@@ -60,7 +60,7 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, ylim = c(6, 0))\n\
                 l <- legend(1, 1, c('a', 'b'), fill = c('red', 'blue'), xjust = 0.2, yjust = 0.3)",
             ours: |d| {
-                d.plot().x(X).y(Y).ylim(6, 0).draw();
+                d.plot().x(X).y(Y).ylim([6, 0]).draw();
                 d.legend()
                     .pos((1, 1))
                     .labels(["a", "b"])
@@ -75,7 +75,7 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0), ylim = c(6, 0))\n\
                 l <- legend('bottomright', c('a', 'b', 'c'), pch = 1:3, ncol = 2, inset = c(0.02, 0.1))",
             ours: |d| {
-                d.plot().x(X).y(Y).xlim(6, 0).ylim(6, 0).draw();
+                d.plot().x(X).y(Y).xlim([6, 0]).ylim([6, 0]).draw();
                 d.legend()
                     .pos("bottomright")
                     .labels(["a", "b", "c"])
@@ -90,7 +90,7 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0))\n\
                 l <- legend('bottomleft', c('a', 'b'), pch = 1:2, title = 'mmm nnn mmm nnn')",
             ours: |d| {
-                d.plot().x(X).y(Y).xlim(6, 0).draw();
+                d.plot().x(X).y(Y).xlim([6, 0]).draw();
                 let keys = LegendOptions::default().pch([1, 2]);
                 d.legend()
                     .pos("bottomleft")
@@ -105,7 +105,7 @@ fn cases() -> Vec<Case> {
             r: "plot(x, y, ann = FALSE, xlim = c(6, 0))\n\
                 l <- legend('center', c('a', 'b'), lty = 1:2, text.width = 1.5)",
             ours: |d| {
-                d.plot().x(X).y(Y).xlim(6, 0).draw();
+                d.plot().x(X).y(Y).xlim([6, 0]).draw();
                 d.legend()
                     .pos("center")
                     .labels(["a", "b"])

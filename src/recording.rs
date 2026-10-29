@@ -28,7 +28,7 @@
 //!
 //! // ...and draw it later, as often as needed.
 //! let mut dev = Device::pdf("plot.pdf").width(8.0).height(4.0).open()?;
-//! dev.par().mfrow(1, 2).draw();
+//! dev.par().mfrow([1, 2]).draw();
 //! dev.add_figure(&fig); // panel 1
 //! dev.add_figure(&fig); // panel 2
 //! dev.close()?;
@@ -78,7 +78,7 @@
 //! # fn main() -> std::io::Result<()> {
 //! let x = [2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8];
 //! let mut fig = Figure::new();
-//! fig.par().mfrow(1, 2).draw();
+//! fig.par().mfrow([1, 2]).draw();
 //! fig.hist().x(&x).draw(); // left panel
 //! fig.boxplot().x(&x).draw(); // right panel
 //!
@@ -480,7 +480,7 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::null().open().unwrap();
     /// let mut fig = Figure::new();
     /// fig.plot().x([1, 2, 3]).y([2, 4, 3]).draw();
-    /// dev.par().mfrow(1, 2).draw();
+    /// dev.par().mfrow([1, 2]).draw();
     /// dev.add_figure(&fig); // left
     /// dev.add_figure(&fig); // right
     /// ```
@@ -574,7 +574,7 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::null().open().unwrap();
     /// let mut fig = Figure::new();
     /// fig.plot().x([1, 2, 3]).draw();
-    /// dev.par().mfrow(2, 2).draw();
+    /// dev.par().mfrow([2, 2]).draw();
     /// dev.add_figure_at(2, 2, &fig); // bottom right
     /// ```
     ///
@@ -613,7 +613,7 @@ impl<B: Backend> Device<B> {
         if !self.is_used() {
             self.try_plot_new()?;
         }
-        self.par().mfg(row, col).try_draw()?;
+        self.par().mfg((row, col)).try_draw()?;
         self.try_add_figure(fig)
     }
 }

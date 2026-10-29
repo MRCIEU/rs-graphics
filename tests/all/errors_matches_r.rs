@@ -132,16 +132,22 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
             d.points().x(1).y(1).col(-1).try_draw()
         }),
         ("par(mfrow = c(0, 1))", "par", |d| {
-            d.par().mfrow(0, 1).try_draw()
+            d.par().mfrow([0, 1]).try_draw()
         }),
         ("par(mfcol = c(1, 0))", "par", |d| {
-            d.par().mfcol(1, 0).try_draw()
+            d.par().mfcol([1, 0]).try_draw()
+        }),
+        ("par(mfrow = c(-1, 2))", "par", |d| {
+            d.par().mfrow([-1, 2]).try_draw()
+        }),
+        ("par(mfg = c(0, 1))", "par", |d| {
+            d.par().mfg([0, 1]).try_draw()
         }),
         ("par(mfg = c(3, 1))", "par", |d| {
-            d.par().mfg(3, 1).try_draw()
+            d.par().mfg([3, 1]).try_draw()
         }),
         ("par(mfg = c(1, 3))", "par", |d| {
-            d.par().mfg(1, 3).try_draw()
+            d.par().mfg([1, 3]).try_draw()
         }),
         (
             "plot(1:100, log = 'x'); par(xaxp = c(1, 100, 7))",

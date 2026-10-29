@@ -56,7 +56,7 @@ fn text_placement_matches_r() {
     let (ours, ()) = r::ours(page, |dev| {
         dev.par().mar([0, 0, 0, 0]).draw();
         dev.plot_new();
-        dev.plot_window().xlim(0, 10).ylim(0, 11).draw();
+        dev.plot_window().xlim([0, 10]).ylim([0, 11]).draw();
         for (i, &(label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
             let text = dev
                 .text()

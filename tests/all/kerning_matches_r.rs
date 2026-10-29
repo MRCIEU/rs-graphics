@@ -74,7 +74,7 @@ fn kerned_strings_match_r() {
         .remove(0);
     let (ours_pdf, ()) = r::ours(page, |d| {
         d.plot_new();
-        d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+        d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
         for &(x, y, s, font, cex, srt) in ITEMS {
             d.text()
                 .x([x])
@@ -107,7 +107,7 @@ fn kerned_strings_match_r() {
 fn last_pair_of_a_character_is_kerned() {
     let (ours, ()) = r::ours((PAGE_W, PAGE_H), |d| {
         d.plot_new();
-        d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+        d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
         d.text().x([5]).y([5]).labels(["Fr"]).draw();
     });
     let t = pdf::parse(&ours).page().texts;

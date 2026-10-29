@@ -27,9 +27,10 @@
 //! value or several (see [`Values`]), and in style vectors (symbols, line
 //! types and widths, sizes, fonts, colours) an element may be `None`,
 //! R's `NA`: `.pch([Some(19), None])`, `.col([Some("red"), None])` (see
-//! [`NaValues`]); limits take two numbers
-//! (`.xlim(0.0, 10.0)`). As in R, numbers may be integers or floats
-//! (`.cex(2)`, `.xlim(0, 10)`, `.mar([5, 4, 4, 2])`). Settings holding one of R's string-valued choices
+//! [`NaValues`]); a setting of two or more numbers takes one array
+//! (`.xlim([0, 10])`, `.mar([5, 4, 4, 2])`), and a pair a tuple too, whose
+//! numbers may mix types (`.xlim((0, 10.5))`). As in R, numbers may be
+//! integers or floats (`.cex(2)`). Settings holding one of R's string-valued choices
 //! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
 //! `.order_h("decr")`).
 //!
@@ -654,9 +655,11 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// (`Option<Vec<T>>`), `option_numbers` (`Option<Vec<f64>>` from
 /// [`Numbers`](crate::numbers::Numbers)), `labels`
 /// (`Option<Vec<Option<Label>>>` from [`Labels`](crate::plotmath::Labels),
-/// `None` = `NA`), `pair` (`Option<(f64, f64)>` from two
-/// numbers), `option_pair` (`Option<(f64, f64)>` from one
-/// [`Pair`](crate::numbers::Pair) tuple), `array` (`Option<[f64; N]>`
+/// `None` = `NA`), `pair` (`Option<(f64, f64)>` from a
+/// [`Pair`](crate::numbers::Pair): an array or tuple of two numbers),
+/// `pair_array` (`[f64; 2]` from a `Pair`), `one_or_pair`
+/// (`Option<(f64, f64)>` from one number used twice or a `Pair`, see
+/// [`OneOrPair`](crate::numbers::OneOrPair)), `array` (`Option<[f64; N]>`
 /// from an array of any numbers), `na` (`Option<Option<f64>>`, R's
 /// `NA`-able number, from a number or `None` for `NA`), `count`
 /// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
@@ -865,19 +868,29 @@ macro_rules! options {
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pair $t:ty) => {
         $($a)*
-        pub fn $field(
-            mut self,
-            a: impl $crate::numbers::Num,
-            b: impl $crate::numbers::Num,
-        ) -> Self {
-            self$(.$p)?.$field = Some((a.to_f64(), b.to_f64()));
+        #[doc = ""]
+        #[doc = "Takes an array or tuple of two numbers (see [`Pair`](crate::numbers::Pair))."]
+        pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
+            self$(.$p)?.$field = Some(value.into_pair());
             self
         }
     };
-    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_pair $t:ty) => {
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pair_array $t:ty) => {
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes an array or tuple of two numbers (see [`Pair`](crate::numbers::Pair))."]
         pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
-            self$(.$p)?.$field = Some(value.into_pair());
+            let (a, b) = value.into_pair();
+            self$(.$p)?.$field = Some([a, b]);
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident one_or_pair $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number for both, or an array or tuple of two (see [`OneOrPair`](crate::numbers::OneOrPair))."]
+        pub fn $field(mut self, value: impl $crate::numbers::OneOrPair) -> Self {
+            self$(.$p)?.$field = Some(value.into_one_or_pair());
             self
         }
     };
@@ -1123,7 +1136,7 @@ mod tests {
         assert_eq!((ab.a, ab.b, ab.h), (vec![1.0], vec![2.0, 3.0], vec![3.0]));
 
         let plot = PlotOptions::default()
-            .xlim(0.0, 10.0)
+            .xlim([0.0, 10.0])
             .main(Label::math("x^2"))
             .axes(false);
         assert_eq!(plot.xlim, Some((0.0, 10.0)));

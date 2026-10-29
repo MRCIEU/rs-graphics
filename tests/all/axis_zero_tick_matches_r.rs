@@ -49,12 +49,12 @@ fn zero_ticks_match_r() {
         .pdfs
         .remove(0);
     let (ours, ()) = r::ours(page, |dev| {
-        dev.par().mfrow(1, 3).draw();
+        dev.par().mfrow([1, 3]).draw();
         for &(xlim, ylim) in RANGES {
             dev.plot_new();
             dev.plot_window()
-                .xlim(xlim.0, xlim.1)
-                .ylim(ylim.0, ylim.1)
+                .xlim((xlim.0, xlim.1))
+                .ylim((ylim.0, ylim.1))
                 .draw();
             dev.axis().side(1).draw();
             dev.axis().side(2).draw();

@@ -245,8 +245,8 @@ fn abline_matches_r() {
             dev.plot_new();
             let (xl, yl) = c.lims;
             dev.plot_window()
-                .xlim(xl.0, xl.1)
-                .ylim(yl.0, yl.1)
+                .xlim((xl.0, xl.1))
+                .ylim((yl.0, yl.1))
                 .xlog(c.log.contains('x'))
                 .ylog(c.log.contains('y'))
                 .draw();
@@ -263,7 +263,7 @@ fn window() -> Device<AnyBackend> {
         .open()
         .unwrap();
     dev.plot_new();
-    dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
+    dev.plot_window().xlim([0.0, 1.0]).ylim([0.0, 1.0]).draw();
     dev
 }
 

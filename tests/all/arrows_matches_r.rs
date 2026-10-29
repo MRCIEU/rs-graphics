@@ -63,7 +63,7 @@ fn arrows_match_r() {
         .remove(0);
     let (ours, ()) = r::ours(page, |dev| {
         dev.plot_new();
-        dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
+        dev.plot_window().xlim([0.0, 10.0]).ylim([0.0, 10.0]).draw();
         for &(x0, y0, x1, y1, length, angle, code) in CALLS {
             dev.arrows()
                 .x0(x0)

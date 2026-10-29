@@ -257,7 +257,7 @@ fn breaks_rules_and_functions_match_r() {
         "{ pdf(NULL); hist(x, xlim = c(-20, 30), ylim = c(0, 10)); par('usr') }",
     );
     let mut dev = Device::memory("pdf").width(7.0).height(7.0).open().unwrap();
-    dev.hist().x(skewed).xlim(-20, 30).ylim(0, 10).draw();
+    dev.hist().x(skewed).xlim([-20, 30]).ylim([0, 10]).draw();
     let (a, b, c, d) = dev.usr();
     for (ours, r) in [a, b, c, d].iter().zip(&usr) {
         assert!((ours - r).abs() < 1e-9, "usr {:?} vs {usr:?}", (a, b, c, d));

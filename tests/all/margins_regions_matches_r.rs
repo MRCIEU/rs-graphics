@@ -99,7 +99,7 @@ fn cases() -> Vec<Case> {
                 for (i in 1:4) plot(x, y, ann = FALSE)\n\
                 mtext('title', outer = TRUE, line = 1)",
             ours: |d| {
-                d.par().mfrow(2, 2).omi([0.0, 0.0, 0.5, 0.0]).draw();
+                d.par().mfrow([2, 2]).omi([0.0, 0.0, 0.5, 0.0]).draw();
                 for _ in 0..4 {
                     d.plot().x(X).y(Y).draw();
                 }
@@ -145,7 +145,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(1, 2)); plot(x, y, ann = FALSE)\n\
                 par(oma = c(0, 0, 2, 0)); plot(x, y, ann = FALSE)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot().x(X).y(Y).draw();
                 d.par().oma([0, 0, 2, 0]).draw();
                 d.plot().x(X).y(Y).draw();

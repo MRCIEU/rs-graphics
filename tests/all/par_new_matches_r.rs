@@ -98,7 +98,7 @@ fn cases() -> Vec<Case> {
                 pl(x, 'B'); pl(sqrt(x), 'C')",
             setup: |p| p,
             draw: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 pl(d, &squares(), Some("A"), true);
                 d.par().new(true).draw();
                 let rev: Vec<f64> = squares().into_iter().rev().collect();
@@ -115,12 +115,12 @@ fn cases() -> Vec<Case> {
                 pl(x, 'B')",
             setup: |p| p,
             draw: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 pl(d, &squares(), Some("A"), true);
                 d.par().new(true).draw();
                 d.plot_new();
                 d.plot_new();
-                d.plot_window().xlim(0.0, 20.0).ylim(0.0, 1.0).draw();
+                d.plot_window().xlim([0.0, 20.0]).ylim([0.0, 1.0]).draw();
                 d.axis().side(3).draw();
                 pl(d, &xs(), Some("B"), true);
             },
@@ -132,7 +132,7 @@ fn cases() -> Vec<Case> {
                 pl(falling(), 'B')",
             setup: |p| p,
             draw: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 pl(d, &squares(), Some("A"), true);
                 d.par().new(true).draw();
                 let black = ColorSpec::Index(1);
@@ -152,7 +152,7 @@ fn cases() -> Vec<Case> {
                 pl(falling(), axes = FALSE); pl(x, 'B')",
             setup: |p| p.oma(Sides::new(0.0, 0.0, 2.0, 0.0)),
             draw: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 pl(d, &squares(), Some("A"), true);
                 d.par().new(true).draw();
                 let o = MtextOptions::default().outer(true);
@@ -168,7 +168,7 @@ fn cases() -> Vec<Case> {
                 pl(x^2, 'A'); pl(x, 'B')",
             setup: |p| p,
             draw: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.par().new(true).draw();
                 assert!(!d.is_new());
                 pl(d, &squares(), Some("A"), true);

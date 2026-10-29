@@ -58,7 +58,7 @@ fn draw_ours(c: &Case) -> Vec<u8> {
     if let Some(bg) = c.par_bg {
         d.par().bg(Color::try_from(bg).unwrap()).draw();
     }
-    d.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
+    d.plot_window().xlim([0.0, 1.0]).ylim([0.0, 1.0]).draw();
     let zero = ColorSpec::Index(0);
     d.points()
         .x([0.5])

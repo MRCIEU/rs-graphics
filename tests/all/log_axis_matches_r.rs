@@ -115,7 +115,7 @@ fn draw_ours(c: &Case, dev: &mut Device<AnyBackend>) {
         .xlab("x")
         .ylab("y");
     if let Some((a, b)) = c.xlim {
-        opts = opts.xlim(a, b);
+        opts = opts.xlim((a, b));
     }
     dev.plot()
         .x(values(c.x, c.xlog))

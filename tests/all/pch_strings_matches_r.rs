@@ -34,7 +34,7 @@ fn cases() -> Vec<Case> {
                 points(1:6, rep(1, 6), pch = c('a', 'bc', '\\u00e9', NA, '', '+'), cex = 2)",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(0, 7).ylim(0, 2).draw();
+                d.plot_window().xlim([0, 7]).ylim([0, 2]).draw();
                 d.points()
                     .x(1..=6)
                     .y([1; 6])

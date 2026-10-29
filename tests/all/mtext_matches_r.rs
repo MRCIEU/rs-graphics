@@ -116,9 +116,9 @@ fn mtext_placement_matches_r() {
 
     let par = ParOptions::default().oma(Sides::new(2.0, 3.0, 4.0, 1.5));
     let (ours, ()) = r::ours_with(page, par, |dev| {
-        dev.par().mfrow(2, 2).draw();
+        dev.par().mfrow([2, 2]).draw();
         dev.plot_new();
-        dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
+        dev.plot_window().xlim([0.0, 10.0]).ylim([0.0, 5.0]).draw();
         for c in &cases {
             dev.mtext()
                 .text(c.text)

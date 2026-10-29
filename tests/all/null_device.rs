@@ -14,7 +14,7 @@ use rs_graphics::prelude::*;
 /// What a device works out for a few calls: the legend's box, an axis's
 /// ticks, a label's width, the coordinates and the plot region.
 fn measure<B: Backend>(dev: &mut Device<B>) -> String {
-    dev.par().mfrow(1, 2).cex(1.3).draw();
+    dev.par().mfrow([1, 2]).cex(1.3).draw();
     dev.plot()
         .x([1, 10, 100])
         .y([3, 1, 2])

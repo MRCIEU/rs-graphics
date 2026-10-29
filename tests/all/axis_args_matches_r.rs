@@ -378,8 +378,8 @@ fn draw_ours(c: &Case) -> Vec<u8> {
     let (pdf, ()) = r::ours_with((PAGE_W, PAGE_H), par, |dev| {
         dev.plot_new();
         dev.plot_window()
-            .xlim(c.xlim.0, c.xlim.1)
-            .ylim(0.0, 10.0)
+            .xlim((c.xlim.0, c.xlim.1))
+            .ylim([0.0, 10.0])
             .draw();
         (c.draw)(dev);
     });
@@ -440,7 +440,7 @@ fn axis_returns_tick_positions_like_r() {
 
     fn scene<G: Graphics>(g: &mut G) -> Vec<G::AxisResult> {
         g.plot_new();
-        g.plot_window().xlim(0, 10).ylim(0, 10).draw();
+        g.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
         let mut out = vec![
             g.axis().side(1).draw(),
             g.axis()
@@ -455,7 +455,11 @@ fn axis_returns_tick_positions_like_r() {
             g.axis().side(2).draw_labels(false).tick(false).draw(),
         ];
         g.plot_new();
-        g.plot_window().xlim(1, 1000).ylim(1, 10).xlog(true).draw();
+        g.plot_window()
+            .xlim([1, 1000])
+            .ylim([1, 10])
+            .xlog(true)
+            .draw();
         out.push(g.axis().side(1).draw());
         out.push(g.axis().side(3).at([100, 5, 2000]).draw());
         out

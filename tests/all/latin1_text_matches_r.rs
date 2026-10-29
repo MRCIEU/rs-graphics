@@ -45,7 +45,7 @@ fn latin1_text_matches_r() {
     let (ours, ()) = r::ours(page, |dev| {
         dev.par().mar([0, 0, 0, 0]).draw();
         dev.plot_new();
-        dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 16.0).draw();
+        dev.plot_window().xlim([0.0, 10.0]).ylim([0.0, 16.0]).draw();
         for (i, label) in LABELS.iter().enumerate() {
             for (j, adj) in [0.0, 0.5, 1.0].iter().enumerate() {
                 dev.text()

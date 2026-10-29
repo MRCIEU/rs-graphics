@@ -50,7 +50,7 @@ use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
-use crate::numbers::Pair;
+use crate::numbers::{Num, Pair};
 use crate::par::Bty;
 use crate::plotmath::Label;
 use crate::recycle::{nth_na, pick_na, rep_or};
@@ -66,8 +66,8 @@ use super::{Device, Xpd};
 /// | R | Rust shorthand | Variant |
 /// |---|---|---|
 /// | `legend("topright", ...)` | `"topright"` (or `LegendKeyword::TopRight`) | [`Keyword`](LegendPos::Keyword) |
-/// | `legend(5, 20, ...)` | `(5.0, 20.0)` | [`Xy`](LegendPos::Xy) |
-/// | `legend(c(5, 15), c(10, 20), ...)` | `((5.0, 15.0), (10.0, 20.0))` | [`Corners`](LegendPos::Corners) |
+/// | `legend(5, 20, ...)` | `[5, 20]` or `(5, 20.5)` | [`Xy`](LegendPos::Xy) |
+/// | `legend(c(5, 15), c(10, 20), ...)` | `[[5, 15], [10, 20]]` or `((5, 15), (10, 20.5))` | [`Corners`](LegendPos::Corners) |
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LegendPos {
     /// A single point `(x, y)` in user coordinates; anchored by
@@ -127,11 +127,20 @@ impl TryFrom<&String> for LegendPos {
 }
 
 impl<P: Pair> From<P> for LegendPos {
-    /// `(x, y)`: R's `legend(x, y)`, a point in user coordinates (any
-    /// [`Pair`], e.g. `(5, 20)`).
+    /// `[x, y]` or `(x, y)`: R's `legend(x, y)`, a point in user
+    /// coordinates (any [`Pair`]).
     fn from(p: P) -> Self {
         let (x, y) = p.into_pair();
         LegendPos::Xy(x, y)
+    }
+}
+
+impl<N: Num> From<[[N; 2]; 2]> for LegendPos {
+    /// `[[xa, xb], [ya, yb]]`: R's `legend(x = c(xa, xb), y = c(ya, yb))`,
+    /// two opposite corners of the box.
+    fn from([x, y]: [[N; 2]; 2]) -> Self {
+        let ((xa, xb), (ya, yb)) = (x.into_pair(), y.into_pair());
+        LegendPos::Corners(xa, ya, xb, yb)
     }
 }
 
@@ -369,8 +378,9 @@ crate::setters::options! {
         /// `title.font`.
         pub title_font: Option<FontFace> => option FontFace,
         /// Inset from the plot region's edges for keyword positions, as
-        /// fractions of the plot region, `(x, y)`. `None`: `(0, 0)`.
-        pub inset: Option<(f64, f64)> => option_pair (f64, f64),
+        /// fractions of the plot region, `[x, y]` or one number for both.
+        /// `None`: 0.
+        pub inset: Option<(f64, f64)> => one_or_pair (f64, f64),
         /// Colours of the labels. Empty: [`par("col")`]. R's `text.col`.
         ///
         /// [`par("col")`]: crate::par::Par::col

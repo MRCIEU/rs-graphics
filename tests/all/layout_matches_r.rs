@@ -55,7 +55,7 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5, 2), 'one'); bp(c(4, 1, 6, 2), 'two')\n\
                 bp(c(2, 2, 7), 'three'); bp(c(5, 3), 'four')",
             run: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 bp(d, &[3.0, 5.0, 2.0], "one");
                 bp(d, &[4.0, 1.0, 6.0, 2.0], "two");
                 bp(d, &[2.0, 2.0, 7.0], "three");
@@ -67,7 +67,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(3, 2))\n\
                 for (k in 1:6) bp(c(k, 7 - k, 3), paste('fig', k))",
             run: |d| {
-                d.par().mfrow(3, 2).draw();
+                d.par().mfrow([3, 2]).draw();
                 for k in 1..=6 {
                     bp(d, &[k as f64, 7.0 - k as f64, 3.0], &format!("fig {k}"));
                 }
@@ -78,7 +78,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfcol = c(2, 3))\n\
                 bp(c(1, 4, 2), 'a'); bp(c(3, 3, 1), 'b'); bp(c(5, 2, 4), 'c')",
             run: |d| {
-                d.par().mfcol(2, 3).draw();
+                d.par().mfcol([2, 3]).draw();
                 bp(d, &[1.0, 4.0, 2.0], "a");
                 bp(d, &[3.0, 3.0, 1.0], "b");
                 bp(d, &[5.0, 2.0, 4.0], "c");
@@ -90,7 +90,7 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5, 2), 'top'); bp(c(4, 1, 6), 'bottom')",
             run: |d| {
                 d.par().oma(Sides::new(1.0, 2.0, 3.0, 1.0)).draw();
-                d.par().mfrow(2, 1).draw();
+                d.par().mfrow([2, 1]).draw();
                 bp(d, &[3.0, 5.0, 2.0], "top");
                 bp(d, &[4.0, 1.0, 6.0], "bottom");
             },
@@ -100,9 +100,9 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(2, 2))\n\
                 bp(c(3, 5, 2), 'first'); par(mfg = c(2, 2)); bp(c(4, 1, 6), 'last')",
             run: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 bp(d, &[3.0, 5.0, 2.0], "first");
-                d.par().mfg(2, 2).draw();
+                d.par().mfg([2, 2]).draw();
                 bp(d, &[4.0, 1.0, 6.0], "last");
             },
         },
@@ -186,7 +186,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(2, 2))\n\
                 for (k in 1:4) plot(1:10, (1:10)^2, type = 'n', main = paste('p', k), xlab = 'x', ylab = 'y')",
             run: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 let x: Vec<f64> = (1..=10).map(f64::from).collect();
                 let y: Vec<f64> = x.iter().map(|v| v * v).collect();
                 for k in 1..=4 {

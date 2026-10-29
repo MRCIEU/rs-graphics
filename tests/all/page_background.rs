@@ -65,7 +65,7 @@ fn two_pages(format: &str) -> String {
         .open()
         .unwrap();
     dev.plot_new();
-    dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
+    dev.plot_window().xlim([0.0, 1.0]).ylim([0.0, 1.0]).draw();
     dev.points()
         .x([0.5])
         .y([0.5])
@@ -76,7 +76,7 @@ fn two_pages(format: &str) -> String {
         )
         .draw();
     dev.plot_new();
-    dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
+    dev.plot_window().xlim([0.0, 1.0]).ylim([0.0, 1.0]).draw();
     dev.points()
         .x([0.5])
         .y([0.5])

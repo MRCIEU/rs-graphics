@@ -272,7 +272,7 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 
 | R | Rust | |
 |---|---|---|
-| `xlim` | `.xlim()` | The x range shown, in data units (also on a log axis); decreasing for a reversed axis. |
+| `xlim` | `.xlim()` | The x range shown, `[from, to]` in data units (also on a log axis); decreasing for a reversed axis. |
 | `ylim` | `.ylim()` | The y range shown; as `xlim`. |
 | `asp` | `.asp()` | Aspect ratio: one x unit is `asp` y units long on the page. |
 | `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
@@ -531,14 +531,14 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `ncol` | `.ncol()` | Number of columns. |
 | `horiz` | `.horiz()` | Whether to lay the entries out in one row. |
 | `title` | `.title()` | Text or a plotmath expression above the entries. |
-| `inset` | `.inset()` | Inset from the plot region's edges for keyword positions, as fractions of the plot region, `(x, y)`. |
+| `inset` | `.inset()` | Inset from the plot region's edges for keyword positions, as fractions of the plot region, `[x, y]` or one number for both. |
 | `xpd` | `.xpd()` | How far drawing may reach (`Xpd`; the setter also takes `false`/`true`). |
 | `title.col` | `.title_col()` | Colour of the title. |
 | `title.adj` | `.title_adj()` | Where the title sits across the box (0 left, 1 right) and its justification there. |
 | `title.cex` | `.title_cex()` | Size of the title. |
 | `title.font` | `.title_font()` | Font of the title. |
 | `seg.len` | `.seg_len()` | Length of each key's line, in character widths. |
-| `x`, `y` | `.pos()` | Where the legend goes: a keyword such as `"topright"`, a point `(x, y)` for its top-left corner, or two corners `((xa, xb), (ya, yb))` (see `LegendPos`). |
+| `x`, `y` | `.pos()` | Where the legend goes: a keyword such as `"topright"`, a point `[x, y]` for its top-left corner, or two corners `[[xa, xb], [ya, yb]]` (tuples work too; see `LegendPos`). |
 | `legend` | `.labels()` | The keys' labels: text or plotmath expressions, one or several (see `Labels`); a `None` element (R's `NA`) keeps its key but has no text and takes no room. |
 | `adj` (second value) | `.vadj()` | Vertical adjustment of the labels. |
 
@@ -627,9 +627,9 @@ R's arguments not available: `trace`.
 | `mai` | `.mai()` | Margins in inches, instead of lines. |
 | `mar` | `.mar()` | Margins around the plot region, in lines: bottom, left, top, right. |
 | `mex` | `.mex()` | Expansion factor for margin lines, a multiple of `cex`. |
-| `mfcol` | `.mfcol()` | Splits the page into a grid of `nrow` by `ncol` panels, filled column by column; otherwise as `mfrow`. |
-| `mfg` | `.mfg()` | Picks the panel the next plot draws into: the one at (`row`, `col`), counting from 1. |
-| `mfrow` | `.mfrow()` | Splits the page into a grid of `nrow` by `ncol` panels, filled row by row. |
+| `mfcol` | `.mfcol()` | Splits the page into a grid of `[nrow, ncol]` panels, filled column by column; otherwise as `mfrow`. |
+| `mfg` | `.mfg()` | Picks the panel the next plot draws into: the one at `[row, col]`, counting from 1. |
+| `mfrow` | `.mfrow()` | Splits the page into a grid of `[nrow, ncol]` panels, filled row by row (an array or tuple of two counts; fractions are truncated, as in R). |
 | `mgp` | `.mgp()` | Margin lines of the axis title, the tick labels and the axis line. |
 | `new` | `.new()` | Overlays the next plot: with `true`, the next `plot_new()` draws into the current figure without advancing or clearing it (e.g. for a second `plot_window()` with an axis on side 4). |
 | `oma` | `.oma()` | Outer margins, in lines. |

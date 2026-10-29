@@ -91,7 +91,7 @@ fn cases() -> Vec<Case> {
                 d.barplot()
                     .height(mat())
                     .offset([0.0, 10.0, 0.0, 5.0])
-                    .ylim(0.0, 25.0)
+                    .ylim([0.0, 25.0])
                     .draw();
             },
         },
@@ -189,7 +189,7 @@ fn cases() -> Vec<Case> {
                     .height(mat())
                     .beside(true)
                     .legend_text(ROWS)
-                    .ylim(0.0, 8.0)
+                    .ylim([0.0, 8.0])
                     .legend_pos((2.0, 7.5))
                     .args_legend(LegendOptions::default().ncol(3usize).xjust(0.0).cex(0.8))
                     .draw();

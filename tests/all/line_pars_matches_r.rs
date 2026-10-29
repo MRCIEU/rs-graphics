@@ -31,7 +31,7 @@ const R_CALLS: &str = "plot.new(); plot.window(c(0, 10), c(0, 10))\n\
 
 fn ours(d: &mut Device<AnyBackend>) {
     d.plot_new();
-    d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+    d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
     d.lines()
         .x([1, 2, 3])
         .y([1, 5, 2])

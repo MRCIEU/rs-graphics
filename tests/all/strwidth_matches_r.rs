@@ -132,11 +132,14 @@ fn strwidth_and_strheight_match_r() {
         let mut dev = Device::memory("pdf").width(7.0).height(6.0).open().unwrap();
         dev.par().ps(c.ps).lheight(c.lheight).draw();
         if c.mfrow {
-            dev.par().mfrow(2, 2).draw();
+            dev.par().mfrow([2, 2]).draw();
         }
         dev.plot_new();
         let xlim = if c.mfrow { (10, 0) } else { (0, 10) };
-        dev.plot_window().xlim(xlim.0, xlim.1).ylim(-2, 5).draw();
+        dev.plot_window()
+            .xlim((xlim.0, xlim.1))
+            .ylim([-2, 5])
+            .draw();
         let mut ours = Vec::new();
         for height in [false, true] {
             for units in ["inches", "user", "figure"] {

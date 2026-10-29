@@ -89,7 +89,7 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
 }
 
 fn draw_types_h_s<B: Backend>(dev: &mut Device<B>) {
-    dev.par().mfrow(1, 2).draw();
+    dev.par().mfrow([1, 2]).draw();
 
     // type = "h": counts as vertical lines.
     let k: Vec<f64> = (0..=8).map(f64::from).collect();
@@ -169,7 +169,7 @@ fn draw_legend<B: Backend>(dev: &mut Device<B>) {
         .type_(PlotType::Lines)
         .col(2)
         .lwd(2.0)
-        .ylim(-1.0, 1.6)
+        .ylim([-1.0, 1.6])
         .main("legend(\"topright\")")
         .xlab("x")
         .ylab("value");
@@ -272,7 +272,7 @@ fn draw_pie<B: Backend>(dev: &mut Device<B>) {
 fn draw_pch<B: Backend>(dev: &mut Device<B>) {
     dev.par().mar([0.5, 0.5, 2.5, 0.5]).draw();
     dev.plot_new();
-    dev.plot_window().xlim(0.5, 7.5).ylim(-0.2, 5.4).draw();
+    dev.plot_window().xlim([0.5, 7.5]).ylim([-0.2, 5.4]).draw();
     let symbol = |pch: i32| XyOptions::default().pch(pch).col("blue").bg("red").cex(2.0);
     let label = TextOptions::default().col(Color::BLACK).cex(0.8);
     for pch in 0..26 {

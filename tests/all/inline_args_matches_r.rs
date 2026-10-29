@@ -42,9 +42,9 @@ struct Case {
 
 /// Two panels, the first one current, with `plot.window(c(0, 10), c(0, 10))`.
 fn panels(d: &mut Device<AnyBackend>) {
-    d.par().mfrow(1, 2).draw();
+    d.par().mfrow([1, 2]).draw();
     d.plot_new();
-    d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+    d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
 }
 
 fn cases() -> Vec<Case> {
@@ -149,7 +149,7 @@ fn cases() -> Vec<Case> {
                      col = 'red', ann = FALSE)\n\
                 barplot(c(3, 1, 2), lwd = 2.5, axis.lty = 1, names.arg = c('a', 'b', 'c'))",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.hist()
                     .x([1, 2, 2, 3, 3, 3, 4])
                     .lwd(3)
@@ -215,13 +215,13 @@ fn cases() -> Vec<Case> {
                      ylab = 'yyy')\n\
                 plot(x, y, fg = 'blue', adj = 1, font = 3, xlab = 'xxx', ylab = 'yyy')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot()
                     .x(X)
                     .y(Y)
                     .type_("b")
                     .pch('o')
-                    .ylim(2, 4)
+                    .ylim([2, 4])
                     .fg("red")
                     .adj(0)
                     .lend("butt")
@@ -251,7 +251,7 @@ fn cases() -> Vec<Case> {
                 axis(2, labels = FALSE); abline(h = 0)",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.points().x([5]).y([5]).draw();
                 d.par().usr([0, 20, -5, 5]).draw();
                 d.points().x([5]).y([0]).draw();
@@ -269,7 +269,11 @@ fn cases() -> Vec<Case> {
                 par(usr = c(0, 3, 0, 1)); points(c(10, 100), c(0.5, 0.5))",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(1, 100).ylim(0, 1).xlog(true).draw();
+                d.plot_window()
+                    .xlim([1, 100])
+                    .ylim([0, 1])
+                    .xlog(true)
+                    .draw();
                 d.par().usr([0, 3, 0, 1]).draw();
                 d.points().x([10, 100]).y([0.5, 0.5]).draw();
             },
@@ -284,14 +288,14 @@ fn cases() -> Vec<Case> {
                 plot.new(); plot.window(c(0, 1), c(0, 1)); par(xlog = TRUE, usr = c(0, 2, 0, 1))\n\
                 points(c(1, 10, 100), c(0.2, 0.4, 0.6))",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot_new();
-                d.plot_window().xlim(0, 3).ylim(0, 1).draw();
+                d.plot_window().xlim([0, 3]).ylim([0, 1]).draw();
                 d.par().xlog(true).draw();
                 d.points().x([1, 10, 100]).y([0.5, 0.5, 0.5]).draw();
                 d.axis().side(2).draw();
                 d.plot_new();
-                d.plot_window().xlim(0, 1).ylim(0, 1).draw();
+                d.plot_window().xlim([0, 1]).ylim([0, 1]).draw();
                 d.par().xlog(true).usr([0, 2, 0, 1]).draw();
                 d.points().x([1, 10, 100]).y([0.2, 0.4, 0.6]).draw();
             },
@@ -304,16 +308,16 @@ fn cases() -> Vec<Case> {
                 par(ylbias = -0.1); plot.new(); plot.window(c(0, 10), c(0, 10))\n\
                 title(xlab = 'xx', ylab = 'yy'); axis(1); axis(3)",
             ours: |d| {
-                d.par().mfrow(1, 2).ylbias(0.5).draw();
+                d.par().mfrow([1, 2]).ylbias(0.5).draw();
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.title().xlab("xx").ylab("yy").draw();
                 d.axis().side(1).draw();
                 d.axis().side(4).draw();
                 d.axis().side(3).draw();
                 d.par().ylbias(-0.1).draw();
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.title().xlab("xx").ylab("yy").draw();
                 d.axis().side(1).draw();
                 d.axis().side(3).draw();
@@ -330,7 +334,7 @@ fn cases() -> Vec<Case> {
                 legend('bottomleft', legend = c('a', NA, 'c'), pch = 1:3)",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.text()
                     .x([2, 4, 6, 8])
                     .y([8])
@@ -459,15 +463,19 @@ fn par_usr_is_checked() {
 fn par_usr_on_a_log_axis_sets_log_ticks() {
     let mut dev = Device::memory("pdf").width(5).height(5).open().unwrap();
     dev.plot_new();
-    dev.plot_window().xlim(1, 100).ylim(0, 1).xlog(true).draw();
+    dev.plot_window()
+        .xlim([1, 100])
+        .ylim([0, 1])
+        .xlog(true)
+        .draw();
     dev.par().usr([0, 3, 0, 1]).draw();
     let got = dev.current_par().xaxp;
     let mut want = Device::memory("pdf").width(5).height(5).open().unwrap();
     want.par().xaxs("i").draw();
     want.plot_new();
     want.plot_window()
-        .xlim(1, 1000)
-        .ylim(0, 1)
+        .xlim([1, 1000])
+        .ylim([0, 1])
         .xlog(true)
         .draw();
     assert_eq!(got, want.current_par().xaxp);

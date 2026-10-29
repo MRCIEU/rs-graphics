@@ -180,8 +180,8 @@ fn cases() -> Vec<Case> {
                 d.boxplot()
                     .x(groups(&P))
                     .horizontal(true)
-                    .ylim(0.0, 100.0)
-                    .xlim(0.0, 5.0)
+                    .ylim([0.0, 100.0])
+                    .xlim([0.0, 5.0])
                     .notch(true)
                     .draw();
             },

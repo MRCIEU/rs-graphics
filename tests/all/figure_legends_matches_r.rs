@@ -100,7 +100,7 @@ fit("mfrow_at.1", 1.5, 6.8)
 par(op)
 par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
             draw: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 let a = fit_figure(
                     LegendPos::Keyword(LegendKeyword::BottomRight),
                     &keys().title("Key"),
@@ -124,7 +124,7 @@ par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
                     .with(&keys())
                     .draw();
                 out.extend(layouts(d.add_figure_at(2, 1, &b), d.usr()));
-                d.par().mfg(2, 2).draw();
+                d.par().mfg([2, 2]).draw();
                 d.plot()
                     .x(DOSE)
                     .y(FITTED)
@@ -188,7 +188,7 @@ fit("mfrow_3x2.0", "topleft", inset = 0.05)
 fit("mfrow_3x2.1", "topleft", inset = 0.05)
 fit("mfrow_3x2.2", "topleft", inset = 0.05)"#,
             draw: |d| {
-                d.par().mfrow(3, 2).draw();
+                d.par().mfrow([3, 2]).draw();
                 let fig = fit_figure(
                     LegendPos::Keyword(LegendKeyword::TopLeft),
                     &keys().inset((0.05, 0.05)),

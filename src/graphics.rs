@@ -22,7 +22,7 @@
 //! `[1, 2, 3]`, `1..=10` for R's `1:10`, or one number, `1`, as R's
 //! length-one vector; `f64` data isn't copied, whether
 //! borrowed or a `Vec` moved in), and numeric setters
-//! take integers too (`.cex(2)`, `.xlim(0, 10)`):
+//! take integers too (`.cex(2)`, `.xlim([0, 10])`):
 //!
 //! ```no_run
 //! # use rs_graphics::prelude::*;
@@ -70,7 +70,7 @@ use crate::highlevel::{
     PlotOptions,
 };
 use crate::layout::{LayoutRespect, LayoutSize};
-use crate::numbers::{Groups, Num, Numbers};
+use crate::numbers::{Groups, Num, Numbers, Pair};
 use crate::par::ParOptions;
 use crate::plotmath::{Label, Labels};
 use crate::setters::IntoArg;
@@ -113,7 +113,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// figure and plot regions, ready for drawing.
     ///
     /// - **Coordinates:** it leaves linear coordinates of 0..1 on both axes (as
-    ///   `plot_window().xlim(0, 1).ylim(0, 1)`: -0.04..1.04 with the default
+    ///   `plot_window().xlim([0, 1]).ylim([0, 1])`: -0.04..1.04 with the default
     ///   `xaxs = yaxs = "r"`) and their default ticks, so you can draw straight
     ///   away. Call [`plot_window`](Graphics::plot_window) next for other limits
     ///   or log axes.
@@ -151,7 +151,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
-    /// dev.plot_window().xlim(0, 10).ylim(0, 100).draw();
+    /// dev.plot_window().xlim([0, 10]).ylim([0, 100]).draw();
     /// dev.points().x([2, 5, 8]).y([10, 50, 90]).draw();
     /// dev.axis().side(1).draw();
     /// dev.axis().side(2).draw();
@@ -273,7 +273,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// let mids = dev.barplot().height([3, 5, 2]).names(["A", "B", "C"]).ylim(0, 6).draw();
+    /// let mids = dev.barplot().height([3, 5, 2]).names(["A", "B", "C"]).ylim([0, 6]).draw();
     /// dev.text().x(&mids).y([3.3, 5.3, 2.3]).labels(["3", "5", "2"]).draw();
     /// ```
     ///
@@ -384,7 +384,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
-    /// dev.plot_window().xlim(1, 1000).ylim(0, 1).xlog(true).draw();
+    /// dev.plot_window().xlim([1, 1000]).ylim([0, 1]).xlog(true).draw();
     /// dev.axis().side(1).draw();
     /// ```
     ///
@@ -709,8 +709,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// [`labels`](LegendCall::labels) (text or plotmath expressions; one or
     /// several, see [`Labels`]) and [`pos`](LegendCall::pos) are required.
-    /// `pos` is a keyword such as `"topright"`, a point `(x, y)` for the
-    /// top-left corner, or two corners `((xa, xb), (ya, yb))` (see
+    /// `pos` is a keyword such as `"topright"`, a point `[x, y]` for the
+    /// top-left corner, or two corners `[[xa, xb], [ya, yb]]` (see
     /// [`LegendPos`]). The other arguments are in [`LegendOptions`]; the
     /// per-key ones (`col`, `pch`, `lty`, `lwd`, `fill`, ...) are recycled over
     /// the keys. On a [`Device`], `.draw()` returns where the box and labels
@@ -825,7 +825,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.par().mfrow(1, 2).oma([0, 0, 2, 0]).las(1).draw();
+    /// dev.par().mfrow([1, 2]).oma([0, 0, 2, 0]).las(1).draw();
     /// ```
     ///
     /// # Errors
@@ -1393,16 +1393,17 @@ call!(
 );
 
 impl<G: Graphics> PlotWindowCall<'_, G> {
-    /// The x range shown, in data units (also on a log axis); decreasing
-    /// for a reversed axis. Required.
-    pub fn xlim(mut self, from: impl Num, to: impl Num) -> Self {
-        self.xlim = Some((from.to_f64(), to.to_f64()));
+    /// The x range shown, `[from, to]` in data units (also on a log axis);
+    /// decreasing for a reversed axis. Takes an array or tuple of two
+    /// numbers (see [`Pair`]). Required.
+    pub fn xlim(mut self, xlim: impl Pair) -> Self {
+        self.xlim = Some(xlim.into_pair());
         self
     }
 
     /// The y range shown; as [`xlim`](PlotWindowCall::xlim). Required.
-    pub fn ylim(mut self, from: impl Num, to: impl Num) -> Self {
-        self.ylim = Some((from.to_f64(), to.to_f64()));
+    pub fn ylim(mut self, ylim: impl Pair) -> Self {
+        self.ylim = Some(ylim.into_pair());
         self
     }
 }
@@ -1635,8 +1636,8 @@ call!(
     LegendCall("legend"), LegendOptions => G::LegendResult,
     args {
         /// Where the legend goes: a keyword such as `"topright"`, a point
-        /// `(x, y)` for its top-left corner, or two corners `((xa, xb), (ya,
-        /// yb))` (see [`LegendPos`]). Required. A string that isn't one of
+        /// `[x, y]` for its top-left corner, or two corners `[[xa, xb], [ya,
+        /// yb]]` (tuples work too; see [`LegendPos`]). Required. A string that isn't one of
         /// the nine keywords (or a unique prefix of one) is an error of the
         /// call. R's `x` and `y`.
         pos: LegendPos = (fallible impl IntoArg<LegendPos> => IntoArg::into_arg),
@@ -1757,9 +1758,26 @@ pub(crate) enum ParGrid {
 /// Page layout: on a device, or recorded in a
 /// [`Figure`](crate::recording::Figure), which can then hold a whole
 /// multi-panel plot.
+/// A pair of grid counts (`mfrow`, `mfcol`, `mfg`) as R's `as.integer()`
+/// reads them: fractions truncated. A negative or non-finite value becomes
+/// 0, which R's checks reject ("invalid value specified for graphical
+/// parameter").
+fn grid_pair(p: impl Pair) -> (usize, usize) {
+    let count = |v: f64| {
+        if v.is_finite() && v >= 0.0 {
+            v as usize
+        } else {
+            0
+        }
+    };
+    let (a, b) = p.into_pair();
+    (count(a), count(b))
+}
+
 impl<G: Graphics> ParCall<'_, G> {
-    /// Splits the page into a grid of `nrow` by `ncol` panels, filled row by
-    /// row.
+    /// Splits the page into a grid of `[nrow, ncol]` panels, filled row by
+    /// row (an array or tuple of two counts; fractions are truncated, as in
+    /// R).
     ///
     /// It also sets [`par(cex)`] to 0.83 (2 x 2) or 0.66 (more than 2 rows or
     /// columns) and `mex` to 1, and the next `plot_new()` starts a new page at
@@ -1777,7 +1795,7 @@ impl<G: Graphics> ParCall<'_, G> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.par().mfrow(1, 2).draw();
+    /// dev.par().mfrow([1, 2]).draw();
     /// dev.plot().x([1, 2, 3]).draw(); // left panel
     /// dev.hist().x([1, 2, 2, 3]).draw(); // right panel
     /// ```
@@ -1785,15 +1803,16 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `nrow` or
-    /// `ncol` is zero.
+    /// `ncol` is below 1 (or not finite).
     ///
     /// [`par(cex)`]: crate::par::Par::cex
-    pub fn mfrow(mut self, nrow: usize, ncol: usize) -> Self {
+    pub fn mfrow(mut self, mfrow: impl Pair) -> Self {
+        let (nrow, ncol) = grid_pair(mfrow);
         self.page.grid = Some(ParGrid::Rows(nrow, ncol));
         self
     }
 
-    /// Splits the page into a grid of `nrow` by `ncol` panels, filled column by
+    /// Splits the page into a grid of `[nrow, ncol]` panels, filled column by
     /// column; otherwise as [`mfrow`](ParCall::mfrow).
     ///
     /// This is R's `par(mfcol = c(nrow, ncol))`.
@@ -1803,7 +1822,7 @@ impl<G: Graphics> ParCall<'_, G> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.par().mfcol(2, 1).draw();
+    /// dev.par().mfcol([2, 1]).draw();
     /// dev.plot().x([1, 2, 3]).draw(); // top panel
     /// dev.plot().x([3, 2, 1]).draw(); // bottom panel
     /// ```
@@ -1811,13 +1830,14 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `nrow` or
-    /// `ncol` is zero.
-    pub fn mfcol(mut self, nrow: usize, ncol: usize) -> Self {
+    /// `ncol` is below 1 (or not finite).
+    pub fn mfcol(mut self, mfcol: impl Pair) -> Self {
+        let (nrow, ncol) = grid_pair(mfcol);
         self.page.grid = Some(ParGrid::Cols(nrow, ncol));
         self
     }
 
-    /// Picks the panel the next plot draws into: the one at (`row`, `col`),
+    /// Picks the panel the next plot draws into: the one at `[row, col]`,
     /// counting from 1.
     ///
     /// It neither advances nor starts a new page. The panel number is derived
@@ -1833,18 +1853,18 @@ impl<G: Graphics> ParCall<'_, G> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.par().mfrow(2, 2).draw();
+    /// dev.par().mfrow([2, 2]).draw();
     /// dev.plot().x([1, 2, 3]).draw(); // top left
-    /// dev.par().mfg(2, 2).draw();
+    /// dev.par().mfg([2, 2]).draw();
     /// dev.plot().x([3, 2, 1]).draw(); // bottom right
     /// ```
     ///
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `row`/`col` are outside the current arrangement.
-    pub fn mfg(mut self, row: usize, col: usize) -> Self {
-        self.page.mfg = Some((row, col));
+    /// `row`/`col` are below 1 or outside the current arrangement.
+    pub fn mfg(mut self, mfg: impl Pair) -> Self {
+        self.page.mfg = Some(grid_pair(mfg));
         self
     }
 
@@ -1899,8 +1919,9 @@ impl<G: Graphics> ParCall<'_, G> {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, unless
     /// both sizes are positive.
-    pub fn fin(mut self, fin: [impl Num; 2]) -> Self {
-        self.page.fin = Some(fin.map(Num::to_f64));
+    pub fn fin(mut self, fin: impl Pair) -> Self {
+        let (w, h) = fin.into_pair();
+        self.page.fin = Some([w, h]);
         self
     }
 }

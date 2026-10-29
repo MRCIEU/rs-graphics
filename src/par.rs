@@ -109,7 +109,7 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
 /// # use rs_graphics::prelude::*;
 /// # let mut dev = Device::null().open().unwrap();
 /// dev.par().xaxs("i").draw();
-/// dev.plot_window().xlim(0, 10).ylim(0, 10).draw();
+/// dev.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
 /// let (x0, x1, y0, _) = dev.usr();
 /// assert_eq!((x0, x1), (0.0, 10.0)); // exact
 /// assert!(y0 < 0.0); // yaxs "r": extended
@@ -489,7 +489,7 @@ par_options! {
         /// `plt`, or `mar` and `pty`; takes precedence over `plt`. A `par()`
         /// call setting `mar`, `mai`, `pty` or `plt` resets it to `None`, as
         /// in R. Applied at the next `plot_new()`.
-        pub pin: Option<[f64; 2]> => @Some array [f64; 2],
+        pub pin: Option<[f64; 2]> => @Some pair_array [f64; 2],
         /// Shape of the plot region: [`Pty::Square`] makes the `mar`-based
         /// region square. Default [`Pty::Maximal`]. Applied at the next
         /// `plot_new()`.

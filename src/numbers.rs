@@ -27,7 +27,7 @@
 //! # use rs_graphics::prelude::*;
 //! # let mut dev = Device::null().width(4).height(4).open().unwrap();
 //! let y = vec![2.0, 3.5, 1.0];
-//! dev.plot().x(1..=3).y(&y).xlim(0, 4).draw();
+//! dev.plot().x(1..=3).y(&y).xlim([0, 4]).draw();
 //! ```
 
 use std::borrow::Cow;
@@ -282,15 +282,18 @@ impl<'a, N: Numbers<'a>> Groups<'a> for N {
     }
 }
 
-/// Two numbers, such as limits `(0, 10)` or a point `(5.0, 20.0)`.
+/// Two numbers, such as limits `[0, 10]` or a point `(5.0, 20.0)`: what
+/// every two-value setting takes (`.xlim([0, 10])`, `.mfrow([1, 2])`), as R
+/// takes `c(a, b)`.
 ///
-/// Implemented for tuples of any two [`Num`] types.
+/// Implemented for arrays of two [`Num`]s and for tuples of any two `Num`
+/// types; a tuple can mix them (`(0, 10.5)`), an array can't.
 ///
 /// # Examples
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// assert_eq!((5, 20).into_pair(), (5.0, 20.0));
+/// assert_eq!([5, 20].into_pair(), (5.0, 20.0));
 /// assert_eq!((0.5, 2).into_pair(), (0.5, 2.0));
 /// ```
 pub trait Pair {
@@ -303,6 +306,48 @@ impl<A: Num, B: Num> Pair for (A, B) {
         (self.0.to_f64(), self.1.to_f64())
     }
 }
+
+impl<N: Num> Pair for [N; 2] {
+    fn into_pair(self) -> (f64, f64) {
+        (self[0].to_f64(), self[1].to_f64())
+    }
+}
+
+/// One number used for both values, or a [`Pair`]: what `legend()`'s
+/// `inset` takes, as R recycles `inset = 0.05` to both directions.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # use rs_graphics::numbers::OneOrPair;
+/// assert_eq!(0.05.into_one_or_pair(), (0.05, 0.05));
+/// assert_eq!([0.05, 0.1].into_one_or_pair(), (0.05, 0.1));
+/// ```
+pub trait OneOrPair {
+    /// The two values as `f64`s.
+    fn into_one_or_pair(self) -> (f64, f64);
+}
+
+impl<P: Pair> OneOrPair for P {
+    fn into_one_or_pair(self) -> (f64, f64) {
+        self.into_pair()
+    }
+}
+
+macro_rules! one_or_pair_single {
+    ($($t:ty),*) => {
+        $(
+            impl OneOrPair for $t {
+                fn into_one_or_pair(self) -> (f64, f64) {
+                    let v = self.to_f64();
+                    (v, v)
+                }
+            }
+        )*
+    };
+}
+one_or_pair_single!(f64, f32, i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 
 #[cfg(test)]
 // The tests use the reference forms on purpose; clippy would drop the `&`.

@@ -40,8 +40,8 @@ use crate::named_colors::NAMED_COLORS;
 fn blank<G: Graphics>(g: &mut G, xlim: (f64, f64), ylim: (f64, f64)) -> Result<(), Error> {
     g.try_plot_new()?;
     g.plot_window()
-        .xlim(xlim.0, xlim.1)
-        .ylim(ylim.0, ylim.1)
+        .xlim((xlim.0, xlim.1))
+        .ylim((ylim.0, ylim.1))
         .try_draw()
 }
 

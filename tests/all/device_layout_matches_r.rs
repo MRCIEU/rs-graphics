@@ -65,8 +65,8 @@ fn plot_region_and_usr_match_r() {
         .unwrap();
     dev.plot_new();
     dev.plot_window()
-        .xlim(xlim.0, xlim.1)
-        .ylim(ylim.0, ylim.1)
+        .xlim((xlim.0, xlim.1))
+        .ylim((ylim.0, ylim.1))
         .draw();
 
     let plt = dev.plot_region();

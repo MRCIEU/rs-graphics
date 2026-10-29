@@ -61,7 +61,7 @@ fn cases() -> Vec<Case> {
             pages: 2,
             r: "par(mfrow = c(1, 2)); pl(3, 'A'); pl(4, 'B'); pl(5, 'C')",
             draw: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 pl(d, 3, "A");
                 pl(d, 4, "B");
                 pl(d, 5, "C");

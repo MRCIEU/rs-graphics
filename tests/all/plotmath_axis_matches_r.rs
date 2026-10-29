@@ -114,7 +114,7 @@ fn plotmath_axis_labels_match_r() {
     let mut dev = r::device((PAGE_W, PAGE_H));
     dev.par().mar([5.0, 6.0, 5.0, 6.0]).draw();
     dev.plot_new();
-    dev.plot_window().xlim(0.0, 6.0).ylim(0.0, 6.0).draw();
+    dev.plot_window().xlim([0.0, 6.0]).ylim([0.0, 6.0]).draw();
     for c in CASES {
         let opts = (c.opts)()
             .at(1..=c.exprs.len())
@@ -204,7 +204,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .oma([2.0, 0.0, 2.0, 0.0])
         .draw();
     d.plot_new();
-    d.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
+    d.plot_window().xlim([0.0, 10.0]).ylim([0.0, 10.0]).draw();
     d.title()
         .with(
             &TitleOptions::default()
@@ -341,7 +341,7 @@ fn plotmath_high_level_titles_match_r() {
         .compress(false)
         .open()
         .unwrap();
-    d.par().mfrow(2, 3).draw();
+    d.par().mfrow([2, 3]).draw();
     let x: Vec<f64> = (1..=10).map(f64::from).collect();
     let y: Vec<f64> = x.iter().map(|v| v * v).collect();
     d.plot()

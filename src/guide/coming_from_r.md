@@ -58,14 +58,17 @@ dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 | `"red"`, `"#FF000080"`, `2` (colours) | the same: `.col("red")`, `.col(2)` |
 | `lty = "dashed"`, `lty = 2`, `"44"` | the same: `.lty("dashed")`, `.lty(2)` |
 | `pch = "+"` | `.pch('+')` |
-| `xlim = c(0, 10)` | `.xlim(0, 10)` |
+| `xlim = c(0, 10)` | `.xlim([0, 10])` |
 | `mar = c(5, 4, 4, 2)` | `.mar([5, 4, 4, 2])` |
 | `expression(alpha^2)` | `Label::math("alpha^2")` |
 | `font = 2` | `.font(2)` or `.font("bold")` |
 
-Numbers may be integers or floats, as in R (`.cex(2)`, `.xlim(0, 10)`); a
+Numbers may be integers or floats, as in R (`.cex(2)`, `.xlim([0, 10])`); a
 single number is a vector of one (`.x(1)`). Rust arrays hold one type, so
-once an element is `None` the others are written `Some(..)`.
+once an element is `None` the others are written `Some(..)`, and an array
+of numbers can't mix integers and floats: a two-number setting (`xlim`,
+`mfrow`, legend `pos`, ...) also takes a tuple, which can (`.xlim((0,
+10.5))`).
 
 # Devices
 
@@ -101,7 +104,7 @@ par(mfrow = c(1, 2), mar = c(4, 4, 2, 1), las = 1)
 ```
 # use rs_graphics::prelude::*;
 # let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
-dev.par().mfrow(1, 2).mar([4, 4, 2, 1]).las(1).draw();
+dev.par().mfrow([1, 2]).mar([4, 4, 2, 1]).las(1).draw();
 ```
 
 - [`par("las")`] (reading a value) is `dev.current_par().las`.
@@ -192,7 +195,7 @@ mtext("Two panels", outer = TRUE, line = 0.5, font = 2)
 ```
 # use rs_graphics::prelude::*;
 # let mut dev = Device::memory("svg").width(8).height(4).open().unwrap();
-dev.par().mfrow(1, 2).oma([0, 0, 2, 0]).draw();
+dev.par().mfrow([1, 2]).oma([0, 0, 2, 0]).draw();
 let h = dev
     .hist()
     .x([4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7])
@@ -201,7 +204,7 @@ let h = dev
     .draw();
 dev.abline().v(h.mids[2]).lty("dashed").draw(); // R counts from 1
 let heights = [3.0, 5.0, 2.0];
-let mp = dev.barplot().height(heights).names(["A", "B", "C"]).ylim(0, 6).draw();
+let mp = dev.barplot().height(heights).names(["A", "B", "C"]).ylim([0, 6]).draw();
 let above: Vec<f64> = heights.iter().map(|h| h + 0.3).collect();
 dev.text().x(&mp).y(&above).labels(["3", "5", "2"]).draw();
 dev.mtext().text("Two panels").outer(true).line(0.5).font(2).draw();

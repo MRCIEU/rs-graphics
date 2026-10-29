@@ -45,7 +45,7 @@ fn cases() -> Vec<Case> {
                 lines(c(1, 14), c(1, 6)); points(c(9, 12), c(3, 4), pch = 19)\n\
                 text(10, 2, 'abc')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot().x(X).y(Y).draw();
                 d.par().xpd(Xpd::Device).draw();
                 d.lines().x([1, 14]).y([1, 6]).draw();
@@ -59,7 +59,7 @@ fn cases() -> Vec<Case> {
                 abline(h = 3, v = 2, col = 'red')\n\
                 axis(3, at = c(-4, 0, 3, 8, 12))",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot().x(X).y(Y).draw();
                 d.par().xpd(Xpd::Device).draw();
                 d.abline().h(3).v(2).col("red").draw();
@@ -72,7 +72,7 @@ fn cases() -> Vec<Case> {
                 text(11, 3, 'abc', xpd = NA); text(11, 4, 'sum', xpd = TRUE)\n\
                 legend(8, 5, legend = c('abc', 'sum'), pch = 1:2, xpd = NA)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot().x(X).y(Y).draw();
                 d.text()
                     .x([11])
@@ -94,7 +94,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(1, 2), xpd = TRUE); plot(x, y, ann = FALSE)\n\
                 abline(h = 2, col = 'blue'); par(xpd = NA); abline(h = 4, col = 'red')",
             ours: |d| {
-                d.par().mfrow(1, 2).xpd(true).draw();
+                d.par().mfrow([1, 2]).xpd(true).draw();
                 d.plot().x(X).y(Y).draw();
                 d.abline().h(2).col("blue").draw();
                 d.par().xpd(Xpd::Device).draw();
@@ -107,9 +107,9 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), ylim = c(0, 4), xpd = FALSE)\n\
                 barplot(c(3, 5, 2), ylim = c(0, 4))",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
-                d.barplot().height([3, 5, 2]).ylim(0, 4).xpd(false).draw();
-                d.barplot().height([3, 5, 2]).ylim(0, 4).draw();
+                d.par().mfrow([1, 2]).draw();
+                d.barplot().height([3, 5, 2]).ylim([0, 4]).xpd(false).draw();
+                d.barplot().height([3, 5, 2]).ylim([0, 4]).draw();
             },
         },
         Case {
@@ -121,7 +121,7 @@ fn cases() -> Vec<Case> {
                 plot(x, y, log = 'x', ann = FALSE)\n\
                 abline(a = 1, b = 0.5, untf = TRUE, xpd = NA, col = 'green')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot().x(X).y(Y).draw();
                 d.abline().h(2).xpd(true).col("blue").draw();
                 d.abline().v(3).xpd(Xpd::Device).col("red").draw();

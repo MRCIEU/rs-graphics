@@ -68,8 +68,8 @@ macro_rules! window {
 fn window(d: &mut Device<AnyBackend>, xlim: (f64, f64), ylim: (f64, f64)) {
     d.plot_new();
     d.plot_window()
-        .xlim(xlim.0, xlim.1)
-        .ylim(ylim.0, ylim.1)
+        .xlim((xlim.0, xlim.1))
+        .ylim((ylim.0, ylim.1))
         .draw();
 }
 
@@ -299,7 +299,11 @@ fn cases() -> Vec<Case> {
             ),
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(1, 100).ylim(0, 10).xlog(true).draw();
+                d.plot_window()
+                    .xlim([1, 100])
+                    .ylim([0, 10])
+                    .xlog(true)
+                    .draw();
                 d.polygon()
                     .x([2.0, 50.0, 50.0, 2.0, NAN, 2.0, 50.0, 50.0, 2.0])
                     .y([1.0, 1.0, 4.0, 4.0, NAN, 6.0, 6.0, 9.0, 9.0])

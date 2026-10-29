@@ -856,7 +856,7 @@ impl<B: Backend> Device<B> {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
-    /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
+    /// dev.plot_window().xlim([0, 10]).ylim([0, 1]).draw();
     /// let (x0, x1, ..) = dev.usr();
     /// assert!((x0 + 0.4).abs() < 1e-9 && (x1 - 10.4).abs() < 1e-9); // 4% added at each end
     /// ```
@@ -1076,6 +1076,11 @@ impl<B: Backend> Device<B> {
     /// `par(mfg = )`; see [`ParCall::mfg`](crate::graphics::ParCall::mfg).
     pub(crate) fn mfg(&mut self, row: usize, col: usize) -> Result<(), Error> {
         let (nrow, ncol) = (self.arrangement.nrow(), self.arrangement.ncol());
+        if row == 0 || col == 0 {
+            return Err(Error::invalid(
+                "invalid value specified for graphical parameter \"mfg\"",
+            ));
+        }
         if !(1..=nrow).contains(&row) {
             return Err(Error::invalid("parameter \"i\" in \"mfg\" is out of range"));
         }
@@ -1117,7 +1122,7 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.par().mfrow(2, 2).draw();
+    /// dev.par().mfrow([2, 2]).draw();
     /// assert_eq!(dev.current_par().cex, 0.83);
     /// ```
     ///
@@ -1157,7 +1162,7 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.par().mfrow(1, 2).draw();
+    /// dev.par().mfrow([1, 2]).draw();
     /// dev.plot().x([1, 2]).draw();
     /// dev.plot().x([2, 1]).draw();
     /// assert_eq!(dev.current_figure(), 2);
@@ -1179,7 +1184,7 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.par().mfrow(1, 2).draw();
+    /// dev.par().mfrow([1, 2]).draw();
     /// dev.plot().x([1, 2]).draw();
     /// assert_eq!(dev.figure_region().x1, dev.din().0 / 2.0);
     /// ```
@@ -1385,7 +1390,7 @@ impl<B: Backend> Device<B> {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
-    /// dev.plot_window().xlim(0, 10).ylim(0, 1).draw();
+    /// dev.plot_window().xlim([0, 10]).ylim([0, 1]).draw();
     /// assert_eq!(dev.ax_ticks(1), [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
     /// ```
     ///

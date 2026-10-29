@@ -49,7 +49,7 @@ If you leave out an argument R requires, that's R's error (`dev.plot().try_draw(
 
 As in R, numbers may be integers or floats (a vector's elements must all be the same type):
 
-`dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)`, 
+`dev.plot().x(1..=10).y(&y).cex(2).xlim([0, 12])`, 
 
 Vectors can be passed by reference or by value (`.x(&x)` or `.x(x)`, `.h([1, 2])`).
 
@@ -121,7 +121,7 @@ Each high-level call (`plot`, `hist`, `barplot`, `boxplot`, `pie`) starts the ne
 ```rust
 // R: pdf("panels.pdf", 8, 4); par(mfrow = c(1, 2), oma = c(0, 0, 2, 0))
 let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
-dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
+dev.par().mfrow([1, 2]).oma([0.0, 0.0, 2.0, 0.0]).draw();
 
 let x = [4.2, 5.1, 5.3, 5.9, 6.4, 7.0, 7.7];
 let h = dev.hist().x(&x).col("lightblue").main("Histogram").draw(); // panel 1
@@ -131,7 +131,7 @@ let centres = dev // panel 2: bar centres, for labelling the bars
     .barplot()
     .height([3.0, 5.0, 2.0])
     .names(["A", "B", "C"])
-    .ylim(0.0, 6.0)
+    .ylim([0.0, 6.0])
     .draw();
 dev.text().x(&centres).y(&[3.3, 5.3, 2.3]).labels(&["3", "5", "2"]).draw();
 
@@ -158,7 +158,7 @@ Every call that takes arguments has an options struct: `PlotOptions`, `HistOptio
 
 ### Figures as values
 
-A `Figure` records the same calls without a device, so you can build a figure (a plot and its margins) once and draw it later, on any device and in any panel. A figure can also hold a whole plot, page layout and several pages included: `fig.par().mfrow(2, 2).draw()` and `fig.layout()` are recorded too, and adding such a figure sets that layout up on the device (R's `recordPlot()`/`replayPlot()`).
+A `Figure` records the same calls without a device, so you can build a figure (a plot and its margins) once and draw it later, on any device and in any panel. A figure can also hold a whole plot, page layout and several pages included: `fig.par().mfrow([2, 2]).draw()` and `fig.layout()` are recorded too, and adding such a figure sets that layout up on the device (R's `recordPlot()`/`replayPlot()`).
 
 ```rust
 let dose = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
@@ -183,7 +183,7 @@ fig.legend()
     .draw();
 
 let mut dev = Device::pdf("fits.pdf").width(8.0).height(8.0).open()?;
-dev.par().mfrow(2, 2).draw();
+dev.par().mfrow([2, 2]).draw();
 dev.add_figure_at(1, 1, &fig); // top left
 dev.add_figure_at(2, 2, &fig); // bottom right
 dev.close()?;
@@ -207,7 +207,7 @@ A whole plot, with its panels, is recorded the same way. Here the calls use `.tr
 
 ```rust
 let mut summary = Figure::new();
-summary.par().mfrow(1, 2).oma([0, 0, 2, 0]).try_draw()?;
+summary.par().mfrow([1, 2]).oma([0, 0, 2, 0]).try_draw()?;
 summary.hist().x(&response).main("Histogram").try_draw()?;
 summary.boxplot().x(&response).main("Box plot").try_draw()?;
 summary.mtext().text("Response").outer(true).line(0.5).font(2).try_draw()?;

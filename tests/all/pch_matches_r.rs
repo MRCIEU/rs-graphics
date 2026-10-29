@@ -107,7 +107,7 @@ fn r_code(c: &Case) -> String {
 fn draw_ours(c: &Case, dev: &mut Device<AnyBackend>) {
     dev.par().mar([0, 0, 0, 0]).cex(c.par_cex).draw();
     dev.plot_new();
-    dev.plot_window().xlim(0, 8).ylim(0, 6).draw();
+    dev.plot_window().xlim([0, 8]).ylim([0, 6]).draw();
     let bg =
         c.bg.map_or(ColorSpec::None, |b| ColorSpec::try_from(b).unwrap());
     let (xs, ys): (Vec<f64>, Vec<f64>) = (0..26).map(pch_pos).unzip();

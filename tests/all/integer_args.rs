@@ -27,8 +27,8 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .cex(2)
         .lwd(2)
         .bg("red")
-        .xlim(0, 5)
-        .ylim(0, 6)
+        .xlim([0, 5])
+        .ylim([0, 6])
         .xaxp([0, 5, 5])
         .draw();
     g.lines().x(1..=4).y([1i64, 2, 2, 3]).lwd(3).draw();
@@ -75,7 +75,7 @@ fn with_integers<G: Graphics>(g: &mut G) {
         .labels(["line", "point"])
         .with(&keys)
         .draw();
-    g.plot_window().xlim(0, 10).ylim(0, 5).draw();
+    g.plot_window().xlim([0, 10]).ylim([0, 5]).draw();
     g.hist().x([1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).draw();
     g.barplot()
         .height([3, 5, 2])
@@ -103,8 +103,8 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .cex(2.0)
         .lwd(2.0)
         .bg("red")
-        .xlim(0.0, 5.0)
-        .ylim(0.0, 6.0)
+        .xlim([0.0, 5.0])
+        .ylim([0.0, 6.0])
         .xaxp([0.0, 5.0, 5.0])
         .draw();
     g.lines()
@@ -175,7 +175,7 @@ fn with_floats<G: Graphics>(g: &mut G) {
         .labels(["line", "point"])
         .with(&keys)
         .draw();
-    g.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
+    g.plot_window().xlim([0.0, 10.0]).ylim([0.0, 5.0]).draw();
     g.hist()
         .x([1.0, 2.0, 2.0, 3.0, 3.0, 3.0])
         .breaks([0.0, 1.0, 2.0, 3.0])
@@ -230,8 +230,8 @@ fn with_other_number_types<G: Graphics>(g: &mut G) {
         .y(vec![2_i64, 4, 3, 5])
         .cex(2_u8)
         .lwd([Some(2_u16), None])
-        .xlim(0_u64, 5_usize)
-        .ylim(0_i8, 6_i16)
+        .xlim((0_u64, 5_usize))
+        .ylim((0_i8, 6_i16))
         .xaxp([0_u64, 5, 5])
         .draw();
     g.points().x([2, 3]).y([5, 1]).cex(1..3).draw();
@@ -243,7 +243,10 @@ fn with_other_number_types<G: Graphics>(g: &mut G) {
         .pch(1)
         .inset((0_u8, 0_usize))
         .draw();
-    g.plot_window().xlim(0_u8, 10_u64).ylim(0_i64, 5_i8).draw();
+    g.plot_window()
+        .xlim((0_u8, 10_u64))
+        .ylim((0_i64, 5_i8))
+        .draw();
 }
 
 fn with_other_number_types_as_floats<G: Graphics>(g: &mut G) {
@@ -253,8 +256,8 @@ fn with_other_number_types_as_floats<G: Graphics>(g: &mut G) {
         .y([2.0, 4.0, 3.0, 5.0])
         .cex(2.0)
         .lwd([Some(2.0), None])
-        .xlim(0.0, 5.0)
-        .ylim(0.0, 6.0)
+        .xlim([0.0, 5.0])
+        .ylim([0.0, 6.0])
         .xaxp([0.0, 5.0, 5.0])
         .draw();
     g.points()
@@ -270,7 +273,7 @@ fn with_other_number_types_as_floats<G: Graphics>(g: &mut G) {
         .pch(1)
         .inset((0.0, 0.0))
         .draw();
-    g.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
+    g.plot_window().xlim([0.0, 10.0]).ylim([0.0, 5.0]).draw();
 }
 
 #[test]
@@ -343,7 +346,7 @@ fn boxplot_stats_takes_integers() {
 #[allow(clippy::needless_borrows_for_generic_args)] // `&one` on purpose
 fn with_single_numbers<G: Graphics>(g: &mut G) {
     let one = 1.0;
-    g.plot().x(1).y(&one).xlim(0, 4).ylim(0, 4).draw();
+    g.plot().x(1).y(&one).xlim([0, 4]).ylim([0, 4]).draw();
     g.points().x(2.0).y(2).draw();
     g.lines().x(1).y(1).draw();
     g.text().x(3).y(3.0).labels("a").draw();
@@ -359,7 +362,7 @@ fn with_single_numbers<G: Graphics>(g: &mut G) {
 
 /// The same, as one-element vectors.
 fn with_one_element_vectors<G: Graphics>(g: &mut G) {
-    g.plot().x([1.0]).y([1.0]).xlim(0, 4).ylim(0, 4).draw();
+    g.plot().x([1.0]).y([1.0]).xlim([0, 4]).ylim([0, 4]).draw();
     g.points().x([2.0]).y([2.0]).draw();
     g.lines().x([1.0]).y([1.0]).draw();
     g.text().x([3.0]).y([3.0]).labels(["a"]).draw();
@@ -404,4 +407,79 @@ fn single_numbers_are_vectors_of_one() {
         format!("{:?}", boxplot_stats(5, 1.5)),
         format!("{:?}", boxplot_stats([5.0], 1.5))
     );
+}
+
+/// Every two-number setting as arrays: limits, page grid and panel, figure
+/// and plot sizes, legend position, corners and inset.
+fn pairs_as_arrays<G: Graphics>(g: &mut G) {
+    g.par().mfrow([2, 2]).pin([3, 2]).draw();
+    g.plot().x([1, 2, 3]).xlim([0, 4]).ylim([0, 5]).draw();
+    g.legend().pos([1, 4]).labels("a").inset([0.0, 0.0]).draw();
+    g.legend()
+        .pos("topright")
+        .labels("b")
+        .inset([0.05, 0.05])
+        .draw();
+    g.legend().pos([[2, 3], [1, 2]]).labels("c").draw();
+    g.hist().x([1, 2, 2, 3]).xlim([0, 4]).ylim([0, 3]).draw();
+    g.barplot().height([1, 2]).xlim([0, 3]).ylim([0, 3]).draw();
+    g.boxplot()
+        .x([1, 2, 3, 9])
+        .xlim([0, 2])
+        .ylim([0, 10])
+        .draw();
+    g.par().mfg([1, 2]).draw();
+    g.plot_new();
+    g.plot_window().xlim([0, 1]).ylim([0, 1]).draw();
+    g.par().fin([3, 2]).draw();
+    g.plot_new();
+}
+
+/// The same settings as tuples, mixing integers and floats, with R's
+/// truncation of fractional grid counts and one number for `inset`.
+fn pairs_as_tuples<G: Graphics>(g: &mut G) {
+    g.par().mfrow((2.7, 2)).pin((3.0, 2)).draw();
+    g.plot().x([1, 2, 3]).xlim((0, 4.0)).ylim((0.0, 5)).draw();
+    g.legend().pos((1, 4.0)).labels("a").inset(0).draw();
+    g.legend().pos("topright").labels("b").inset(0.05).draw();
+    g.legend().pos(((2, 3.0), (1.0, 2))).labels("c").draw();
+    g.hist()
+        .x([1, 2, 2, 3])
+        .xlim((0.0, 4))
+        .ylim((0, 3.0))
+        .draw();
+    g.barplot()
+        .height([1, 2])
+        .xlim((0, 3.0))
+        .ylim((0.0, 3))
+        .draw();
+    g.boxplot()
+        .x([1, 2, 3, 9])
+        .xlim((0, 2.0))
+        .ylim((0.0, 10))
+        .draw();
+    g.par().mfg((1.9, 2)).draw();
+    g.plot_new();
+    g.plot_window().xlim((0, 1.0)).ylim((0.0, 1)).draw();
+    g.par().fin((3.0, 2)).draw();
+    g.plot_new();
+}
+
+/// Two-number settings take an array or a tuple (mixed types), `inset`
+/// one number too, and grid counts are truncated as R's `as.integer()`.
+#[test]
+fn pair_settings_take_arrays_or_tuples() {
+    let mut a = device(7.0, 6.0);
+    pairs_as_arrays(&mut a);
+    let mut b = device(7.0, 6.0);
+    pairs_as_tuples(&mut b);
+    assert!(a.finish() == b.finish(), "device output differs");
+
+    let (mut fa, mut fb) = (Figure::new(), Figure::new());
+    pairs_as_arrays(&mut fa);
+    pairs_as_tuples(&mut fb);
+    let (mut a, mut b) = (device(7.0, 6.0), device(7.0, 6.0));
+    a.add_figure(&fa);
+    b.add_figure(&fb);
+    assert!(a.finish() == b.finish(), "figure output differs");
 }

@@ -45,7 +45,7 @@
 //! [`error::Error`] instead. To reuse a set of arguments, build its options struct
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
 //! [`prelude`] imports it all, including the trait. As in R, numbers may
-//! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (data
+//! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim([0, 12])` (data
 //! vectors are any [`Numbers`](numbers::Numbers), by reference or by
 //! value; `f64` data isn't copied either way; one number is a vector of
 //! one, as in R: `plot(1, 1)` is `.x(1).y(1)`). R's `NA` in a setting is `None`:
@@ -112,7 +112,7 @@
 //!
 //! let x = [1.0, 2.0, 3.0, 4.0];
 //! let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
-//! dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
+//! dev.par().mfrow([1, 2]).oma([0.0, 0.0, 2.0, 0.0]).draw();
 //! dev.plot().x(&x).y(&[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
 //! dev.abline().a(0).b(4).draw(); // still panel 1
 //! dev.hist().x(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
@@ -140,7 +140,7 @@
 //! fig.hist().x(&[1.0, 2.0, 2.5, 3.0, 3.2]).main("Recorded").draw();
 //!
 //! let mut dev = Device::pdf("figure.pdf").width(8.0).height(4.0).open()?;
-//! dev.par().mfrow(1, 2).draw();
+//! dev.par().mfrow([1, 2]).draw();
 //! dev.add_figure_at(1, 2, &fig); // right-hand panel
 //! dev.close()?;
 //! # Ok::<(), std::io::Error>(())

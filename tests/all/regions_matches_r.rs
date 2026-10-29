@@ -102,7 +102,7 @@ fn cases() -> Vec<Case> {
                 par(fig = c(0.5, 1, 0, 0.5), new = TRUE); pl(5, 'inset')",
             setup: |p| p,
             draw: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 pl(d, 10, "A");
                 d.par().fig([0.5, 1.0, 0.0, 0.5]).draw();
                 d.par().new(true).draw();

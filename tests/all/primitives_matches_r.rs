@@ -38,7 +38,7 @@ fn cols(names: &[&str]) -> Vec<ColorSpec> {
 /// `plot.new(); plot.window(c(0, 10), c(0, 10))`.
 fn window(d: &mut Dev) {
     d.plot_new();
-    d.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
+    d.plot_window().xlim([0.0, 10.0]).ylim([0.0, 10.0]).draw();
 }
 
 const WINDOW_R: &str = "plot.new(); plot.window(c(0, 10), c(0, 10))\n";
@@ -239,7 +239,7 @@ fn cases() -> Vec<Case> {
                 d.par().oma(Sides::from([1.0, 2.0, 1.0, 1.0])).draw();
                 d.par().lty(LineType::DOTTED).draw();
                 d.par().col(Color::try_from("darkred").unwrap()).draw();
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot_new();
                 d.box_().draw();
                 d.box_()
@@ -297,7 +297,7 @@ fn cases() -> Vec<Case> {
                 boxplot(list(1:5, c(2, 4, 6)), main = 'X')\n\
                 pie(c(1, 2, 3), labels = c('a', 'b'))",
             draw: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 let red = Color::try_from("red").unwrap();
                 d.par().fg(red).draw();
                 d.par().col(red).draw();
@@ -338,8 +338,8 @@ fn cases() -> Vec<Case> {
             draw: |d| {
                 d.plot_new();
                 d.plot_window()
-                    .xlim(1.0, 100.0)
-                    .ylim(1.0, 10.0)
+                    .xlim([1.0, 100.0])
+                    .ylim([1.0, 10.0])
                     .xlog(true)
                     .draw();
                 d.arrows()
@@ -415,7 +415,11 @@ fn cases() -> Vec<Case> {
                      col = c('red', 'blue', 'green', 'orange', 'purple', 'black'))",
             draw: |d| {
                 d.plot_new();
-                d.plot_window().xlim(1, 100).ylim(0, 10).xlog(true).draw();
+                d.plot_window()
+                    .xlim([1, 100])
+                    .ylim([0, 10])
+                    .xlog(true)
+                    .draw();
                 d.text()
                     .x([f64::NAN, 10.0, 0.0, 50.0, -1.0, 20.0])
                     .y([2.0, 3.0, 4.0, 5.0, 6.0, f64::NAN])
@@ -432,8 +436,8 @@ fn cases() -> Vec<Case> {
                 d.plot_new();
                 let asp = PlotWindowOptions::default().asp(1.0);
                 d.plot_window()
-                    .xlim(0.0, 10.0)
-                    .ylim(0.0, 2.0)
+                    .xlim([0.0, 10.0])
+                    .ylim([0.0, 2.0])
                     .with(&asp)
                     .draw();
                 d.rect()
@@ -445,8 +449,8 @@ fn cases() -> Vec<Case> {
                 // Ignored on a log axis, as in R.
                 let log = asp.xlog(true);
                 d.plot_window()
-                    .xlim(1.0, 100.0)
-                    .ylim(0.0, 2.0)
+                    .xlim([1.0, 100.0])
+                    .ylim([0.0, 2.0])
                     .with(&log)
                     .draw();
                 let red = RectOptions::default().border(cols(&["red"]));

@@ -75,7 +75,11 @@ fn ge_pretty_matches_r_xaxp() {
         let mut dev = Device::null().open().unwrap();
         dev.par().lab([ndiv, ndiv, 7]).draw();
         dev.plot_new();
-        dev.plot_window().xlim(lo, up).ylim(0, 1).xaxs("i").draw();
+        dev.plot_window()
+            .xlim((lo, up))
+            .ylim([0, 1])
+            .xaxs("i")
+            .draw();
         let [a, b, n] = dev.current_par().xaxp;
         let actual = (a, b, n as i32);
         assert!(

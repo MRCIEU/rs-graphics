@@ -47,7 +47,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(2, 4)); for (b in c('o', 'l', '7', 'c', 'u', ']', 'n', '[')) \
                 plot(x, y, ann = FALSE, bty = b)",
             ours: |d| {
-                d.par().mfrow(2, 4).draw();
+                d.par().mfrow([2, 4]).draw();
                 for b in ["o", "l", "7", "c", "u", "]", "n", "["] {
                     d.plot().x(X).y(Y).bty(b).draw();
                 }
@@ -133,7 +133,7 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), main = 'title', sub = 'sub', xlab = 'xlab', ylab = 'ylab', \
                 font.main = 1, col.sub = 'blue', cex.sub = 1.3, col.lab = 'grey40')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.hist()
                     .x(H)
                     .main("title")
@@ -204,7 +204,7 @@ fn cases() -> Vec<Case> {
                 title(main = expression(alpha^2), adj = 0.75)",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.par().adj(0).draw();
                 d.title().main("M").sub("S").xlab("X").ylab("Y").draw();
                 d.title().main("N").xlab("W").ylab("Z").adj(1).draw();
@@ -223,7 +223,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().oma([2, 3, 3, 1]).draw();
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.title()
                     .main("M")
                     .sub("S")
@@ -255,7 +255,7 @@ fn cases() -> Vec<Case> {
                 axis(1); axis(2)\n\
                 plot.window(c(0, 10), c(0, 10)); axis(3)",
             ours: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 d.plot().x(X).y(Y).asp(1).draw();
                 d.plot()
                     .x(X)
@@ -271,15 +271,15 @@ fn cases() -> Vec<Case> {
                 d.plot().x(X).y(Y).panel_first(grid).panel_last(mark).draw();
                 d.plot_new();
                 d.plot_window()
-                    .xlim(0, 10)
-                    .ylim(0, 10)
+                    .xlim([0, 10])
+                    .ylim([0, 10])
                     .xaxs("i")
                     .lab([3, 8, 7])
                     .draw();
                 d.axis().side(1).draw();
                 d.axis().side(2).draw();
                 // The inline xaxs and lab didn't last.
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.axis().side(3).draw();
             },
         },
@@ -293,7 +293,7 @@ fn cases() -> Vec<Case> {
                 mtext(expression(alpha, beta), side = 4, at = c(1, 4))",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 5).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 5]).draw();
                 d.mtext()
                     .text(["a", "b", "c"])
                     .side(1)
@@ -333,7 +333,7 @@ fn cases() -> Vec<Case> {
                 hist(h, breaks = c(0, 3, 7), labels = TRUE, ann = FALSE)\n\
                 hist(h, breaks = c(0, 4, 7), labels = c('p', 'q'), ann = FALSE)",
             ours: |d| {
-                d.par().mfrow(1, 3).draw();
+                d.par().mfrow([1, 3]).draw();
                 d.hist()
                     .x(H)
                     .labels(true)
@@ -366,7 +366,7 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), ylim = c(0, 4), xpd = FALSE)\n\
                 invisible(hist(h, plot = FALSE)); invisible(barplot(c(1, 2), plot = FALSE))",
             ours: |d| {
-                d.par().mfrow(2, 3).draw();
+                d.par().mfrow([2, 3]).draw();
                 d.plot().x(X).y(Y).frame_plot(false).draw();
                 d.plot().x(X).y(Y).axes(false).frame_plot(true).draw();
                 d.boxplot()
@@ -380,7 +380,7 @@ fn cases() -> Vec<Case> {
                     .show_names(false)
                     .frame_plot(false)
                     .draw();
-                d.barplot().height([3, 5, 2]).ylim(0, 4).xpd(false).draw();
+                d.barplot().height([3, 5, 2]).ylim([0, 4]).xpd(false).draw();
                 d.hist().x(H).plot(false).draw();
                 d.barplot().height([1, 2]).plot(false).draw();
             },
@@ -391,7 +391,7 @@ fn cases() -> Vec<Case> {
                 plot(y, ylab = '')\n\
                 plot(c(3, 1, 4, 1, 5, 9, 2), type = 'b', xlab = 'i', ylab = '')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot().x(Y).draw();
                 d.plot()
                     .x([3, 1, 4, 1, 5, 9, 2])
@@ -439,7 +439,7 @@ fn cases() -> Vec<Case> {
                      mgp = c(2, 0.6, 0), tck = 0.02, xlab = 'X', ylab = 'Y')\n\
                 plot(x, y, tcl = -0.2, las = 2, ann = FALSE)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot()
                     .x(X)
                     .y(Y)
@@ -463,7 +463,7 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), las = 2, cex.axis = 0.7,\n\
                         col.axis = 'red', mgp = c(2, 0.5, 0), ylab = 'Y')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.hist()
                     .x(H)
                     .las(1)
@@ -493,7 +493,7 @@ fn cases() -> Vec<Case> {
                         cex.axis = 0.7)\n\
                 barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), axisnames = FALSE, horiz = TRUE)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.barplot()
                     .height([3, 5, 2])
                     .names(["a", "b", "c"])
@@ -517,7 +517,7 @@ fn cases() -> Vec<Case> {
                 boxplot(list(a = c(1, 2, 3, 9), b = c(2, 3, 4)), horizontal = TRUE, las = 1,\n\
                         xaxp = c(0, 10, 2), gap.axis = 0)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 let groups = [vec![1.0, 2.0, 3.0, 9.0], vec![2.0, 3.0, 4.0]];
                 d.boxplot()
                     .x(&groups)

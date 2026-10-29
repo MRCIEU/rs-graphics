@@ -10,7 +10,7 @@ The words the docs use come from R. In short:
 | figure region | The plot region plus its margins: one panel. |
 | outer margins | Space around all the panels of a page, e.g. for a shared title: [`oma`](crate::par::Par::oma) (lines), [`omi`](crate::par::Par::omi) (inches). Text goes there with `mtext().outer(true)`. |
 | inner region | The page less the outer margins, which the panels share. |
-| panels | Several figures on a page: [`par().mfrow(rows, cols)`](crate::graphics::ParCall::mfrow) fills them row by row, `mfcol` column by column, [`layout()`](crate::graphics::Graphics::layout) in any grid. Each high-level plot moves to the next panel. |
+| panels | Several figures on a page: [`par().mfrow([rows, cols])`](crate::graphics::ParCall::mfrow) fills them row by row, `mfcol` column by column, [`layout()`](crate::graphics::Graphics::layout) in any grid. Each high-level plot moves to the next panel. |
 | user coordinates | The data's units inside the plot region, set by the plot's limits (`xlim`, `ylim`), read as [`par("usr")`] ([`Device::usr`](crate::device::Device::usr)). Most drawing calls take them. |
 | clipping | What is cut off at a region's edge: [`xpd`](crate::par::Par::xpd) ([`Xpd`](crate::par::Xpd)): the plot region (the default), the figure region, or the whole device. |
 
