@@ -51,7 +51,8 @@ use tiny_skia::{
 };
 
 use super::{Backend, LineEnd, LineJoin as BeLineJoin, Stroke, TextStyle};
-use crate::afm::{self, FontFace};
+use crate::afm;
+use crate::font::FontFace;
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;

@@ -449,11 +449,11 @@ impl Backend for SvgBackend {
         }
         let (x, y) = self.to_pt(origin);
         let style_str = match style.face {
-            crate::afm::FontFace::Italic | crate::afm::FontFace::BoldItalic => "italic",
+            crate::font::FontFace::Italic | crate::font::FontFace::BoldItalic => "italic",
             _ => "normal",
         };
         let weight = match style.face {
-            crate::afm::FontFace::Bold | crate::afm::FontFace::BoldItalic => "bold",
+            crate::font::FontFace::Bold | crate::font::FontFace::BoldItalic => "bold",
             _ => "normal",
         };
         self.flush_shapes();
@@ -475,7 +475,7 @@ impl Backend for SvgBackend {
             out.push_str(")\"");
         }
         out.push('>');
-        if style.face == crate::afm::FontFace::Symbol {
+        if style.face == crate::font::FontFace::Symbol {
             let text: String = text.chars().map(crate::afm::symbol_to_unicode).collect();
             out.push_str(&escape_xml(&text));
         } else {
@@ -529,7 +529,7 @@ mod tests {
         b.draw_text(
             Point::new(0.0, 0.0),
             "t",
-            &TextStyle::new(red, crate::afm::FontFace::Plain, 10.0),
+            &TextStyle::new(red, crate::font::FontFace::Plain, 10.0),
         );
         dot(&mut b, 0.75, red); // the text ended the run
         b.push_clip(Rect::new(0.0, 0.0, 1.0, 1.0));

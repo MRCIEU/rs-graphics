@@ -38,7 +38,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-pub use crate::font::FontFace;
+use crate::font::FontFace;
 
 /// The AFM file for `face`.
 fn afm_source(face: FontFace) -> &'static str {

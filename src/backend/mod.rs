@@ -39,6 +39,7 @@ pub mod svg;
 pub use any::{AnyBackend, Format};
 
 use crate::color::Color;
+use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
 use crate::numbers::Num;
@@ -172,9 +173,6 @@ impl Stroke {
     }
 }
 
-/// The font faces (see [`crate::font`]): plain, bold, italic, bold italic
-/// and Symbol (font 5).
-pub use crate::font::FontFace;
 
 /// How a [`Backend`] paints a run of text: colour, font face, size and
 /// rotation.

@@ -15,7 +15,8 @@
 //! pieces (whole strings, or one character at a time for names, as R
 //! does), with sizes from the TeX-like styles (`STYLE_D` ... `STYLE_SS1`).
 
-use crate::afm::{self, FontFace};
+use crate::afm;
+use crate::font::FontFace;
 use crate::backend::{Backend, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::Point;
