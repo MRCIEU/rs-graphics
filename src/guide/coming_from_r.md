@@ -141,6 +141,33 @@ or a whole plot with its page layout (`fig.par().mfrow(..)`,
   `png()` and `svg()` use the system's fonts.
 - `par(family)`, `vfont` and R's other font families aren't supported.
 
+# Beyond R
+
+A few setters do in one step what takes several calls in R. Their docs
+start "**Not in R.**", they are listed as *not in R* in the [R
+reference](crate::guide::r_reference), and each draws what the R code it
+replaces draws (see [`extra`](crate::extra)):
+
+- `.label_srt(45)` on `axis()`, and on the x axis (`barplot()` and
+  `boxplot()`: the names axis) of the high-level plots: tick labels at
+  any angle, ending at their ticks. In R: `axis(labels = FALSE)`, then
+  `text(srt = 45, adj = c(1, 0.5), xpd = NA)` at the labels' line.
+- `.panel_bg("grey92")` on `plot()`, `hist()`, `barplot()` and
+  `boxplot()`: a background for the plot region only. In R:
+  `panel.first = rect(<par("usr")>, col = "grey92", border = NA)`.
+
+```
+# use rs_graphics::prelude::*;
+# let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
+dev.par().mar([7, 4, 2, 1]).draw();
+dev.barplot()
+    .height([3, 5, 2])
+    .names(["first group", "second group", "third group"])
+    .label_srt(45)
+    .panel_bg("grey92")
+    .draw();
+```
+
 # Complete scripts
 
 A scatter plot with a fitted line and a legend:

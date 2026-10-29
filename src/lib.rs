@@ -180,6 +180,7 @@ pub mod charts;
 pub mod color;
 pub mod device;
 pub mod error;
+pub mod extra;
 pub mod font;
 pub mod geometry;
 pub mod graphics;

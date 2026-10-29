@@ -589,6 +589,8 @@ crate::setters::options! {
         pub lwd: Option<f64> => number f64,
         /// Whether to draw: `false` only returns the bins. `None`: `true`.
         pub plot: Option<bool> => option bool,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::PlotExtras => no_setter,
     }
 }
 
@@ -596,6 +598,7 @@ impl Default for HistOptions {
     fn default() -> Self {
         HistOptions {
             deferred_error: None,
+            extra: Default::default(),
             breaks: None,
             freq: None,
             xlim: None,
@@ -790,6 +793,7 @@ impl<B: Backend> Device<B> {
             let xlim = opts.xlim.unwrap_or((breaks[0], breaks[nb - 1]));
             let ylim = opts.ylim.unwrap_or((0.0, ymax));
             self.plot_window_impl(xlim, ylim, &window);
+            crate::extra::panel_bg(self, &opts.extra)?;
 
             if opts.ann {
                 let or = |l: &Option<Label>, default: &str| {
@@ -826,7 +830,8 @@ impl<B: Backend> Device<B> {
                     lwd: opts.lwd,
                     ..InlineAxis::default()
                 };
-                self.axis_impl(1, &inline.apply(AxisOptions::default()))?;
+                let x_axis = crate::extra::rotated_axis(&opts.extra, AxisOptions::default());
+                self.axis_impl(1, &inline.apply(x_axis))?;
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
                 let yticks = if freq {
                     self.ax_ticks(2)

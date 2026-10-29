@@ -59,6 +59,7 @@ mod open;
 mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
+pub(crate) use axis::AxisLabelStyle;
 pub use axis::AxisOptions;
 pub(crate) use axis::check_axis;
 pub(crate) use legend::check_legend;

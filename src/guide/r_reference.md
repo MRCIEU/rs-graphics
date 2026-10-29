@@ -57,6 +57,8 @@
 | `adj` | `.adj()` | Position of the titles along their sides (0 left, 1 right). |
 | `lend` | `.lend()` | Line ends of the lines and symbols, the axes and the frame. |
 | `xpd` | `.xpd()` | Clipping: where the points and lines are clipped, how far the axes' ticks may reach, and the titles' clip (at least the figure region). |
+| *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
+| *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
 R's arguments not available: `lim2`, `ann` (use `dev.par().ann(false)`), `xgap.axis`, `ygap.axis`.
 
@@ -104,6 +106,8 @@ R's arguments not available: `lim2`, `ann` (use `dev.par().ann(false)`), `xgap.a
 | `tcl` | `.tcl()` | Tick length in margin lines. |
 | `gap.axis` | `.gap_axis()` | Minimum gap between axis labels. |
 | `lwd` | `.lwd()` | Width of the axes' line and ticks (only the axes: the bars are unaffected). |
+| *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
+| *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
 R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `.breaks(n)`), `warn.unused`, `panel.first`, `sub`.
 
@@ -162,6 +166,8 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `tcl` | `.tcl()` | Tick length in margin lines. |
 | `gap.axis` | `.gap_axis()` | Minimum gap between axis labels. |
 | `lwd` | `.lwd()` | Width of the axes' line and ticks (not the bars' borders, as in R). |
+| *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
+| *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
 R's arguments not available: `inside`, `panel.first`, `panel.last`.
 
@@ -238,6 +244,8 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | `yaxt` | `.yaxt()` | Type of the y axis, as `xaxt`. |
 | `xaxp` | `.xaxp()` | Default tick positions of the x axis (used by the value axis when `horizontal`). |
 | `yaxp` | `.yaxp()` | Default tick positions of the y axis, as `xaxp`. |
+| *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
+| *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
 R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, `panel.first`, `panel.last`.
 
@@ -473,6 +481,7 @@ R's arguments not available: `vfont`.
 | `tcl` | `.tcl()` | Tick length in margin lines; negative points outwards. |
 | `xpd` | `.xpd()` | How far ticks and labels may reach along the axis: the plot region, figure region or device, as for `par(xpd)`. |
 | `lend` | `.lend()` | Ends of the axis line and ticks (`"round"`, `"butt"`, `"square"`). |
+| *not in R* | `.label_srt()` | Rotates the tick labels by this many degrees (anticlockwise, as `text()`'s `srt`), each ending at its tick: placed `mgp[1]` lines beyond the axis line, as `las = 2` labels are, right-justified on sides 1 and 2 (left on 3 and 4) unless `hadj` says otherwise, centred across on the "M" height unless `padj` does, and none dropped for overlapping. |
 
 ### `abline()`
 

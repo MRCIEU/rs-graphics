@@ -163,7 +163,24 @@ crate::setters::options! {
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::AxisExtras => no_setter,
     }
+}
+
+/// How `axis()` sets its labels: worked out from `side` and `las`, then
+/// adjusted by the extras ([`crate::extra::axis_labels`]).
+pub(crate) struct AxisLabelStyle {
+    /// Rotation, in degrees.
+    pub angle: f64,
+    /// Whether the labels read along the axis (they get `GMtext()`'s line
+    /// bias, are centred on their tick and measured by width).
+    pub parallel: bool,
+    /// The default `padj`.
+    pub padj: f64,
+    /// Whether labels closer than `gap.axis` to the previous one are
+    /// dropped.
+    pub drop_overlaps: bool,
 }
 
 impl Default for AxisOptions {
@@ -196,6 +213,7 @@ impl Default for AxisOptions {
             tcl: None,
             xpd: None,
             lend: None,
+            extra: Default::default(),
         }
     }
 }
@@ -222,7 +240,14 @@ impl<B: Backend> Device<B> {
         let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);
         let mgp = opts.mgp.unwrap_or(self.par.mgp);
-        let perpendicular = las_perpendicular(side, las);
+        let mut style = AxisLabelStyle {
+            angle: las_rotation(side, las),
+            parallel: !las_perpendicular(side, las),
+            padj: default_padj(side, las),
+            drop_overlaps: true,
+        };
+        crate::extra::axis_labels(&opts.extra, &mut style);
+        let perpendicular = !style.parallel;
 
         // `line` = NA: the axis line sits at `mgp[2]`, and the labels'
         // `mgp[1]` is not taken relative to it.
@@ -407,8 +432,8 @@ impl<B: Backend> Device<B> {
                 0.5
             });
         // `GMtext()`'s rotation and `yLineBias` nudge.
-        let angle = las_rotation(side, las);
-        let bias = self.line_bias(side, !perpendicular);
+        let angle = style.angle;
+        let bias = self.line_bias(side, style.parallel);
         let label_perp = axis_base + outward * (mgp[1] - lineoff + bias) * lh;
 
         // Labels left to right (bottom to top), skipping those within `gap`
@@ -428,7 +453,7 @@ impl<B: Backend> Device<B> {
             let padj = nth(&opts.padj, i)
                 .flatten()
                 .filter(|p| p.is_finite())
-                .unwrap_or_else(|| default_padj(side, las));
+                .unwrap_or(style.padj);
             let temp = along(v);
             let label = match label {
                 Label::Text(t) => t.as_str(),
@@ -447,7 +472,7 @@ impl<B: Backend> Device<B> {
             let (w, h) = self.text_size_inches(label, face, cex);
             let labw = if perpendicular { h } else { w };
             let tnew = temp - 0.5 * labw;
-            if tnew - tlast >= gap {
+            if !style.drop_overlaps || tnew - tlast >= gap {
                 self.text_at_clipped(
                     Xpd::Device,
                     point(label_perp, temp),

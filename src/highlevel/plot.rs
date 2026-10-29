@@ -330,6 +330,8 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::PlotExtras => no_setter,
     }
 }
 
@@ -337,6 +339,7 @@ impl Default for PlotOptions {
     fn default() -> Self {
         PlotOptions {
             deferred_error: None,
+            extra: Default::default(),
             type_: None,
             pch: Vec::new(),
             col: Vec::new(),
@@ -425,6 +428,7 @@ impl<B: Backend> Device<B> {
             lab: opts.lab,
         };
         self.plot_window_impl(xlim, ylim, &window);
+        crate::extra::panel_bg(self, &opts.extra)?;
         if let Some(panel) = &opts.panel_first {
             self.try_add_figure(panel)?;
         }
@@ -467,11 +471,14 @@ impl<B: Backend> Device<B> {
                 ..InlineAxis::default()
             };
             for (side, axt, axp) in [(1, opts.xaxt, opts.xaxp), (2, opts.yaxt, opts.yaxp)] {
-                let o = AxisOptions {
+                let mut o = AxisOptions {
                     axt,
                     axp,
                     ..AxisOptions::default()
                 };
+                if side == 1 {
+                    o = crate::extra::rotated_axis(&opts.extra, o);
+                }
                 self.axis_impl(side, &inline.apply(o))?;
             }
         }

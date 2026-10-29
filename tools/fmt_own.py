@@ -19,8 +19,9 @@ the copy, so rustfmt never follows them into other files: it is safe on
 src/lib.rs and tests/all/main.rs, unlike plain rustfmt.
 
 rustfmt reorders `use` and `mod` lines, so a hunk can reach beyond an edit
-and drop or duplicate an import. The script warns when the `use`/`mod`
-tokens of a file change; check those files.
+and drop or duplicate an import. Hunks that would change the `use`/`mod`
+lines they cover are skipped (and counted), and the script warns if a
+file's `use`/`mod` lines change anyway.
 
 Usage:
   tools/fmt_own.py [--rev REV] [--dry-run] [FILE...]
@@ -101,11 +102,15 @@ def format_file(path, rev, dry_run):
     old = p.stdout.splitlines(keepends=True) if p.returncode == 0 else []
     mine = changed_lines(old, cur)
     fmt = rustfmt(cur)
-    out, applied = [], 0
+    out, applied, skipped = [], 0, 0
     sm = difflib.SequenceMatcher(None, cur, fmt, autojunk=False)
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal" or not (set(range(i1, max(i2, i1 + 1))) & mine):
             out.extend(cur[i1:i2])
+        elif import_tokens("".join(cur[i1:i2])) != import_tokens("".join(fmt[j1:j2])):
+            # rustfmt moved a `use`/`mod` line across the hunk's edge.
+            out.extend(cur[i1:i2])
+            skipped += 1
         else:
             out.extend(fmt[j1:j2])
             applied += 1
@@ -118,7 +123,8 @@ def format_file(path, rev, dry_run):
     if not dry_run and after != before:
         open(path, "w").write(after)
     verb = "would apply" if dry_run else "applied"
-    print(f"{rel}: {verb} {applied} hunk(s){warn}")
+    skip = f", skipped {skipped} that move use/mod lines (format those by hand)" if skipped else ""
+    print(f"{rel}: {verb} {applied} hunk(s){skip}{warn}")
 
 
 def main():

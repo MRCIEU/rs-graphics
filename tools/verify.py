@@ -58,10 +58,11 @@ def step_bless(_base):
             env={"RS_GRAPHICS_BLESS": "1"}, log=LOGS / "bless.log")
     if p.returncode != 0:
         return False, "generated_docs failed (see log)"
-    changed = run(["git", "status", "--porcelain", "--", *GENERATED]).stdout.strip()
+    changed = [line[3:] for line in
+               run(["git", "status", "--porcelain", "--", *GENERATED]).stdout.splitlines() if line]
     if not changed:
         return True, "generated docs unchanged"
-    files = ", ".join(line[3:] for line in changed.splitlines())
+    files = ", ".join(changed)
     return True, f"REVIEW the diff of: {files}"
 
 

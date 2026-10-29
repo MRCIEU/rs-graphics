@@ -244,6 +244,8 @@ crate::setters::options! {
         /// `false` works out the bars' centres and returns them without
         /// drawing. `None`: `true`.
         pub plot: Option<bool> => option bool,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::PlotExtras => no_setter,
     }
 }
 
@@ -251,6 +253,7 @@ impl Default for BarplotOptions {
     fn default() -> Self {
         BarplotOptions {
             deferred_error: None,
+            extra: Default::default(),
             names: None,
             col: Vec::new(),
             border: None,
@@ -752,6 +755,7 @@ impl<B: Backend> Device<B> {
             };
             self.plot_window_impl(xlim, ylim, &window);
         }
+        crate::extra::panel_bg(self, &opts.extra)?;
 
         // R draws everything with `par(xpd = xpd)`, `TRUE` by default
         // (restored by `barplot_impl`).
@@ -826,6 +830,7 @@ impl<B: Backend> Device<B> {
                 cex_axis: opts.cex_names,
                 ..AxisOptions::default()
             };
+            let names = crate::extra::rotated_axis(&opts.extra, names);
             self.axis_impl(if horiz { 2 } else { 1 }, &inline.apply(names))?;
         }
 

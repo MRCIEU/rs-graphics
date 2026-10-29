@@ -257,6 +257,35 @@ A few fidelity-relevant decisions worth calling out:
 - **Joint tick-label formatting.** Default axis labels are formatted as
   a vector, like `formatReal()` (`0.0 0.5 1.0`; scientific only when
   strictly narrower).
+- **Options not in R (`src/extra.rs`).** A few setters do in one step
+  what takes several calls in R (`label_srt` for rotated tick labels,
+  `panel_bg` for a plot-region background). They are kept apart from the
+  R ports so that every R-named setter still does exactly what R does.
+  - **Placement.** An extra is a setter on the R call where users would
+    look for it (`dev.axis()..label_srt(45)`), not a separate namespace.
+    All its code is in `src/extra.rs`. The `extras!` macro there
+    declares the values and generates the setters on the options
+    structs and builders, in impl blocks documented "**Not in R.**".
+  - **Storage and behaviour.** The values live in a hidden `extra`
+    field of the call's options struct, so `.with(&opts)` and `Figure`
+    replay carry them with no further code. The R function's `*_impl`
+    makes one call into `src/extra.rs` at the point where R users would
+    write their workaround (for `panel_bg`, where R evaluates
+    `panel.first`). Unset, that call changes nothing; the gallery must
+    stay byte-identical.
+  - **Equal to R code.** Each extra's doc names the R code it replaces,
+    and `tests/all/extra_matches_r.rs` runs that code in R and compares
+    the output path by path. Prefer an exact R equivalent: rotated
+    labels are placed as R's `las = 2` labels are, so `label_srt(90)` on
+    side 1 is `las = 2`.
+  - **Documentation.** `tests/all/generated_docs.rs` reads the `extras!`
+    blocks and lists the setters as *not in R* rows in the R reference.
+    Add the extra to the table in `src/extra.rs`'s module doc and to
+    "Beyond R" in `src/guide/coming_from_r.md`.
+  - **What fits here.** An extra replaces an idiom that R users write
+    by hand: value labels on bars, a legend outside the plot, margins
+    fitted to the labels. R functions not yet ported, such as `grid()`
+    and `rug()`, belong in the R-faithful API, not here.
 
 ## Example gallery
 

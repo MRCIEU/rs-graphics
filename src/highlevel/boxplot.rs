@@ -414,6 +414,8 @@ crate::setters::options! {
         /// Labels the boxes with `names`. `None`: when there is more than one
         /// box. R's `show.names`.
         pub show_names: Option<bool> => option bool,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::PlotExtras => no_setter,
     }
 }
 
@@ -421,6 +423,7 @@ impl Default for BoxplotOptions {
     fn default() -> Self {
         BoxplotOptions {
             deferred_error: None,
+            extra: Default::default(),
             names: None,
             col: Vec::new(),
             border: Vec::new(),
@@ -568,6 +571,7 @@ impl<B: Backend> Device<B> {
                 self.plot_window_impl(xlim, ylim, &window);
             }
         }
+        crate::extra::panel_bg(self, &opts.extra)?;
         // Whether the position axis is logarithmic (from the device, as R's
         // `par()`, so it also holds with `add`).
         let pos_log = if opts.horizontal {
@@ -795,6 +799,7 @@ impl<B: Backend> Device<B> {
                     labels: Some(labels),
                     ..side_pars(name_side)
                 };
+                let names = crate::extra::rotated_axis(&opts.extra, names);
                 self.axis_impl(name_side, &inline.apply(names))?;
             }
             self.axis_impl(value_side, &inline.apply(side_pars(value_side)))?;

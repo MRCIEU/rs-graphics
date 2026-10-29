@@ -164,6 +164,55 @@ fn options_structs(src: &[(PathBuf, String)]) -> Vec<(String, Vec<String>, Vec<S
     out
 }
 
+/// The options that aren't in R (`extras!` in `src/extra.rs`): the
+/// builders each block's setters are on, and the setters.
+fn extras(src: &[(PathBuf, String)]) -> Vec<(Vec<String>, Vec<Setter>)> {
+    let text = &src
+        .iter()
+        .find(|(p, _)| p.ends_with("src/extra.rs"))
+        .unwrap()
+        .1;
+    let lines: Vec<&str> = text.lines().collect();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let t = lines[i].trim();
+        if !(t.starts_with("struct ") && t.contains(" for [")) {
+            i += 1;
+            continue;
+        }
+        // The header may run over lines, up to its `{`.
+        let mut header = t.to_string();
+        while !header.ends_with('{') {
+            i += 1;
+            header.push(' ');
+            header.push_str(lines[i].trim());
+        }
+        let calls: Vec<String> = header
+            .split_once("=> [")
+            .and_then(|(_, c)| c.split_once(']'))
+            .map(|(c, _)| c.split(',').map(|s| s.trim().to_string()).collect())
+            .unwrap_or_default();
+        let mut setters = Vec::new();
+        i += 1;
+        while i < lines.len() && lines[i].trim() != "}" {
+            let lt = lines[i].trim();
+            if let Some((name, rest)) = lt.split_once(':') {
+                if rest.contains("=>") && name.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
+                    setters.push(Setter {
+                        name: name.to_string(),
+                        doc: doc_above(&lines, i),
+                        rust: None,
+                    });
+                }
+            }
+            i += 1;
+        }
+        out.push((calls, setters));
+    }
+    out
+}
+
 /// The `call!` invocations: builder, R name, and argument setters.
 fn calls(graphics: &str) -> Vec<(String, String, Vec<Setter>)> {
     let lines: Vec<&str> = graphics.lines().collect();
@@ -417,6 +466,9 @@ const BXP_PARS: &[&str] = &[
     "outbg",
 ];
 
+/// How an option that isn't in R starts its doc.
+const NOT_IN_R: &str = "**Not in R.** ";
+
 /// One function's section of the table.
 struct Section {
     title: String,
@@ -458,6 +510,12 @@ fn render(sections: &[Section], par_names: &[String]) -> String {
         let mut rows: Vec<(usize, String, String, String)> = Vec::new();
         let mut used = BTreeSet::new();
         for s in &sec.setters {
+            // Options not in R: their own rows, last.
+            if let Some(doc) = s.doc.strip_prefix(NOT_IN_R) {
+                let rust = format!("`.{}()`", s.name);
+                rows.push((usize::MAX, "*not in R*".into(), rust, summary(doc)));
+                continue;
+            }
             let special = SPECIAL
                 .iter()
                 .find(|(f, n, _)| *f == sec.title && *n == s.name)
@@ -548,11 +606,18 @@ fn sections() -> (Vec<Section>, Vec<String>) {
         .1;
     let formals = r_formals();
     let structs = options_structs(&src);
+    let extras = extras(&src);
     let fields_of = |builder: &str| -> Vec<Setter> {
         structs
             .iter()
             .filter(|(_, calls, _)| calls.iter().any(|c| c == builder))
             .flat_map(|(_, _, f)| f.clone())
+            .chain(
+                extras
+                    .iter()
+                    .filter(|(calls, _)| calls.iter().any(|c| c == builder))
+                    .flat_map(|(_, f)| f.clone()),
+            )
             .collect()
     };
     let par_fields: Vec<Setter> = structs
