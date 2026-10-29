@@ -129,6 +129,7 @@ num!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
+/// # use rs_graphics::numbers::Numbers;
 /// assert_eq!(&*(1..=3_i32).into_numbers(), &[1.0, 2.0, 3.0]);
 /// assert_eq!(&*[1_i32, 2].into_numbers(), &[1.0, 2.0]);
 /// assert_eq!(&*2.5_f64.into_numbers(), &[2.5]);
@@ -236,6 +237,7 @@ range_numbers!(i32, i64, u32, u64, usize);
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
+/// # use rs_graphics::numbers::Groups;
 /// let groups = [vec![1, 2], vec![3]].into_groups();
 /// assert_eq!(&*groups, &[vec![1.0, 2.0], vec![3.0]]);
 /// assert_eq!([1_i32, 2, 3].into_groups().len(), 1);
@@ -293,6 +295,7 @@ impl<'a, N: Numbers<'a>> Groups<'a> for N {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
+/// # use rs_graphics::numbers::Pair;
 /// assert_eq!([5, 20].into_pair(), (5.0, 20.0));
 /// assert_eq!((0.5, 2).into_pair(), (0.5, 2.0));
 /// ```

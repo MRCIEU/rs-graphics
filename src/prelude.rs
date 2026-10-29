@@ -18,6 +18,13 @@
 //! plots' options and results, the backends, and [`ErrorKind`] (the
 //! error type itself is [`rs_graphics::Error`](crate::Error), kept out of
 //! the glob import so it doesn't clash with other `Error`s).
+//!
+//! The traits that say what a setter accepts ([`Numbers`](crate::numbers::Numbers),
+//! [`Pair`](crate::numbers::Pair), [`Labels`](crate::plotmath::Labels),
+//! [`Pch`](crate::setters::Pch), [`Values`](crate::setters::Values), ...)
+//! aren't here: setters work without them. Import one from its module
+//! (`use rs_graphics::numbers::Numbers;`) to name it in your own functions
+//! or call its methods.
 
 pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
@@ -37,11 +44,6 @@ pub use crate::highlevel::{
 };
 pub use crate::layout::{LayoutRespect, LayoutSize};
 pub use crate::lty::LineType;
-pub use crate::numbers::{Groups, Numbers, Pair};
 pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};
-pub use crate::plotmath::{Expression, Label, Labels};
+pub use crate::plotmath::{Expression, Label};
 pub use crate::recording::{Figure, FigureResult};
-pub use crate::setters::Pch;
-// The old name of `Pch`.
-#[doc(hidden)]
-pub use crate::setters::Pch as LegendPch;

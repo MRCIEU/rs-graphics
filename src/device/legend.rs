@@ -242,11 +242,6 @@ crate::error::from_r_string!(
 );
 crate::error::from_str_via_try_from!(LegendPos);
 
-/// The old name of [`Pch`](crate::setters::Pch), the trait every `pch`
-/// setter takes.
-#[doc(hidden)]
-pub use crate::setters::Pch as LegendPch;
-
 crate::setters::options! {
     /// The arguments of R's `legend()` other than its position and labels.
     /// Settings left unset are R's defaults, given on each setter.
@@ -894,6 +889,7 @@ impl<B: Backend> Device<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::setters::Pch;
 
     #[test]
     fn positions_convert_like_r() {

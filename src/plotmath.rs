@@ -278,6 +278,7 @@ impl From<Expression> for Label {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
+/// # use rs_graphics::plotmath::Labels;
 /// assert_eq!("a".into_labels(), vec![Some(Label::from("a"))]);
 /// assert_eq!([Some("a"), None].into_labels(), vec![Some(Label::from("a")), None]);
 /// # let mut dev = Device::null().width(4).height(4).open().unwrap();

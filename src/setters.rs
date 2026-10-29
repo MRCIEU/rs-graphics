@@ -488,6 +488,7 @@ na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String,
 ///
 /// ```
 /// use rs_graphics::prelude::*;
+/// use rs_graphics::setters::Pch;
 ///
 /// assert_eq!([19, 1].into_pch(), [Some(19), Some(1)]);
 /// assert_eq!("abc".into_pch(), [Some(97)]);
