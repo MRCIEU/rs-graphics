@@ -90,7 +90,7 @@ fn plot_region_and_usr_match_r() {
     assert!((computed_mai.top - r_mai[2]).abs() < 1e-6);
     assert!((computed_mai.right - r_mai[3]).abs() < 1e-6);
 
-    let (ux0, ux1, uy0, uy1) = dev.usr();
+    let [ux0, ux1, uy0, uy1] = dev.usr();
     // R's par('usr') order is (x0, x1, y0, y1).
     assert!(
         (ux0 - usr[0]).abs() < 1e-6,

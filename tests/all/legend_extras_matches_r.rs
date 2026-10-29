@@ -444,8 +444,8 @@ fn legend_extras_match_r() {
         // The return value, to 1/5000 of each axis range.
         let r = r_layout(r_value);
         let (tx, ty) = (
-            (usr.1 - usr.0).abs() / 5000.0,
-            (usr.3 - usr.2).abs() / 5000.0,
+            (usr[1] - usr[0]).abs() / 5000.0,
+            (usr[3] - usr[2]).abs() / 5000.0,
         );
         let mut mine = vec![
             (layout.left, tx),

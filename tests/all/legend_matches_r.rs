@@ -155,7 +155,7 @@ fn cases() -> Vec<Case> {
 /// Compares `legend()`'s return value with R's, printed by the script as
 /// `name left top w h text.x... text.y...`. Tolerance: 1/5000 of the axis
 /// range (about 0.1pt on these pages).
-fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: (f64, f64, f64, f64)) {
+fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: [f64; 4]) {
     let line = r_stdout
         .lines()
         .find(|l| l.split_whitespace().next() == Some(name))
@@ -168,8 +168,8 @@ fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: (f64
     let n = ours.text_x.len();
     assert_eq!(r.len(), 4 + 2 * n, "{name}: number of returned values");
     let (tx, ty) = (
-        (usr.1 - usr.0).abs() / 5000.0,
-        (usr.3 - usr.2).abs() / 5000.0,
+        (usr[1] - usr[0]).abs() / 5000.0,
+        (usr[3] - usr[2]).abs() / 5000.0,
     );
     let mut ours_flat = vec![(ours.left, tx), (ours.top, ty), (ours.w, tx), (ours.h, ty)];
     ours_flat.extend(ours.text_x.iter().map(|&v| (v, tx)));

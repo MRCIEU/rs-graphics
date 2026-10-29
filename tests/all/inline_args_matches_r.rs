@@ -479,7 +479,7 @@ fn par_usr_on_a_log_axis_sets_log_ticks() {
         .xlog(true)
         .draw();
     assert_eq!(got, want.current_par().xaxp);
-    assert_eq!(dev.usr(), (0.0, 3.0, 0.0, 1.0));
+    assert_eq!(dev.usr(), [0.0, 3.0, 0.0, 1.0]);
     // And so the same ticks.
     assert_eq!(dev.axis().side(1).draw(), want.axis().side(1).draw());
 }

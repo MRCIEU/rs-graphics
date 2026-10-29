@@ -803,7 +803,7 @@ impl<B: Backend> Device<B> {
         output.close(&self.finish())
     }
 
-    /// Returns the page size in inches, `(width, height)`.
+    /// Returns the page size in inches, `[width, height]`.
     ///
     /// This is R's [`par("din")`].
     ///
@@ -812,12 +812,12 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// let dev = Device::null().width(7).height(5).open().unwrap();
-    /// assert_eq!(dev.din(), (7.0, 5.0));
+    /// assert_eq!(dev.din(), [7.0, 5.0]);
     /// ```
     ///
     /// [`par("din")`]: crate::device::Device::din
-    pub fn din(&self) -> (f64, f64) {
-        (self.width_in, self.height_in)
+    pub fn din(&self) -> [f64; 2] {
+        [self.width_in, self.height_in]
     }
 
     /// Returns the current plot region, in inches from the page's bottom-left
@@ -832,7 +832,7 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::null().open().unwrap();
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let r = dev.plot_region();
-    /// assert!(r.x0 > 0.0 && r.x1 < dev.din().0);
+    /// assert!(r.x0 > 0.0 && r.x1 < dev.din()[0]);
     /// ```
     ///
     /// [`par("plt")`]: crate::par::Par::plt
@@ -840,7 +840,8 @@ impl<B: Backend> Device<B> {
         self.plt
     }
 
-    /// Returns the coordinate limits of the plot region, `(x0, x1, y0, y1)`.
+    /// Returns the coordinate limits of the plot region, `[x0, x1, y0, y1]`
+    /// (what [`par().usr(..)`](crate::par::ParOptions::usr) takes).
     ///
     /// On a log axis the limits are log10 values (for data from 1 to 100 the x
     /// limits start near 0, not 1), while everything that takes coordinates
@@ -857,13 +858,14 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
     /// dev.plot_window().xlim([0, 10]).ylim([0, 1]).draw();
-    /// let (x0, x1, ..) = dev.usr();
+    /// let [x0, x1, ..] = dev.usr();
     /// assert!((x0 + 0.4).abs() < 1e-9 && (x1 - 10.4).abs() < 1e-9); // 4% added at each end
     /// ```
     ///
     /// [`par("usr")`]: crate::device::Device::usr
-    pub fn usr(&self) -> (f64, f64, f64, f64) {
-        self.usr
+    pub fn usr(&self) -> [f64; 4] {
+        let (x0, x1, y0, y1) = self.usr;
+        [x0, x1, y0, y1]
     }
 
     /// Returns whether the x axis is logarithmic.
@@ -1186,7 +1188,7 @@ impl<B: Backend> Device<B> {
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.par().mfrow([1, 2]).draw();
     /// dev.plot().x([1, 2]).draw();
-    /// assert_eq!(dev.figure_region().x1, dev.din().0 / 2.0);
+    /// assert_eq!(dev.figure_region().x1, dev.din()[0] / 2.0);
     /// ```
     ///
     /// [`par("fig")`]: crate::graphics::ParCall::fig
@@ -1484,7 +1486,7 @@ impl<B: Backend> Device<B> {
     /// # dev.plot().x([1, 10]).y([1, 10]).draw();
     /// let r = dev.plot_region();
     /// let corner = dev.inches_to_user(Point::new(r.x0, r.y0));
-    /// assert!((corner.x - dev.usr().0).abs() < 1e-9);
+    /// assert!((corner.x - dev.usr()[0]).abs() < 1e-9);
     /// ```
     pub fn inches_to_user(&self, p: Point) -> Point {
         let (x, y) = self.inches_to_data(p);

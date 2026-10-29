@@ -63,7 +63,7 @@ fn fails_where_a_pdf_device_fails() {
 #[test]
 fn draws_and_writes_nothing() {
     let mut dev = Device::null().open().unwrap();
-    assert_eq!(dev.din(), (7.0, 7.0));
+    assert_eq!(dev.din(), [7.0, 7.0]);
     for _ in 0..3 {
         dev.plot().x(1..=1000).draw();
     }
@@ -86,7 +86,7 @@ fn takes_pdfs_options() {
         .bg("ivory")
         .open()
         .unwrap();
-    let (w, h) = dev.din();
+    let [w, h] = dev.din();
     assert!((w - 10.0 / 2.54).abs() < 1e-12 && (h - 5.0 / 2.54).abs() < 1e-12);
     assert_eq!(dev.start_ps(), 9.0);
     assert_eq!(dev.current_par().bg, Color::try_from("ivory").unwrap());

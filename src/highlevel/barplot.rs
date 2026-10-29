@@ -850,7 +850,7 @@ impl<B: Backend> Device<B> {
             // to `legend()` as data, which puts the legend near the bottom;
             // we don't copy that.)
             let pos = opts.legend_pos.unwrap_or_else(|| {
-                let (ux0, ux1, uy0, uy1) = self.usr();
+                let [ux0, ux1, uy0, uy1] = self.usr();
                 let plt = self.plot_region();
                 let data = |v: f64, log: bool| if log { 10f64.powf(v) } else { v };
                 let x = data(ux1 - 0.1 * (ux1 - ux0) / plt.width(), self.xlog());

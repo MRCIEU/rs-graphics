@@ -72,7 +72,7 @@ fn fit_figure(pos: LegendPos, opts: &LegendOptions) -> Figure {
 }
 
 /// A legend's layout and the `usr` of the panel it was drawn in.
-type Drawn = (LegendLayout, (f64, f64, f64, f64));
+type Drawn = (LegendLayout, [f64; 4]);
 
 struct Case {
     name: &'static str,
@@ -84,7 +84,7 @@ struct Case {
     draw: fn(&mut Device<AnyBackend>) -> Vec<Drawn>,
 }
 
-fn layouts(r: FigureResult, usr: (f64, f64, f64, f64)) -> Vec<Drawn> {
+fn layouts(r: FigureResult, usr: [f64; 4]) -> Vec<Drawn> {
     r.legends.into_iter().map(|l| (l, usr)).collect()
 }
 
@@ -234,8 +234,8 @@ fn figure_legends_in_panels_match_r() {
                 .map(|v| v.parse().unwrap())
                 .collect();
             let (tx, ty) = (
-                (usr.1 - usr.0).abs() / 5000.0,
-                (usr.3 - usr.2).abs() / 5000.0,
+                (usr[1] - usr[0]).abs() / 5000.0,
+                (usr[3] - usr[2]).abs() / 5000.0,
             );
             let mut flat = vec![
                 (layout.left, tx),

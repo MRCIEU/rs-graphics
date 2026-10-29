@@ -110,7 +110,7 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
 /// # let mut dev = Device::null().open().unwrap();
 /// dev.par().xaxs("i").draw();
 /// dev.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
-/// let (x0, x1, y0, _) = dev.usr();
+/// let [x0, x1, y0, _] = dev.usr();
 /// assert_eq!((x0, x1), (0.0, 10.0)); // exact
 /// assert!(y0 < 0.0); // yaxs "r": extended
 /// assert_eq!("i".parse::<AxisStyle>().unwrap(), AxisStyle::Exact);

@@ -86,8 +86,9 @@ pub struct BoxStats {
     pub outliers: Vec<f64>,
     /// The number of non-`NaN` values (`boxplot.stats()$n`).
     pub n: usize,
-    /// The notch: `median -/+ 1.58 * IQR / sqrt(n)` (`boxplot.stats()$conf`).
-    pub conf: (f64, f64),
+    /// The notch, `[low, high]`: `median -/+ 1.58 * IQR / sqrt(n)`
+    /// (`boxplot.stats()$conf`).
+    pub conf: [f64; 2],
 }
 
 /// Computes the statistics of one box from the values `x`: hinges, median,
@@ -130,7 +131,7 @@ pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Num) -> BoxStats {
             upper_whisker: f64::NAN,
             outliers: Vec::new(),
             n,
-            conf: (f64::NAN, f64::NAN),
+            conf: [f64::NAN, f64::NAN],
         };
     }
     let five = fivenum(&sorted);
@@ -165,7 +166,7 @@ pub fn boxplot_stats<'a>(x: impl Numbers<'a>, coef: impl Num) -> BoxStats {
         upper_whisker: hi,
         outliers,
         n,
-        conf: (five[2] - half_notch, five[2] + half_notch),
+        conf: [five[2] - half_notch, five[2] + half_notch],
     }
 }
 
@@ -537,11 +538,7 @@ impl<B: Backend> Device<B> {
             for s in &stats {
                 let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
                 let out = if opts.outline { &s.outliers[..] } else { &[] };
-                let conf = if opts.notch {
-                    vec![s.conf.0, s.conf.1]
-                } else {
-                    vec![]
-                };
+                let conf = if opts.notch { s.conf.to_vec() } else { vec![] };
                 for &v in five.iter().chain(out).chain(&conf) {
                     if v.is_finite() {
                         lo = lo.min(v);
@@ -639,7 +636,7 @@ impl<B: Backend> Device<B> {
             // In `bxp()`'s order: box fill, median (line, then symbol),
             // whiskers, staples, then the box border on top, then outliers.
             let (box_pos, box_val): (Vec<f64>, Vec<f64>) = if opts.notch {
-                let (c0, c1) = s.conf;
+                let [c0, c1] = s.conf;
                 let f = notch_frac;
                 (
                     [-1.0, 1.0, 1.0, f, 1.0, 1.0, -1.0, -1.0, -f, -1.0]
