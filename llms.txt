@@ -915,7 +915,7 @@ R's arguments not available: `trace`.
 | `tck` | `.tck()` | Tick mark length as a fraction of the plot region (if above 0.5, of its height for an x axis, so `1` draws grid lines; else of its smaller side); positive points inwards. |
 | `tcl` | `.tcl()` | Tick mark length, in margin lines; negative points outwards. |
 | `usr` | `.usr()` | User coordinates of the plot region, `[x0, x1, y0, y1]`, in log10 units on a log axis (as `par("usr")` reads). |
-| `xaxp` | `.xaxp()` | First and last default x tick and the number of intervals between them (on a log axis, a tick-rule code instead: see `crate::pretty::axis_pars`). |
+| `xaxp` | `.xaxp()` | First and last default x tick and the number of intervals between them. |
 | `xaxs` | `.xaxs()` | Range style of the x axis: `AxisStyle::Regular` (`"r"`, the default) extends the range by 4% at each end, `AxisStyle::Exact` (`"i"`) uses it as given. |
 | `xaxt` | `.xaxt()` | Whether `axis()` draws x axes (sides 1 and 3): `AxisType::None` stops it. |
 | `xlog` | `.xlog()` | Makes the x axis logarithmic, or linear again: from now on, x values are mapped through `log10` first. |

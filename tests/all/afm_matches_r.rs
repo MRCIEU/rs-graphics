@@ -6,15 +6,16 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Cross-checks `rs_graphics::afm::str_width_inches` against R's own
-//! `strwidth()` on a `pdf()` device (which uses the same Helvetica AFM
-//! metrics by default). Skipped if `Rscript` isn't available.
+//! Cross-checks string widths from the Helvetica AFM metrics against R's
+//! own `strwidth()` on a `pdf()` device (which uses the same metrics by
+//! default), through `strwidth()` on a null device (PDF's measurements).
+//! Skipped if `Rscript` isn't available.
 
 use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::afm::{str_width_inches, FontFace};
+use rs_graphics::prelude::*;
 
 fn r_strwidth(s: &str, pointsize: f64, cex: f64, font: i32) -> f64 {
     let script = format!(
@@ -53,8 +54,14 @@ fn str_width_matches_r() {
 
     for &(s, ps, cex, font) in cases {
         let expected = r_strwidth(s, ps, cex, font);
-        let face = FontFace::try_from(font).unwrap();
-        let actual = str_width_inches(s, face, ps * cex);
+        let mut dev = Device::null().pointsize(ps).open().unwrap();
+        let actual = dev
+            .strwidth()
+            .s(s)
+            .cex(cex)
+            .font(font)
+            .units("inches")
+            .get();
         // R's PostScript/PDF kern-pair lookup has an internal indexing quirk
         // (`devPS.c`'s `KPstart`/`KPend` construction silently drops the
         // last-in-file kerning pair for some first characters). We

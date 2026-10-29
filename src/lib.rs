@@ -174,8 +174,7 @@
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
-#[doc(hidden)]
-pub mod afm;
+mod afm;
 pub mod backend;
 pub mod charts;
 pub mod color;
@@ -188,16 +187,13 @@ pub mod guide;
 pub mod highlevel;
 pub mod layout;
 pub mod lty;
-#[doc(hidden)]
-pub mod named_colors;
+mod named_colors;
 pub mod numbers;
 pub mod par;
-#[doc(hidden)]
-pub mod pch;
+mod pch;
 pub mod plotmath;
 pub mod prelude;
-#[doc(hidden)]
-pub mod pretty;
+mod pretty;
 pub mod recording;
 mod recycle;
 pub mod setters;

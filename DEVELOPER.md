@@ -109,8 +109,8 @@ usage, see [README.md](README.md).
   character symbols (`pch = "."`, `"a"`, ...), line
   types `lty` (`src/lty.rs`; `LineType::SOLID`, `DASHED`, ... for R's
   codes 0-6), the R4 default color palette and all 657
-  named colors (`src/color.rs`, `src/named_colors.rs`; `"red".into()`
-  gives a `ColorSpec`), and the exact
+  named colors (`src/color.rs`, `src/named_colors.rs`; setters take the
+  names, `.col("red")`, and `ColorSpec::try_from("red")` converts one), and the exact
   `pretty()`/`GEPretty()` axis tick-placement algorithms - both of
   which R uses, with **different constants** (`src/pretty.rs`).
 - Text layout (`src/afm.rs`): Helvetica and Symbol AFM metrics (the same tables

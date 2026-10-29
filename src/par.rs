@@ -611,9 +611,11 @@ par_options! {
         /// Default `c(5, 5, 7)`.
         pub lab: [i32; 3] => option [i32; 3],
         /// First and last default x tick and the number of intervals between
-        /// them (on a log axis, a tick-rule code instead: see
-        /// [`crate::pretty::axis_pars`]). `plot_new()`, `plot_window()` and
-        /// `par(usr = )` set it from the axis range and `lab`; change it
+        /// them. On a log axis the first two are powers of ten and the third
+        /// a code, as R's: 3 for ticks at 1, 2 and 5 times each power, 2 for
+        /// 1 and 5, 1 for powers of ten only (under about two decades, the
+        /// negated number of linear intervals). `plot_new()`, `plot_window()`
+        /// and `par(usr = )` set it from the axis range and `lab`; change it
         /// afterwards to change the ticks `axis()` draws by default.
         /// Initially `c(0, 1, 5)`.
         pub xaxp: [f64; 3] => array [f64; 3],
