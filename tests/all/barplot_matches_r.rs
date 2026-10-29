@@ -15,7 +15,7 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::AnyBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::BarplotOptions;
@@ -48,7 +48,7 @@ const R_MAT: &str = "m <- matrix(c(3,5,2, 4,1,6, 2,2,7, 5,3,1), nrow = 3)";
 struct Case {
     name: &'static str,
     r: &'static str,
-    run: fn(&mut Device<PdfBackend>),
+    run: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {

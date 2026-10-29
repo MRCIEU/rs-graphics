@@ -27,7 +27,7 @@ const PAGE: (f64, f64) = (7.0, 7.0);
 struct Case {
     name: &'static str,
     r: &'static str,
-    ours: fn(&mut Device<PdfBackend>),
+    ours: fn(&mut Device<AnyBackend>),
     clip: bool,
 }
 

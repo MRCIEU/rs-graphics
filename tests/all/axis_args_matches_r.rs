@@ -19,12 +19,10 @@ use crate::common::{pdf, r};
 
 use std::process::Command;
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::lty::LineType;
 use rs_graphics::plotmath::Label as AxisLabel;
-use rs_graphics::par::{AxisType, Par, Sides};
 use rs_graphics::prelude::*;
 
 const PAGE_W: f64 = 7.0;
@@ -37,8 +35,8 @@ struct Case {
     /// `par()` settings for R, run before `plot.new()`.
     r_par: &'static str,
     xlim: (f64, f64),
-    setup: fn(&mut Par),
-    draw: fn(&mut Device<PdfBackend>),
+    setup: fn(ParOptions) -> ParOptions,
+    draw: fn(&mut Device<AnyBackend>),
 }
 
 fn col(name: &str) -> Option<ColorSpec> {
@@ -72,7 +70,7 @@ fn cases() -> Vec<Case> {
             r: "axis(1, line = 1); axis(2, line = -1); \
                 axis(3, line = 2, las = 2); axis(4, line = 0.5, las = 1)",
             xlim: (0.0, 10.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.axis()
                     .side(1)
@@ -94,7 +92,7 @@ fn cases() -> Vec<Case> {
             r: "axis(1, pos = 2); axis(2, pos = 3, las = 1); \
                 axis(3, pos = 8, line = 3); axis(4, pos = 12)",
             xlim: (0.0, 10.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.axis()
                     .side(1)
@@ -116,7 +114,7 @@ fn cases() -> Vec<Case> {
             r: "axis(1, outer = TRUE); axis(2, outer = TRUE, line = 1); \
                 axis(3, outer = TRUE, line = -1); axis(4, outer = TRUE, las = 2)",
             xlim: (0.0, 10.0),
-            setup: |p| p.oma = Sides::new(2.0, 3.0, 2.0, 1.0),
+            setup: |p| p.oma(Sides::new(2.0, 3.0, 2.0, 1.0)),
             draw: |d| {
                 d.axis()
                     .side(1)
@@ -136,7 +134,7 @@ fn cases() -> Vec<Case> {
             r: "axis(1, tck = 0.02); axis(2, tck = -0.03); \
                 axis(3, tck = 1, col.ticks = 'grey'); axis(4, tcl = 0.4)",
             xlim: (0.0, 10.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.axis()
                     .side(1)
@@ -161,7 +159,7 @@ fn cases() -> Vec<Case> {
                 axis(2, las = 1, hadj = 0.5, padj = -0.5); \
                 axis(3, las = 2, hadj = 0.2); axis(4, padj = c(1, NA, 0.5))",
             xlim: (0.0, 10.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 let o = AxisOptions::default().hadj(0.0).padj(vec![0.0, 1.0]);
                 d.axis().side(1).with(&o).draw();
@@ -181,7 +179,7 @@ fn cases() -> Vec<Case> {
                 axis(2, at = seq(0, 10, 0.25), las = 1, gap.axis = 0); \
                 axis(4, at = seq(0, 10, 0.25), las = 1, gap.axis = 3)",
             xlim: (0.0, 10.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 let at = Some(seq(0.0, 10.0, 0.5));
                 let o = AxisOptions::default().at(at.clone()).gap_axis(-0.5);
@@ -204,7 +202,7 @@ fn cases() -> Vec<Case> {
                 axis(3, tick = FALSE, at = c(2, 5, 7), labels = c('a', 'bb', 'ccc')); \
                 axis(4, lwd = 0, lwd.ticks = 2)",
             xlim: (0.0, 10.0),
-            setup: |p| p.lwd = 3.0,
+            setup: |p| p.lwd(3.0),
             draw: |d| {
                 let o = AxisOptions::default()
                     .lwd(2.0)
@@ -233,7 +231,7 @@ fn cases() -> Vec<Case> {
             r_par: "par(xaxt = 'n')",
             r: "axis(1); axis(3, xaxt = 's'); axis(2, yaxt = 'n'); axis(4)",
             xlim: (0.0, 10.0),
-            setup: |p| p.xaxt = AxisType::None,
+            setup: |p| p.xaxt(AxisType::None),
             draw: |d| {
                 d.axis().side(1).draw();
                 let o = AxisOptions::default().axt(AxisType::Standard);
@@ -250,7 +248,7 @@ fn cases() -> Vec<Case> {
                 axis(2, at = c(-2, 5, 12), labels = c('lo', 'mid', 'hi'), las = 1); \
                 axis(4, at = c(8, 2), labels = c('eight', 'two'))",
             xlim: (10.0, 0.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.axis().side(3).draw();
                 d.par().xpd(Xpd::Figure).draw();
@@ -278,7 +276,7 @@ fn cases() -> Vec<Case> {
                 axis(3, at = seq(0, 10, 0.5), labels = c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ')); \
                 axis(2, at = c(1, 5, 9), labels = c(NA, NA, NA))",
             xlim: (0.0, 10.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 let o = AxisOptions::default()
                     .at(seq(0.0, 10.0, 2.5))
@@ -302,7 +300,7 @@ fn cases() -> Vec<Case> {
             r: "axis(1, mgp = c(3, 0.3, 0)); axis(2); \
                 axis(3, mgp = c(3, 1.5, 0.5), line = 1); axis(4, mgp = c(3, 0.2, -0.5), pos = 9, las = 1)",
             xlim: (0.0, 10.0),
-            setup: |p| p.mgp = [2.0, 0.7, 0.2],
+            setup: |p| p.mgp([2.0, 0.7, 0.2]),
             draw: |d| {
                 d.axis().side(1).mgp([3.0, 0.3, 0.0]).draw();
                 // `par(mgp)` when not given inline.
@@ -318,10 +316,7 @@ fn cases() -> Vec<Case> {
                 title(main = 'M', sub = 'S', xlab = 'X', ylab = 'Y'); \
                 mtext('A', 3, line = 1); mtext('B', 4, line = 1)",
             xlim: (0.0, 10.0),
-            setup: |p| {
-                p.mex = 2.0;
-                p.mgp = [2.5, 0.8, 0.0];
-            },
+            setup: |p| p.mex(2.0).mgp([2.5, 0.8, 0.0]),
             draw: |d| {
                 d.axis().side(1).draw();
                 d.axis().side(2).draw();
@@ -339,7 +334,7 @@ fn cases() -> Vec<Case> {
                 title(main = 'M', sub = 'S', xlab = 'X', ylab = 'Y'); \
                 mtext('A', 3, line = 1); mtext('B', 4, line = 1)",
             xlim: (0.0, 10.0),
-            setup: |p| p.mex = 0.7,
+            setup: |p| p.mex(0.7),
             draw: |d| {
                 d.axis().side(1).draw();
                 d.axis().side(2).draw();
@@ -355,7 +350,7 @@ fn cases() -> Vec<Case> {
             r_par: "",
             r: "axis(1, at = seq(0, 10, 0.5), labels = c(rbind(NA, strrep(LETTERS[1:10], 3)), 'ZZZ'))",
             xlim: (10.0, 0.0),
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 let o = AxisOptions::default()
                     .at(seq(0.0, 10.0, 0.5))
@@ -379,8 +374,7 @@ fn r_code(c: &Case) -> String {
 }
 
 fn draw_ours(c: &Case) -> Vec<u8> {
-    let mut par = Par::default();
-    (c.setup)(&mut par);
+    let par = (c.setup)(ParOptions::default());
     let (pdf, ()) = r::ours_with((PAGE_W, PAGE_H), par, |dev| {
         dev.plot_new();
         dev.plot_window()
@@ -476,7 +470,13 @@ fn axis_returns_tick_positions_like_r() {
             .collect::<Vec<_>>()
             .join(",")
     };
-    let device = || Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+    let device = || {
+        Device::memory("pdf")
+            .width(PAGE_W)
+            .height(PAGE_H)
+            .open()
+            .unwrap()
+    };
     let mut dev = device();
     let ours: String = scene(&mut dev).iter().map(|v| show(v) + "\n").collect();
     assert_eq!(ours, expected);

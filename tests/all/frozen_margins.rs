@@ -15,11 +15,13 @@
 use rs_graphics::prelude::*;
 
 fn draw(change_margins: bool) -> Vec<u8> {
-    let par = Par {
-        oma: Sides::from([1.0, 1.0, 2.0, 1.0]),
-        ..Par::default()
-    };
-    let mut d = Device::new(PdfBackend::new(6.0, 5.0).with_compression(false), par);
+    let mut d = Device::memory("pdf")
+        .width(6)
+        .height(5)
+        .compress(false)
+        .open()
+        .unwrap();
+    d.par().oma(Sides::from([1.0, 1.0, 2.0, 1.0])).draw();
     d.plot_new();
     d.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
     if change_margins {

@@ -43,7 +43,7 @@ use crate::numbers::Num;
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let mut dev = Device::new(SvgBackend::new(6, 4), Par::default());
+/// let mut dev = Device::memory("svg").width(6).height(4).open().unwrap();
 /// dev.plot().x([1, 2, 3]).draw();
 /// let svg = String::from_utf8(dev.finish()).unwrap();
 /// assert!(svg.contains("<svg"));
@@ -63,11 +63,13 @@ pub struct SvgBackend {
     pending: Option<(String, String)>,
     /// The style of the open `<g>` of same-style shapes, if any.
     group_style: Option<String>,
+    /// Gzip-compress the finished document (`.svgz`).
+    gzip: bool,
 }
 
 impl SvgBackend {
     /// Creates an SVG backend for a `width_in` x `height_in` inch page.
-    pub fn new(width_in: impl Num, height_in: impl Num) -> Self {
+    pub(crate) fn new(width_in: impl Num, height_in: impl Num) -> Self {
         let (width_in, height_in) = (width_in.to_f64(), height_in.to_f64());
         SvgBackend {
             width_in,
@@ -79,6 +81,23 @@ impl SvgBackend {
             style: String::new(),
             pending: None,
             group_style: None,
+            gzip: false,
+        }
+    }
+
+    /// Makes the finished document gzip-compressed (`.svgz`), the device
+    /// builder's `compress(true)` for SVG.
+    pub(crate) fn with_gzip(mut self, gzip: bool) -> Self {
+        self.gzip = gzip;
+        self
+    }
+
+    /// The finished document as bytes: plain SVG, or gzipped with `gzip`.
+    fn finish_bytes(self) -> Vec<u8> {
+        if self.gzip {
+            self.finish_svgz()
+        } else {
+            self.finish().into_bytes()
         }
     }
 
@@ -149,12 +168,12 @@ impl SvgBackend {
     /// `.svgz` files, but browsers only display them when served with
     /// `Content-Encoding: gzip`, so [`SvgBackend::finish`]'s plain SVG is the
     /// default.
-    pub fn finish_svgz(self) -> Vec<u8> {
+    pub(crate) fn finish_svgz(self) -> Vec<u8> {
         gzip_compress(self.finish().as_bytes(), DEFLATE_LEVEL)
     }
 
     /// Finishes the SVG document and returns it.
-    pub fn finish(mut self) -> String {
+    pub(crate) fn finish(mut self) -> String {
         self.flush_shapes();
         let mut out = String::new();
         let _ = writeln!(
@@ -287,7 +306,7 @@ fn escape_xml(s: &str) -> String {
 
 impl Backend for SvgBackend {
     fn into_bytes(self) -> Vec<u8> {
-        self.finish().into_bytes()
+        self.finish_bytes()
     }
 
     fn size_inches(&self) -> (f64, f64) {
@@ -310,8 +329,8 @@ impl Backend for SvgBackend {
     }
 
     fn take_page(&mut self) -> Vec<u8> {
-        let fresh = SvgBackend::new(self.width_in, self.height_in);
-        std::mem::replace(self, fresh).finish().into_bytes()
+        let fresh = SvgBackend::new(self.width_in, self.height_in).with_gzip(self.gzip);
+        std::mem::replace(self, fresh).finish_bytes()
     }
 
     fn new_page(&mut self) {

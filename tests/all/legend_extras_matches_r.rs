@@ -27,7 +27,7 @@ const PAGE_H: f64 = 5.0;
 const X: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
 const Y: [f64; 5] = [2.0, 4.0, 3.0, 5.0, 1.0];
 
-type Draw = fn(&mut Device<PdfBackend>) -> LegendLayout;
+type Draw = fn(&mut Device<AnyBackend>) -> LegendLayout;
 
 struct Case {
     name: &'static str,

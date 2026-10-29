@@ -140,17 +140,17 @@ the corresponding `*.default` R function:
   outlined paths). Consecutive shapes with the same fill/stroke style are
   wrapped in one `<g>` carrying it, so a big scatter plot doesn't repeat
   the style on every point (about a third of the size).
-  `SvgBackend::finish_svgz()` returns the document gzip-compressed (`.svgz`,
-  about 4-6x smaller again) instead of `finish()`'s plain SVG. It isn't the
+  `Device::svg(file).compress(true)` writes the document gzip-compressed
+  (`.svgz`, about 4-6x smaller again) instead of plain SVG. It isn't the
   default: browsers display `.svgz` only when served with
   `Content-Encoding: gzip`, though Inkscape and Illustrator open it.
 - `pdf.rs` - hand-rolled PDF writer (one page per R page), using the 4 standard
   Type1 Helvetica faces (plus Symbol for plotmath) every PDF viewer bundles (no font embedding
   needed), matching R's own `pdf()` device's default font. Like R's
   `pdf()`, the content stream is Flate-compressed by default (deflated in
-  pieces on all cores); `PdfBackend::with_compression(false)` is R's
-  `compress = FALSE`, whose operators can be read as text (the
-  `*_matches_r` tests use it).
+  pieces on all cores); `.compress(false)` is R's `compress = FALSE`,
+  whose operators can be read as text (the `*_matches_r` tests use it,
+  through `common::r::device`).
 - `raster.rs` - PNG via [`tiny-skia`](https://docs.rs/tiny-skia) for
   shapes/paths/clipping and [`ab_glyph`](https://docs.rs/ab_glyph)
   (bundled Liberation Sans) for glyph rasterization.
@@ -239,9 +239,8 @@ A few fidelity-relevant decisions worth calling out:
 - **Page background.** As in R, `par("bg")` starts as the device's
   background: transparent for PDF (R's `pdf()`), white for SVG, and the
   canvas colour for PNG. Set one with `DeviceBuilder::bg`
-  (`Device::pdf(file).bg("white")`, R's `pdf(bg = )`), or with
-  `PdfBackend::with_background` / `RasterBackend::new`'s background when
-  building a backend for `Device::new`. New pages are filled with it, and `legend()`
+  (`Device::pdf(file).bg("white")`, R's `pdf(bg = )`; the same on
+  `Device::memory(..)`). New pages are filled with it, and `legend()`
   boxes by default.
 - **Latin-1 text.** Strings may contain Latin-1 characters (`±`, `é`,
   `×`, ...): string widths use each glyph's AFM metrics looked up by its
@@ -300,6 +299,17 @@ The integration tests are modules of one test binary, `tests/all/`
 runs every test in parallel threads. Add a new file there and a `mod`
 line to `tests/all/main.rs`. Tests that run R name their temporary files
 `rs_graphics_<module>_...` so parallel tests don't clash.
+
+The built-in backends' constructors are crate-private (users open
+devices through `DeviceBuilder`), so the tests that need a backend built
+by hand are unit tests in the crate (`cargo test --lib`):
+`src/backend/smoke_tests.rs` (each backend's output well formed;
+compressed PDF, `.svgz` and the PNG `pHYs` chunk; PNG output independent
+of the thread count; `AnyBackend` gives the wrapped backend's bytes) and
+`src/device/open_tests.rs` (every `DeviceBuilder` option byte-identical
+to the backend set up by hand, R's defaults, the format by name only,
+`open()` creating the file and `close()` writing it, `Device::memory`
+giving the file's bytes).
 
 Most tests are self-contained. Several integration tests
 (`tests/all/*_matches_r.rs`) additionally cross-check numeric output
@@ -445,15 +455,6 @@ against a real R installation by shelling out to `Rscript`:
   numbers (data vectors, ranges, recycled and single setters, limits,
   arrays, pairs, `layout()` sizes, `fig()`, backend constructors) draw byte
   for byte what the same `f64`s do, on a device and in a `Figure`.
-- `tests/all/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
-  and `DeviceBuilder`: every option byte-identical to `Device::new` with
-  the same settings, R's defaults, the format by name only (never the
-  file name's), `open()` creating the file (and failing on a bad path)
-  and `close()` writing it.
-- `tests/all/backend_smoke.rs` (no R needed) - each backend's output is well
-  formed; compressed PDF, `.svgz` and the PNG `pHYs` chunk; PNG output
-  independent of the thread count; `AnyBackend` gives the wrapped
-  backend's bytes; format names.
 - `tests/all/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
   `plot_new()` move nothing until the next plot (R would move margin
   text but not the data).

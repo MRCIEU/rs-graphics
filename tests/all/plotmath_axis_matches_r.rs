@@ -24,9 +24,7 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
-use rs_graphics::par::Par;
 use rs_graphics::plotmath::Label;
 use rs_graphics::prelude::*;
 
@@ -113,9 +111,8 @@ fn plotmath_axis_labels_match_r() {
     .pdfs
     .remove(0);
 
-    let mut par = Par::default();
-    par.mar = rs_graphics::par::Sides::new(5.0, 6.0, 5.0, 6.0);
-    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
+    let mut dev = r::device((PAGE_W, PAGE_H));
+    dev.par().mar([5.0, 6.0, 5.0, 6.0]).draw();
     dev.plot_new();
     dev.plot_window().xlim(0.0, 6.0).ylim(0.0, 6.0).draw();
     for c in CASES {
@@ -125,7 +122,7 @@ fn plotmath_axis_labels_match_r() {
         dev.axis().side(c.side).with(&opts).draw();
     }
     // Byte for byte: R writes Symbol codes above 127 as raw bytes.
-    let ours_pdf = dev.into_backend().finish();
+    let ours_pdf = dev.finish();
     pdf::assert_same_pdf(
         "plotmath_axis_labels_match_r",
         pdf::parse(&ours_pdf),
@@ -136,16 +133,18 @@ fn plotmath_axis_labels_match_r() {
 
 #[test]
 fn consecutive_digits_are_all_plain() {
-    let mut dev = Device::new(
-        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-        Par::default(),
-    );
+    let mut dev = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .compress(false)
+        .open()
+        .unwrap();
     dev.plot_new();
     let opts = AxisOptions::default()
         .at(vec![0.5])
         .labels(vec![Some(Label::math("bolditalic(x12)"))]);
     dev.axis().side(1).with(&opts).draw();
-    let fonts: Vec<(String, Vec<u8>)> = pdf::parse(&dev.into_backend().finish())
+    let fonts: Vec<(String, Vec<u8>)> = pdf::parse(&dev.finish())
         .page()
         .texts
         .into_iter()
@@ -198,13 +197,12 @@ fn plotmath_title_mtext_text_legend_match_r() {
     use rs_graphics::device::{
         LegendKeyword, LegendOptions, LegendPos, MtextOptions, TitleOptions,
     };
-    use rs_graphics::par::Sides;
-    let par = Par {
-        mar: Sides::new(5.0, 6.0, 5.0, 6.0),
-        oma: Sides::new(2.0, 0.0, 2.0, 0.0),
-        ..Par::default()
-    };
-    let mut d = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
+
+    let mut d = r::device((PAGE_W, PAGE_H));
+    d.par()
+        .mar([5.0, 6.0, 5.0, 6.0])
+        .oma([2.0, 0.0, 2.0, 0.0])
+        .draw();
     d.plot_new();
     d.plot_window().xlim(0.0, 10.0).ylim(0.0, 10.0).draw();
     d.title()
@@ -291,7 +289,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .with(&opts)
         .draw();
 
-    let ours_pdf = d.into_backend().finish();
+    let ours_pdf = d.finish();
     // R clips `mtext()` to the device even for inner margins (its
     // `C_mtext` tests `outer` on the SEXP); we clip to the figure.
     let how = pdf::Compare {
@@ -337,10 +335,12 @@ fn plotmath_high_level_titles_match_r() {
     };
     let math = |s: &str| Some(Label::math(s));
     let abc = || ["a", "b", "c"];
-    let mut d = Device::new(
-        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-        Par::default(),
-    );
+    let mut d = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .compress(false)
+        .open()
+        .unwrap();
     d.par().mfrow(2, 3).draw();
     let x: Vec<f64> = (1..=10).map(f64::from).collect();
     let y: Vec<f64> = x.iter().map(|v| v * v).collect();
@@ -388,7 +388,7 @@ fn plotmath_high_level_titles_match_r() {
         .with(&PieOptions::default().labels(abc()).main(math("pi * r^2")))
         .draw();
 
-    let ours_pdf = d.into_backend().finish();
+    let ours_pdf = d.finish();
     pdf::assert_same_pdf(
         "plotmath_high_level_titles_match_r",
         pdf::parse(&ours_pdf),

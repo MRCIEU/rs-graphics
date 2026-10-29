@@ -51,7 +51,7 @@
 //! ```compile_fail
 //! #![deny(unused_must_use)]
 //! # use rs_graphics::prelude::*;
-//! let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
+//! let mut dev = Device::memory("svg").width(5.0).height(5.0).open().unwrap();
 //! dev.plot_new();
 //! dev.abline().h(0.5); // no `.draw()`: nothing drawn, and a warning
 //! ```

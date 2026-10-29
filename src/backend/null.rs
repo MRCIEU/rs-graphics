@@ -21,17 +21,16 @@ use crate::numbers::Num;
 ///
 /// Layouts, return values (`legend()`, `axis()`, `strwidth()`) and errors
 /// (margins too large for the page) are those a PDF device of the same size
-/// would give, without the cost of writing anything. Open it with
-/// [`Device::null`](crate::device::Device::null) rather than directly.
+/// would give, without the cost of writing anything. Devices from
+/// [`Device::null`](crate::device::Device::null) draw on one.
 ///
 /// This is R's `pdf(NULL)`.
 ///
 /// # Examples
 ///
 /// ```
-/// use rs_graphics::backend::null::NullBackend;
 /// # use rs_graphics::prelude::*;
-/// let mut dev = Device::new(NullBackend::new(7, 5), Par::default());
+/// let mut dev = Device::null().width(7).height(5).open().unwrap();
 /// dev.plot().x([1, 2, 3]).draw();
 /// assert!(dev.finish().is_empty());
 /// ```
@@ -45,7 +44,7 @@ pub struct NullBackend {
 impl NullBackend {
     /// Creates a null backend for a page of `width_in` by `height_in`
     /// inches, with a transparent background (as PDF's).
-    pub fn new(width_in: impl Num, height_in: impl Num) -> Self {
+    pub(crate) fn new(width_in: impl Num, height_in: impl Num) -> Self {
         NullBackend {
             width_in: width_in.to_f64(),
             height_in: height_in.to_f64(),
@@ -57,7 +56,7 @@ impl NullBackend {
     /// legend box is filled with. Nothing is painted.
     ///
     /// [`par(bg)`]: crate::par::Par::bg
-    pub fn with_background(mut self, color: Color) -> Self {
+    pub(crate) fn with_background(mut self, color: Color) -> Self {
         self.background = color;
         self
     }

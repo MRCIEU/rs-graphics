@@ -55,7 +55,7 @@ fn r_list(g: &[&[f64]; 3]) -> String {
     format!("list({})", groups.join(", "))
 }
 
-type Draw = fn(&mut Device<PdfBackend>);
+type Draw = fn(&mut Device<AnyBackend>);
 
 struct Case {
     name: &'static str,

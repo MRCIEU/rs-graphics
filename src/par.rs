@@ -368,7 +368,7 @@ macro_rules! par_options {
             /// ```
             /// # use rs_graphics::prelude::*;
             /// let compact = ParOptions::default().mar([4, 4, 1, 1]).cex_axis(0.8);
-            /// let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+            /// let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
             /// dev.par().with(&compact).draw();
             /// ```
             #[derive(Clone, Debug, Default, PartialEq)]
@@ -454,7 +454,7 @@ par_options! {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
     /// dev.par().las(1).cex_axis(0.8).draw();
     /// assert_eq!(dev.current_par().las, 1);
     /// ```

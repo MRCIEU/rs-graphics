@@ -17,11 +17,9 @@ use crate::common;
 use crate::common::{pdf, r};
 
 use rs_graphics::backend::LineEnd;
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AblineOptions, Device};
 use rs_graphics::lty::LineType;
-use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
 
 const PAGE_W: f64 = 6.0;
@@ -40,7 +38,7 @@ struct Case {
     r: &'static str,
     log: &'static str,
     lims: ((f64, f64), (f64, f64)),
-    draw: fn(&mut Device<PdfBackend>),
+    draw: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {
@@ -258,8 +256,12 @@ fn abline_matches_r() {
     }
 }
 
-fn window() -> Device<PdfBackend> {
-    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+fn window() -> Device<AnyBackend> {
+    let mut dev = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .open()
+        .unwrap();
     dev.plot_new();
     dev.plot_window().xlim(0.0, 1.0).ylim(0.0, 1.0).draw();
     dev

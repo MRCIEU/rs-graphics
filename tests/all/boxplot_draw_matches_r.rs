@@ -15,7 +15,7 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::AnyBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
@@ -125,7 +125,7 @@ fn r_code(c: &Case) -> String {
     )
 }
 
-fn draw_ours(c: &Case, dev: &mut Device<PdfBackend>) {
+fn draw_ours(c: &Case, dev: &mut Device<AnyBackend>) {
     dev.par().lwd(c.lwd).draw();
     let opts = BoxplotOptions::default()
         .col(vec![ColorSpec::Color(Color::try_from(c.col).unwrap())])

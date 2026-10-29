@@ -17,17 +17,16 @@ use crate::common;
 use crate::common::{pdf, r};
 
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{Device, MtextOptions};
 use rs_graphics::highlevel::{PlotOptions, PlotType};
-use rs_graphics::par::{Par, Sides};
+use rs_graphics::par::Sides;
 use rs_graphics::prelude::*;
 
 const PAGE_W: f64 = 8.0;
 const PAGE_H: f64 = 6.0;
 
-type Dev = Device<PdfBackend>;
+type Dev = Device<AnyBackend>;
 
 fn xs() -> Vec<f64> {
     (1..=10).map(|i| i as f64).collect()
@@ -67,7 +66,7 @@ fn falling() -> Vec<f64> {
 struct Case {
     name: &'static str,
     r: &'static str,
-    setup: fn(&mut Par),
+    setup: fn(ParOptions) -> ParOptions,
     draw: fn(&mut Dev),
 }
 
@@ -78,7 +77,7 @@ fn cases() -> Vec<Case> {
             r: "par(mar = c(5, 4, 4, 5)); pl(x^2, 'Two scales')\n\
                 par(new = TRUE); pl(sqrt(x), axes = FALSE, col = 'red')\n\
                 axis(4); mtext('sqrt', side = 4, line = 3)",
-            setup: |p| p.mar = Sides::new(5.0, 4.0, 4.0, 5.0),
+            setup: |p| p.mar(Sides::new(5.0, 4.0, 4.0, 5.0)),
             draw: |d| {
                 pl(d, &squares(), Some("Two scales"), true);
                 d.par().new(true).draw();
@@ -97,7 +96,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(2, 2)); pl(x^2, 'A')\n\
                 par(new = TRUE); pl(rev(x)^2, axes = FALSE)\n\
                 pl(x, 'B'); pl(sqrt(x), 'C')",
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.par().mfrow(2, 2).draw();
                 pl(d, &squares(), Some("A"), true);
@@ -114,7 +113,7 @@ fn cases() -> Vec<Case> {
                 par(new = TRUE); plot.new(); plot.new()\n\
                 plot.window(c(0, 20), c(0, 1)); axis(3)\n\
                 pl(x, 'B')",
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.par().mfrow(1, 2).draw();
                 pl(d, &squares(), Some("A"), true);
@@ -131,7 +130,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(1, 2)); pl(x^2, 'A')\n\
                 par(new = TRUE); points(5, 50, pch = 19)\n\
                 pl(falling(), 'B')",
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.par().mfrow(1, 2).draw();
                 pl(d, &squares(), Some("A"), true);
@@ -151,7 +150,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(1, 2), oma = c(0, 0, 2, 0)); pl(x^2, 'A')\n\
                 par(new = TRUE); mtext('Outer', side = 3, outer = TRUE)\n\
                 pl(falling(), axes = FALSE); pl(x, 'B')",
-            setup: |p| p.oma = Sides::new(0.0, 0.0, 2.0, 0.0),
+            setup: |p| p.oma(Sides::new(0.0, 0.0, 2.0, 0.0)),
             draw: |d| {
                 d.par().mfrow(1, 2).draw();
                 pl(d, &squares(), Some("A"), true);
@@ -167,7 +166,7 @@ fn cases() -> Vec<Case> {
             name: "ignored_before_plotting",
             r: "par(mfrow = c(1, 2)); suppressWarnings(par(new = TRUE))\n\
                 pl(x^2, 'A'); pl(x, 'B')",
-            setup: |_| {},
+            setup: |p| p,
             draw: |d| {
                 d.par().mfrow(1, 2).draw();
                 d.par().new(true).draw();
@@ -199,8 +198,7 @@ fn par_new_matches_r() {
         .collect();
     let r = r::run_r("par_new", page, R_PRELUDE, &r_cases);
     for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
-        let mut par = Par::default();
-        (c.setup)(&mut par);
+        let par = (c.setup)(ParOptions::default());
         let (ours, ()) = r::ours_with(page, par, c.draw);
         pdf::assert_same_pdf(
             c.name,

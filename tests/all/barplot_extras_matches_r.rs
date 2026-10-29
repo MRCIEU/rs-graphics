@@ -50,7 +50,7 @@ fn r_matrix() -> String {
 
 const ROWS: [&str; 3] = ["r1", "r2", "r3"];
 
-type Draw = fn(&mut Device<PdfBackend>);
+type Draw = fn(&mut Device<AnyBackend>);
 
 struct Case {
     name: &'static str,

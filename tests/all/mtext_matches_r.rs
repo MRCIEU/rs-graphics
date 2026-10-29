@@ -18,7 +18,7 @@ use crate::common;
 use crate::common::{pdf, r};
 
 use rs_graphics::device::MtextOptions;
-use rs_graphics::par::{Par, Sides};
+use rs_graphics::par::Sides;
 use rs_graphics::prelude::*;
 
 struct Case {
@@ -114,10 +114,7 @@ fn mtext_placement_matches_r() {
         .pdfs
         .remove(0);
 
-    let par = Par {
-        oma: Sides::new(2.0, 3.0, 4.0, 1.5),
-        ..Par::default()
-    };
+    let par = ParOptions::default().oma(Sides::new(2.0, 3.0, 4.0, 1.5));
     let (ours, ()) = r::ours_with(page, par, |dev| {
         dev.par().mfrow(2, 2).draw();
         dev.plot_new();

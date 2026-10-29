@@ -24,7 +24,7 @@ use rs_graphics::prelude::*;
 struct Case {
     name: &'static str,
     r: &'static str,
-    run: fn(&mut Device<PdfBackend>) -> LegendLayout,
+    run: fn(&mut Device<AnyBackend>) -> LegendLayout,
 }
 
 fn cases() -> Vec<Case> {
@@ -251,7 +251,7 @@ fn legend_return_value_on_log_axes_matches_r() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
     let opts = PlotOptions::default().xlog(true).ylog(true);
     dev.plot()
         .x([1.0, 1000.0])

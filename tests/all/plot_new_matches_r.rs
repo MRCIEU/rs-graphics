@@ -17,7 +17,6 @@ use crate::common;
 use crate::common::{pdf, r};
 
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::ColorSpec;
 use rs_graphics::device::Device;
 use rs_graphics::par::AxisStyle;
@@ -29,10 +28,10 @@ const PAGE_H: f64 = 5.0;
 struct Case {
     name: &'static str,
     r: &'static str,
-    draw: fn(&mut Device<PdfBackend>),
+    draw: fn(&mut Device<AnyBackend>),
 }
 
-fn axes(d: &mut Device<PdfBackend>, sides: &[i32]) {
+fn axes(d: &mut Device<AnyBackend>, sides: &[i32]) {
     for &s in sides {
         d.axis().side(s).draw();
     }

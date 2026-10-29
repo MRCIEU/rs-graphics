@@ -56,7 +56,7 @@ struct Case {
     name: &'static str,
     /// R code; `m` is the matrix above.
     r: &'static str,
-    ours: fn(&mut Device<PdfBackend>),
+    ours: fn(&mut Device<AnyBackend>),
 }
 
 macro_rules! window {
@@ -65,7 +65,7 @@ macro_rules! window {
     };
 }
 
-fn window(d: &mut Device<PdfBackend>, xlim: (f64, f64), ylim: (f64, f64)) {
+fn window(d: &mut Device<AnyBackend>, xlim: (f64, f64), ylim: (f64, f64)) {
     d.plot_new();
     d.plot_window()
         .xlim(xlim.0, xlim.1)

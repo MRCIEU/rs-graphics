@@ -124,7 +124,7 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
 /// Errors only a device can see (they depend on its state, or are found
 /// while drawing): R's code (after `plot(1:10)`), R's name for the call,
 /// and the call.
-type DeviceCall = fn(&mut Device<PdfBackend>) -> Result<(), Error>;
+type DeviceCall = fn(&mut Device<AnyBackend>) -> Result<(), Error>;
 
 fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
     vec![
@@ -162,8 +162,8 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
     ]
 }
 
-fn device() -> Device<PdfBackend> {
-    let mut dev = Device::new(PdfBackend::new(7, 7), Par::default());
+fn device() -> Device<AnyBackend> {
+    let mut dev = Device::memory("pdf").width(7).height(7).open().unwrap();
     dev.plot().x(1..=10).draw();
     dev
 }
@@ -216,7 +216,7 @@ fn errors_match_r() {
     if !common::r_available() {
         return;
     }
-    let args = argument_errors::<Device<PdfBackend>>();
+    let args = argument_errors::<Device<AnyBackend>>();
     let on_device = device_errors();
     let code: Vec<&str> = args
         .iter()
@@ -300,7 +300,7 @@ fn errors_while_drawing_end_with_their_call() {
 /// The error type works with `?` in a function returning a boxed error.
 #[test]
 fn errors_work_with_the_question_mark() {
-    fn plot_it(dev: &mut Device<PdfBackend>) -> Result<(), Box<dyn std::error::Error>> {
+    fn plot_it(dev: &mut Device<AnyBackend>) -> Result<(), Box<dyn std::error::Error>> {
         dev.plot().y([1, 2]).try_draw()?;
         Ok(())
     }

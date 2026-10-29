@@ -33,7 +33,7 @@ struct Case {
     name: &'static str,
     /// R code; `x` and `y` are the vectors above.
     r: &'static str,
-    ours: fn(&mut Device<PdfBackend>),
+    ours: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {

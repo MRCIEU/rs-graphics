@@ -14,9 +14,7 @@ use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
 
 fn r_par_values(width: f64, height: f64, ps: f64, xlim: (f64, f64), ylim: (f64, f64)) -> Vec<f64> {
@@ -59,10 +57,12 @@ fn plot_region_and_usr_match_r() {
     let (pin, rest) = r_values.split_at(2);
     let (mai, usr) = rest.split_at(4);
 
-    let mut par = Par::default();
-    par.ps = ps;
-    let backend = PdfBackend::new(width, height).with_compression(false);
-    let mut dev = Device::new(backend, par);
+    let mut dev = Device::memory("pdf")
+        .width(width)
+        .height(height)
+        .pointsize(ps)
+        .open()
+        .unwrap();
     dev.plot_new();
     dev.plot_window()
         .xlim(xlim.0, xlim.1)

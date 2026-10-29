@@ -226,8 +226,12 @@ impl TextStyle {
 /// Coordinates are in inches from the page's bottom-left corner, y
 /// upwards (see the [module docs](self)). The crate's backends are
 /// [`PdfBackend`](pdf::PdfBackend), [`SvgBackend`](svg::SvgBackend),
-/// [`RasterBackend`](raster::RasterBackend) and [`AnyBackend`]; code that
-/// works with any of them takes a `B: Backend`.
+/// [`RasterBackend`](raster::RasterBackend) and [`AnyBackend`], made by
+/// the device builder ([`Device::pdf`](crate::device::Device::pdf),
+/// [`Device::memory`](crate::device::Device::memory), ...); code that works
+/// with any of them takes a `B: Backend`. To draw somewhere else, implement
+/// this trait and pass your backend to
+/// [`Device::new`](crate::device::Device::new).
 ///
 /// # Examples
 ///
@@ -238,9 +242,9 @@ impl TextStyle {
 /// fn draw<B: Backend>(dev: &mut Device<B>) {
 ///     dev.plot().x([1, 2, 3]).draw();
 /// }
-/// let mut pdf = Device::new(PdfBackend::new(5, 5), Par::default());
+/// let mut pdf = Device::memory("pdf").width(5).height(5).open().unwrap();
 /// draw(&mut pdf);
-/// let mut svg = Device::new(SvgBackend::new(5, 5), Par::default());
+/// let mut svg = Device::memory("svg").width(5).height(5).open().unwrap();
 /// draw(&mut svg);
 /// ```
 pub trait Backend {
@@ -298,8 +302,8 @@ pub trait Backend {
     fn effective_font_size(&self, requested_pt: f64) -> f64;
 
     /// Returns the background colour [`par(bg)`] starts as: white for SVG, the
-    /// canvas colour for PNG, and transparent for PDF unless set with
-    /// [`with_background`](pdf::PdfBackend::with_background).
+    /// canvas colour for PNG, and transparent for PDF unless the device was
+    /// opened with a [`bg`](crate::device::DeviceBuilder::bg).
     ///
     /// New pages and default `legend()` boxes are filled with [`par(bg)`].
     ///
@@ -330,3 +334,6 @@ pub trait Backend {
     where
         Self: Sized;
 }
+
+#[cfg(test)]
+mod smoke_tests;

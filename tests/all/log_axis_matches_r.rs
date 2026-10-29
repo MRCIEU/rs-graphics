@@ -18,7 +18,7 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::AnyBackend;
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::PlotOptions;
@@ -108,7 +108,7 @@ fn r_code(c: &Case) -> String {
     )
 }
 
-fn draw_ours(c: &Case, dev: &mut Device<PdfBackend>) {
+fn draw_ours(c: &Case, dev: &mut Device<AnyBackend>) {
     let mut opts = PlotOptions::default()
         .xlog(c.xlog)
         .ylog(c.ylog)

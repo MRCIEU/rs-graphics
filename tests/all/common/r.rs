@@ -79,19 +79,30 @@ pub fn run_r_args(tag: &str, prelude: &str, cases: &[(&str, (f64, f64), &str, &s
     }
 }
 
-/// Draws with `f` on an uncompressed PDF device of `page` inches with the
-/// default `par()`; returns the file and what `f` returned.
-pub fn ours<T>(page: (f64, f64), f: impl FnOnce(&mut Device<PdfBackend>) -> T) -> (Vec<u8>, T) {
-    ours_with(page, Par::default(), f)
+/// An uncompressed in-memory PDF device of `page` inches, R's defaults.
+pub fn device(page: (f64, f64)) -> Device<AnyBackend> {
+    Device::memory("pdf")
+        .width(page.0)
+        .height(page.1)
+        .compress(false)
+        .open()
+        .unwrap()
 }
 
-/// [`ours`], starting from `par`.
+/// Draws with `f` on an uncompressed PDF device of `page` inches with the
+/// default `par()`; returns the file and what `f` returned.
+pub fn ours<T>(page: (f64, f64), f: impl FnOnce(&mut Device<AnyBackend>) -> T) -> (Vec<u8>, T) {
+    ours_with(page, ParOptions::default(), f)
+}
+
+/// [`ours`], with `par` applied first (`dev.par().with(&par)`).
 pub fn ours_with<T>(
     page: (f64, f64),
-    par: Par,
-    f: impl FnOnce(&mut Device<PdfBackend>) -> T,
+    par: ParOptions,
+    f: impl FnOnce(&mut Device<AnyBackend>) -> T,
 ) -> (Vec<u8>, T) {
-    let mut dev = Device::new(PdfBackend::new(page.0, page.1).with_compression(false), par);
+    let mut dev = device(page);
+    dev.par().with(&par).draw();
     let value = f(&mut dev);
-    (dev.into_backend().finish(), value)
+    (dev.finish(), value)
 }

@@ -29,7 +29,7 @@ const Y: [f64; 8] = [3.0, -2.0, 5.0, NA, 8.0, 6.0, 9.0, 4.0];
 /// For log y axes: a 0 (skipped there) and a wide range.
 const Y_LOG: [f64; 8] = [3.0, 0.0, 5.0, NA, 8.0, 60.0, 900.0, 4.0];
 
-type Draw = fn(&mut Device<PdfBackend>);
+type Draw = fn(&mut Device<AnyBackend>);
 
 struct Case {
     name: &'static str,

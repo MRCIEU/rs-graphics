@@ -123,10 +123,12 @@ fn plotmath_extras_match_r() {
     .pdfs
     .remove(0);
 
-    let mut d = Device::new(
-        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-        Par::default(),
-    );
+    let mut d = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .compress(false)
+        .open()
+        .unwrap();
     d.par().mar([1, 1, 1, 1]).draw();
     d.plot_new();
     d.plot_window().xlim(0, 10).ylim(0, 10).draw();
@@ -140,7 +142,7 @@ fn plotmath_extras_match_r() {
             .draw();
     }
 
-    let ours_pdf = d.into_backend().finish();
+    let ours_pdf = d.finish();
     pdf::assert_same_pdf(
         "plotmath_extras_match_r",
         pdf::parse(&ours_pdf),

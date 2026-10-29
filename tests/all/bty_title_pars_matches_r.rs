@@ -27,7 +27,7 @@ const X: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
 const Y: [f64; 5] = [2.0, 4.0, 3.0, 5.0, 1.0];
 const H: [f64; 12] = [1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0, 6.0, 6.5, 7.0];
 
-type Draw = fn(&mut Device<PdfBackend>);
+type Draw = fn(&mut Device<AnyBackend>);
 
 struct Case {
     name: &'static str,
@@ -572,17 +572,19 @@ fn bty_and_title_pars_match_r() {
 /// `nan` coordinate, which makes the PDF invalid (an R bug, not copied).
 #[test]
 fn mtext_nan_line_skips_the_label() {
-    let mut dev = Device::new(
-        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-        Par::default(),
-    );
+    let mut dev = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .compress(false)
+        .open()
+        .unwrap();
     dev.plot_new();
     dev.mtext()
         .text(["p", "q"])
         .side(2)
         .line([Some(1.0), None])
         .draw();
-    let texts = pdf::parse(&dev.into_backend().finish()).page().texts;
+    let texts = pdf::parse(&dev.finish()).page().texts;
     let strings: Vec<&str> = texts.iter().map(|t| t.string.as_str()).collect();
     assert_eq!(strings, ["p"]);
     for t in &texts {
@@ -594,10 +596,12 @@ fn mtext_nan_line_skips_the_label() {
 #[test]
 fn plot_false_returns_the_result_without_drawing() {
     let blank = || {
-        Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        )
+        Device::memory("pdf")
+            .width(PAGE_W)
+            .height(PAGE_H)
+            .compress(false)
+            .open()
+            .unwrap()
     };
     let (mut a, mut b) = (blank(), blank());
     assert_eq!(
@@ -607,7 +611,7 @@ fn plot_false_returns_the_result_without_drawing() {
     let h = a.hist().x(H).plot(false).draw();
     let drawn = b.hist().x(H).draw();
     assert_eq!((h.breaks, h.counts), (drawn.breaks, drawn.counts));
-    let drawn = pdf::parse(&a.into_backend().finish());
+    let drawn = pdf::parse(&a.finish());
     for page in drawn.pages {
         let page = page.without_background();
         assert!(page.paths.is_empty() && page.texts.is_empty());

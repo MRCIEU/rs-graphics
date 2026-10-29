@@ -195,11 +195,13 @@ fn with_floats<G: Graphics>(g: &mut G) {
     g.pie().x([1.0, 2.0, 3.0]).radius(1.0).draw();
 }
 
-fn device(w: f64, h: f64) -> Device<PdfBackend> {
-    Device::new(
-        PdfBackend::new(w, h).with_compression(false),
-        Par::default(),
-    )
+fn device(w: f64, h: f64) -> Device<AnyBackend> {
+    Device::memory("pdf")
+        .width(w)
+        .height(h)
+        .compress(false)
+        .open()
+        .unwrap()
 }
 
 #[test]
@@ -291,12 +293,12 @@ fn option_setters_take_every_number_type() {
 #[test]
 fn layout_fig_and_backends_take_integers() {
     let render = |ints: bool| {
-        let backend = if ints {
-            PdfBackend::new(8, 6)
+        let builder = if ints {
+            Device::memory("pdf").width(8).height(6)
         } else {
-            PdfBackend::new(8.0, 6.0)
+            Device::memory("pdf").width(8.0).height(6.0)
         };
-        let mut dev = Device::new(backend.with_compression(false), Par::default());
+        let mut dev = builder.compress(false).open().unwrap();
         if ints {
             dev.layout().mat(&[[1, 2]]).widths([2, 1]).draw();
         } else {
@@ -317,10 +319,10 @@ fn layout_fig_and_backends_take_integers() {
     };
     assert!(render(true) == render(false));
     // Mixed integers and floats in one array literal are floats.
-    let mut dev = Device::new(SvgBackend::new(5, 5), Par::default());
+    let mut dev = Device::memory("svg").width(5).height(5).open().unwrap();
     dev.par().fig([0.0, 0.5, 0.0, 1.0]).draw();
-    let raster = RasterBackend::new(2, 2, 72, Color::WHITE);
-    assert!(!Device::new(raster, Par::default()).finish().is_empty());
+    let png = Device::memory("png").width(2).height(2).res(72);
+    assert!(!png.open().unwrap().finish().is_empty());
 }
 
 #[test]

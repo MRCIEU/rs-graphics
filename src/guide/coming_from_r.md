@@ -15,7 +15,7 @@ plot(x, y, pch = 19, col = "red", main = "Weight")
 
 ```
 # use rs_graphics::prelude::*;
-# let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+# let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
 # let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
 dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 ```
@@ -100,7 +100,7 @@ par(mfrow = c(1, 2), mar = c(4, 4, 2, 1), las = 1)
 
 ```
 # use rs_graphics::prelude::*;
-# let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+# let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
 dev.par().mfrow(1, 2).mar([4, 4, 2, 1]).las(1).draw();
 ```
 
@@ -153,7 +153,7 @@ legend("topleft", legend = c("observed", "fit"),
 
 ```
 # use rs_graphics::prelude::*;
-# let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+# let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
 let x = [1.0, 2.0, 3.0, 4.0, 5.0];
 let y = [2.1, 3.9, 6.2, 7.8, 10.1];
 dev.plot()
@@ -191,7 +191,7 @@ mtext("Two panels", outer = TRUE, line = 0.5, font = 2)
 
 ```
 # use rs_graphics::prelude::*;
-# let mut dev = Device::new(SvgBackend::new(8, 4), Par::default());
+# let mut dev = Device::memory("svg").width(8).height(4).open().unwrap();
 dev.par().mfrow(1, 2).oma([0, 0, 2, 0]).draw();
 let h = dev
     .hist()

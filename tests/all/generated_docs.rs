@@ -699,9 +699,9 @@ fn r_reference_table_is_up_to_date() {
 fn chart_svg(
     name: &str,
     (w, h): (f64, f64),
-    draw: fn(&mut Device<SvgBackend>) -> Result<(), rs_graphics::Error>,
+    draw: fn(&mut Device<AnyBackend>) -> Result<(), rs_graphics::Error>,
 ) -> String {
-    let mut dev = Device::new(SvgBackend::new(w, h), Par::default());
+    let mut dev = Device::memory("svg").width(w).height(h).open().unwrap();
     draw(&mut dev).unwrap();
     let svg = String::from_utf8(dev.finish()).unwrap();
     let start = svg.find("<svg").unwrap();
@@ -728,7 +728,7 @@ fn chart_svg(
 
 #[test]
 fn charts_are_up_to_date() {
-    type Chart = fn(&mut Device<SvgBackend>) -> Result<(), rs_graphics::Error>;
+    type Chart = fn(&mut Device<AnyBackend>) -> Result<(), rs_graphics::Error>;
     let charts: [(&str, (f64, f64), Chart); 7] = [
         ("pch", (8.0, 4.5), charts::pch),
         ("line_types", (7.0, 5.0), charts::line_types),

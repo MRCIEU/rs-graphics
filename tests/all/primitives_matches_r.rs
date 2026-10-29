@@ -21,13 +21,12 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::prelude::*;
 
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
 
-type Dev = Device<PdfBackend>;
+type Dev = Device<AnyBackend>;
 
 fn cols(names: &[&str]) -> Vec<ColorSpec> {
     names
@@ -507,7 +506,11 @@ fn primitives_match_r() {
 #[test]
 #[should_panic(expected = "invalid 'pos' value")]
 fn text_pos_outside_1_to_4_panics_like_r() {
-    let mut d = Device::new(PdfBackend::new(PAGE_W, PAGE_H), Par::default());
+    let mut d = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .open()
+        .unwrap();
     window(&mut d);
     d.text().x([5]).y([5]).labels(["a"]).pos(5).draw();
 }

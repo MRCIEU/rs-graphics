@@ -42,18 +42,18 @@ fn measure<B: Backend>(dev: &mut Device<B>) -> String {
 
 #[test]
 fn measures_as_a_pdf_device() {
-    let mut pdf = Device::new(PdfBackend::new(8, 5), Par::default());
+    let mut pdf = Device::memory("pdf").width(8).height(5).open().unwrap();
     let mut null = Device::null().width(8).height(5).open().unwrap();
     assert_eq!(measure(&mut null), measure(&mut pdf));
     // PDF rounds text to whole points; an SVG device doesn't, so a legend
     // at `cex(1.3)` comes out differently there.
-    let mut svg = Device::new(SvgBackend::new(8, 5), Par::default());
+    let mut svg = Device::memory("svg").width(8).height(5).open().unwrap();
     assert_ne!(measure(&mut null), measure(&mut svg));
 }
 
 #[test]
 fn fails_where_a_pdf_device_fails() {
-    let mut pdf = Device::new(PdfBackend::new(1.5, 1.5), Par::default());
+    let mut pdf = Device::memory("pdf").width(1.5).height(1.5).open().unwrap();
     let mut null = Device::null().width(1.5).height(1.5).open().unwrap();
     let e = null.try_plot_new().unwrap_err();
     assert_eq!(e, pdf.try_plot_new().unwrap_err());
@@ -90,13 +90,9 @@ fn takes_pdfs_options() {
     assert!((w - 10.0 / 2.54).abs() < 1e-12 && (h - 5.0 / 2.54).abs() < 1e-12);
     assert_eq!(dev.start_ps(), 9.0);
     assert_eq!(dev.current_par().bg, Color::try_from("ivory").unwrap());
-    // Transparent by default, as PDF's; also through `Device::new`.
+    // Transparent by default, as PDF's.
     let dev = Device::null().open().unwrap();
     assert_eq!(dev.current_par().bg.a, 0);
-    use rs_graphics::backend::null::NullBackend;
-    let red = Color::rgb(255, 0, 0);
-    let dev = Device::new(NullBackend::new(7, 7).with_background(red), Par::default());
-    assert_eq!(dev.current_par().bg, red);
     // Pixels need a PNG device.
     let e = Device::null().units("px").open().err().unwrap();
     assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);

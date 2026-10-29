@@ -23,7 +23,7 @@ const PAGE_H: f64 = 5.0;
 struct Case {
     name: &'static str,
     r: &'static str,
-    ours: fn(&mut Device<PdfBackend>),
+    ours: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {

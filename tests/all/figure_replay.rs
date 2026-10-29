@@ -193,12 +193,13 @@ fn scenes() -> Vec<(&'static str, Scene, Direct)> {
 }
 
 fn device(format: Format) -> Device<AnyBackend> {
-    let backend = match format {
-        Format::Pdf => AnyBackend::Pdf(PdfBackend::new(7.0, 6.0).with_compression(false)),
-        Format::Svg => AnyBackend::Svg(SvgBackend::new(7.0, 6.0)),
-        Format::Png => AnyBackend::Png(RasterBackend::new(7.0, 6.0, 72.0, Color::WHITE)),
-    };
-    Device::new(backend, Par::default())
+    // `compress(false)`: an uncompressed PDF, a plain SVG; ignored for PNG.
+    Device::memory(format)
+        .width(7.0)
+        .height(6.0)
+        .compress(false)
+        .open()
+        .unwrap()
 }
 
 const FORMATS: [Format; 3] = [Format::Pdf, Format::Svg, Format::Png];
@@ -483,7 +484,7 @@ fn barplot_shading_on_a_log_axis_panics() {
                 let mut fig = Figure::new();
                 fig.barplot().height([1, 2]).ylog(true).density(10).draw();
             } else {
-                let mut dev = Device::new(PdfBackend::new(5, 5), Par::default());
+                let mut dev = Device::memory("pdf").width(5).height(5).open().unwrap();
                 dev.barplot().height([1, 2]).ylog(true).density(10).draw();
             }
         });

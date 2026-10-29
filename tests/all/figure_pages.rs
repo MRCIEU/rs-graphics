@@ -34,8 +34,13 @@ fn whole_plot<G: Graphics>(g: &mut G) {
     g.plot().x([1, 2]).draw();
 }
 
-fn bytes<B: Backend>(make: fn() -> B, recorded: bool) -> Vec<u8> {
-    let mut dev = Device::new(make(), Par::default());
+fn bytes(format: &str, recorded: bool) -> Vec<u8> {
+    let mut dev = Device::memory(format)
+        .width(8)
+        .height(7)
+        .compress(false)
+        .open()
+        .unwrap();
     if recorded {
         let mut fig = Figure::new();
         whole_plot(&mut fig);
@@ -48,9 +53,7 @@ fn bytes<B: Backend>(make: fn() -> B, recorded: bool) -> Vec<u8> {
 
 #[test]
 fn a_recorded_whole_plot_draws_as_the_calls_do() {
-    let pdf = || PdfBackend::new(8, 7).with_compression(false);
-    let svg = || SvgBackend::new(8, 7);
-    let png = || RasterBackend::new(8, 7, 72, Color::WHITE);
+    let (pdf, svg, png) = ("pdf", "svg", "png");
     assert_eq!(bytes(pdf, true), bytes(pdf, false), "pdf");
     assert_eq!(bytes(svg, true), bytes(svg, false), "svg");
     assert_eq!(bytes(png, true), bytes(png, false), "png");

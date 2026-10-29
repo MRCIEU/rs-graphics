@@ -104,7 +104,7 @@ fn r_code(c: &Case) -> String {
     )
 }
 
-fn draw_ours(c: &Case, dev: &mut Device<PdfBackend>) {
+fn draw_ours(c: &Case, dev: &mut Device<AnyBackend>) {
     dev.par().mar([0, 0, 0, 0]).cex(c.par_cex).draw();
     dev.plot_new();
     dev.plot_window().xlim(0, 8).ylim(0, 6).draw();

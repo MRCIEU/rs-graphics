@@ -21,7 +21,6 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::{BarplotOptions, BoxplotOptions, HistOptions, PlotOptions};
@@ -32,7 +31,7 @@ use rs_graphics::prelude::*;
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
 
-type Dev = Device<PdfBackend>;
+type Dev = Device<AnyBackend>;
 
 /// Data shared with R (`hx` there).
 fn hist_data() -> Vec<f64> {

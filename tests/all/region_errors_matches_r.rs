@@ -24,7 +24,7 @@ struct Case {
     name: &'static str,
     size: (f64, f64),
     r: &'static str,
-    rust: fn(&mut Device<PdfBackend>),
+    rust: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {
@@ -124,12 +124,12 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-fn device(w: f64, h: f64) -> Device<PdfBackend> {
-    Device::new(PdfBackend::new(w, h), Par::default())
+fn device(w: f64, h: f64) -> Device<AnyBackend> {
+    Device::memory("pdf").width(w).height(h).open().unwrap()
 }
 
 /// `try_plot_new()`'s error message, or `"ok"`.
-fn outcome(dev: &mut Device<PdfBackend>) -> String {
+fn outcome(dev: &mut Device<AnyBackend>) -> String {
     match dev.try_plot_new() {
         Ok(()) => "ok".to_string(),
         Err(e) => {

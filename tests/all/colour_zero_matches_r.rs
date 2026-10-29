@@ -17,11 +17,9 @@ use crate::common;
 use crate::common::{pdf, r};
 
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::Device;
 use rs_graphics::lty::LineType;
-use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
 
 const PAGE_W: f64 = 5.0;
@@ -48,11 +46,14 @@ const DRAW_R: &str = "plot.window(c(0, 1), c(0, 1))\n\
     segments(0, 1, 1, 0, col = 0, lwd = 3)";
 
 fn draw_ours(c: &Case) -> Vec<u8> {
-    let mut backend = PdfBackend::new(PAGE_W, PAGE_H).with_compression(false);
+    let mut builder = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .compress(false);
     if let Some(bg) = c.page_bg {
-        backend = backend.with_background(Color::try_from(bg).unwrap());
+        builder = builder.bg(bg);
     }
-    let mut d = Device::new(backend, Par::default());
+    let mut d = builder.open().unwrap();
     d.plot_new();
     if let Some(bg) = c.par_bg {
         d.par().bg(Color::try_from(bg).unwrap()).draw();
@@ -101,7 +102,7 @@ fn draw_ours(c: &Case) -> Vec<u8> {
         .y1([0.0])
         .with(&line)
         .draw();
-    d.into_backend().finish()
+    d.finish()
 }
 
 #[test]

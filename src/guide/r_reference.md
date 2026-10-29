@@ -714,9 +714,10 @@ R's arguments not available: `vfont`.
 | `onefile` | `.onefile()` | Puts all pages in one file, PDF only. |
 | `bg` | `.bg()` | Page background, and the starting `par(bg)`; a colour that draws nothing (`ColorSpec::None`, `"transparent"`) is transparent. |
 | `pointsize` | `.pointsize()` | Starting text size, `par(ps)`, in big points; it also fixes the size of plotting symbols and margin lines from the start. |
-| `compress` | `.compress()` | Compresses the page contents, PDF only (ignored for SVG and PNG). |
+| `compress` | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
 | (none) | `.units()` | Units of `width` and `height`. |
 | (none) | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
+| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
 
 R's arguments not available: `family`, `title`, `fonts`, `version`, `paper`, `encoding`, `fg`, `pagecentre`, `colormodel`, `useDingbats`, `useKerning`, `fillOddEven`, `timestamp`, `producer`, `author`.
 
@@ -734,7 +735,8 @@ R's arguments not available: `family`, `title`, `fonts`, `version`, `paper`, `en
 | `bg` | `.bg()` | Page background, and the starting `par(bg)`; a colour that draws nothing (`ColorSpec::None`, `"transparent"`) is transparent. |
 | (none) | `.units()` | Units of `width` and `height`. |
 | (none) | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
-| (none) | `.compress()` | Compresses the page contents, PDF only (ignored for SVG and PNG). |
+| (none) | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
+| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
 
 R's arguments not available: `family`, `antialias`, `symbolfamily`.
 
@@ -751,7 +753,8 @@ R's arguments not available: `family`, `antialias`, `symbolfamily`.
 | `pointsize` | `.pointsize()` | Starting text size, `par(ps)`, in big points; it also fixes the size of plotting symbols and margin lines from the start. |
 | `bg` | `.bg()` | Page background, and the starting `par(bg)`; a colour that draws nothing (`ColorSpec::None`, `"transparent"`) is transparent. |
 | `res` | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
-| (none) | `.compress()` | Compresses the page contents, PDF only (ignored for SVG and PNG). |
+| (none) | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
+| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
 | (none) | `.onefile()` | Puts all pages in one file, PDF only. |
 
 R's arguments not available: `type`, `antialias`.

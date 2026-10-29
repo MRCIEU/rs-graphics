@@ -18,7 +18,7 @@ use crate::common::{pdf, r};
 
 use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::PieOptions;
-use rs_graphics::par::{AxisStyle, Par};
+use rs_graphics::par::{AxisStyle, ParOptions};
 
 struct Case {
     name: &'static str,
@@ -108,10 +108,9 @@ fn pie_matches_r() {
         .collect();
     let r = r::run_r_sized("pie", "", &r_cases);
     for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
-        let mut par = Par::default();
+        let mut par = ParOptions::default();
         if c.exact_axes {
-            par.xaxs = AxisStyle::Exact;
-            par.yaxs = AxisStyle::Exact;
+            par = par.xaxs(AxisStyle::Exact).yaxs(AxisStyle::Exact);
         }
         let opts = PieOptions::default()
             .labels(LABELS)

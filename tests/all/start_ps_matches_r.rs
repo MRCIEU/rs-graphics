@@ -16,13 +16,11 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::graphics::Graphics;
 use rs_graphics::color::ColorSpec;
 use rs_graphics::device::{Device, LegendKeyword, LegendPos};
 use rs_graphics::highlevel::{PlotOptions, PlotType};
 use rs_graphics::lty::LineType;
-use rs_graphics::par::Par;
-use rs_graphics::graphics::Graphics;
 
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
@@ -39,11 +37,13 @@ fn r_code(ps: f64) -> String {
 }
 
 fn draw_ours(start: f64, ps: f64) -> Vec<u8> {
-    let par = Par {
-        ps: start,
-        ..Par::default()
-    };
-    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
+    let mut dev = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .compress(false)
+        .pointsize(start)
+        .open()
+        .unwrap();
     dev.par().ps(ps).draw();
     let opts = PlotOptions::default()
         .type_(PlotType::Both)
@@ -62,7 +62,7 @@ fn draw_ours(start: f64, ps: f64) -> Vec<u8> {
         .pch(1)
         .lty(LineType::from_code(1).unwrap())
         .draw();
-    dev.into_backend().finish()
+    dev.finish()
 }
 
 #[test]

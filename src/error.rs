@@ -29,7 +29,7 @@ use std::fmt;
 /// ```
 /// use rs_graphics::prelude::*; // includes `ErrorKind`
 ///
-/// let mut dev = Device::new(SvgBackend::new(0.5, 0.5), Par::default());
+/// let mut dev = Device::memory("svg").width(0.5).height(0.5).open().unwrap();
 /// let err = dev.plot().x([1, 2, 3]).try_draw().unwrap_err();
 /// assert_eq!(err.call(), "plot.new");
 /// assert_eq!(err.kind(), ErrorKind::DoesNotFit);

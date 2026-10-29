@@ -31,7 +31,7 @@ const PAGE_H: f64 = 5.0;
 const X: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
 const Y: [f64; 5] = [2.0, 4.0, 3.0, 5.0, 1.0];
 
-type Draw = fn(&mut Device<PdfBackend>);
+type Draw = fn(&mut Device<AnyBackend>);
 
 struct Case {
     name: &'static str,
@@ -41,7 +41,7 @@ struct Case {
 }
 
 /// Two panels, the first one current, with `plot.window(c(0, 10), c(0, 10))`.
-fn panels(d: &mut Device<PdfBackend>) {
+fn panels(d: &mut Device<AnyBackend>) {
     d.par().mfrow(1, 2).draw();
     d.plot_new();
     d.plot_window().xlim(0, 10).ylim(0, 10).draw();
@@ -384,13 +384,15 @@ fn inline_args_match_r() {
 #[test]
 fn mtext_clips_to_the_figure_unless_xpd_is_na() {
     let clip_of = |draw: Draw| {
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        );
+        let mut dev = Device::memory("pdf")
+            .width(PAGE_W)
+            .height(PAGE_H)
+            .compress(false)
+            .open()
+            .unwrap();
         panels(&mut dev);
         draw(&mut dev);
-        let texts = pdf::parse(&dev.into_backend().finish()).page().texts;
+        let texts = pdf::parse(&dev.finish()).page().texts;
         assert_eq!(texts.len(), 1);
         texts[0].clip
     };
@@ -431,7 +433,7 @@ fn par_usr_is_checked() {
                 if figure {
                     Figure::new().par().usr(usr).draw();
                 } else {
-                    let mut dev = Device::new(PdfBackend::new(5, 5), Par::default());
+                    let mut dev = Device::memory("pdf").width(5).height(5).open().unwrap();
                     dev.par().usr(usr).draw();
                 }
             });
@@ -455,12 +457,12 @@ fn par_usr_is_checked() {
 /// copied.)
 #[test]
 fn par_usr_on_a_log_axis_sets_log_ticks() {
-    let mut dev = Device::new(PdfBackend::new(5, 5), Par::default());
+    let mut dev = Device::memory("pdf").width(5).height(5).open().unwrap();
     dev.plot_new();
     dev.plot_window().xlim(1, 100).ylim(0, 1).xlog(true).draw();
     dev.par().usr([0, 3, 0, 1]).draw();
     let got = dev.current_par().xaxp;
-    let mut want = Device::new(PdfBackend::new(5, 5), Par::default());
+    let mut want = Device::memory("pdf").width(5).height(5).open().unwrap();
     want.par().xaxs("i").draw();
     want.plot_new();
     want.plot_window()

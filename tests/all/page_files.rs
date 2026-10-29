@@ -43,17 +43,13 @@ fn page<B: Backend>(dev: &mut Device<B>, k: usize) {
         .draw();
 }
 
-/// Page `k` drawn alone, on the backend an opened device would use.
+/// Page `k` drawn alone, on an in-memory device like the opened one.
 fn alone(format: &str, k: usize, bg: Option<Color>) -> Vec<u8> {
-    let backend: AnyBackend = match format {
-        "png" => RasterBackend::new(4, 3, 72, bg.unwrap_or(Color::WHITE)).into(),
-        "pdf" => PdfBackend::new(4, 3).into(),
-        _ => SvgBackend::new(4, 3).into(),
-    };
-    let mut dev = Device::new(backend, Par::default());
+    let mut builder = Device::memory(format).width(4).height(3);
     if let Some(bg) = bg {
-        dev.par().bg(bg).draw();
+        builder = builder.bg(bg);
     }
+    let mut dev = builder.open().unwrap();
     page(&mut dev, k);
     dev.finish()
 }

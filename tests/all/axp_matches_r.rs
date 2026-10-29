@@ -19,10 +19,8 @@ use crate::common::{pdf, r};
 use std::process::Command;
 
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::highlevel::PlotOptions;
-use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
 
 const PAGE_W: f64 = 7.0;
@@ -73,11 +71,12 @@ fn axp_values_match_r() {
     assert_eq!(r.lines().count(), WINDOWS.len(), "R output: {r}");
     for (line, (xlim, ylim, log, lab)) in r.lines().zip(WINDOWS) {
         let want: Vec<f64> = line.split_whitespace().map(|t| t.parse().unwrap()).collect();
-        let par = Par {
-            lab: [lab[0], lab[1], 7],
-            ..Par::default()
-        };
-        let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H), par);
+        let mut dev = Device::memory("pdf")
+            .width(PAGE_W)
+            .height(PAGE_H)
+            .open()
+            .unwrap();
+        dev.par().lab([lab[0], lab[1], 7]).draw();
         dev.plot_new();
         dev.plot_window()
             .xlim(xlim.0, xlim.1)
@@ -101,7 +100,7 @@ fn axp_values_match_r() {
 struct Case {
     name: &'static str,
     r: &'static str,
-    draw: fn(&mut Device<PdfBackend>),
+    draw: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {

@@ -15,12 +15,11 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::AnyBackend;
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::{BarplotOptions, PlotOptions, PlotType};
-use rs_graphics::backend::svg::SvgBackend;
 use rs_graphics::layout::{LayoutRespect, LayoutSize};
-use rs_graphics::par::{Par, Sides};
+use rs_graphics::par::Sides;
 use rs_graphics::plotmath::Label;
 use rs_graphics::graphics::Graphics;
 
@@ -30,7 +29,7 @@ const PAGE_H: f64 = 6.0;
 /// R: `bp(h, main)`.
 const R_PRELUDE: &str = "bp <- function(h, main) barplot(h, names.arg = LETTERS[seq_along(h)], main = main, ylab = 'v')\n";
 
-fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
+fn bp(d: &mut Device<AnyBackend>, h: &[f64], main: &str) {
     let o = BarplotOptions::default()
         .names(
             (0..h.len())
@@ -45,7 +44,7 @@ fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
 struct Case {
     name: &'static str,
     r: &'static str,
-    run: fn(&mut Device<PdfBackend>),
+    run: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {
@@ -224,8 +223,8 @@ fn layout_matches_r() {
     }
 }
 
-fn svg_device() -> Device<SvgBackend> {
-    Device::new(SvgBackend::new(8.0, 6.0), Par::default())
+fn svg_device() -> Device<AnyBackend> {
+    Device::memory("svg").width(8.0).height(6.0).open().unwrap()
 }
 
 /// `.draw()` returns the number of figures, as R's `layout()` does

@@ -29,7 +29,7 @@ const R_CALLS: &str = "plot.new(); plot.window(c(0, 10), c(0, 10))\n\
     abline(h = 4, lwd = 5, lend = 'butt')\n\
     lines(c(7, 8, 9), c(9, 5, 9), lwd = 6)\n";
 
-fn ours(d: &mut Device<PdfBackend>) {
+fn ours(d: &mut Device<AnyBackend>) {
     d.plot_new();
     d.plot_window().xlim(0, 10).ylim(0, 10).draw();
     d.lines()
@@ -111,7 +111,7 @@ fn inline_line_pars_match_r() {
 #[test]
 #[should_panic(expected = "invalid value specified for graphical parameter \"lmitre\"")]
 fn lmitre_below_one_panics_like_r() {
-    let mut dev = Device::new(PdfBackend::new(6, 6), Par::default());
+    let mut dev = Device::memory("pdf").width(6).height(6).open().unwrap();
     dev.plot_new();
     dev.lines().x([1, 2]).y([1, 2]).lmitre(0.5).draw();
 }

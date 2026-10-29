@@ -664,28 +664,36 @@ crate::setters::options! {
 }
 
 impl<B: Backend> Device<B> {
-    /// Creates a device drawing onto `backend`, starting with the graphical
-    /// parameters `par`.
+    /// Creates a device drawing onto a backend of your own.
     ///
-    /// This is the general route: for any [`Backend`], for output kept in
-    /// memory (get it with [`finish`](Device::finish)), and for backend options
-    /// that [`DeviceBuilder`] doesn't cover, such as PNG
-    /// [`with_threads`](crate::backend::raster::RasterBackend::with_threads).
-    /// The device has no file; to open one for a file, use [`Device::pdf`],
-    /// [`Device::svg`], [`Device::png`] or [`Device::format`]. If `par.bg` is
-    /// left at its default (white), the device starts with the backend's own
-    /// background instead: transparent for PDF.
+    /// For a [`Backend`] you implement (a GUI canvas, another file format):
+    /// PDF, SVG and PNG devices are opened with [`Device::pdf`],
+    /// [`Device::svg`], [`Device::png`], [`Device::format`] or
+    /// [`Device::memory`]. The device starts with R's default graphical
+    /// parameters and the backend's background ([`Backend::default_bg`]);
+    /// change them with [`par()`](crate::graphics::Graphics::par). It has no
+    /// file: [`finish`](Device::finish) returns the backend's bytes, or
+    /// [`into_backend`](Device::into_backend) the backend itself.
+    ///
+    /// R's equivalent is a graphics device written in C.
     ///
     /// # Examples
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// let mut dev = Device::new(SvgBackend::new(5, 4), Par::default());
+    /// # fn custom_backend() -> AnyBackend { Device::memory("svg").open().unwrap().into_backend() }
+    /// let mut dev = Device::new(custom_backend());
+    /// dev.par().cex(1.2).draw();
     /// dev.plot().x([1, 2, 3]).draw();
-    /// let svg = String::from_utf8(dev.finish()).unwrap();
-    /// assert!(svg.starts_with("<svg") || svg.starts_with("<?xml"));
+    /// let bytes = dev.finish();
     /// ```
-    pub fn new(backend: B, mut par: Par) -> Self {
+    pub fn new(backend: B) -> Self {
+        Device::with_par(backend, Par::default())
+    }
+
+    /// [`Device::new`] starting from `par`, for the device builder (the
+    /// starting point size and background).
+    pub(crate) fn with_par(backend: B, mut par: Par) -> Self {
         if par.bg == Par::default().bg {
             par.bg = backend.default_bg();
         }
@@ -743,10 +751,13 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// let mut dev = Device::new(PdfBackend::new(5, 4), Par::default());
+    /// # fn main() -> std::io::Result<()> {
+    /// let mut dev = Device::memory("pdf").width(5).height(4).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// let pdf: Vec<u8> = dev.finish();
     /// assert!(pdf.starts_with(b"%PDF"));
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn finish(self) -> Vec<u8> {
         self.backend.into_bytes()
@@ -777,15 +788,16 @@ impl<B: Backend> Device<B> {
     /// # Errors
     ///
     /// If writing the file fails, or writing an earlier page's file failed
-    /// (the first such error). A device made with [`Device::new`] has no file:
-    /// closing it is an [`InvalidInput`](std::io::ErrorKind::InvalidInput)
-    /// error; use [`finish`](Device::finish) for its bytes.
+    /// (the first such error). A device from [`Device::memory`] or
+    /// [`Device::new`] has no file: closing it is an
+    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error; use
+    /// [`finish`](Device::finish) for its bytes.
     pub fn close(mut self) -> std::io::Result<()> {
         let Some(output) = self.output.take() else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                "no file to close: the device was made with Device::new; \
-                 open one with Device::pdf/svg/png/format, or use finish()",
+                "no file to close: the device's output is in memory \
+                 (Device::memory or Device::new); use finish()",
             ));
         };
         output.close(&self.finish())
@@ -799,7 +811,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// let dev = Device::new(SvgBackend::new(7, 5), Par::default());
+    /// let dev = Device::null().width(7).height(5).open().unwrap();
     /// assert_eq!(dev.din(), (7.0, 5.0));
     /// ```
     ///
@@ -2565,9 +2577,9 @@ mod tests {
 
     #[test]
     fn inches_to_user_inverts_user_to_inches() {
-        use super::{Device, Par, PlotWindowOptions, Side};
-        use crate::backend::pdf::PdfBackend;
-        let mut dev = Device::new(PdfBackend::new(7.0, 5.0), Par::default());
+        use super::{Device, PlotWindowOptions, Side};
+
+        let mut dev = Device::memory("pdf").width(7.0).height(5.0).open().unwrap();
         dev.plot_new_impl().unwrap();
         assert!(!dev.xlog() && !dev.ylog());
         let log_x = PlotWindowOptions {

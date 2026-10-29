@@ -1142,12 +1142,10 @@ mod tests {
 
     #[test]
     fn calls_have_the_same_setters_and_with() {
-        use crate::backend::svg::SvgBackend;
         use crate::device::{AxisOptions, Device};
         use crate::graphics::Graphics;
-        use crate::par::Par;
 
-        let mut dev = Device::new(SvgBackend::new(4.0, 4.0), Par::default());
+        let mut dev = Device::memory("svg").width(4.0).height(4.0).open().unwrap();
         let saved = AxisOptions::default().las(1).at([1.0, 2.0]).lwd(3.0);
 
         let call = dev.axis().side(2).las(2).tick(false);

@@ -19,9 +19,6 @@
 //! error type itself is [`rs_graphics::Error`](crate::Error), kept out of
 //! the glob import so it doesn't clash with other `Error`s).
 
-pub use crate::backend::pdf::PdfBackend;
-pub use crate::backend::raster::RasterBackend;
-pub use crate::backend::svg::SvgBackend;
 pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
 pub use crate::device::{

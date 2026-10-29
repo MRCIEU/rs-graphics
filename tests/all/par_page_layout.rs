@@ -16,7 +16,7 @@
 
 use rs_graphics::prelude::*;
 
-fn panels(dev: &mut Device<PdfBackend>) {
+fn panels(dev: &mut Device<AnyBackend>) {
     for i in 0..3 {
         let y = [1.0, 3.0 + i as f64, 2.0];
         dev.plot().x([1.0, 2.0, 3.0]).y(y).main("Panel").draw();
@@ -24,11 +24,13 @@ fn panels(dev: &mut Device<PdfBackend>) {
     dev.mtext().text("Page").side(3).outer(true).draw();
 }
 
-fn render(setup: impl Fn(&mut Device<PdfBackend>)) -> Vec<u8> {
-    let mut dev = Device::new(
-        PdfBackend::new(8.0, 6.0).with_compression(false),
-        Par::default(),
-    );
+fn render(setup: impl Fn(&mut Device<AnyBackend>)) -> Vec<u8> {
+    let mut dev = Device::memory("pdf")
+        .width(8.0)
+        .height(6.0)
+        .compress(false)
+        .open()
+        .unwrap();
     setup(&mut dev);
     panels(&mut dev);
     dev.finish()
@@ -57,7 +59,7 @@ fn last_grid_in_a_call_wins() {
 
 #[test]
 fn settings_in_the_same_call_override_the_grid_defaults() {
-    let mut dev = Device::new(PdfBackend::new(8.0, 6.0), Par::default());
+    let mut dev = Device::memory("pdf").width(8.0).height(6.0).open().unwrap();
     dev.par().mfrow(2, 2).draw();
     assert_eq!(dev.current_par().cex, 0.83);
     dev.par().cex(0.5).mex(1.5).mfrow(2, 2).draw();
@@ -77,7 +79,7 @@ fn with_keeps_the_grid() {
 #[test]
 #[should_panic(expected = "invalid value specified for graphical parameter \"mfrow\"")]
 fn zero_rows_panic_at_draw() {
-    let mut dev = Device::new(PdfBackend::new(8.0, 6.0), Par::default());
+    let mut dev = Device::memory("pdf").width(8.0).height(6.0).open().unwrap();
     dev.par().mfrow(0, 2).draw();
 }
 
@@ -85,11 +87,13 @@ fn zero_rows_panic_at_draw() {
 /// the setter order: the same as separate calls in R's usual order.
 #[test]
 fn page_layout_is_applied_in_order() {
-    let draw = |setup: &dyn Fn(&mut Device<PdfBackend>)| {
-        let mut dev = Device::new(
-            PdfBackend::new(8.0, 6.0).with_compression(false),
-            Par::default(),
-        );
+    let draw = |setup: &dyn Fn(&mut Device<AnyBackend>)| {
+        let mut dev = Device::memory("pdf")
+            .width(8.0)
+            .height(6.0)
+            .compress(false)
+            .open()
+            .unwrap();
         dev.plot().x([1, 2]).y([1, 2]).draw();
         setup(&mut dev);
         dev.plot().x([1, 2]).y([2, 1]).draw();

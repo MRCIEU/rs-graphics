@@ -81,7 +81,7 @@ struct Case {
     r: &'static str,
     /// Draws the page; returns each legend's layout and the `usr` of the
     /// panel it was drawn in, in drawing order.
-    draw: fn(&mut Device<PdfBackend>) -> Vec<Drawn>,
+    draw: fn(&mut Device<AnyBackend>) -> Vec<Drawn>,
 }
 
 fn layouts(r: FigureResult, usr: (f64, f64, f64, f64)) -> Vec<Drawn> {

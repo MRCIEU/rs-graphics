@@ -17,7 +17,7 @@ use crate::common;
 use crate::common::{pdf, r};
 
 use rs_graphics::highlevel::{PlotOptions, PlotType};
-use rs_graphics::par::Par;
+use rs_graphics::par::ParOptions;
 use rs_graphics::graphics::Graphics;
 
 const PAGE_W: f64 = 6.0;
@@ -81,10 +81,7 @@ fn r_code(c: &Case) -> String {
 }
 
 fn draw_ours(c: &Case) -> Vec<u8> {
-    let par = Par {
-        cex: c.cex,
-        ..Par::default()
-    };
+    let par = ParOptions::default().cex(c.cex);
     let opts = PlotOptions::default()
         .type_(PlotType::try_from(c.type_).unwrap())
         .ylog(c.ylog)

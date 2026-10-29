@@ -18,16 +18,15 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::AnyBackend;
+use rs_graphics::graphics::Graphics;
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::PlotOptions;
-use rs_graphics::par::Par;
-use rs_graphics::graphics::Graphics;
 
 const PAGE_W: f64 = 6.0;
 const PAGE_H: f64 = 5.0;
 
-type Dev = Device<PdfBackend>;
+type Dev = Device<AnyBackend>;
 
 /// R: `pl(n, main)` is `plot(1:n, main = main, xlab = 'x', ylab = 'y')`.
 const R_PRELUDE: &str = "pl <- function(n, main) plot(1:n, main = main, xlab = 'x', ylab = 'y')\n";
@@ -113,13 +112,15 @@ fn multipage_pdf_matches_r() {
 #[test]
 fn compressed_pages_inflate_to_the_uncompressed_ones() {
     let draw = |compress: bool| {
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(compress),
-            Par::default(),
-        );
+        let mut dev = Device::memory("pdf")
+            .width(PAGE_W)
+            .height(PAGE_H)
+            .compress(compress)
+            .open()
+            .unwrap();
         pl(&mut dev, 3, "one");
         pl(&mut dev, 4, "two");
-        dev.into_backend().finish()
+        dev.finish()
     };
     let (plain, packed) = (draw(false), draw(true));
     let packed_text = String::from_utf8_lossy(&packed);
