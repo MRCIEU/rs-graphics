@@ -24,7 +24,7 @@ struct Case {
     name: &'static str,
     size: (f64, f64),
     r: &'static str,
-    rust: fn(&mut Device<PdfBackend>),
+    rust: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {
@@ -51,7 +51,7 @@ fn cases() -> Vec<Case> {
             name: "oma_with_mfrow",
             size: (7.0, 7.0),
             r: "par(oma = c(40, 0, 0, 0), mfrow = c(2, 1))",
-            rust: |d| d.par().oma([40, 0, 0, 0]).mfrow(2, 1).draw(),
+            rust: |d| d.par().oma([40, 0, 0, 0]).mfrow([2, 1]).draw(),
         },
         Case {
             name: "fin_too_wide",
@@ -96,7 +96,7 @@ fn cases() -> Vec<Case> {
             name: "many_panels",
             size: (4.0, 4.0),
             r: "par(mfrow = c(6, 6))",
-            rust: |d| d.par().mfrow(6, 6).draw(),
+            rust: |d| d.par().mfrow([6, 6]).draw(),
         },
         Case {
             name: "lcm_layout_too_wide",
@@ -124,12 +124,12 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-fn device(w: f64, h: f64) -> Device<PdfBackend> {
-    Device::new(PdfBackend::new(w, h), Par::default())
+fn device(w: f64, h: f64) -> Device<AnyBackend> {
+    Device::memory("pdf").width(w).height(h).open().unwrap()
 }
 
 /// `try_plot_new()`'s error message, or `"ok"`.
-fn outcome(dev: &mut Device<PdfBackend>) -> String {
+fn outcome(dev: &mut Device<AnyBackend>) -> String {
     match dev.try_plot_new() {
         Ok(()) => "ok".to_string(),
         Err(e) => {
@@ -209,7 +209,7 @@ fn failed_figure_is_retried_like_r() {
          invisible(dev.off()); cat(m, m2, a, b, c, d, e, sep = '|')",
     );
     let mut dev = device(7.0, 7.0);
-    dev.par().mfrow(1, 3).draw();
+    dev.par().mfrow([1, 3]).draw();
     dev.plot_new();
     dev.par().mar([60, 1, 1, 1]).draw();
     let err = outcome(&mut dev);

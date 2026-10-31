@@ -12,9 +12,9 @@
 //! A colour argument is a string (`"red"`, `"#FF0000"`, `"#FF000080"`), a
 //! small integer indexing the current palette ([`ColorSpec::Index`]; the
 //! default palette is [`DEFAULT_PALETTE`]), or nothing (`None`, R's
-//! `NA`: don't draw). [`Color::parse`] accepts the strings R's
-//! `col2rgb()` and graphics functions accept, except numeric strings such
-//! as `"2"` (R's palette indices; use [`ColorSpec::Index`]).
+//! `NA`: don't draw). [`Color`] converts from the strings R's `col2rgb()`
+//! and graphics functions accept, except numeric strings such as `"2"`
+//! (R's palette indices, which [`ColorSpec`]'s conversion takes).
 
 use crate::named_colors::NAMED_COLORS;
 
@@ -23,17 +23,29 @@ use crate::named_colors::NAMED_COLORS;
 /// This is the same representation R uses internally (a packed
 /// `AABBGGRR` `u32`). Alpha 255 is opaque, 0 fully transparent. A
 /// `Color` converts into a [`ColorSpec`], so it can be passed wherever a
-/// colour argument is taken; so can a string, via [`Color::parse`]
-/// (`TryFrom<&str>`; an invalid string is an error of the call, as R
-/// errors).
+/// colour argument is taken; so can a string (an invalid one is an error
+/// of the call, as R errors).
+///
+/// From a string (`"steelblue".parse::<Color>()` or `TryFrom<&str>`): the hex
+/// forms `"#rgb"`, `"#rgba"`, `"#rrggbb"` and `"#rrggbbaa"`; `"transparent"`
+/// (white with alpha 0); and R's 657 colour names, matched ignoring case
+/// and spaces (`"Light Blue"`). Surrounding whitespace is ignored. `"NA"`,
+/// `""` and unknown names are errors (R: "invalid color name"), and so are
+/// numeric strings such as `"2"`: palette indices are a [`ColorSpec`]'s
+/// (whose string conversion takes them).
+///
+/// This is how R's `col2rgb()` reads colour strings.
 ///
 /// # Examples
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let c = Color::parse("steelblue").unwrap();
+/// let c: Color = "steelblue".parse().unwrap();
 /// assert_eq!(c, Color::rgb(0x46, 0x82, 0xB4));
 /// assert_eq!(c.with_alpha(128).to_hex(), "#4682b480");
+/// assert_eq!("#f00".parse::<Color>().unwrap(), Color::rgb(255, 0, 0));
+/// assert_eq!("Dark Red".parse::<Color>().unwrap(), Color::rgb(139, 0, 0));
+/// assert!("NA".parse::<Color>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Color {
@@ -83,29 +95,9 @@ impl Color {
     /// Opaque white.
     pub const WHITE: Color = Color::rgb(255, 255, 255);
 
-    /// Parses a colour string, or returns `None` for `"NA"`, an empty
-    /// string or an unknown name.
-    ///
-    /// Accepted: the hex forms `"#rgb"`, `"#rgba"`, `"#rrggbb"` and
-    /// `"#rrggbbaa"`; `"transparent"`, which is white with alpha 0
-    /// (`#FFFFFF00`); and R's 657 built-in colour names, matched ignoring
-    /// case and spaces (`"Light Blue"` is `"lightblue"`). Surrounding
-    /// whitespace is ignored. Numeric strings such as `"2"` are not palette
-    /// indices here; use [`ColorSpec::Index`].
-    ///
-    /// This is how R's `col2rgb()` and graphics functions read colour
-    /// strings.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(Color::parse("#f00"), Some(Color::rgb(255, 0, 0)));
-    /// assert_eq!(Color::parse("Dark Red"), Some(Color::rgb(139, 0, 0)));
-    /// assert_eq!(Color::parse("transparent"), Some(Color::rgba(255, 255, 255, 0)));
-    /// assert_eq!(Color::parse("NA"), None);
-    /// ```
-    pub fn parse(spec: &str) -> Option<Color> {
+    /// A colour string, `None` for `"NA"`, `""` or an unknown name; the
+    /// public routes are `FromStr`/`TryFrom<&str>` (R's message).
+    pub(crate) fn parse(spec: &str) -> Option<Color> {
         let s = spec.trim();
         if s.is_empty() || s.eq_ignore_ascii_case("NA") {
             return None;
@@ -227,7 +219,7 @@ pub const DEFAULT_PALETTE: [Color; 8] = [
 /// Every `col`/`bg`/`border`-style argument takes one. It converts from a
 /// [`Color`] or a palette index (`i32`), from an `Option` of either
 /// (`None` is [`ColorSpec::None`]), and, with `TryFrom`, from a colour
-/// string (as [`Color::parse`]; a whole number is a palette index, `"NA"`
+/// string (as [`Color`]'s; a whole number is a palette index, `"NA"`
 /// is [`ColorSpec::None`], anything else an error) or an `Option` of one.
 /// So recycled colour vectors can mix colours and `NA`s:
 /// `.col([Some("red"), None])`.
@@ -317,7 +309,7 @@ fn invalid_color(s: &str) -> crate::error::Error {
 impl TryFrom<&str> for ColorSpec {
     type Error = crate::error::Error;
 
-    /// A colour name or hex string, as [`Color::parse`]; a whole number is
+    /// A colour name or hex string, as [`Color`]'s; a whole number is
     /// a palette index (`"2"`, as R); `"NA"` (any case) gives
     /// `ColorSpec::None` (draw nothing), as R's `NA`.
     ///
@@ -360,6 +352,7 @@ impl TryFrom<&String> for ColorSpec {
 macro_rules! from_option {
     ($($t:ty),*) => {
         $(
+            /// Converts a colour, or `None` for R's `NA` (draw nothing).
             impl From<Option<$t>> for ColorSpec {
                 fn from(c: Option<$t>) -> Self {
                     c.map_or(ColorSpec::None, Into::into)
@@ -374,6 +367,12 @@ from_option!(Color, ColorSpec, i32);
 macro_rules! try_from_option {
     ($($t:ty),*) => {
         $(
+            /// Converts a colour string, or `None` for R's `NA` (draw nothing).
+            ///
+            /// # Errors
+            ///
+            /// If the string isn't a colour (see [`ColorSpec`]'s
+            /// conversions).
             impl TryFrom<Option<$t>> for ColorSpec {
                 type Error = crate::error::Error;
 
@@ -386,12 +385,13 @@ macro_rules! try_from_option {
 }
 try_from_option!(&str, String, &String);
 
-crate::error::from_str_via_parse!(Color, "colour");
+crate::error::from_str_via_try_from!(Color);
+crate::error::from_str_via_try_from!(ColorSpec);
 
 impl TryFrom<&str> for Color {
     type Error = crate::error::Error;
 
-    /// A colour name or hex string, as [`Color::parse`].
+    /// A colour name or hex string (see [`Color`]).
     ///
     /// # Errors
     ///
@@ -431,8 +431,8 @@ impl TryFrom<&String> for Color {
 /// ```
 /// # use rs_graphics::prelude::*;
 /// let greys = gray_colors(3);
-/// assert_eq!(greys[0], ColorSpec::Color(Color::parse("#4D4D4D").unwrap()));
-/// assert_eq!(greys[2], ColorSpec::Color(Color::parse("#E6E6E6").unwrap()));
+/// assert_eq!(greys[0], ColorSpec::Color("#4D4D4D".parse().unwrap()));
+/// assert_eq!(greys[2], ColorSpec::Color("#E6E6E6".parse().unwrap()));
 /// ```
 pub fn gray_colors(n: usize) -> Vec<ColorSpec> {
     let (gamma, a, b) = (2.2_f64, 0.3_f64.powf(2.2), 0.9_f64.powf(2.2));

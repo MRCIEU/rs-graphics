@@ -8,8 +8,9 @@
 
 //! The `Backend` trait: a minimal drawing surface that the higher-level
 //! graphics engine (`crate::device`) renders onto. Implemented for SVG
-//! (`svg.rs`), PDF (`pdf.rs`), and PNG rasterization (`raster.rs`), and
-//! [`AnyBackend`], which wraps any of the three behind one type.
+//! (`svg.rs`), PDF (`pdf.rs`), PNG rasterization (`raster.rs`) and a null
+//! device that draws nothing (`null.rs`), and [`AnyBackend`], which wraps
+//! any of them behind one type.
 //!
 //! # Coordinate convention
 //! All coordinates passed to a `Backend` are in **inches**, origin at the
@@ -21,7 +22,7 @@
 //! Glyph *width* and *height* calculations always go through
 //! `crate::afm` (the same Helvetica AFM tables R's own `pdf()`/
 //! `postscript()` devices use), regardless of backend. That keeps layout
-//! math (label centering, legend sizing, tick offsets, ...) identical to
+//! math (label centring, legend sizing, tick offsets, ...) identical to
 //! R no matter which backend ends up rasterizing the glyphs. Only the
 //! actual glyph *painting* is backend-specific, via [`Backend::draw_text`].
 //!
@@ -30,6 +31,7 @@
 
 mod any;
 mod compress;
+pub mod null;
 mod numfmt;
 pub mod pdf;
 pub mod raster;
@@ -38,37 +40,43 @@ pub mod svg;
 pub use any::{AnyBackend, Format};
 
 use crate::color::Color;
+use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 /// How the ends of a line are drawn: round, butt (flat at the end) or
 /// square (flat, extended by half the line width).
 ///
-/// This is R's `par(lend = )`.
+/// From a string (`"butt".parse::<LineEnd>()` or `TryFrom<&str>`): `"round"`,
+/// `"butt"` or `"square"`, or their codes as strings, `"0"` to `"2"` (R takes
+/// the codes only as numbers). Anything else is an error.
+///
+/// This is R's [`par(lend)`].
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("butt".parse::<LineEnd>().unwrap(), LineEnd::Butt);
+/// assert!("flat".parse::<LineEnd>().is_err());
+/// ```
+///
+/// [`par(lend)`]: crate::par::Par::lend
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineEnd {
-    /// Rounded ends (the default).
+    /// Rounded ends (the default). R's `"round"`.
     Round,
-    /// Flat ends, at the end points.
+    /// Flat ends, at the end points. R's `"butt"`.
     Butt,
-    /// Flat ends, extended by half the line width.
+    /// Flat ends, extended by half the line width. R's `"square"`.
     Square,
 }
 
 impl LineEnd {
-    /// Reads `"round"`, `"butt"` or `"square"`, or their numeric codes as
-    /// strings `"0"`, `"1"`, `"2"`; `None` for anything else.
-    ///
-    /// These are R's `lend` names; R accepts the codes only as numbers.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineEnd::parse("butt"), Some(LineEnd::Butt));
-    /// assert_eq!(LineEnd::parse("flat"), None);
-    /// ```
-    pub fn parse(spec: &str) -> Option<LineEnd> {
+    /// R's `lend` name or code, `None` otherwise; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(spec: &str) -> Option<LineEnd> {
         match spec {
             "round" | "0" => Some(LineEnd::Round),
             "butt" | "1" => Some(LineEnd::Butt),
@@ -78,36 +86,40 @@ impl LineEnd {
     }
 }
 
-crate::error::from_str_via_parse!(LineEnd, "line end");
 crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"square\"");
 
 /// How the corners of a line are drawn: round, mitred (pointed) or
 /// bevelled (cut off).
 ///
-/// This is R's `par(ljoin = )`.
+/// From a string (`"mitre".parse::<LineJoin>()` or `TryFrom<&str>`): `"round"`,
+/// `"mitre"` or `"bevel"`, or their codes as strings, `"0"` to `"2"` (R takes
+/// the codes only as numbers). Anything else is an error.
+///
+/// This is R's [`par(ljoin)`].
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("mitre".parse::<LineJoin>().unwrap(), LineJoin::Mitre);
+/// ```
+///
+/// [`par(ljoin)`]: crate::par::Par::ljoin
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineJoin {
-    /// Rounded corners (the default).
+    /// Rounded corners (the default). R's `"round"`.
     Round,
-    /// Pointed corners, bevelled where longer than the mitre limit.
+    /// Pointed corners, bevelled where longer than the mitre limit. R's
+    /// `"mitre"`.
     Mitre,
-    /// Corners cut off.
+    /// Corners cut off. R's `"bevel"`.
     Bevel,
 }
 
 impl LineJoin {
-    /// Reads `"round"`, `"mitre"` or `"bevel"`, or their numeric codes as
-    /// strings `"0"`, `"1"`, `"2"`; `None` for anything else.
-    ///
-    /// These are R's `ljoin` names; R accepts the codes only as numbers.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineJoin::parse("mitre"), Some(LineJoin::Mitre));
-    /// ```
-    pub fn parse(spec: &str) -> Option<LineJoin> {
+    /// R's `ljoin` name or code, `None` otherwise; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(spec: &str) -> Option<LineJoin> {
         match spec {
             "round" | "0" => Some(LineJoin::Round),
             "mitre" | "1" => Some(LineJoin::Mitre),
@@ -117,7 +129,6 @@ impl LineJoin {
     }
 }
 
-crate::error::from_str_via_parse!(LineJoin, "line join");
 crate::error::from_r_string!(LineJoin, "line join", "\"round\", \"mitre\" or \"bevel\"");
 
 /// Everything a [`Backend`] needs to draw a line: colour, width, line type,
@@ -151,10 +162,10 @@ impl Stroke {
     /// let s = Stroke::simple(Color::BLACK, 2);
     /// assert_eq!(s.width_pt(), 1.5);
     /// ```
-    pub fn simple(color: Color, lwd: impl Into<f64>) -> Self {
+    pub fn simple(color: Color, lwd: impl Num) -> Self {
         Stroke {
             color,
-            lwd: lwd.into(),
+            lwd: lwd.to_f64(),
             lty: LineType::SOLID,
             lend: LineEnd::Round,
             ljoin: LineJoin::Round,
@@ -166,11 +177,36 @@ impl Stroke {
     pub fn width_pt(&self) -> f64 {
         (self.lwd * 0.75).max(0.01)
     }
+
+    /// Returns the dash pattern in points (alternately drawn and skipped
+    /// lengths, starting with a drawn one), or `None` for a solid line.
+    ///
+    /// Each length is the line type's, in `lwd` units, times the line width
+    /// in points. Unless the line ends are butt, drawn lengths are one `lwd`
+    /// shorter and gaps one `lwd` longer, so that the round or square ends
+    /// don't fill the gaps (lengths below 0 become 0). A pattern whose
+    /// lengths are all 0.01pt or less is solid. Blank lines are `None` too:
+    /// a backend draws nothing for them (see [`LineType::BLANK`]).
+    ///
+    /// This is how R's `pdf()` device (`PDFSetLineTexture()`) draws `lty`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # use rs_graphics::backend::{LineEnd, Stroke};
+    /// let mut s = Stroke::simple(Color::BLACK, 1);
+    /// assert_eq!(s.dash_pt(), None);
+    /// s.lty = LineType::DASHED; // 4 on, 4 off; round ends
+    /// assert_eq!(s.dash_pt(), Some(vec![2.25, 3.75]));
+    /// s.lend = LineEnd::Butt;
+    /// assert_eq!(s.dash_pt(), Some(vec![3.0, 3.0]));
+    /// ```
+    pub fn dash_pt(&self) -> Option<Vec<f64>> {
+        self.lty.dash_lengths_pt(self.lwd, self.lend == LineEnd::Butt)
+    }
 }
 
-/// The font faces (see [`crate::font`]): plain, bold, italic, bold italic
-/// and Symbol (font 5).
-pub use crate::font::FontFace;
 
 /// How a [`Backend`] paints a run of text: colour, font face, size and
 /// rotation.
@@ -186,10 +222,10 @@ pub struct TextStyle {
     pub color: Color,
     /// Font face: plain, bold, italic, bold italic or Symbol.
     pub face: FontFace,
-    /// Point size to paint at: `par(ps) * cex` after
+    /// Point size to paint at: `par(ps) * par(cex) * cex` after
     /// [`Backend::effective_font_size`] (so whole points on PDF).
     pub size_pt: f64,
-    /// Rotation in degrees, counterclockwise about the anchor point,
+    /// Rotation in degrees, anticlockwise about the anchor point,
     /// matching R's `srt` text-rotation convention.
     pub rotation_deg: f64,
 }
@@ -205,8 +241,8 @@ impl TextStyle {
     /// let style = TextStyle::new(Color::BLACK, FontFace::Bold, 12);
     /// assert_eq!(style.rotation_deg, 0.0);
     /// ```
-    pub fn new(color: Color, face: FontFace, size_pt: impl Into<f64>) -> Self {
-        let size_pt = size_pt.into();
+    pub fn new(color: Color, face: FontFace, size_pt: impl Num) -> Self {
+        let size_pt = size_pt.to_f64();
         TextStyle {
             color,
             face,
@@ -222,8 +258,13 @@ impl TextStyle {
 /// Coordinates are in inches from the page's bottom-left corner, y
 /// upwards (see the [module docs](self)). The crate's backends are
 /// [`PdfBackend`](pdf::PdfBackend), [`SvgBackend`](svg::SvgBackend),
-/// [`RasterBackend`](raster::RasterBackend) and [`AnyBackend`]; code that
-/// works with any of them takes a `B: Backend`.
+/// [`RasterBackend`](raster::RasterBackend),
+/// [`NullBackend`](null::NullBackend) and [`AnyBackend`], made by
+/// the device builder ([`Device::pdf`](crate::device::Device::pdf),
+/// [`Device::memory`](crate::device::Device::memory), ...); code that works
+/// with any of them takes a `B: Backend`. To draw somewhere else, implement
+/// this trait and pass your backend to
+/// [`Device::new`](crate::device::Device::new).
 ///
 /// # Examples
 ///
@@ -234,9 +275,9 @@ impl TextStyle {
 /// fn draw<B: Backend>(dev: &mut Device<B>) {
 ///     dev.plot().x([1, 2, 3]).draw();
 /// }
-/// let mut pdf = Device::new(PdfBackend::new(5, 5), Par::default());
+/// let mut pdf = Device::memory("pdf").width(5).height(5).open().unwrap();
 /// draw(&mut pdf);
-/// let mut svg = Device::new(SvgBackend::new(5, 5), Par::default());
+/// let mut svg = Device::memory("svg").width(5).height(5).open().unwrap();
 /// draw(&mut svg);
 /// ```
 pub trait Backend {
@@ -283,7 +324,7 @@ pub trait Backend {
     fn device_unit_inches(&self) -> f64;
 
     /// Returns the point size this device actually sets text at, given the
-    /// requested size (`par(ps) * cex`).
+    /// requested size (`par(ps) * par(cex) * cex`).
     ///
     /// The device sends every text size through this, for measuring as well
     /// as drawing. It's the requested size for SVG and PNG, and rounded to a
@@ -293,11 +334,13 @@ pub trait Backend {
     /// (`svg()`, `png()`) don't.
     fn effective_font_size(&self, requested_pt: f64) -> f64;
 
-    /// Returns the background colour `par(bg)` starts as: white for SVG, the
-    /// canvas colour for PNG, and transparent for PDF unless set with
-    /// [`with_background`](pdf::PdfBackend::with_background).
+    /// Returns the background colour [`par(bg)`] starts as: white for SVG, the
+    /// canvas colour for PNG, and transparent for PDF unless the device was
+    /// opened with a [`bg`](crate::device::DeviceBuilder::bg).
     ///
-    /// New pages and default `legend()` boxes are filled with `par(bg)`.
+    /// New pages and default `legend()` boxes are filled with [`par(bg)`].
+    ///
+    /// [`par(bg)`]: crate::par::Par::bg
     fn default_bg(&self) -> Color;
 
     /// Starts a new page.
@@ -324,3 +367,6 @@ pub trait Backend {
     where
         Self: Sized;
 }
+
+#[cfg(test)]
+mod smoke_tests;

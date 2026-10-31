@@ -8,73 +8,20 @@
 
 //! Cross-checks multi-figure output (`mfrow`/`mfcol`, `oma`, `mfg`,
 //! `layout()` with spanning figures / `lcm()` / `respect`, and `par(cex)`)
-//! against a real R `pdf()` device's uncompressed output: every bar
-//! rectangle and every text origin. Skipped if `Rscript` isn't available.
+//! against a real R `pdf()` device's uncompressed output: every painted
+//! path and text item in order (see `common::pdf::assert_same`). Skipped if
+//! `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
-
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::AnyBackend;
 use rs_graphics::device::Device;
 use rs_graphics::highlevel::{BarplotOptions, PlotOptions, PlotType};
-use rs_graphics::backend::svg::SvgBackend;
 use rs_graphics::layout::{LayoutRespect, LayoutSize};
-use rs_graphics::par::{Par, Sides};
+use rs_graphics::par::Sides;
+use rs_graphics::plotmath::Label;
 use rs_graphics::graphics::Graphics;
-
-/// `(x, y)` of every text matrix, sorted.
-fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let Some(idx) = line.find(" Tm") else {
-            continue;
-        };
-        // Reversed: [y, x, ...].
-        let nums: Vec<f64> = line[..idx]
-            .split_whitespace()
-            .rev()
-            .take(6)
-            .filter_map(|t| t.parse().ok())
-            .collect();
-        if nums.len() == 6 {
-            out.push((nums[1], nums[0]));
-        }
-    }
-    // Coordinates are printed with 2 (R) vs 3 (ours) decimals, so sort on
-    // coarsely rounded values to get the same order from both.
-    let key = |p: &(f64, f64)| ((p.0 * 10.0).round() as i64, (p.1 * 10.0).round() as i64);
-    out.sort_by_key(key);
-    out
-}
-
-/// `[x, y_bottom, w, h]` of every drawn rectangle, ignoring the full-page
-/// background, normalised so `h > 0`.
-fn rects(pdf: &str) -> Vec<[f64; 4]> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let line = line.trim();
-        if !line.ends_with(" re") {
-            continue;
-        }
-        let nums: Vec<f64> = line
-            .split_whitespace()
-            .filter_map(|t| t.parse().ok())
-            .collect();
-        if nums.len() != 4 || (nums[2] >= PAGE_W * 72.0 - 1.0 && nums[3] >= PAGE_H * 72.0 - 1.0) {
-            continue;
-        }
-        let (x, y, w, h) = (nums[0], nums[1], nums[2], nums[3]);
-        out.push(if h < 0.0 {
-            [x, y + h, w, -h]
-        } else {
-            [x, y, w, h]
-        });
-    }
-    let key = |r: &[f64; 4]| r.map(|v| (v * 10.0).round() as i64);
-    out.sort_by_key(key);
-    out
-}
 
 const PAGE_W: f64 = 8.0;
 const PAGE_H: f64 = 6.0;
@@ -82,27 +29,22 @@ const PAGE_H: f64 = 6.0;
 /// R: `bp(h, main)`.
 const R_PRELUDE: &str = "bp <- function(h, main) barplot(h, names.arg = LETTERS[seq_along(h)], main = main, ylab = 'v')\n";
 
-fn bp(d: &mut Device<PdfBackend>, h: &[f64], main: &str) {
-    let o = BarplotOptions {
-        names: Some(
+fn bp(d: &mut Device<AnyBackend>, h: &[f64], main: &str) {
+    let o = BarplotOptions::default()
+        .names(
             (0..h.len())
-                .map(|i| ((b'A' + i as u8) as char).to_string().into())
-                .collect(),
-        ),
-        main: Some(main.into()),
-        ylab: Some("v".into()),
-        ..Default::default()
-    };
+                .map(|i| Label::from(((b'A' + i as u8) as char).to_string()))
+                .collect::<Vec<_>>(),
+        )
+        .main(main)
+        .ylab("v");
     d.barplot().height(h).with(&o).draw();
 }
 
 struct Case {
     name: &'static str,
     r: &'static str,
-    run: fn(&mut Device<PdfBackend>),
-    /// Compare rectangles. Off where `box()` is drawn (a rectangle for us,
-    /// a polyline in R).
-    check_rects: bool,
+    run: fn(&mut Device<AnyBackend>),
 }
 
 fn cases() -> Vec<Case> {
@@ -113,37 +55,34 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5, 2), 'one'); bp(c(4, 1, 6, 2), 'two')\n\
                 bp(c(2, 2, 7), 'three'); bp(c(5, 3), 'four')",
             run: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 bp(d, &[3.0, 5.0, 2.0], "one");
                 bp(d, &[4.0, 1.0, 6.0, 2.0], "two");
                 bp(d, &[2.0, 2.0, 7.0], "three");
                 bp(d, &[5.0, 3.0], "four");
             },
-            check_rects: true,
         },
         Case {
             name: "mfrow_3x2",
             r: "par(mfrow = c(3, 2))\n\
                 for (k in 1:6) bp(c(k, 7 - k, 3), paste('fig', k))",
             run: |d| {
-                d.par().mfrow(3, 2).draw();
+                d.par().mfrow([3, 2]).draw();
                 for k in 1..=6 {
                     bp(d, &[k as f64, 7.0 - k as f64, 3.0], &format!("fig {k}"));
                 }
             },
-            check_rects: true,
         },
         Case {
             name: "mfcol_2x3_partial",
             r: "par(mfcol = c(2, 3))\n\
                 bp(c(1, 4, 2), 'a'); bp(c(3, 3, 1), 'b'); bp(c(5, 2, 4), 'c')",
             run: |d| {
-                d.par().mfcol(2, 3).draw();
+                d.par().mfcol([2, 3]).draw();
                 bp(d, &[1.0, 4.0, 2.0], "a");
                 bp(d, &[3.0, 3.0, 1.0], "b");
                 bp(d, &[5.0, 2.0, 4.0], "c");
             },
-            check_rects: true,
         },
         Case {
             name: "mfrow_2x1_oma",
@@ -151,23 +90,21 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5, 2), 'top'); bp(c(4, 1, 6), 'bottom')",
             run: |d| {
                 d.par().oma(Sides::new(1.0, 2.0, 3.0, 1.0)).draw();
-                d.par().mfrow(2, 1).draw();
+                d.par().mfrow([2, 1]).draw();
                 bp(d, &[3.0, 5.0, 2.0], "top");
                 bp(d, &[4.0, 1.0, 6.0], "bottom");
             },
-            check_rects: true,
         },
         Case {
             name: "mfg",
             r: "par(mfrow = c(2, 2))\n\
                 bp(c(3, 5, 2), 'first'); par(mfg = c(2, 2)); bp(c(4, 1, 6), 'last')",
             run: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 bp(d, &[3.0, 5.0, 2.0], "first");
-                d.par().mfg(2, 2).draw();
+                d.par().mfg([2, 2]).draw();
                 bp(d, &[4.0, 1.0, 6.0], "last");
             },
-            check_rects: true,
         },
         Case {
             name: "layout_span_heights",
@@ -182,7 +119,6 @@ fn cases() -> Vec<Case> {
                 bp(d, &[4.0, 1.0], "left");
                 bp(d, &[2.0, 6.0, 1.0], "right");
             },
-            check_rects: true,
         },
         Case {
             name: "layout_cm_widths",
@@ -196,7 +132,6 @@ fn cases() -> Vec<Case> {
                 bp(d, &[3.0, 5.0], "narrow");
                 bp(d, &[4.0, 1.0, 6.0], "wide");
             },
-            check_rects: true,
         },
         Case {
             name: "layout_mixed_cm_heights",
@@ -212,7 +147,6 @@ fn cases() -> Vec<Case> {
                 bp(d, &[4.0, 1.0, 6.0], "b");
                 bp(d, &[2.0, 2.0, 7.0], "c");
             },
-            check_rects: true,
         },
         Case {
             name: "layout_respect",
@@ -224,7 +158,6 @@ fn cases() -> Vec<Case> {
                     bp(d, &[k as f64, 2.0], &format!("r {k}"));
                 }
             },
-            check_rects: true,
         },
         Case {
             name: "layout_respect_matrix",
@@ -239,7 +172,6 @@ fn cases() -> Vec<Case> {
                 bp(d, &[3.0, 5.0], "sq");
                 bp(d, &[4.0, 1.0, 6.0], "free");
             },
-            check_rects: true,
         },
         Case {
             name: "par_cex_half",
@@ -248,29 +180,25 @@ fn cases() -> Vec<Case> {
                 d.par().cex(0.5).draw();
                 bp(d, &[3.0, 5.0, 2.0], "small");
             },
-            check_rects: true,
         },
         Case {
             name: "mfrow_2x2_plot",
             r: "par(mfrow = c(2, 2))\n\
                 for (k in 1:4) plot(1:10, (1:10)^2, type = 'n', main = paste('p', k), xlab = 'x', ylab = 'y')",
             run: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 let x: Vec<f64> = (1..=10).map(f64::from).collect();
                 let y: Vec<f64> = x.iter().map(|v| v * v).collect();
                 for k in 1..=4 {
                     let title = format!("p {k}");
-                    let o = PlotOptions {
-                        type_: Some(PlotType::None),
-                        main: Some(title.as_str().into()),
-                        xlab: Some("x".into()),
-                        ylab: Some("y".into()),
-                        ..Default::default()
-                    };
+                    let o = PlotOptions::default()
+                        .type_(PlotType::None)
+                        .main(title.as_str())
+                        .xlab("x")
+                        .ylab("y");
                     d.plot().x(&x).y(&y).with(&o).draw();
                 }
             },
-            check_rects: false,
         },
     ]
 }
@@ -281,75 +209,22 @@ fn layout_matches_r() {
         return;
     }
     let cases = cases();
-    let dir = std::env::temp_dir();
-    let mut script = String::from(R_PRELUDE);
-    for c in &cases {
-        script.push_str(&format!(
-            "pdf(file = '{}/rs_graphics_layout_{}.pdf', width = 8, height = 6, compress = FALSE)\n\
-             {}\ninvisible(dev.off())\n",
-            dir.display(),
+    let page = (PAGE_W, PAGE_H);
+    let r_cases: Vec<_> = cases.iter().map(|c| (c.name, c.r)).collect();
+    let r = r::run_r("layout", page, R_PRELUDE, &r_cases);
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours, ()) = r::ours(page, c.run);
+        pdf::assert_same_pdf(
             c.name,
-            c.r
-        ));
-    }
-    let script_path = dir.join("rs_graphics_layout.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_layout_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-
-        let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), Par::default());
-        (c.run)(&mut dev);
-        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-
-        let (r_t, our_t) = (text_origins(&r_pdf), text_origins(&ours));
-        assert_eq!(
-            our_t.len(),
-            r_t.len(),
-            "{}: text item count\nours={our_t:?}\nr={r_t:?}",
-            c.name
+            pdf::parse(&ours),
+            pdf::parse(r_pdf),
+            &pdf::Compare::default(),
         );
-        for (a, b) in our_t.iter().zip(&r_t) {
-            assert!(
-                (a.0 - b.0).abs() < 0.05 && (a.1 - b.1).abs() < 0.05,
-                "{}: text origin differs: ours={a:?} r={b:?}\nours={our_t:?}\nr={r_t:?}",
-                c.name
-            );
-        }
-
-        if c.check_rects {
-            let (r_r, our_r) = (rects(&r_pdf), rects(&ours));
-            assert_eq!(
-                our_r.len(),
-                r_r.len(),
-                "{}: rect count\nours={our_r:?}\nr={r_r:?}",
-                c.name
-            );
-            for (a, b) in our_r.iter().zip(&r_r) {
-                for k in 0..4 {
-                    assert!(
-                        (a[k] - b[k]).abs() < 0.05,
-                        "{}: rect differs: ours={a:?} r={b:?}",
-                        c.name
-                    );
-                }
-            }
-        }
     }
 }
 
-fn svg_device() -> Device<SvgBackend> {
-    Device::new(SvgBackend::new(8.0, 6.0), Par::default())
+fn svg_device() -> Device<AnyBackend> {
+    Device::memory("svg").width(8.0).height(6.0).open().unwrap()
 }
 
 /// `.draw()` returns the number of figures, as R's `layout()` does

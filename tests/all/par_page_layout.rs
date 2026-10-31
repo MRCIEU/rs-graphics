@@ -16,7 +16,7 @@
 
 use rs_graphics::prelude::*;
 
-fn panels(dev: &mut Device<PdfBackend>) {
+fn panels(dev: &mut Device<AnyBackend>) {
     for i in 0..3 {
         let y = [1.0, 3.0 + i as f64, 2.0];
         dev.plot().x([1.0, 2.0, 3.0]).y(y).main("Panel").draw();
@@ -24,11 +24,13 @@ fn panels(dev: &mut Device<PdfBackend>) {
     dev.mtext().text("Page").side(3).outer(true).draw();
 }
 
-fn render(setup: impl Fn(&mut Device<PdfBackend>)) -> Vec<u8> {
-    let mut dev = Device::new(
-        PdfBackend::new(8.0, 6.0).with_compression(false),
-        Par::default(),
-    );
+fn render(setup: impl Fn(&mut Device<AnyBackend>)) -> Vec<u8> {
+    let mut dev = Device::memory("pdf")
+        .width(8.0)
+        .height(6.0)
+        .compress(false)
+        .open()
+        .unwrap();
     setup(&mut dev);
     panels(&mut dev);
     dev.finish()
@@ -37,59 +39,61 @@ fn render(setup: impl Fn(&mut Device<PdfBackend>)) -> Vec<u8> {
 #[test]
 fn one_par_call_matches_separate_calls() {
     let direct = render(|dev| {
-        dev.par().mfrow(2, 2).draw();
+        dev.par().mfrow([2, 2]).draw();
         dev.par().oma(Sides::new(0.0, 0.0, 2.0, 0.0)).draw();
     });
-    let via_par = render(|dev| dev.par().mfrow(2, 2).oma([0.0, 0.0, 2.0, 0.0]).draw());
+    let via_par = render(|dev| dev.par().mfrow([2, 2]).oma([0.0, 0.0, 2.0, 0.0]).draw());
     assert_eq!(direct, via_par);
     // Setter order doesn't matter.
-    let reordered = render(|dev| dev.par().oma([0.0, 0.0, 2.0, 0.0]).mfrow(2, 2).draw());
+    let reordered = render(|dev| dev.par().oma([0.0, 0.0, 2.0, 0.0]).mfrow([2, 2]).draw());
     assert_eq!(direct, reordered);
 }
 
 #[test]
 fn last_grid_in_a_call_wins() {
-    let direct = render(|dev| dev.par().mfcol(2, 2).draw());
+    let direct = render(|dev| dev.par().mfcol([2, 2]).draw());
     // The last of mfrow/mfcol in a call wins.
-    let last = render(|dev| dev.par().mfrow(3, 1).mfcol(2, 2).draw());
+    let last = render(|dev| dev.par().mfrow([3, 1]).mfcol([2, 2]).draw());
     assert_eq!(direct, last);
 }
 
 #[test]
 fn settings_in_the_same_call_override_the_grid_defaults() {
-    let mut dev = Device::new(PdfBackend::new(8.0, 6.0), Par::default());
-    dev.par().mfrow(2, 2).draw();
+    let mut dev = Device::memory("pdf").width(8.0).height(6.0).open().unwrap();
+    dev.par().mfrow([2, 2]).draw();
     assert_eq!(dev.current_par().cex, 0.83);
-    dev.par().cex(0.5).mex(1.5).mfrow(2, 2).draw();
+    dev.par().cex(0.5).mex(1.5).mfrow([2, 2]).draw();
     assert_eq!((dev.current_par().cex, dev.current_par().mex), (0.5, 1.5));
-    dev.par().mfrow(3, 2).cex(0.9).draw();
+    dev.par().mfrow([3, 2]).cex(0.9).draw();
     assert_eq!(dev.current_par().cex, 0.9);
 }
 
 #[test]
 fn with_keeps_the_grid() {
     let opts = ParOptions::default().oma([0.0, 0.0, 2.0, 0.0]);
-    let direct = render(|dev| dev.par().mfrow(2, 2).oma([0.0, 0.0, 2.0, 0.0]).draw());
-    let with = render(|dev| dev.par().mfrow(2, 2).with(&opts).draw());
+    let direct = render(|dev| dev.par().mfrow([2, 2]).oma([0.0, 0.0, 2.0, 0.0]).draw());
+    let with = render(|dev| dev.par().mfrow([2, 2]).with(&opts).draw());
     assert_eq!(direct, with);
 }
 
 #[test]
 #[should_panic(expected = "invalid value specified for graphical parameter \"mfrow\"")]
 fn zero_rows_panic_at_draw() {
-    let mut dev = Device::new(PdfBackend::new(8.0, 6.0), Par::default());
-    dev.par().mfrow(0, 2).draw();
+    let mut dev = Device::memory("pdf").width(8.0).height(6.0).open().unwrap();
+    dev.par().mfrow([0, 2]).draw();
 }
 
 /// `new` is applied after `fig`/`fin` and `mfg` after the grid, whatever
 /// the setter order: the same as separate calls in R's usual order.
 #[test]
 fn page_layout_is_applied_in_order() {
-    let draw = |setup: &dyn Fn(&mut Device<PdfBackend>)| {
-        let mut dev = Device::new(
-            PdfBackend::new(8.0, 6.0).with_compression(false),
-            Par::default(),
-        );
+    let draw = |setup: &dyn Fn(&mut Device<AnyBackend>)| {
+        let mut dev = Device::memory("pdf")
+            .width(8.0)
+            .height(6.0)
+            .compress(false)
+            .open()
+            .unwrap();
         dev.plot().x([1, 2]).y([1, 2]).draw();
         setup(&mut dev);
         dev.plot().x([1, 2]).y([2, 1]).draw();
@@ -112,11 +116,11 @@ fn page_layout_is_applied_in_order() {
         draw(&|dev| dev.par().new(true).fin([3, 2]).draw())
     );
     let separate = draw(&|dev| {
-        dev.par().mfrow(2, 2).draw();
-        dev.par().mfg(2, 2).draw();
+        dev.par().mfrow([2, 2]).draw();
+        dev.par().mfg([2, 2]).draw();
     });
     assert_eq!(
         separate,
-        draw(&|dev| dev.par().mfg(2, 2).mfrow(2, 2).draw())
+        draw(&|dev| dev.par().mfg([2, 2]).mfrow([2, 2]).draw())
     );
 }

@@ -14,9 +14,7 @@ use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
-use rs_graphics::par::Par;
 use rs_graphics::prelude::*;
 
 fn r_par_values(width: f64, height: f64, ps: f64, xlim: (f64, f64), ylim: (f64, f64)) -> Vec<f64> {
@@ -59,14 +57,16 @@ fn plot_region_and_usr_match_r() {
     let (pin, rest) = r_values.split_at(2);
     let (mai, usr) = rest.split_at(4);
 
-    let mut par = Par::default();
-    par.ps = ps;
-    let backend = PdfBackend::new(width, height).with_compression(false);
-    let mut dev = Device::new(backend, par);
+    let mut dev = Device::memory("pdf")
+        .width(width)
+        .height(height)
+        .pointsize(ps)
+        .open()
+        .unwrap();
     dev.plot_new();
     dev.plot_window()
-        .xlim(xlim.0, xlim.1)
-        .ylim(ylim.0, ylim.1)
+        .xlim((xlim.0, xlim.1))
+        .ylim((ylim.0, ylim.1))
         .draw();
 
     let plt = dev.plot_region();
@@ -90,7 +90,7 @@ fn plot_region_and_usr_match_r() {
     assert!((computed_mai.top - r_mai[2]).abs() < 1e-6);
     assert!((computed_mai.right - r_mai[3]).abs() < 1e-6);
 
-    let (ux0, ux1, uy0, uy1) = dev.usr();
+    let [ux0, ux1, uy0, uy1] = dev.usr();
     // R's par('usr') order is (x0, x1, y0, y1).
     assert!(
         (ux0 - usr[0]).abs() < 1e-6,

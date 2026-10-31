@@ -13,19 +13,20 @@
 //! `polygon()` when shading.
 
 use super::Device;
-use super::primitives::pick;
 use crate::backend::{Backend, Stroke};
 use crate::color::ColorSpec;
 use crate::geometry::Point;
 use crate::lty::LineType;
-use crate::setters::pick_na;
+use crate::recycle::{pick, pick_na};
 
 /// Whether R shades: some `density` is given and not `NA` or negative
 /// (`polygon()`/`rect()` treat a `density` that is all `NA` or negative
 /// as not given). R tests this with `is.numeric(density)`, so a logical
 /// `density = NA` takes the shading path anyway, filling with `col`
-/// (`par(fg)` by default) and outlining in it (an R bug, not copied:
+/// ([`par(fg)`] by default) and outlining in it (an R bug, not copied:
 /// `None`s are R's `NA_real_`).
+///
+/// [`par(fg)`]: crate::par::Par::fg
 pub(crate) fn shading(density: &[Option<f64>]) -> bool {
     density.iter().any(|d| d.is_some_and(|d| d >= 0.0))
 }
@@ -53,29 +54,27 @@ impl<B: Backend> Device<B> {
     ///
     /// Without shading (see [`shading`]) this is `C_polygon`: each polygon
     /// of at least two points is filled with `col` (empty: none) and
-    /// outlined with `border` (empty: `par(fg)`), `lty` and `lwd`, in turn.
+    /// outlined with `border` (empty: [`par(fg)`]), `lty` and `lwd`, in turn.
     ///
     /// With shading, as `polygon.R`: `col` is the colour of the shading
-    /// lines (empty or `None` elements: `par(fg)`) and `border` defaults to
+    /// lines (empty or `None` elements: [`par(fg)`]) and `border` defaults to
     /// it. Each polygon in turn is shaded with lines (`density` > 0, lines
     /// per inch, at `angle` degrees, default 45), left empty (`density` 0)
     /// or filled with its `col` (`density` `None` or negative); then all
     /// borders are drawn. Shading is skipped on log axes (R warns
     /// "cannot hatch with logarithmic scale active").
+    ///
+    /// [`par(fg)`]: crate::par::Par::fg
     pub(crate) fn polygons(&mut self, x: &[f64], y: &[f64], s: &ShapeStyle) {
         // Runs of finite points, in data units and in inches.
-        let mut runs: Vec<Run> = Vec::new();
-        let mut run = (Vec::new(), Vec::new());
-        let n = x.len().min(y.len());
-        for i in 0..=n {
-            let p = (i < n).then(|| self.data_to_inches(x[i], y[i]));
-            if let Some(p) = p.filter(|p| p.x.is_finite() && p.y.is_finite()) {
-                run.0.push((x[i], y[i]));
-                run.1.push(p);
-            } else if !run.1.is_empty() {
-                runs.push(std::mem::take(&mut run));
-            }
-        }
+        let runs: Vec<Run> = self
+            .finite_runs(x, y)
+            .into_iter()
+            .map(|(start, pts)| {
+                let data = (start..start + pts.len()).map(|i| (x[i], y[i])).collect();
+                (data, pts)
+            })
+            .collect();
         let fg = ColorSpec::Color(self.par.fg);
         let (lty, lwd) = (self.par.lty, self.par.lwd);
         let shade = shading(s.density);
@@ -262,9 +261,7 @@ impl<B: Backend> Device<B> {
             let (ta, tb) = (t[o[k]], t[o[k + 1]]);
             let p0 = self.usr_to_inches(x0 + xd * ta, y0 + yd * ta);
             let p1 = self.usr_to_inches(x0 + xd * tb, y0 + yd * tb);
-            if [p0.x, p0.y, p1.x, p1.y].iter().all(|v| v.is_finite()) {
-                self.backend.draw_line(p0, p1, stroke);
-            }
+            self.draw_line_if_finite(p0, p1, stroke);
         }
     }
 }

@@ -11,19 +11,17 @@
 //! tick rules (`GLPretty()` + `CreateAtVector()`: 1-2-5, 1-5, powers of
 //! ten with decimation, a linear axis for small ranges, a reversed axis),
 //! with non-positive values that must be dropped, plus explicit `at` in
-//! data units. Compares every label (string and origin), every two-point
-//! stroke (axis lines and ticks) and the number of points drawn. Skipped if
-//! `Rscript` isn't available.
+//! data units. Compares every painted path and text item in order (see
+//! `common::pdf::assert_same`), except the origins of labels with a minus
+//! sign (R's `/minus`). Skipped if `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
-
-use rs_graphics::backend::pdf::PdfBackend;
+use rs_graphics::backend::AnyBackend;
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::PlotOptions;
-use rs_graphics::par::Par;
 
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
@@ -89,7 +87,7 @@ fn cases() -> Vec<Case> {
     ]
 }
 
-fn r_script(c: &Case, path: &str) -> String {
+fn r_code(c: &Case) -> String {
     let log = format!(
         "{}{}",
         if c.xlog { "x" } else { "" },
@@ -104,94 +102,29 @@ fn r_script(c: &Case, path: &str) -> String {
         .map(|a| format!("axis(3, at = {})\n", r_vec(a)))
         .unwrap_or_default();
     format!(
-        "pdf(file = '{path}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
-         suppressWarnings(plot({x}, {y}, log = '{log}', xlab = 'x', ylab = 'y'{xlim}))\n\
-         {at3}invisible(dev.off())\n",
+        "suppressWarnings(plot({x}, {y}, log = '{log}', xlab = 'x', ylab = 'y'{xlim}))\n{at3}",
         x = r_vec(&values(c.x, c.xlog)),
         y = r_vec(&values(c.y, c.ylog)),
     )
 }
 
-fn draw_ours(c: &Case) -> String {
-    let mut dev = Device::new(
-        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-        Par::default(),
-    );
-    let opts = PlotOptions {
-        xlog: c.xlog,
-        ylog: c.ylog,
-        xlim: c.xlim,
-        xlab: Some("x".into()),
-        ylab: Some("y".into()),
-        ..PlotOptions::default()
-    };
+fn draw_ours(c: &Case, dev: &mut Device<AnyBackend>) {
+    let mut opts = PlotOptions::default()
+        .xlog(c.xlog)
+        .ylog(c.ylog)
+        .xlab("x")
+        .ylab("y");
+    if let Some((a, b)) = c.xlim {
+        opts = opts.xlim((a, b));
+    }
     dev.plot()
         .x(values(c.x, c.xlog))
         .y(values(c.y, c.ylog))
         .with(&opts)
         .draw();
     if let Some(at) = c.at3 {
-        let o = AxisOptions {
-            at: Some(at.to_vec()),
-            ..Default::default()
-        };
+        let o = AxisOptions::default().at(at.to_vec());
         dev.axis().side(3).with(&o).draw();
-    }
-    String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
-}
-
-#[derive(Debug, PartialEq)]
-struct Extracted {
-    /// `(string, x, y)` of every label, sorted by position.
-    labels: Vec<(String, f64, f64)>,
-    /// Every stroked two-point path (`[x0, y0, x1, y1]`), in order.
-    segments: Vec<Vec<f64>>,
-    /// Number of curved paths (`pch = 1` circles).
-    curves: usize,
-}
-
-fn extract(pdf: &str) -> Extracted {
-    let mut labels = Vec::new();
-    let mut segments = Vec::new();
-    let mut curves = 0;
-    let mut path: Vec<f64> = Vec::new();
-    let mut curved = false;
-    let mut nums: Vec<f64> = Vec::new();
-    // Set by a text matrix, so strings in the document info don't count.
-    let mut origin = None;
-    for t in pdf.split_whitespace() {
-        if let Ok(v) = t.parse::<f64>() {
-            nums.push(v);
-            continue;
-        }
-        match t {
-            "m" | "l" if nums.len() >= 2 => path.extend(&nums[nums.len() - 2..]),
-            "c" => curved = true,
-            "Tm" if nums.len() >= 6 => origin = Some((nums[nums.len() - 2], nums[nums.len() - 1])),
-            "S" | "s" | "f" | "B" | "b" | "n" => {
-                if curved && t != "n" {
-                    curves += 1;
-                } else if t == "S" && path.len() == 4 {
-                    segments.push(path.clone());
-                }
-                path.clear();
-                curved = false;
-            }
-            _ if t.starts_with('(') && t.ends_with(")") => {
-                if let Some((x, y)) = origin.take() {
-                    labels.push((t[1..t.len() - 1].to_string(), x, y));
-                }
-            }
-            _ => {}
-        }
-        nums.clear();
-    }
-    let key = |p: &(String, f64, f64)| ((p.1 * 10.0).round() as i64, (p.2 * 10.0).round() as i64);
-    labels.sort_by_key(key);
-    Extracted {
-        labels,
-        segments,
-        curves,
     }
 }
 
@@ -200,57 +133,23 @@ fn log_axes_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = String::new();
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_log_axis_{}.pdf", c.name));
-        script.push_str(&r_script(c, &path.display().to_string()));
-    }
-    let script_path = dir.join("rs_graphics_log_axis.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_log_axis_{}.pdf", c.name));
-        let r = extract(&String::from_utf8_lossy(&std::fs::read(&path).unwrap()));
-        let ours = extract(&draw_ours(c));
-        let name = c.name;
-
-        assert_eq!(ours.curves, r.curves, "{name}: points drawn");
-        let strings = |e: &Extracted| e.labels.iter().map(|l| l.0.clone()).collect::<Vec<_>>();
-        assert_eq!(strings(&ours), strings(&r), "{name}: labels");
-        for (a, b) in ours.labels.iter().zip(&r.labels) {
-            // R's `pdf()` draws `-` as the wider `/minus` glyph, which we
-            // deliberately don't, so "1e-05" is laid out differently.
-            if a.0.contains('-') {
-                continue;
-            }
-            assert!(
-                (a.1 - b.1).abs() < 0.05 && (a.2 - b.2).abs() < 0.05,
-                "{name}: label origin differs: ours={a:?} r={b:?}"
-            );
-        }
-        assert_eq!(
-            ours.segments.len(),
-            r.segments.len(),
-            "{name}: segment count\nours={:?}\nr={:?}",
-            ours.segments,
-            r.segments
-        );
-        for (a, b) in ours.segments.iter().zip(&r.segments) {
-            assert!(
-                a.iter().zip(b).all(|(p, q)| (p - q).abs() < 0.05),
-                "{name}: segment differs: ours={a:?} r={b:?}"
-            );
-        }
+    let page = (PAGE_W, PAGE_H);
+    let codes: Vec<String> = cases.iter().map(r_code).collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
+    let r = r::run_r("log_axis", page, "", &r_cases);
+    // R's `pdf()` draws `-` as the wider `/minus` glyph, which we
+    // deliberately don't, so "1e-05" is laid out differently.
+    let how = pdf::Compare {
+        skip_origin: |t| t.string.contains('-'),
+        ..Default::default()
+    };
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours, ()) = r::ours(page, |dev| draw_ours(c, dev));
+        pdf::assert_same_pdf(c.name, pdf::parse(&ours), pdf::parse(r_pdf), &how);
     }
 }

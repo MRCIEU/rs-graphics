@@ -6,77 +6,25 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Cross-checks `legend()` layout (box rectangle + every label origin)
-//! against a real R `pdf()` device's uncompressed output, for keyword
-//! positions, `inset`, multi-column / horizontal layouts, titles, filled
-//! boxes, `cex`/`intersp`, `par(cex)` and corner-pair positioning, and
+//! Cross-checks `legend()` against a real R `pdf()` device's uncompressed
+//! output (every painted path and text item in order, see
+//! `common::pdf::assert_same`), for keyword positions, `inset`,
+//! multi-column / horizontal layouts, titles, filled boxes,
+//! `cex`/`intersp`, `par(cex)` and corner-pair positioning, and
 //! `legend()`'s return value (also on log axes). Skipped if `Rscript`
 //! isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
 use std::process::Command;
 
 use rs_graphics::prelude::*;
 
-/// `(x, y)` of every text matrix, sorted.
-fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let Some(idx) = line.find(" Tm") else {
-            continue;
-        };
-        // Reversed: [y, x, ...].
-        let nums: Vec<f64> = line[..idx]
-            .split_whitespace()
-            .rev()
-            .take(6)
-            .filter_map(|t| t.parse().ok())
-            .collect();
-        if nums.len() == 6 {
-            out.push((nums[1], nums[0]));
-        }
-    }
-    out.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    out
-}
-
-/// `[x, y_bottom, w, h]` of every drawn rectangle (`... re` without a clip),
-/// ignoring full-page backgrounds, normalised so `h > 0`.
-fn rects(pdf: &str) -> Vec<[f64; 4]> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let line = line.trim();
-        if !line.ends_with(" re") {
-            continue;
-        }
-        let nums: Vec<f64> = line
-            .split_whitespace()
-            .filter_map(|t| t.parse().ok())
-            .collect();
-        // Skip the page background and the plot-region `box()` (which R
-        // draws as a polyline rather than a rectangle).
-        if nums.len() != 4
-            || nums[2] >= 431.0
-            || (nums[0] - 59.04).abs() < 0.01 && (nums[1] - 73.44).abs() < 0.01
-        {
-            continue;
-        }
-        let (x, y, w, h) = (nums[0], nums[1], nums[2], nums[3]);
-        out.push(if h < 0.0 {
-            [x, y + h, w, -h]
-        } else {
-            [x, y, w, h]
-        });
-    }
-    out.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    out
-}
-
 struct Case {
     name: &'static str,
     r: &'static str,
-    run: fn(&mut Device<PdfBackend>) -> LegendLayout,
+    run: fn(&mut Device<AnyBackend>) -> LegendLayout,
 }
 
 fn cases() -> Vec<Case> {
@@ -207,7 +155,7 @@ fn cases() -> Vec<Case> {
 /// Compares `legend()`'s return value with R's, printed by the script as
 /// `name left top w h text.x... text.y...`. Tolerance: 1/5000 of the axis
 /// range (about 0.1pt on these pages).
-fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: (f64, f64, f64, f64)) {
+fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: [f64; 4]) {
     let line = r_stdout
         .lines()
         .find(|l| l.split_whitespace().next() == Some(name))
@@ -220,8 +168,8 @@ fn check_return_value(name: &str, ours: &LegendLayout, r_stdout: &str, usr: (f64
     let n = ours.text_x.len();
     assert_eq!(r.len(), 4 + 2 * n, "{name}: number of returned values");
     let (tx, ty) = (
-        (usr.1 - usr.0).abs() / 5000.0,
-        (usr.3 - usr.2).abs() / 5000.0,
+        (usr[1] - usr[0]).abs() / 5000.0,
+        (usr[3] - usr[2]).abs() / 5000.0,
     );
     let mut ours_flat = vec![(ours.left, tx), (ours.top, ty), (ours.w, tx), (ours.h, ty)];
     ours_flat.extend(ours.text_x.iter().map(|&v| (v, tx)));
@@ -240,83 +188,46 @@ fn legend_layout_matches_r() {
         return;
     }
     let cases = cases();
-    let dir = std::env::temp_dir();
-    let mut script = String::from("x <- 1:25; y <- sin(x * 0.35) * 8 + x * 0.6\n");
-    for c in &cases {
-        script.push_str(&format!(
-            "pdf(file = '{}/rs_graphics_legend_{}.pdf', width = 6, height = 4, compress = FALSE)\n\
-             plot(x, y, pch = 19, xlab = 'x', ylab = 'y')\n\
-             l <- {{ {} }}\n\
-             cat('{}', unlist(l$rect[c('left', 'top', 'w', 'h')]), l$text$x, l$text$y, '\\n')\n\
-             invisible(dev.off())\n",
-            dir.display(),
-            c.name,
-            c.r,
-            c.name
-        ));
-    }
-    let script_path = dir.join("rs_graphics_legend.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
+    let page = (6.0, 4.0);
+    let codes: Vec<String> = cases
+        .iter()
+        .map(|c| {
+            format!(
+                "plot(x, y, pch = 19, xlab = 'x', ylab = 'y')\n\
+                 l <- {{ {} }}\n\
+                 cat('{}', unlist(l$rect[c('left', 'top', 'w', 'h')]), l$text$x, l$text$y, '\\n')",
+                c.r, c.name
+            )
+        })
+        .collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
+    let run = r::run_r(
+        "legend",
+        page,
+        "x <- 1:25; y <- sin(x * 0.35) * 8 + x * 0.6",
+        &r_cases,
     );
 
     let x: Vec<f64> = (1..=25).map(|i| i as f64).collect();
     let y: Vec<f64> = x.iter().map(|v| (v * 0.35).sin() * 8.0 + v * 0.6).collect();
 
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_legend_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-
-        let mut dev = Device::new(PdfBackend::new(6.0, 4.0).with_compression(false), Par::default());
-        let opts = PlotOptions {
-            pch: vec![Some(19)],
-            xlab: Some("x".into()),
-            ylab: Some("y".into()),
-            ..PlotOptions::default()
-        };
-        dev.plot().x(&x).y(&y).with(&opts).draw();
-        let layout = (c.run)(&mut dev);
-        check_return_value(
+    for (c, r_pdf) in cases.iter().zip(&run.pdfs) {
+        let (ours, (layout, usr)) = r::ours(page, |dev| {
+            dev.plot().x(&x).y(&y).pch(19).xlab("x").ylab("y").draw();
+            let layout = (c.run)(dev);
+            (layout, dev.usr())
+        });
+        check_return_value(c.name, &layout, &run.stdout, usr);
+        pdf::assert_same_pdf(
             c.name,
-            &layout,
-            &String::from_utf8_lossy(&out.stdout),
-            dev.usr(),
+            pdf::parse(&ours),
+            pdf::parse(r_pdf),
+            &pdf::Compare::default(),
         );
-        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-
-        let (r_t, our_t) = (text_origins(&r_pdf), text_origins(&ours));
-        assert_eq!(our_t.len(), r_t.len(), "{}: text item count", c.name);
-        for (a, b) in our_t.iter().zip(&r_t) {
-            assert!(
-                (a.0 - b.0).abs() < 0.05 && (a.1 - b.1).abs() < 0.05,
-                "{}: text origin differs: ours={a:?} r={b:?}\nours={our_t:?}\nr={r_t:?}",
-                c.name
-            );
-        }
-
-        let (r_r, our_r) = (rects(&r_pdf), rects(&ours));
-        assert_eq!(
-            our_r.len(),
-            r_r.len(),
-            "{}: rect count\nours={our_r:?}\nr={r_r:?}",
-            c.name
-        );
-        for (a, b) in our_r.iter().zip(&r_r) {
-            for k in 0..4 {
-                assert!(
-                    (a[k] - b[k]).abs() < 0.05,
-                    "{}: rect differs: ours={a:?} r={b:?}",
-                    c.name
-                );
-            }
-        }
     }
 }
 
@@ -340,12 +251,8 @@ fn legend_return_value_on_log_axes_matches_r() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
-    let opts = PlotOptions {
-        xlog: true,
-        ylog: true,
-        ..PlotOptions::default()
-    };
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
+    let opts = PlotOptions::default().xlog(true).ylog(true);
     dev.plot()
         .x([1.0, 1000.0])
         .y([2.0, 500.0])

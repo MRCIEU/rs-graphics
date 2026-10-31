@@ -23,7 +23,7 @@
 //! as on other axes.
 //!
 //! Labels and the title may be plotmath expressions (`Label::math`). As
-//! R draws them with `text()`, they are rotated by `par(srt)`.
+//! R draws them with `text()`, they are rotated by [`par(srt)`].
 //!
 //! The per-key arguments are R's vectors, recycled over the keys
 //! ([`LegendOptions`]), including shaded boxes (`density`/`angle`). Not
@@ -36,9 +36,12 @@
 //! `"blank"` gets no line column here, while R (seeing a string) leaves
 //! an empty one.
 //!
-//! `par(cex)` scales everything as in `legend.R`: the character cell
+//! [`par(cex)`] scales everything as in `legend.R`: the character cell
 //! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and
-//! `text(cex = )` both multiply by `par("cex")`, i.e. `cexbase`).
+//! `text(cex = )` both multiply by [`par(cex)`], i.e. `cexbase`).
+//!
+//! [`par(cex)`]: crate::par::Par::cex
+//! [`par(srt)`]: crate::par::Par::srt
 
 use crate::backend::Backend;
 use crate::color::ColorSpec;
@@ -46,10 +49,10 @@ use crate::error::Error;
 use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
-use crate::numbers::Pair;
-
+use crate::numbers::{Num, Pair};
+use crate::par::Bty;
 use crate::plotmath::Label;
-use crate::setters::{char_pch, pick_na};
+use crate::recycle::{nth_na, pick_na, rep_or};
 
 use super::hatch::ShapeStyle;
 use super::{Device, Xpd};
@@ -62,8 +65,8 @@ use super::{Device, Xpd};
 /// | R | Rust shorthand | Variant |
 /// |---|---|---|
 /// | `legend("topright", ...)` | `"topright"` (or `LegendKeyword::TopRight`) | [`Keyword`](LegendPos::Keyword) |
-/// | `legend(5, 20, ...)` | `(5.0, 20.0)` | [`Xy`](LegendPos::Xy) |
-/// | `legend(c(5, 15), c(10, 20), ...)` | `((5.0, 15.0), (10.0, 20.0))` | [`Corners`](LegendPos::Corners) |
+/// | `legend(5, 20, ...)` | `[5, 20]` or `(5, 20.5)` | [`Xy`](LegendPos::Xy) |
+/// | `legend(c(5, 15), c(10, 20), ...)` | `[[5, 15], [10, 20]]` or `((5, 15), (10, 20.5))` | [`Corners`](LegendPos::Corners) |
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LegendPos {
     /// A single point `(x, y)` in user coordinates; anchored by
@@ -86,9 +89,8 @@ impl From<LegendKeyword> for LegendPos {
 impl TryFrom<&str> for LegendPos {
     type Error = crate::error::Error;
 
-    /// One of R's keywords, matched like R's `match.arg()`
-    /// ([`LegendKeyword::parse`]: the full name, or a unique prefix such
-    /// as `"topr"`).
+    /// One of R's keywords, matched like R's `match.arg()` (the full name,
+    /// or a unique prefix such as `"topr"`; see [`LegendKeyword`]).
     ///
     /// # Errors
     ///
@@ -124,11 +126,20 @@ impl TryFrom<&String> for LegendPos {
 }
 
 impl<P: Pair> From<P> for LegendPos {
-    /// `(x, y)`: R's `legend(x, y)`, a point in user coordinates (any
-    /// [`Pair`], e.g. `(5, 20)`).
+    /// `[x, y]` or `(x, y)`: R's `legend(x, y)`, a point in user
+    /// coordinates (any [`Pair`]).
     fn from(p: P) -> Self {
         let (x, y) = p.into_pair();
         LegendPos::Xy(x, y)
+    }
+}
+
+impl<N: Num> From<[[N; 2]; 2]> for LegendPos {
+    /// `[[xa, xb], [ya, yb]]`: R's `legend(x = c(xa, xb), y = c(ya, yb))`,
+    /// two opposite corners of the box.
+    fn from([x, y]: [[N; 2]; 2]) -> Self {
+        let ((xa, xb), (ya, yb)) = (x.into_pair(), y.into_pair());
+        LegendPos::Corners(xa, ya, xb, yb)
     }
 }
 
@@ -169,18 +180,37 @@ corners!(
 /// A legend position by keyword: a corner, an edge or the centre of the
 /// plot region.
 ///
-/// Strings work too, as R's keywords (`"bottomright"`, `"top"`, ...; see
-/// [`LegendKeyword::parse`]).
+/// Strings work too (`FromStr`, `TryFrom<&str>`), as R's keywords
+/// (`"bottomright"`, `"top"`, ...), matched like R's `match.arg()`: the
+/// full name, or a unique prefix (`"topr"` is `TopRight`; `"to"` is
+/// ambiguous, an error).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("topr".parse::<LegendKeyword>().unwrap(), LegendKeyword::TopRight);
+/// assert!("to".parse::<LegendKeyword>().is_err()); // top or topleft/topright
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LegendKeyword {
+    /// R's `"bottomright"`.
     BottomRight,
+    /// R's `"bottom"`.
     Bottom,
+    /// R's `"bottomleft"`.
     BottomLeft,
+    /// R's `"left"`.
     Left,
+    /// R's `"topleft"`.
     TopLeft,
+    /// R's `"top"`.
     Top,
+    /// R's `"topright"`.
     TopRight,
+    /// R's `"right"`.
     Right,
+    /// R's `"center"`.
     Center,
 }
 
@@ -197,9 +227,9 @@ impl LegendKeyword {
         ("center", LegendKeyword::Center),
     ];
 
-    /// Parse like R's `match.arg()`: an exact match, or else a unique
-    /// prefix (so `"topr"` is `TopRight`, but `"to"` is ambiguous).
-    pub fn parse(s: &str) -> Option<LegendKeyword> {
+    /// Like R's `match.arg()`: an exact match, or else a unique prefix
+    /// (`"topr"` is `TopRight`, `"to"` is ambiguous); `None` otherwise.
+    pub(crate) fn parse(s: &str) -> Option<LegendKeyword> {
         if let Some(&(_, k)) = Self::ALL.iter().find(|(name, _)| *name == s) {
             return Some(k);
         }
@@ -213,206 +243,25 @@ impl LegendKeyword {
     }
 }
 
-crate::error::from_str_via_parse!(LegendKeyword, "legend position");
-
-/// Whether a legend has a box around it.
-///
-/// This is R's `legend(bty = )`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum LegendBty {
-    /// `"o"` (the default): draw the box.
-    #[default]
-    Box,
-    /// `"n"`: no box.
-    None,
-}
-
-impl LegendBty {
-    /// `"o"` or `"n"`.
-    pub fn parse(s: &str) -> Option<LegendBty> {
-        match s {
-            "o" => Some(LegendBty::Box),
-            "n" => Some(LegendBty::None),
-            _ => None,
-        }
-    }
-}
-
-crate::error::from_str_via_parse!(LegendBty, "legend box type");
-crate::error::from_r_string!(LegendBty, "legend box type", "\"o\" or \"n\"");
-
-/// Values the legend's `pch` setter takes: plotting symbols for the keys,
-/// as numbers, characters or strings.
-///
-/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
-/// `['a', 'b']`) or strings (`["a", "b"]`), recycled over the keys;
-/// `None` elements are R's `NA`, a key without a point (`[Some(19), None]`,
-/// `[Some("x"), None]`).
-///
-/// As in R: a string's first character is its symbol (`""` draws none),
-/// except that when the first string has several characters, it alone is
-/// used, one character per key (`"abc"` gives keys `a`, `b`, `c`, as R's
-/// `legend(pch = "abc")`). ASCII characters are their character codes;
-/// other characters are stored as minus their Unicode code point (R's
-/// negative `pch`), so `'é'` is `-233`.
-///
-/// This is R's `legend(pch = )`.
-///
-/// # Examples
-///
-/// ```
-/// use rs_graphics::prelude::*;
-///
-/// assert_eq!([19, 1].into_pch(), [Some(19), Some(1)]);
-/// assert_eq!("abc".into_pch(), [Some(97), Some(98), Some(99)]);
-/// assert_eq!([Some("x"), None].into_pch(), [Some(120), None]);
-/// assert_eq!('é'.into_pch(), [Some(-233)]);
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
-/// # dev.plot().x(&[1, 2]).draw();
-/// dev.legend().pos("topleft").labels(["a", "b"]).pch([19, 1]).draw();
-/// ```
-pub trait LegendPch {
-    /// Converts the value into `pch` codes, one per key in order; `None`
-    /// for a key without a point.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert_eq!(vec![Some(19), None].into_pch(), [Some(19), None]);
-    /// ```
-    fn into_pch(self) -> Vec<Option<i32>>;
-}
-
-/// R's `pch` codes for character `pch` values (`None` = `NA`).
-fn string_pch<S: AsRef<str>>(strings: &[Option<S>]) -> Vec<Option<i32>> {
-    match strings.first() {
-        Some(Some(first)) if first.as_ref().chars().count() > 1 => {
-            first.as_ref().chars().map(|c| Some(char_pch(c))).collect()
-        }
-        _ => strings
-            .iter()
-            .map(|s| {
-                s.as_ref()
-                    .and_then(|s| s.as_ref().chars().next())
-                    .map(char_pch)
-            })
-            .collect(),
-    }
-}
-
-macro_rules! legend_pch_impls {
-    (numbers: $($n:ty),*; strings: $($s:ty),*) => {
-        $(
-            legend_pch_impls!(@each $n, |v: $n| Some(i32::from(v)), |v: Option<$n>| v.map(i32::from));
-        )*
-        $(
-            impl LegendPch for $s {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&[Some(self)])
-                }
-            }
-            impl LegendPch for Option<$s> {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&[self])
-                }
-            }
-            impl<const N: usize> LegendPch for [$s; N] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.map(Some))
-                }
-            }
-            impl<const N: usize> LegendPch for [Option<$s>; N] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self)
-                }
-            }
-            impl LegendPch for &[$s] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.iter().map(Some).collect::<Vec<_>>())
-                }
-            }
-            impl<const N: usize> LegendPch for &[$s; N] {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.iter().map(Some).collect::<Vec<_>>())
-                }
-            }
-            impl LegendPch for Vec<$s> {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self.into_iter().map(Some).collect::<Vec<_>>())
-                }
-            }
-            impl LegendPch for Vec<Option<$s>> {
-                fn into_pch(self) -> Vec<Option<i32>> {
-                    string_pch(&self)
-                }
-            }
-        )*
-    };
-    (@each $e:ty, $one:expr, $opt:expr) => {
-        impl LegendPch for $e {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                vec![$one(self)]
-            }
-        }
-        impl LegendPch for Option<$e> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                vec![$opt(self)]
-            }
-        }
-        impl<const N: usize> LegendPch for [$e; N] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($one).collect()
-            }
-        }
-        impl<const N: usize> LegendPch for [Option<$e>; N] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($opt).collect()
-            }
-        }
-        impl LegendPch for &[$e] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.iter().copied().map($one).collect()
-            }
-        }
-        impl<const N: usize> LegendPch for &[$e; N] {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.iter().copied().map($one).collect()
-            }
-        }
-        impl LegendPch for Vec<$e> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($one).collect()
-            }
-        }
-        impl LegendPch for &Vec<$e> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.iter().copied().map($one).collect()
-            }
-        }
-        impl LegendPch for Vec<Option<$e>> {
-            fn into_pch(self) -> Vec<Option<i32>> {
-                self.into_iter().map($opt).collect()
-            }
-        }
-    };
-}
-legend_pch_impls!(numbers: i32, i16, u8, u16; strings: &str, String, &String);
-legend_pch_impls!(@each char, |c: char| Some(char_pch(c)), |c: Option<char>| c.map(char_pch));
+crate::error::from_r_string!(
+    LegendKeyword,
+    "legend position",
+    "\"bottomright\", \"bottom\", \"bottomleft\", \"left\", \"topleft\", \"top\", \"topright\", \"right\" or \"center\" (or a unique prefix)"
+);
+crate::error::from_str_via_try_from!(LegendPos);
 
 crate::setters::options! {
     /// The arguments of R's `legend()` other than its position and labels.
-    /// Empty `Vec`s and `None` are R's defaults, given for each field.
+    /// Settings left unset are R's defaults, given on each setter.
     ///
     /// The per-key arguments (`col`, `pch`, `lty`, `lwd`, `fill`, `border`,
     /// `density`, `angle`, `pt_bg`, `pt_cex`, `pt_lwd`, `cex`, `x_intersp`,
     /// `seg_len`, `text_col`, `text_font`) are recycled over the keys, as in
     /// R. A `None`
     /// element is R's `NA` for that key (`.pch([Some(19), None])`): the
-    /// field says what it does. Which parts a key has follows R's rules:
+    /// setter says what it does. Which parts a key has follows R's rules:
     /// - a box, if `fill` or `density` is given (every key gets one; without
-    ///   `density` a `None` fill is an empty box, with it `None` is `par(fg)`),
+    ///   `density` a `None` fill is an empty box, with it `None` is [`par(fg)`]),
     ///   shaded with lines if `density` is;
     /// - a line, if `lty` has a line type other than blank, or `lwd` is given
     ///   (R: "one of these two must be specified for line drawing"; `lty` is
@@ -422,34 +271,46 @@ crate::setters::options! {
     ///   unless `merge` is `false`; keys whose `pch` is `None` (or negative and
     ///   above -32, as in R) have none.
     ///
+    /// [`par(fg)`]: crate::par::Par::fg
     #[derive(Clone, Debug, Default)]
     pub struct LegendOptions => [LegendCall] {
-        /// Colours of the lines and points. Empty: `par("col")`.
+        /// Colours of the lines and points. Empty: [`par(col)`].
+        ///
+        /// [`par(col)`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Plotting symbols (see [`LegendPch`] for characters). Empty: no
-        /// points; `None`: no point on that key.
+        /// Plotting symbols: R's symbol codes, characters or strings; a first
+        /// string of several characters gives one symbol per key, as R's
+        /// `legend(pch = "abc")`. Empty: no points; `None`: no point on that
+        /// key.
         pub pch: Vec<Option<i32>> => legend_pch Option<i32>,
         /// Line types of the lines. Empty: solid, if `lwd` asks for lines;
         /// `None`: no line on that key.
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Line widths of the lines; giving any draws lines. Empty:
-        /// `par("lwd")`; `None`: no line on that key (its point, if any, uses
-        /// `par(lwd)`).
+        /// [`par(lwd)`]; `None`: no line on that key (its point, if any, uses
+        /// [`par(lwd)`]).
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
         /// Fill colours of box keys; giving any draws boxes. Empty: no fill,
         /// and no boxes unless `density` is given. With shading, the colour of
-        /// the lines (empty or `None`: `par(fg)`).
+        /// the lines (empty or `None`: [`par(fg)`]).
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub fill: Vec<ColorSpec> => values ColorSpec,
         /// Border colours of box keys. Empty: black (R's default).
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Shading lines per inch in the box keys; giving any draws boxes.
         /// As for [`rect()`](crate::graphics::Graphics::rect): the lines take
-        /// the `fill` colour (empty: `par(fg)`); `None` or negative fills the
+        /// the `fill` colour (empty: [`par(fg)`]); `None` or negative fills the
         /// box instead, 0 leaves it empty. Empty: no shading.
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled over the keys.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Fill colour of `pch` 21 to 25. Empty: none. R's `pt.bg`.
         pub pt_bg: Vec<ColorSpec> => values ColorSpec,
         /// Size of the points. Empty: `cex`; `None`: no point on that key.
@@ -458,20 +319,26 @@ crate::setters::options! {
         /// Line width of the points. Empty: `lwd`; `None`: no point on that
         /// key. R's `pt.lwd`.
         pub pt_lwd: Vec<Option<f64>> => na_values f64,
-        /// Whether to draw the surrounding box. `None`: a box (R's `"o"`).
-        pub bty: Option<LegendBty> => option LegendBty,
-        /// Fill colour of the legend box. `None`: `par("bg")` (transparent, so
+        /// Whether to draw the surrounding box: [`Bty::N`] (`"n"`) draws
+        /// none, any other value the whole box (R's `legend()` draws no
+        /// partial boxes). `None`: a box (R's `"o"`).
+        pub bty: Option<Bty> => option Bty,
+        /// Fill colour of the legend box. `None`: [`par(bg)`] (transparent, so
         /// unfilled, on PDF by default: see [`Backend::default_bg`]).
-        pub bg: Option<ColorSpec> => option ColorSpec,
-        /// Size of each key's text and symbol, times `par(cex)`. Empty and
+        ///
+        /// [`par(bg)`]: crate::par::Par::bg
+        pub bg: Option<ColorSpec> => option_value ColorSpec,
+        /// Size of each key's text and symbol, times [`par(cex)`]. Empty and
         /// `None`: 1.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
         pub cex: Vec<Option<f64>> => na_values f64,
         /// Horizontal justification of the box relative to its `x` position.
         /// `None`: 0, or 0.5 for [`LegendPos::Corners`] (R's defaults).
-        pub xjust: Option<f64> => option f64,
+        pub xjust: Option<f64> => number f64,
         /// Vertical justification of the box relative to its `y` position.
         /// `None`: 1, or 0.5 for [`LegendPos::Corners`] (R's defaults).
-        pub yjust: Option<f64> => option f64,
+        pub yjust: Option<f64> => number f64,
         /// Space between each key and its label, in character widths (a
         /// column is as wide as its widest). Empty and `None`: 1. R's
         /// `x.intersp`.
@@ -483,16 +350,18 @@ crate::setters::options! {
         /// 2. R's `seg.len`.
         pub seg_len: Vec<Option<f64>> => na_values f64,
         /// Width of the label text, in x *user* units: one width for every
-        /// column, or one per column; `f64::NAN` (R's `NA`) makes each column
-        /// as wide as its own widest label. Empty: every column as wide as the
-        /// widest label. R's `text.width`.
-        pub text_width: Vec<f64> => values f64,
+        /// column, or one per column; `None` (R's `NA`) makes each column as
+        /// wide as its own widest label. Empty: every column as wide as the
+        /// widest label. A negative width, or `None` among other values, is an
+        /// error of the call (R's "'text.width' must be numeric, >= 0, or a
+        /// scalar NA"). R's `text.width`.
+        pub text_width: Vec<Option<f64>> => na_values f64,
         /// Horizontal adjustment of the labels. `None`: 0 (left). R's
         /// `adj[1]`.
-        pub adj: Option<f64> => option f64,
-        /// Vertical adjustment of the labels. `None`: 0.5. `Some(None)` (the
-        /// setter's `f64::NAN`, R's `NA`) centres each label's ink, as R's
-        /// one-value `adj = x` does. R's `adj[2]`.
+        pub adj: Option<f64> => number f64,
+        /// Vertical adjustment of the labels. Default 0.5; `None` (R's `NA`)
+        /// centres each label's ink, as R's one-value `adj = x` does. R's
+        /// `adj[2]`.
         pub vadj: Option<Option<f64>> => na f64,
         /// Whether to draw each point in the middle of its line. `None`: R's
         /// default, `true` when the keys have both lines and points.
@@ -504,33 +373,46 @@ crate::setters::options! {
         /// Text or a plotmath expression above the entries. `None`: no title.
         pub title: Option<Label> => option Label,
         /// Size of the title. `None`: the first `cex`. R's `title.cex`.
-        pub title_cex: Option<f64> => option f64,
+        pub title_cex: Option<f64> => number f64,
         /// Colour of the title. `None`: the first `text_col`. R's `title.col`.
-        pub title_col: Option<ColorSpec> => option ColorSpec,
+        pub title_col: Option<ColorSpec> => option_value ColorSpec,
         /// Where the title sits across the box (0 left, 1 right) and its
         /// justification there. `None`: 0.5 (centred). R's `title.adj`.
-        pub title_adj: Option<f64> => option f64,
+        pub title_adj: Option<f64> => number f64,
         /// Font of the title. `None`: the first `text_font`. R's
         /// `title.font`.
         pub title_font: Option<FontFace> => option FontFace,
         /// Inset from the plot region's edges for keyword positions, as
-        /// fractions of the plot region, `(x, y)`. `None`: `(0, 0)`.
-        pub inset: Option<(f64, f64)> => option_pair (f64, f64),
-        /// Colours of the labels. Empty: `par("col")`. R's `text.col`.
+        /// fractions of the plot region, `[x, y]` or one number for both.
+        /// `None`: 0.
+        pub inset: Option<(f64, f64)> => one_or_pair (f64, f64),
+        /// Colours of the labels. Empty: [`par(col)`]. R's `text.col`.
+        ///
+        /// [`par(col)`]: crate::par::Par::col
         pub text_col: Vec<ColorSpec> => values ColorSpec,
         /// Fonts of the labels (also for measuring them). Empty and `None`:
-        /// `par("font")`. R's `text.font`.
+        /// [`par(font)`]. R's `text.font`.
+        ///
+        /// [`par(font)`]: crate::par::Par::font
         pub text_font: Vec<Option<FontFace>> => na_values FontFace,
-        /// Line width of the legend box. `None`: `par("lwd")`. R's `box.lwd`.
-        pub box_lwd: Option<f64> => option f64,
-        /// Line type of the legend box. `None`: `par("lty")`. R's `box.lty`.
+        /// Line width of the legend box. `None`: [`par(lwd)`]. R's `box.lwd`.
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
+        pub box_lwd: Option<f64> => number f64,
+        /// Line type of the legend box. `None`: [`par(lty)`]. R's `box.lty`.
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub box_lty: Option<LineType> => option LineType,
         /// Colour of the legend box's border (`ColorSpec::None`: no border).
-        /// `None`: `par("fg")`. R's `box.col`.
-        pub box_col: Option<ColorSpec> => option ColorSpec,
+        /// `None`: [`par(fg)`]. R's `box.col`.
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
+        pub box_col: Option<ColorSpec> => option_value ColorSpec,
         /// How far drawing may reach ([`Xpd`]; the setter also takes
-        /// `false`/`true`). `None`: `par(xpd)`; overrides it for this call
+        /// `false`/`true`). `None`: [`par(xpd)`]; overrides it for this call
         /// only.
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
         /// Whether to draw: `false` works out the layout (returned as usual)
         /// but draws nothing. `None`: `true`.
@@ -544,9 +426,11 @@ pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Re
     if labels.is_empty() {
         return Err(Error::invalid("'legend' is of length 0"));
     }
-    let tw = &opts.text_width;
-    let any_na = tw.iter().any(|v| v.is_nan());
-    let bad = (tw.len() > 1 && any_na) || (!any_na && tw.iter().any(|&v| v < 0.0));
+    let tw: Vec<Option<f64>> = (0..opts.text_width.len())
+        .map(|i| nth_na(&opts.text_width, i).flatten())
+        .collect();
+    let any_na = tw.iter().any(Option::is_none);
+    let bad = (tw.len() > 1 && any_na) || tw.iter().flatten().any(|&v| v < 0.0);
     if bad {
         return Err(Error::invalid(
             "'text.width' must be numeric, >= 0, or a scalar NA",
@@ -565,15 +449,17 @@ pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Re
 /// list(w, h, left, top), text = list(x, y))`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LegendLayout {
-    /// `rect$left`, `rect$top`: the box's top-left corner.
+    /// The x of the box's left edge. R's `rect$left`.
     pub left: f64,
+    /// The y of the box's top edge. R's `rect$top`.
     pub top: f64,
-    /// `rect$w`, `rect$h`: the box's width and height.
+    /// The box's width. R's `rect$w`.
     pub w: f64,
+    /// The box's height. R's `rect$h`.
     pub h: f64,
-    /// `text$x`, `text$y`: each label's anchor (its left end and vertical
-    /// centre).
+    /// Each label's x: its left end. R's `text$x`.
     pub text_x: Vec<f64>,
+    /// Each label's y: its vertical centre. R's `text$y`.
     pub text_y: Vec<f64>,
 }
 
@@ -605,32 +491,17 @@ impl<B: Backend> Device<B> {
     ) -> LegendLayout {
         let n = labels.len();
         let plt = self.plt;
-        // The per-key arguments, recycled over the keys (R's `rep_len`),
-        // with R's defaults for those left unset.
-        fn rep<T: Copy>(v: &[T], n: usize, default: T) -> Vec<T> {
-            (0..n)
-                .map(|i| {
-                    if v.is_empty() {
-                        default
-                    } else {
-                        v[i % v.len()]
-                    }
-                })
-                .collect()
-        }
-        // The same for `NaValues` vectors (`None` = R's `NA`), and for those
-        // where `NA` means the default.
-        fn rep_na<T: Copy>(v: &[Option<T>], n: usize, default: T) -> Vec<Option<T>> {
-            (0..n).map(|i| pick_na(v, i, default)).collect()
-        }
-        fn rep_or<T: Copy>(v: &[Option<T>], n: usize, default: T) -> Vec<T> {
+        // The per-key arguments are recycled over the keys (R's
+        // `rep_len`), with R's defaults for those left unset. For these
+        // `NA` (`None`) is the default too.
+        fn rep_na_or<T: Copy>(v: &[Option<T>], n: usize, default: T) -> Vec<T> {
             (0..n)
                 .map(|i| pick_na(v, i, default).unwrap_or(default))
                 .collect()
         }
-        let cex = rep_or(&opts.cex, n, 1.0);
-        let x_intersp = rep_or(&opts.x_intersp, n, 1.0);
-        let seg_len = rep_or(&opts.seg_len, n, 2.0);
+        let cex = rep_na_or(&opts.cex, n, 1.0);
+        let x_intersp = rep_na_or(&opts.x_intersp, n, 1.0);
+        let seg_len = rep_na_or(&opts.seg_len, n, 2.0);
         let inset = opts.inset.unwrap_or((0.0, 0.0));
 
         // Number of columns and of rows ("legends per column").
@@ -654,7 +525,7 @@ impl<B: Backend> Device<B> {
 
         // `text.font` recycled over the keys, as R's `mapply()`; the
         // title's font defaults to the first.
-        let fonts = rep_or(&opts.text_font, n, self.par.font);
+        let fonts = rep_na_or(&opts.text_font, n, self.par.font);
         let title_font = opts.title_font.unwrap_or(fonts[0]);
         let label_w: Vec<f64> = (0..n)
             // An `NA` label takes no room (R's `strwidth(NA)` is 0).
@@ -669,7 +540,8 @@ impl<B: Backend> Device<B> {
         // the given widths, one per column.
         let (ux0, ux1, _, _) = self.usr;
         let inches_per_user_x = plt.width() / (ux1 - ux0).abs();
-        let auto_text_width = opts.text_width.len() == 1 && opts.text_width[0].is_nan();
+        let auto_text_width =
+            opts.text_width.len() == 1 && nth_na(&opts.text_width, 0) == Some(None);
         if auto_text_width {
             ncol = n.div_ceil(n_per_col);
         }
@@ -689,9 +561,11 @@ impl<B: Backend> Device<B> {
         } else if opts.text_width.is_empty() {
             vec![label_w.iter().copied().fold(0.0, f64::max); ncol]
         } else {
-            let tw = &opts.text_width;
+            // `check_legend` allows `NA` only as the one value (above).
             (0..ncol)
-                .map(|c| tw[c % tw.len()].abs() * inches_per_user_x)
+                .map(|c| {
+                    nth_na(&opts.text_width, c).flatten().unwrap_or(0.0).abs() * inches_per_user_x
+                })
                 .collect()
         };
 
@@ -699,7 +573,7 @@ impl<B: Backend> Device<B> {
         // (an expression can be taller). Row `r` holds keys `r`,
         // `r + n_per_col`, ...
         let row_keys = |r: usize| (r..n).step_by(n_per_col);
-        let y_intersp = rep_or(&opts.y_intersp, n_per_col, 1.0);
+        let y_intersp = rep_na_or(&opts.y_intersp, n_per_col, 1.0);
         let row_yc: Vec<f64> = (0..n_per_col)
             .map(|r| row_keys(r).map(|i| yc[i]).fold(0.0, f64::max))
             .collect();
@@ -824,9 +698,9 @@ impl<B: Backend> Device<B> {
         // FALSE` only the positions are worked out.
         let plot = opts.plot.unwrap_or(true);
         if plot {
-            self.push_clip_for(self.par.xpd);
+            self.push_clip_region(self.par.xpd);
         }
-        if plot && opts.bty.unwrap_or_default() == LegendBty::Box {
+        if plot && opts.bty != Some(Bty::N) {
             let bg = opts.bg.unwrap_or(ColorSpec::Color(self.par.bg));
             let fill = self.resolve(bg).filter(|c| c.a > 0);
             let box_col = opts.box_col.unwrap_or(ColorSpec::Color(self.par.fg));
@@ -884,9 +758,9 @@ impl<B: Backend> Device<B> {
                 let fill = if opts.fill.is_empty() {
                     Vec::new()
                 } else {
-                    rep(&opts.fill, n, ColorSpec::None)
+                    rep_or(&opts.fill, n, ColorSpec::None)
                 };
-                let border = rep(&opts.border, n, black);
+                let border = rep_or(&opts.border, n, black);
                 let style = ShapeStyle {
                     col: &fill,
                     border: &border,
@@ -903,12 +777,12 @@ impl<B: Backend> Device<B> {
             }
         }
 
-        let col = rep(&opts.col, n, ColorSpec::Color(self.par.col));
-        let lwd = rep_na(&opts.lwd, n, self.par.lwd);
+        let col = rep_or(&opts.col, n, ColorSpec::Color(self.par.col));
+        let lwd = rep_or(&opts.lwd, n, Some(self.par.lwd));
         if do_lines {
             // A key with an `NA` (`None`) `lty` or `lwd`, or a blank `lty`,
             // has no line.
-            let lty = rep_na(&opts.lty, n, LineType::SOLID);
+            let lty = rep_or(&opts.lty, n, Some(LineType::SOLID));
             for i in 0..n {
                 let line = lwd[i].zip(lty[i]).filter(|&(_, l)| l != LineType::Blank);
                 if let (true, Some((lwd, lty)), Some(c)) = (plot, line, self.resolve(col[i])) {
@@ -927,19 +801,19 @@ impl<B: Backend> Device<B> {
         if plot && has_pch {
             // `pt.cex` defaults to each key's `cex`, `pt.lwd` to its `lwd`
             // (`par(lwd)` where that is `NA`: the point is drawn anyway).
-            let pch = rep_na(&opts.pch, n, -1);
+            let pch = rep_or(&opts.pch, n, Some(-1));
             let pt_cex: Vec<Option<f64>> = if opts.pt_cex.is_empty() {
                 cex.iter().copied().map(Some).collect()
             } else {
-                rep_na(&opts.pt_cex, n, 1.0)
+                rep_or(&opts.pt_cex, n, Some(1.0))
             };
-            let pt_bg = rep(&opts.pt_bg, n, ColorSpec::None);
+            let pt_bg = rep_or(&opts.pt_bg, n, ColorSpec::None);
             let pt_lwd: Vec<Option<f64>> = if opts.pt_lwd.is_empty() {
                 lwd.iter()
                     .map(|l| Some(l.unwrap_or(self.par.lwd)))
                     .collect()
             } else {
-                rep_na(&opts.pt_lwd, n, 1.0)
+                rep_or(&opts.pt_lwd, n, Some(1.0))
             };
             for i in 0..n {
                 // An `NA` (`None`) `pch`, `pt.cex` or `pt.lwd` skips the
@@ -968,7 +842,7 @@ impl<B: Backend> Device<B> {
 
         // `text.col` recycled over the keys; the title's colour defaults
         // to the first.
-        let text_col = rep(&opts.text_col, n, ColorSpec::Color(self.par.col));
+        let text_col = rep_or(&opts.text_col, n, ColorSpec::Color(self.par.col));
         // `text(adj = c(title.adj, 0))` and `text(adj = adj)`.
         let clip = self.par.xpd;
         if let (true, Some(t)) = (plot, title) {
@@ -1027,6 +901,7 @@ impl<B: Backend> Device<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::setters::Pch;
 
     #[test]
     fn positions_convert_like_r() {
@@ -1070,9 +945,12 @@ mod tests {
         assert_eq!(['a', '\u{e9}'].into_pch(), vec![Some(97), Some(-233)]);
         // One character each; "" draws nothing (R's `NA`).
         assert_eq!(["x", "+", ""].into_pch(), vec![Some(120), Some(43), None]);
-        // A first string of several characters is split, the rest unused.
-        assert_eq!("abc".into_pch(), vec![Some(97), Some(98), Some(99)]);
-        assert_eq!(["ab", "z"].into_pch(), vec![Some(97), Some(98)]);
+        // In `legend()` a first string of several characters is split, the
+        // rest unused; `points()` takes each string's first character.
+        assert_eq!("abc".into_legend_pch(), vec![Some(97), Some(98), Some(99)]);
+        assert_eq!(["ab", "z"].into_legend_pch(), vec![Some(97), Some(98)]);
+        assert_eq!(["ab", "z"].into_pch(), vec![Some(97), Some(122)]);
+        assert_eq!(["", "z"].into_legend_pch(), vec![None, Some(122)]);
         assert_eq!(String::from("\u{e9}").into_pch(), vec![Some(-233)]);
         // `None` is R's `NA`, for numbers, characters and strings.
         assert_eq!([Some(19), None].into_pch(), vec![Some(19), None]);
@@ -1089,18 +967,16 @@ mod tests {
     #[test]
     fn text_width_is_checked_like_r() {
         let labels = [Some(Label::from("a"))];
-        let check = |tw: Vec<f64>| {
-            let opts = LegendOptions {
-                text_width: tw,
-                ..LegendOptions::default()
-            };
+        let check = |tw: Vec<Option<f64>>| {
+            let opts = LegendOptions::default().text_width(tw);
             check_legend(&labels, &opts).is_ok()
         };
         assert!(check(vec![]));
-        assert!(check(vec![f64::NAN]));
-        assert!(check(vec![0.0, 1.5]));
-        assert!(!check(vec![-1.0]));
-        assert!(!check(vec![1.0, f64::NAN]));
+        assert!(check(vec![None]));
+        assert!(check(vec![Some(f64::NAN)])); // the old spelling of `NA`
+        assert!(check(vec![Some(0.0), Some(1.5)]));
+        assert!(!check(vec![Some(-1.0)]));
+        assert!(!check(vec![Some(1.0), None]));
     }
 
     #[test]

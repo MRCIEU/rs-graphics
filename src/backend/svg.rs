@@ -29,6 +29,7 @@ use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 /// A backend writing SVG, with real `<text>` elements that the viewer
 /// renders in its own fonts.
@@ -42,7 +43,7 @@ use crate::lty::LineType;
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let mut dev = Device::new(SvgBackend::new(6, 4), Par::default());
+/// let mut dev = Device::memory("svg").width(6).height(4).open().unwrap();
 /// dev.plot().x([1, 2, 3]).draw();
 /// let svg = String::from_utf8(dev.finish()).unwrap();
 /// assert!(svg.contains("<svg"));
@@ -62,12 +63,14 @@ pub struct SvgBackend {
     pending: Option<(String, String)>,
     /// The style of the open `<g>` of same-style shapes, if any.
     group_style: Option<String>,
+    /// Gzip-compress the finished document (`.svgz`).
+    gzip: bool,
 }
 
 impl SvgBackend {
     /// Creates an SVG backend for a `width_in` x `height_in` inch page.
-    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
-        let (width_in, height_in) = (width_in.into(), height_in.into());
+    pub(crate) fn new(width_in: impl Num, height_in: impl Num) -> Self {
+        let (width_in, height_in) = (width_in.to_f64(), height_in.to_f64());
         SvgBackend {
             width_in,
             height_in,
@@ -78,6 +81,23 @@ impl SvgBackend {
             style: String::new(),
             pending: None,
             group_style: None,
+            gzip: false,
+        }
+    }
+
+    /// Makes the finished document gzip-compressed (`.svgz`), the device
+    /// builder's `compress(true)` for SVG.
+    pub(crate) fn with_gzip(mut self, gzip: bool) -> Self {
+        self.gzip = gzip;
+        self
+    }
+
+    /// The finished document as bytes: plain SVG, or gzipped with `gzip`.
+    fn finish_bytes(self) -> Vec<u8> {
+        if self.gzip {
+            self.finish_svgz()
+        } else {
+            self.finish().into_bytes()
         }
     }
 
@@ -148,12 +168,12 @@ impl SvgBackend {
     /// `.svgz` files, but browsers only display them when served with
     /// `Content-Encoding: gzip`, so [`SvgBackend::finish`]'s plain SVG is the
     /// default.
-    pub fn finish_svgz(self) -> Vec<u8> {
+    pub(crate) fn finish_svgz(self) -> Vec<u8> {
         gzip_compress(self.finish().as_bytes(), DEFLATE_LEVEL)
     }
 
     /// Finishes the SVG document and returns it.
-    pub fn finish(mut self) -> String {
+    pub(crate) fn finish(mut self) -> String {
         self.flush_shapes();
         let mut out = String::new();
         let _ = writeln!(
@@ -236,10 +256,7 @@ fn push_stroke_attrs(out: &mut String, stroke: &Stroke) {
     if matches!(stroke.ljoin, LineJoin::Mitre) {
         push_attr(out, "stroke-miterlimit", stroke.lmitre);
     }
-    if let Some(dashes) = stroke
-        .lty
-        .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
-    {
+    if let Some(dashes) = stroke.dash_pt() {
         out.push_str(" stroke-dasharray=\"");
         for (i, &d) in dashes.iter().enumerate() {
             if i > 0 {
@@ -286,7 +303,7 @@ fn escape_xml(s: &str) -> String {
 
 impl Backend for SvgBackend {
     fn into_bytes(self) -> Vec<u8> {
-        self.finish().into_bytes()
+        self.finish_bytes()
     }
 
     fn size_inches(&self) -> (f64, f64) {
@@ -309,8 +326,8 @@ impl Backend for SvgBackend {
     }
 
     fn take_page(&mut self) -> Vec<u8> {
-        let fresh = SvgBackend::new(self.width_in, self.height_in);
-        std::mem::replace(self, fresh).finish().into_bytes()
+        let fresh = SvgBackend::new(self.width_in, self.height_in).with_gzip(self.gzip);
+        std::mem::replace(self, fresh).finish_bytes()
     }
 
     fn new_page(&mut self) {
@@ -429,11 +446,11 @@ impl Backend for SvgBackend {
         }
         let (x, y) = self.to_pt(origin);
         let style_str = match style.face {
-            crate::afm::FontFace::Italic | crate::afm::FontFace::BoldItalic => "italic",
+            crate::font::FontFace::Italic | crate::font::FontFace::BoldItalic => "italic",
             _ => "normal",
         };
         let weight = match style.face {
-            crate::afm::FontFace::Bold | crate::afm::FontFace::BoldItalic => "bold",
+            crate::font::FontFace::Bold | crate::font::FontFace::BoldItalic => "bold",
             _ => "normal",
         };
         self.flush_shapes();
@@ -455,7 +472,7 @@ impl Backend for SvgBackend {
             out.push_str(")\"");
         }
         out.push('>');
-        if style.face == crate::afm::FontFace::Symbol {
+        if style.face == crate::font::FontFace::Symbol {
             let text: String = text.chars().map(crate::afm::symbol_to_unicode).collect();
             out.push_str(&escape_xml(&text));
         } else {
@@ -509,7 +526,7 @@ mod tests {
         b.draw_text(
             Point::new(0.0, 0.0),
             "t",
-            &TextStyle::new(red, crate::afm::FontFace::Plain, 10.0),
+            &TextStyle::new(red, crate::font::FontFace::Plain, 10.0),
         );
         dot(&mut b, 0.75, red); // the text ended the run
         b.push_clip(Rect::new(0.0, 0.0, 1.0, 1.0));

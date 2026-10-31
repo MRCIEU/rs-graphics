@@ -26,59 +26,72 @@ use crate::geometry::Point;
 
 use crate::plotmath::Label;
 
-use super::{Device, Side, Xpd};
-use crate::setters::pick_na;
+use super::{Device, Side, Xpd, default_padj, las_perpendicular, las_rotation};
+use crate::recycle::{nth, nth_na, pick_na};
 
 crate::setters::options! {
     /// The arguments of R's `mtext()` other than `text` and `side`, with
     /// R's defaults. As in R, the text and the vector arguments are recycled
     /// over the longest: `dev.mtext().text(["a", "b"]).at([1, 2]).draw()`
     /// writes two labels.
-    /// Empty: R's default for every label; a `NaN` entry is R's `NA`, the
-    /// default for that label.
+    /// Empty: R's default for every label; a `None` entry is R's `NA`, which
+    /// each setter describes (usually the default for that label).
     #[derive(Clone, Debug, Default)]
     pub struct MtextOptions => [MtextCall] {
         /// Margin line, recycled per label, counting from 0 next to the plot
         /// region (or the inner region for `outer`); may be negative or
-        /// fractional. Empty: 0. A `NaN` entry leaves its label out (R writes
-        /// it with a `nan` coordinate, an invalid PDF: R bug not copied).
-        pub line: Vec<f64> => values f64,
-        /// Draws in the outer margins (`par(oma)`) rather than the figure's.
+        /// fractional. Empty: 0. A `None` entry (R's `NA`) leaves its label
+        /// out (R writes it with a `nan` coordinate, an invalid PDF: R bug
+        /// not copied).
+        pub line: Vec<Option<f64>> => na_values f64,
+        /// Draws in the outer margins ([`par(oma)`]) rather than the figure's.
         /// Default `false`.
+        ///
+        /// [`par(oma)`]: crate::par::Par::oma
         pub outer: bool => value bool,
         /// Position along the side, recycled per label: a user coordinate
         /// for inner margins, or a fraction (0 to 1) of the inner region for
-        /// outer ones. Empty or `NaN`: from `adj` (text parallel to the
-        /// side) or centred (perpendicular).
-        pub at: Vec<f64> => values f64,
-        /// Justification along the text, recycled per label. Empty or `NaN`:
+        /// outer ones. Empty or `None` (R's `NA`): from `adj` (text parallel
+        /// to the side) or centred (perpendicular).
+        pub at: Vec<Option<f64>> => na_values f64,
+        /// Justification along the text, recycled per label. Empty or `None`:
         /// 0.5 for text parallel to the side, otherwise justified at the end
         /// nearest the plot (1 on sides 1 and 2, 0 on sides 3 and 4).
-        pub adj: Vec<f64> => values f64,
+        pub adj: Vec<Option<f64>> => na_values f64,
         /// Justification across the text, recycled per label. Empty or
-        /// `NaN`: depends on `side` and `las` (0, i.e. baseline on the line,
+        /// `None`: depends on `side` and `las` (0, i.e. baseline on the line,
         /// for `las = 0`).
-        pub padj: Vec<f64> => values f64,
+        pub padj: Vec<Option<f64>> => na_values f64,
         /// Text sizes, recycled per label. Empty, `None` or `NaN`: 1. Unlike
-        /// most text, *not* scaled by `par(cex)` (so neither by the
+        /// most text, *not* scaled by [`par(cex)`] (so neither by the
         /// multi-panel reduction), as in R. (For an `NA` after a finite
         /// value, R keeps the previous label's size; that R bug isn't
         /// copied.)
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
         pub cex: Vec<Option<f64>> => na_values f64,
-        /// Text colours, recycled per label. Empty: `par(col)`.
+        /// Text colours, recycled per label. Empty: [`par(col)`].
+        ///
+        /// [`par(col)`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Fonts, recycled per label. Empty or `None`: `par(font)`.
+        /// Fonts, recycled per label. Empty or `None`: [`par(font)`].
+        ///
+        /// [`par(font)`]: crate::par::Par::font
         pub font: Vec<Option<FontFace>> => na_values FontFace,
         /// Text orientation: 0 parallel to the side, 1 horizontal, 2
         /// perpendicular to the side, 3 vertical. It also sets the default
-        /// `adj`, `padj` and `at`, as in R. `None`: `par(las)`; overrides it
+        /// `adj`, `padj` and `at`, as in R. `None`: [`par(las)`]; overrides it
         /// for this call only.
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
         /// Where the text is clipped: at least the figure region (`false`
         /// counts as `true` here), or the whole device for [`Xpd::Device`].
-        /// `None`: `par(xpd)`; overrides it for this call only. `outer` text
+        /// `None`: [`par(xpd)`]; overrides it for this call only. `outer` text
         /// clips to the device. This is what R means to do; R always clips
         /// `mtext()` to the device (an R bug, not copied).
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
     }
 }
@@ -107,26 +120,14 @@ fn default_adj(side: Side, las: i32) -> f64 {
     }
 }
 
-/// `ComputePAdjValue()`.
-fn default_padj(side: Side, las: i32) -> f64 {
-    use Side::*;
-    match (las, side) {
-        (1, Left) | (1, Right) | (2, _) | (3, Bottom) | (3, Top) => 0.5,
-        _ => 0.0,
-    }
-}
-
 /// `ComputeAtValue()` for `at = NA`, as a fraction along the side: `adj`
 /// when the text runs parallel to the side, otherwise the middle.
 fn default_at_fraction(adj: f64, side: Side, las: i32) -> f64 {
-    let horizontal_side = side.is_horizontal();
-    let parallel = match las {
-        1 => horizontal_side,
-        2 => false,
-        3 => !horizontal_side,
-        _ => true,
-    };
-    if parallel { adj } else { 0.5 }
+    if las_perpendicular(side, las) {
+        0.5
+    } else {
+        adj
+    }
 }
 
 impl<B: Backend> Device<B> {
@@ -154,17 +155,13 @@ impl<B: Backend> Device<B> {
         .into_iter()
         .max()
         .unwrap_or(1);
-        let pick = |v: &[f64], i: usize| {
-            (!v.is_empty())
-                .then(|| v[i % v.len()])
-                .filter(|x| !x.is_nan())
-        };
+        let pick = |v: &[Option<f64>], i: usize| nth_na(v, i).flatten();
         for i in 0..n {
             // An `NA` line puts the label nowhere: R draws nothing for it.
-            let line = (!opts.line.is_empty()).then(|| opts.line[i % opts.line.len()]);
-            if line.is_some_and(f64::is_nan) {
-                continue;
-            }
+            let line = match nth_na(&opts.line, i) {
+                Some(None) => continue,
+                line => line.flatten(),
+            };
             let one = One {
                 line,
                 outer: opts.outer,
@@ -173,10 +170,8 @@ impl<B: Backend> Device<B> {
                 padj: pick(&opts.padj, i),
                 // An `NA` (`None`) `cex` or `font` is the default, as in R.
                 cex: pick_na(&opts.cex, i, f64::NAN).filter(|c| !c.is_nan()),
-                col: (!opts.col.is_empty()).then(|| opts.col[i % opts.col.len()]),
-                font: (!opts.font.is_empty())
-                    .then(|| opts.font[i % opts.font.len()])
-                    .flatten(),
+                col: nth(&opts.col, i),
+                font: nth(&opts.font, i).flatten(),
                 las: opts.las,
                 xpd: opts.xpd,
             };
@@ -207,16 +202,7 @@ impl<B: Backend> Device<B> {
             }
         } else {
             match opts.at {
-                Some(at) => {
-                    let (ux0, _, uy0, _) = self.usr;
-                    let x0 = if self.xlog { 10f64.powf(ux0) } else { ux0 };
-                    let y0 = if self.ylog { 10f64.powf(uy0) } else { uy0 };
-                    if horizontal_side {
-                        self.data_to_inches(at, y0).x
-                    } else {
-                        self.data_to_inches(x0, at).y
-                    }
-                }
+                Some(at) => self.data_to_inches_along(horizontal_side, at),
                 None => {
                     let f = default_at_fraction(adj, side, las);
                     if horizontal_side {
@@ -230,16 +216,8 @@ impl<B: Backend> Device<B> {
 
         // `GMtext()`: rotation, and the `yLineBias` nudge for text parallel
         // to the side.
-        let parallel_text = if horizontal_side {
-            !(las == 2 || las == 3)
-        } else {
-            !(las == 1 || las == 2)
-        };
-        let rotation = if parallel_text == horizontal_side {
-            0.0
-        } else {
-            90.0
-        };
+        let parallel_text = !las_perpendicular(side, las);
+        let rotation = las_rotation(side, las);
         let line = opts.line.unwrap_or(0.0) + self.line_bias(side, parallel_text);
 
         // Position across the side.

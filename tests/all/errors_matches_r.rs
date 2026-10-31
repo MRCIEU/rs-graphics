@@ -124,7 +124,7 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
 /// Errors only a device can see (they depend on its state, or are found
 /// while drawing): R's code (after `plot(1:10)`), R's name for the call,
 /// and the call.
-type DeviceCall = fn(&mut Device<PdfBackend>) -> Result<(), Error>;
+type DeviceCall = fn(&mut Device<AnyBackend>) -> Result<(), Error>;
 
 fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
     vec![
@@ -132,16 +132,22 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
             d.points().x(1).y(1).col(-1).try_draw()
         }),
         ("par(mfrow = c(0, 1))", "par", |d| {
-            d.par().mfrow(0, 1).try_draw()
+            d.par().mfrow([0, 1]).try_draw()
         }),
         ("par(mfcol = c(1, 0))", "par", |d| {
-            d.par().mfcol(1, 0).try_draw()
+            d.par().mfcol([1, 0]).try_draw()
+        }),
+        ("par(mfrow = c(-1, 2))", "par", |d| {
+            d.par().mfrow([-1, 2]).try_draw()
+        }),
+        ("par(mfg = c(0, 1))", "par", |d| {
+            d.par().mfg([0, 1]).try_draw()
         }),
         ("par(mfg = c(3, 1))", "par", |d| {
-            d.par().mfg(3, 1).try_draw()
+            d.par().mfg([3, 1]).try_draw()
         }),
         ("par(mfg = c(1, 3))", "par", |d| {
-            d.par().mfg(1, 3).try_draw()
+            d.par().mfg([1, 3]).try_draw()
         }),
         (
             "plot(1:100, log = 'x'); par(xaxp = c(1, 100, 7))",
@@ -162,8 +168,8 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
     ]
 }
 
-fn device() -> Device<PdfBackend> {
-    let mut dev = Device::new(PdfBackend::new(7, 7), Par::default());
+fn device() -> Device<AnyBackend> {
+    let mut dev = Device::memory("pdf").width(7).height(7).open().unwrap();
     dev.plot().x(1..=10).draw();
     dev
 }
@@ -216,7 +222,7 @@ fn errors_match_r() {
     if !common::r_available() {
         return;
     }
-    let args = argument_errors::<Device<PdfBackend>>();
+    let args = argument_errors::<Device<AnyBackend>>();
     let on_device = device_errors();
     let code: Vec<&str> = args
         .iter()
@@ -300,7 +306,7 @@ fn errors_while_drawing_end_with_their_call() {
 /// The error type works with `?` in a function returning a boxed error.
 #[test]
 fn errors_work_with_the_question_mark() {
-    fn plot_it(dev: &mut Device<PdfBackend>) -> Result<(), Box<dyn std::error::Error>> {
+    fn plot_it(dev: &mut Device<AnyBackend>) -> Result<(), Box<dyn std::error::Error>> {
         dev.plot().y([1, 2]).try_draw()?;
         Ok(())
     }
@@ -417,6 +423,7 @@ fn negative_bg_fails_when_opening() {
         .open()
         .err()
         .unwrap();
-    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(e.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(e.call(), "png");
     assert!(!path.exists());
 }

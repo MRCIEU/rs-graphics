@@ -6,12 +6,13 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Cross-checks `rs_graphics::pretty::ge_pretty` against R itself.
+//! Cross-checks the port of R's `GEPretty()` (the default axis ticks)
+//! against R itself.
 //!
 //! `par("xaxp")` after `plot.window(xlim = c(lo, up), xaxs = "i")` reports
 //! exactly the `(lo, up, ndiv)` triple that R's C-level `GEPretty()`
-//! computed for that range - the same routine this crate's `pretty`
-//! module ports. `xaxs = "i"` disables the usual 4% padding so the user
+//! computed for that range, and ours is read back the same way
+//! (`current_par().xaxp`). `xaxs = "i"` disables the usual 4% padding so the user
 //! range fed to `GEPretty()` is exactly `(lo, up)`.
 //!
 //! This test is skipped (not failed) if `Rscript` isn't on `PATH`, so it
@@ -21,7 +22,7 @@ use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::pretty::ge_pretty;
+use rs_graphics::prelude::*;
 
 fn r_xaxp(lo: f64, up: f64, ndiv: i32) -> (f64, f64, i32) {
     let script = format!(
@@ -71,7 +72,16 @@ fn ge_pretty_matches_r_xaxp() {
 
     for &(lo, up, ndiv) in cases {
         let expected = r_xaxp(lo, up, ndiv);
-        let actual = ge_pretty(lo, up, ndiv);
+        let mut dev = Device::null().open().unwrap();
+        dev.par().lab([ndiv, ndiv, 7]).draw();
+        dev.plot_new();
+        dev.plot_window()
+            .xlim((lo, up))
+            .ylim([0, 1])
+            .xaxs("i")
+            .draw();
+        let [a, b, n] = dev.current_par().xaxp;
+        let actual = (a, b, n as i32);
         assert!(
             (actual.0 - expected.0).abs() < 1e-9
                 && (actual.1 - expected.1).abs() < 1e-9

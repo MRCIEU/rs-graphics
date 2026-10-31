@@ -12,10 +12,13 @@
 //!
 //! Only numeric x/y plots are supported: the vast majority of R's
 //! `plot.default` is dispatch logic and argument munging for other input
-//! types, which is out of scope here.
+//! types, which is out of scope here. Not supported: `lim2`, and `ann`
+//! (set [`par(ann)`] instead).
 //!
 //! This is R's `plot(x, y, ...)`, ported from `plot.default` in
 //! `r-source/src/library/graphics/R/plot.R`.
+//!
+//! [`par(ann)`]: crate::par::Par::ann
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
@@ -38,6 +41,10 @@ use super::{InlineAxis, data_range};
 /// values <= 0 on a log axis). Setters also take R's letters
 /// (`.type_("b")`); any other string is an error of the call.
 ///
+/// From a string (`"b".parse::<PlotType>()` or `TryFrom<&str>`): R's letters
+/// `"p"`, `"l"`, `"b"`, `"c"`, `"o"`, `"h"`, `"s"`, `"S"` and `"n"`. Anything
+/// else is an error.
+///
 /// This is R's `type` argument.
 ///
 /// # Examples
@@ -45,10 +52,12 @@ use super::{InlineAxis, data_range};
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let y = [3, 1, 4, 1, 5];
 /// dev.plot().x(&y).type_(PlotType::Both).draw();
 /// dev.lines().x(&y).type_("s").draw();
+/// assert_eq!("S".parse::<PlotType>().unwrap(), PlotType::StepsVerticalFirst);
+/// assert!("x".parse::<PlotType>().is_err());
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlotType {
@@ -81,21 +90,9 @@ pub enum PlotType {
 }
 
 impl PlotType {
-    /// Reads a plot type from its letter: `"p"`, `"l"`, `"b"`, `"c"`,
-    /// `"o"`, `"h"`, `"s"`, `"S"` or `"n"`; `None` for anything else (R
-    /// errors: "invalid plot type").
-    ///
-    /// These are R's `type =` letters.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert_eq!(PlotType::parse("S"), Some(PlotType::StepsVerticalFirst));
-    /// assert_eq!(PlotType::parse("x"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<PlotType> {
+    /// R's `type` letter, `None` if it isn't one; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<PlotType> {
         match s {
             "p" => Some(PlotType::Points),
             "l" => Some(PlotType::Lines),
@@ -111,7 +108,6 @@ impl PlotType {
     }
 }
 
-crate::error::from_str_via_parse!(PlotType, "plot type");
 crate::error::from_r_string!(
     PlotType,
     "plot type",
@@ -120,30 +116,40 @@ crate::error::from_r_string!(
 
 crate::setters::options! {
     /// Options for [`Graphics::plot`](crate::graphics::Graphics::plot), covering the subset of
-    /// `plot.default`'s arguments this crate implements. Unset fields are R's
-    /// defaults, given for each.
+    /// `plot.default`'s arguments this crate implements. Settings left unset
+    /// are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct PlotOptions => [PlotCall] {
         /// What to draw: points, lines, both, steps, ... (see [`PlotType`]).
         /// `None`: points. R's `type`.
         pub type_: Option<PlotType> => option PlotType,
-        /// Plotting symbols, recycled over the points; characters work too
-        /// (a negative value is minus a Unicode code point). Empty:
-        /// `par(pch)`; `None`: no point there.
-        pub pch: Vec<Option<i32>> => na_values i32,
+        /// Plotting symbols, recycled over the points: R's symbol codes,
+        /// characters or strings (a string's first character). Empty:
+        /// [`par(pch)`]; `None`: no point there.
+        ///
+        /// [`par(pch)`]: crate::par::Par::pch
+        pub pch: Vec<Option<i32>> => pch Option<i32>,
         /// Colours, recycled over the points. Lines use the first, except
-        /// `type = "h"`, which has one line per point. Empty: `par(col)`.
+        /// `type = "h"`, which has one line per point. Empty: [`par(col)`].
+        ///
+        /// [`par(col)`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
         /// Fill of symbols 21-25, recycled over the points. Empty: none (R's
         /// `NA`).
         pub bg: Vec<ColorSpec> => values ColorSpec,
         /// Line widths, recycled over the points; lines use the first.
-        /// Empty: `par(lwd)`; `None`: no point there (lines use `par(lwd)`).
+        /// Empty: [`par(lwd)`]; `None`: no point there (lines use [`par(lwd)`]).
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
-        /// Line type of the lines. `None`: `par(lty)`.
+        /// Line type of the lines. `None`: [`par(lty)`].
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Option<LineType> => option LineType,
-        /// Symbol sizes, recycled over the points, times `par(cex)`. Empty:
+        /// Symbol sizes, recycled over the points, times [`par(cex)`]. Empty:
         /// 1; `None`: no point there.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
         pub cex: Vec<Option<f64>> => na_values f64,
         /// x axis limits. `None`: the range of the finite data (positive
         /// values only on a log axis), as R's `xlim = range(x)`.
@@ -166,76 +172,127 @@ crate::setters::options! {
         /// y axis label. `None`: none (no default from the variable name, as
         /// for `xlab`).
         pub ylab: Option<Label> => option Label,
-        /// Size of the main title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
-        pub cex_main: Option<f64> => option f64,
-        /// Colour of the main title. `None`: `par(col.main)`. R's
+        /// Size of the main title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
+        pub cex_main: Option<f64> => number f64,
+        /// Colour of the main title. `None`: [`par(col.main)`]. R's
         /// `col.main`.
-        pub col_main: Option<ColorSpec> => option ColorSpec,
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the main title (a [`FontFace`]). `None`:
-        /// `par(font.main)`. R's `font.main`.
+        /// [`par(font.main)`]. R's `font.main`.
+        ///
+        /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
-        /// Size of the subtitle, relative to `par(cex)`. `None`:
-        /// `par(cex.sub)`. R's `cex.sub`.
-        pub cex_sub: Option<f64> => option f64,
-        /// Colour of the subtitle. `None`: `par(col.sub)`. R's `col.sub`.
-        pub col_sub: Option<ColorSpec> => option ColorSpec,
-        /// Font of the subtitle (a [`FontFace`]). `None`: `par(font.sub)`.
+        /// Size of the subtitle, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.sub)`]. R's `cex.sub`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.sub)`]: crate::par::Par::cex_sub
+        pub cex_sub: Option<f64> => number f64,
+        /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
+        ///
+        /// [`par(col.sub)`]: crate::par::Par::col_sub
+        pub col_sub: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of the subtitle (a [`FontFace`]). `None`: [`par(font.sub)`].
         /// R's `font.sub`.
+        ///
+        /// [`par(font.sub)`]: crate::par::Par::font_sub
         pub font_sub: Option<FontFace> => option FontFace,
         /// Size of the axis titles (`xlab` and `ylab`), relative to
-        /// `par(cex)`. `None`: `par(cex.lab)`. R's `cex.lab`.
-        pub cex_lab: Option<f64> => option f64,
+        /// [`par(cex)`]. `None`: [`par(cex.lab)`]. R's `cex.lab`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.lab)`]: crate::par::Par::cex_lab
+        pub cex_lab: Option<f64> => number f64,
         /// Colour of the axis titles (`xlab` and `ylab`). `None`:
-        /// `par(col.lab)`. R's `col.lab`.
-        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        /// [`par(col.lab)`]. R's `col.lab`.
+        ///
+        /// [`par(col.lab)`]: crate::par::Par::col_lab
+        pub col_lab: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the axis titles (`xlab` and `ylab`; a [`FontFace`]).
-        /// `None`: `par(font.lab)`. R's `font.lab`.
+        /// `None`: [`par(font.lab)`]. R's `font.lab`.
+        ///
+        /// [`par(font.lab)`]: crate::par::Par::font_lab
         pub font_lab: Option<FontFace> => option FontFace,
         /// Whether to draw the axes and the box around the plot. Default
         /// `true`.
         pub axes: bool => value bool,
-        /// Which sides of the box to draw. `None`: `par(bty)`.
+        /// Which sides of the box to draw. `None`: [`par(bty)`].
+        ///
+        /// [`par(bty)`]: crate::par::Par::bty
         pub bty: Option<Bty> => option Bty,
         /// Whether to draw the x axis: `AxisType::None` leaves it out.
-        /// `None`: `par(xaxt)`.
+        /// `None`: [`par(xaxt)`].
+        ///
+        /// [`par(xaxt)`]: crate::par::Par::xaxt
         pub xaxt: Option<AxisType> => option AxisType,
-        /// Whether to draw the y axis, as for `xaxt`. `None`: `par(yaxt)`.
+        /// Whether to draw the y axis, as for `xaxt`. `None`: [`par(yaxt)`].
+        ///
+        /// [`par(yaxt)`]: crate::par::Par::yaxt
         pub yaxt: Option<AxisType> => option AxisType,
         /// Default ticks of the x axis, as `[from, to, intervals]`. `None`:
-        /// `par(xaxp)` as `plot_window()` sets it. Like R, leaves `par()`
+        /// [`par(xaxp)`] as `plot_window()` sets it. Like R, leaves `par()`
         /// itself unchanged.
+        ///
+        /// [`par(xaxp)`]: crate::par::Par::xaxp
         pub xaxp: Option<[f64; 3]> => array [f64; 3],
-        /// Default ticks of the y axis, as for `xaxp`. `None`: `par(yaxp)`.
+        /// Default ticks of the y axis, as for `xaxp`. `None`: [`par(yaxp)`].
+        ///
+        /// [`par(yaxp)`]: crate::par::Par::yaxp
         pub yaxp: Option<[f64; 3]> => array [f64; 3],
         /// Orientation of the axis labels: 0 parallel to the axis, 1
-        /// horizontal, 2 perpendicular, 3 vertical. `None`: `par(las)`.
+        /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
-        /// Size of the axis labels. `None`: `par(cex.axis)`. R's `cex.axis`.
-        pub cex_axis: Option<f64> => option f64,
-        /// Colour of the axis labels. `None`: `par(col.axis)`. R's
+        /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
+        pub cex_axis: Option<f64> => number f64,
+        /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
-        /// Font of the axis labels. `None`: `par(font.axis)`. R's
+        ///
+        /// [`par(col.axis)`]: crate::par::Par::col_axis
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of the axis labels. `None`: [`par(font.axis)`]. R's
         /// `font.axis`.
+        ///
+        /// [`par(font.axis)`]: crate::par::Par::font_axis
         pub font_axis: Option<FontFace> => option FontFace,
         /// Margin lines of the axis titles, axis labels and axis line, for
-        /// the axes and titles. `None`: `par(mgp)`.
+        /// the axes and titles. `None`: [`par(mgp)`].
+        ///
+        /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
-        /// Tick length as a fraction of the plot region. `None`: `par(tck)`.
-        pub tck: Option<f64> => option f64,
-        /// Tick length in margin lines. `None`: `par(tcl)`.
-        pub tcl: Option<f64> => option f64,
+        /// Tick length as a fraction of the plot region. `None`: [`par(tck)`].
+        ///
+        /// [`par(tck)`]: crate::par::Par::tck
+        pub tck: Option<f64> => number f64,
+        /// Tick length in margin lines. `None`: [`par(tcl)`].
+        ///
+        /// [`par(tcl)`]: crate::par::Par::tcl
+        pub tcl: Option<f64> => number f64,
         /// Aspect ratio: one x unit is `asp` y units long (1 for equal
         /// scales); ignored on log axes. `None` (R's `NA`): none.
-        pub asp: Option<f64> => option f64,
+        pub asp: Option<f64> => number f64,
         /// Style of the x axis range: `"r"` adds 4% at each end, `"i"`
-        /// nothing. `None`: `par(xaxs)`.
+        /// nothing. `None`: [`par(xaxs)`].
+        ///
+        /// [`par(xaxs)`]: crate::par::Par::xaxs
         pub xaxs: Option<AxisStyle> => option AxisStyle,
-        /// Style of the y axis range, as for `xaxs`. `None`: `par(yaxs)`.
+        /// Style of the y axis range, as for `xaxs`. `None`: [`par(yaxs)`].
+        ///
+        /// [`par(yaxs)`]: crate::par::Par::yaxs
         pub yaxs: Option<AxisStyle> => option AxisStyle,
         /// Approximate numbers of x and y ticks, used when setting up the
-        /// window. `None`: `par(lab)`.
+        /// window. `None`: [`par(lab)`].
+        ///
+        /// [`par(lab)`]: crate::par::Par::lab
         pub lab: Option<[i32; 3]> => option [i32; 3],
         /// Low-level calls (a [`Figure`]) drawn after the window is set and
         /// before the points, e.g. grid lines; added with
@@ -249,22 +306,35 @@ crate::setters::options! {
         /// `None`: as `axes`. R's `frame.plot`.
         pub frame_plot: Option<bool> => option bool,
         /// Font of character symbols (`pch = "a"`) and of the axis labels
-        /// (over `font_axis`). `None`: `par(font)` for symbols, `font_axis`
+        /// (over `font_axis`). `None`: [`par(font)`] for symbols, `font_axis`
         /// for the axes.
+        ///
+        /// [`par(font)`]: crate::par::Par::font
         pub font: Option<FontFace> => option FontFace,
         /// Colour of the axes' line and ticks and of the frame. `None`:
-        /// `par(fg)` for the axes, `par(col)` for the frame.
-        pub fg: Option<ColorSpec> => option ColorSpec,
+        /// [`par(fg)`] for the axes, [`par(col)`] for the frame.
+        ///
+        /// [`par(col)`]: crate::par::Par::col
+        /// [`par(fg)`]: crate::par::Par::fg
+        pub fg: Option<ColorSpec> => option_value ColorSpec,
         /// Position of the titles along their sides (0 left, 1 right).
-        /// `None`: `par(adj)`.
-        pub adj: Option<f64> => option f64,
+        /// `None`: [`par(adj)`].
+        ///
+        /// [`par(adj)`]: crate::par::Par::adj
+        pub adj: Option<f64> => number f64,
         /// Line ends of the lines and symbols, the axes and the frame.
-        /// `None`: `par(lend)`.
+        /// `None`: [`par(lend)`].
+        ///
+        /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
         /// Clipping: where the points and lines are clipped, how far the
         /// axes' ticks may reach, and the titles' clip (at least the figure
-        /// region). `None`: `par(xpd)`.
+        /// region). `None`: [`par(xpd)`].
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::PlotExtras => no_setter,
     }
 }
 
@@ -272,6 +342,7 @@ impl Default for PlotOptions {
     fn default() -> Self {
         PlotOptions {
             deferred_error: None,
+            extra: Default::default(),
             type_: None,
             pch: Vec::new(),
             col: Vec::new(),
@@ -360,6 +431,7 @@ impl<B: Backend> Device<B> {
             lab: opts.lab,
         };
         self.plot_window_impl(xlim, ylim, &window);
+        crate::extra::panel_bg(self, &opts.extra)?;
         if let Some(panel) = &opts.panel_first {
             self.try_add_figure(panel)?;
         }
@@ -402,11 +474,14 @@ impl<B: Backend> Device<B> {
                 ..InlineAxis::default()
             };
             for (side, axt, axp) in [(1, opts.xaxt, opts.xaxp), (2, opts.yaxt, opts.yaxp)] {
-                let o = AxisOptions {
+                let mut o = AxisOptions {
                     axt,
                     axp,
                     ..AxisOptions::default()
                 };
+                if side == 1 {
+                    o = crate::extra::rotated_axis(&opts.extra, o);
+                }
                 self.axis_impl(side, &inline.apply(o))?;
             }
         }

@@ -10,37 +10,16 @@
 //! `line`, `at`, `adj`, `padj`, `cex`, `font`, and inline `las` 0..=3, plus
 //! `par(las)` without it) against
 //! a real R `pdf()` device's uncompressed output, inside a 2x2 `mfrow` page
-//! with outer margins (so the 0.83 multi-panel `cex` applies). Skipped if
-//! `Rscript` isn't available.
+//! with outer margins (so the 0.83 multi-panel `cex` applies): every text
+//! item (see `common::pdf::assert_same`), except its clip (R clips
+//! `mtext()` to the device). Skipped if `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
-
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::color::ColorSpec;
-use rs_graphics::device::{Device, MtextOptions};
-use rs_graphics::par::{Par, Sides};
+use rs_graphics::device::MtextOptions;
+use rs_graphics::par::Sides;
 use rs_graphics::prelude::*;
-
-/// `(x, y, font size, rotation)` of every text matrix, in drawing order.
-fn text_origins(pdf: &str) -> Vec<(f64, f64, f64, f64)> {
-    let mut out = Vec::new();
-    let mut tf = 1.0;
-    for line in pdf.lines() {
-        let toks: Vec<&str> = line.split_whitespace().collect();
-        for (i, t) in toks.iter().enumerate() {
-            let num = |k: usize| toks[i - k].parse::<f64>().unwrap();
-            if *t == "Tf" {
-                tf = num(1);
-            } else if *t == "Tm" {
-                let (a, b) = (num(6), num(5));
-                out.push((num(2), num(1), tf * a.hypot(b), b.atan2(a).to_degrees()));
-            }
-        }
-    }
-    out
-}
 
 struct Case {
     text: &'static str,
@@ -103,13 +82,10 @@ fn mtext_placement_matches_r() {
         return;
     }
     let cases = cases();
-    let dir = std::env::temp_dir();
-    let pdf_path = dir.join("rs_graphics_mtext.pdf");
-    let mut script = format!(
-        "pdf(file = '{}', width = 8, height = 6, compress = FALSE)\n\
-         par(mfrow = c(2, 2), oma = c(2, 3, 4, 1.5))\n\
+    let page = (8.0, 6.0);
+    let mut script = String::from(
+        "par(mfrow = c(2, 2), oma = c(2, 3, 4, 1.5))\n\
          plot.new(); plot.window(c(0, 10), c(0, 5))\n",
-        pdf_path.display()
     );
     for c in &cases {
         script.push_str(&format!(
@@ -128,66 +104,64 @@ fn mtext_placement_matches_r() {
     }
     // Inline `las` doesn't change `par(las)`; without it, `par(las)` applies.
     script.push_str("par(las = 1); mtext('par las', side = 2, line = 2.5)\n");
-    script.push_str("invisible(dev.off())\n");
-    let script_path = dir.join("rs_graphics_mtext.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
+    // `NA` elements in the recycled vectors (`None` here): the default for
+    // that label.
+    script.push_str(
+        "mtext(c('n1', 'n2', 'n3'), side = 3, line = 1, at = c(2, NA, 8), \
+         adj = c(NA, 0, 1), padj = c(1, NA, 0))\n",
     );
-    let r_pdf = String::from_utf8_lossy(&std::fs::read(&pdf_path).unwrap()).into_owned();
+    let r_pdf = r::run_r("mtext", page, "", &[("all", &script)])
+        .pdfs
+        .remove(0);
 
-    let par = Par {
-        oma: Sides::new(2.0, 3.0, 4.0, 1.5),
-        ..Par::default()
-    };
-    let mut dev = Device::new(PdfBackend::new(8.0, 6.0).with_compression(false), par);
-    dev.par().mfrow(2, 2).draw();
-    dev.plot_new();
-    dev.plot_window().xlim(0.0, 10.0).ylim(0.0, 5.0).draw();
-    for c in &cases {
+    let par = ParOptions::default().oma(Sides::new(2.0, 3.0, 4.0, 1.5));
+    let (ours, ()) = r::ours_with(page, par, |dev| {
+        dev.par().mfrow([2, 2]).draw();
+        dev.plot_new();
+        dev.plot_window().xlim([0.0, 10.0]).ylim([0.0, 5.0]).draw();
+        for c in &cases {
+            dev.mtext()
+                .text(c.text)
+                .side(c.side)
+                .with(
+                    &MtextOptions::default()
+                        .line(vec![c.line])
+                        .outer(c.outer)
+                        .at(c.at.into_iter().collect::<Vec<_>>())
+                        .adj(c.adj.into_iter().collect::<Vec<_>>())
+                        .padj(c.padj.into_iter().collect::<Vec<_>>())
+                        .cex(c.cex.into_iter().map(Some).collect::<Vec<_>>())
+                        .font(
+                            c.font
+                                .into_iter()
+                                .map(|f| Some(FontFace::try_from(f).unwrap()))
+                                .collect::<Vec<_>>(),
+                        )
+                        .las(c.las),
+                )
+                .draw();
+        }
+        assert_eq!(dev.current_par().las, 0);
+        dev.par().las(1).draw();
+        dev.mtext().text("par las").side(2).line(2.5).draw();
         dev.mtext()
-            .text(c.text)
-            .side(c.side)
-            .with(&MtextOptions {
-                line: vec![c.line],
-                outer: c.outer,
-                at: c.at.into_iter().collect(),
-                adj: c.adj.into_iter().collect(),
-                padj: c.padj.into_iter().collect(),
-                cex: c.cex.into_iter().map(Some).collect(),
-                col: Vec::<ColorSpec>::new(),
-                font: c
-                    .font
-                    .into_iter()
-                    .map(|f| Some(FontFace::try_from(f).unwrap()))
-                    .collect(),
-                las: Some(c.las),
-                xpd: None,
-                ..MtextOptions::default()
-            })
+            .text(["n1", "n2", "n3"])
+            .side(3)
+            .line(1)
+            .at([Some(2.0), None, Some(8.0)])
+            .adj([None, Some(0.0), Some(1.0)])
+            .padj([Some(1.0), None, Some(0.0)])
             .draw();
-    }
-    assert_eq!(dev.current_par().las, 0);
-    dev.par().las(1).draw();
-    dev.mtext().text("par las").side(2).line(2.5).draw();
-    let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
+    });
 
-    let (r, o) = (text_origins(&r_pdf), text_origins(&ours));
-    assert_eq!(o.len(), r.len(), "text count\nours={o:?}\nr={r:?}");
-    let texts: Vec<&str> = cases.iter().map(|c| c.text).chain(["par las"]).collect();
-    for ((a, b), c) in o.iter().zip(&r).zip(&texts) {
-        assert!(
-            (a.0 - b.0).abs() < 0.05
-                && (a.1 - b.1).abs() < 0.05
-                && (a.2 - b.2).abs() < 0.05
-                && (a.3 - b.3).abs() < 0.01,
-            "{c:?}: ours={a:?} r={b:?}"
-        );
-    }
+    let (ours, r) = (pdf::parse(&ours), pdf::parse(&r_pdf));
+    assert_eq!(r.pages[0].texts.len(), cases.len() + 4);
+    // R clips `mtext()` to the device even for inner margins (its `C_mtext`
+    // tests `outer` on the SEXP); we clip it to the figure.
+    let how = pdf::Compare {
+        clip: false,
+        angle: 0.01,
+        ..Default::default()
+    };
+    pdf::assert_same_pdf("mtext", ours, r, &how);
 }

@@ -6,41 +6,65 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The crate's error types: [`Error`], an R error from a drawing call
-//! (returned by `.try_draw()`), and [`ParseValueError`], a string that
-//! isn't a valid value (returned by the `FromStr` impls).
+//! The crate's error type, [`Error`]: an R error from a drawing call
+//! (returned by `.try_draw()`), a string that isn't a valid value
+//! (returned by the string-valued types' `FromStr` and `TryFrom`), or a
+//! device that couldn't be opened or written (`open()`, `close()`).
 
 use std::fmt;
+use std::sync::Arc;
 
-/// An R error from a drawing call: what R would stop with, such as a
-/// missing argument, an invalid value, or regions that don't fit the page.
+/// An error: R's error from a drawing call (what R would stop with, such
+/// as a missing argument, an invalid value, or regions that don't fit the
+/// page), a string that names no value (`"wavy".parse::<LineType>()`), or
+/// a device's file that can't be created or written.
 ///
 /// Returned by the builders' `try_draw()` (and [`Device`]'s
 /// `try_plot_new()`, `try_add_figure()`, ...); the matching `draw()`
-/// panics with the same text. It prints like R's own errors, the call's
-/// name then R's message: `plot.new(): figure margins too large`.
+/// panics with the same text. Also returned by opening and closing a
+/// device ([`DeviceBuilder::open`], [`Device::close`]); converts into a
+/// [`std::io::Error`], so `?` works in a function returning
+/// `io::Result`. It prints like R's own errors, the call's name then R's
+/// message: `plot.new(): figure margins too large`.
 ///
 /// This is R's `Error in plot.new() : figure margins too large`.
 ///
 /// [`Device`]: crate::device::Device
+/// [`DeviceBuilder::open`]: crate::device::DeviceBuilder::open
+/// [`Device::close`]: crate::device::Device::close
 ///
 /// # Examples
 ///
 /// ```
 /// use rs_graphics::prelude::*; // includes `ErrorKind`
 ///
-/// let mut dev = Device::new(SvgBackend::new(0.5, 0.5), Par::default());
+/// let mut dev = Device::memory("svg").width(0.5).height(0.5).open().unwrap();
 /// let err = dev.plot().x([1, 2, 3]).try_draw().unwrap_err();
 /// assert_eq!(err.call(), "plot.new");
 /// assert_eq!(err.kind(), ErrorKind::DoesNotFit);
 /// assert_eq!(err.to_string(), "plot.new(): figure margins too large");
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Error {
     call: &'static str,
     kind: ErrorKind,
     message: String,
+    /// The I/O error behind an [`ErrorKind::Io`] error.
+    io: Option<Arc<std::io::Error>>,
 }
+
+impl PartialEq for Error {
+    /// Equal when the call, kind and message are, and, for I/O errors, the
+    /// I/O error's kind.
+    fn eq(&self, other: &Error) -> bool {
+        self.call == other.call
+            && self.kind == other.kind
+            && self.message == other.message
+            && self.io.as_ref().map(|e| e.kind()) == other.io.as_ref().map(|e| e.kind())
+    }
+}
+
+impl Eq for Error {}
 
 /// What kind of R error an [`Error`] is.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -56,6 +80,10 @@ pub enum ErrorKind {
     /// panel, or a figure or plot region larger than allowed. A bigger page,
     /// fewer panels or smaller margins fix it.
     DoesNotFit,
+    /// A device's file couldn't be created or written (`cannot open file
+    /// 'x.pdf': No such file or directory`); [`Error::io_error`] gives the
+    /// underlying [`std::io::Error`].
+    Io,
 }
 
 impl Error {
@@ -65,6 +93,7 @@ impl Error {
             call: "",
             kind: ErrorKind::InvalidArgument,
             message: message.into(),
+            io: None,
         }
     }
 
@@ -74,6 +103,7 @@ impl Error {
             call: "",
             kind: ErrorKind::MissingArgument,
             message: format!("argument \"{name}\" is missing, with no default"),
+            io: None,
         }
     }
 
@@ -83,6 +113,17 @@ impl Error {
             call,
             kind: ErrorKind::DoesNotFit,
             message: message.into(),
+            io: None,
+        }
+    }
+
+    /// A device's file error, from `call` (`"pdf"`, `"dev.off"`, ...).
+    pub(crate) fn io(call: &'static str, e: std::io::Error) -> Error {
+        Error {
+            call,
+            kind: ErrorKind::Io,
+            message: e.to_string(),
+            io: Some(Arc::new(e)),
         }
     }
 
@@ -97,7 +138,8 @@ impl Error {
     }
 
     /// Returns the name of the R function that raised the error, such as
-    /// `"plot.new"` or `"hist"`.
+    /// `"plot.new"` or `"hist"`; empty for an error from a string
+    /// conversion.
     pub fn call(&self) -> &str {
         self.call
     }
@@ -111,6 +153,23 @@ impl Error {
     pub fn message(&self) -> &str {
         &self.message
     }
+
+    /// Returns the I/O error behind an [`ErrorKind::Io`] error, `None` for
+    /// the other kinds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let err = Device::pdf("/no/such/dir/x.pdf").open().err().unwrap();
+    /// assert_eq!(err.kind(), ErrorKind::Io);
+    /// assert_eq!(err.call(), "pdf");
+    /// let io = err.io_error().unwrap();
+    /// assert_eq!(io.kind(), std::io::ErrorKind::NotFound);
+    /// ```
+    pub fn io_error(&self) -> Option<&std::io::Error> {
+        self.io.as_deref()
+    }
 }
 
 impl fmt::Display for Error {
@@ -123,7 +182,25 @@ impl fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.io
+            .as_deref()
+            .map(|e| e as &(dyn std::error::Error + 'static))
+    }
+}
+
+impl From<Error> for std::io::Error {
+    /// The error as an I/O error, so `?` works in a function returning
+    /// `io::Result`: an [`ErrorKind::Io`] error keeps its I/O error's kind,
+    /// the others are `InvalidInput`. It prints as the `Error` does.
+    fn from(e: Error) -> std::io::Error {
+        let kind = e
+            .io_error()
+            .map_or(std::io::ErrorKind::InvalidInput, |io| io.kind());
+        std::io::Error::new(kind, e)
+    }
+}
 
 /// For conversions that can't fail (`TryFrom` from a `From` impl), so
 /// setters can take either kind ([`IntoArg`](crate::setters::IntoArg)).
@@ -141,81 +218,29 @@ impl From<std::num::TryFromIntError> for Error {
     }
 }
 
-/// An error for a string that isn't a valid value of some parameter.
-///
-/// E.g. `"zz"` as a colour or `"x"` as an axis style (`par(xaxs)`).
-/// Returned by the `FromStr` impls of
-/// [`Color`](crate::color::Color), [`LineType`](crate::lty::LineType),
-/// [`LineEnd`](crate::backend::LineEnd), [`LineJoin`](crate::backend::LineJoin),
-/// [`PlotType`](crate::highlevel::PlotType),
-/// [`LegendKeyword`](crate::device::LegendKeyword),
-/// [`LegendBty`](crate::device::LegendBty),
-/// [`OrderH`](crate::highlevel::OrderH), [`Bty`](crate::par::Bty),
-/// [`FontFace`](crate::font::FontFace),
-/// [`Format`](crate::backend::Format), [`Units`](crate::device::Units)
-/// and the `par()` enums. It displays as `invalid <kind>: "<value>"`.
-///
-/// # Examples
-///
-/// ```
-/// # use rs_graphics::prelude::*;
-/// use rs_graphics::error::ParseValueError;
-///
-/// let err: ParseValueError = "wavy".parse::<LineType>().unwrap_err();
-/// assert_eq!(err.kind, "line type");
-/// assert_eq!(err.to_string(), "invalid line type: \"wavy\"");
-/// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParseValueError {
-    /// What was being parsed, e.g. `"colour"` or `"axis style"`.
-    pub kind: &'static str,
-    /// The rejected input.
-    pub value: String,
-}
-
-impl ParseValueError {
-    pub(crate) fn new(kind: &'static str, value: &str) -> Self {
-        ParseValueError {
-            kind,
-            value: value.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for ParseValueError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "invalid {}: {:?}", self.kind, self.value)
-    }
-}
-
-impl std::error::Error for ParseValueError {}
-
-/// `impl FromStr for $ty` via its `parse(&str) -> Option<$ty>`.
-macro_rules! from_str_via_parse {
-    ($ty:ty, $kind:literal) => {
-        impl std::str::FromStr for $ty {
-            type Err = $crate::error::ParseValueError;
-
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                <$ty>::parse(s).ok_or_else(|| $crate::error::ParseValueError::new($kind, s))
-            }
-        }
-    };
-}
-pub(crate) use from_str_via_parse;
-
-/// `impl TryFrom<&str>` (and `String`, `&String`) for `$ty` via its
-/// `parse(&str) -> Option<$ty>`, so setters taking an
-/// [`IntoArg<$ty>`](crate::setters::IntoArg) accept R's strings
-/// (`.order_h("decr")`). An invalid string is an [`Error`] naming `$kind`
-/// and the accepted values `$valid`, as R errors.
+/// The string forms of `$ty`, from its crate-private
+/// `parse(&str) -> Option<$ty>`: `TryFrom<&str>` (and `String`, `&String`),
+/// so setters taking an [`IntoArg<$ty>`](crate::setters::IntoArg) accept
+/// R's strings (`.order_h("decr")`), and `FromStr` (`"decr".parse()`). An
+/// invalid string is an [`Error`] naming `$kind` and the accepted values
+/// `$valid`, as R errors. This is every string-valued type's one route
+/// from a string.
 macro_rules! from_r_string {
     ($ty:ident, $kind:literal, $valid:literal) => {
+        impl std::str::FromStr for $ty {
+            type Err = $crate::error::Error;
+
+            /// Converts as `TryFrom<&str>` does.
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                <$ty>::try_from(s)
+            }
+        }
+
         impl TryFrom<&str> for $ty {
             type Error = $crate::error::Error;
 
             #[doc = concat!("Converts the string form of a [`", stringify!($ty), "`] (R's, \
-                where R has one), via [`", stringify!($ty), "::parse`].")]
+                where R has one).")]
             ///
             /// # Errors
             ///
@@ -250,3 +275,67 @@ macro_rules! from_r_string {
     };
 }
 pub(crate) use from_r_string;
+
+/// `impl FromStr for $ty` through its `TryFrom<&str>`, for types whose
+/// string conversion is written by hand (colours, legend positions).
+macro_rules! from_str_via_try_from {
+    ($ty:ident) => {
+        impl std::str::FromStr for $ty {
+            type Err = $crate::error::Error;
+
+            /// Converts as `TryFrom<&str>` does.
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                <$ty>::try_from(s)
+            }
+        }
+    };
+}
+pub(crate) use from_str_via_try_from;
+
+#[cfg(test)]
+mod string_route_tests {
+    use crate::backend::{Format, LineEnd, LineJoin};
+    use crate::color::{Color, ColorSpec};
+    use crate::device::{BoxWhich, LegendKeyword, LegendPos, StrUnits, Units};
+    use crate::font::FontFace;
+    use crate::highlevel::{HistBreaks, OrderH, PlotType};
+    use crate::lty::LineType;
+    use crate::par::{AxisStyle, AxisType, Bty, Pty};
+    use std::fmt::Debug;
+    use std::str::FromStr;
+
+    /// `FromStr` and `TryFrom<&str>` agree, for a good and a bad string.
+    fn same<T>(good: &str, bad: &str)
+    where
+        T: FromStr<Err = super::Error> + for<'a> TryFrom<&'a str, Error = super::Error> + Debug,
+    {
+        let (a, b) = (good.parse::<T>(), T::try_from(good));
+        assert!(a.is_ok() && b.is_ok(), "{good:?}");
+        assert_eq!(format!("{a:?}"), format!("{b:?}"));
+        let (a, b) = (bad.parse::<T>(), T::try_from(bad));
+        assert_eq!(a.unwrap_err(), b.unwrap_err());
+    }
+
+    #[test]
+    fn every_string_valued_type_has_one_route() {
+        same::<AxisStyle>("i", "x");
+        same::<Pty>("s", "q");
+        same::<Bty>("l", "x");
+        same::<AxisType>("n", "y");
+        same::<FontFace>("bold", "heavy");
+        same::<Color>("red", "notacolour");
+        same::<ColorSpec>("2", "notacolour");
+        same::<StrUnits>("in", "cm");
+        same::<BoxWhich>("out", "x");
+        same::<LineType>("dashed", "wavy");
+        same::<PlotType>("b", "x");
+        same::<HistBreaks>("FD", "F");
+        same::<OrderH>("decr", "up");
+        same::<LineEnd>("butt", "flat");
+        same::<LineJoin>("mitre", "spiky");
+        same::<Format>("png", "jpeg");
+        same::<LegendKeyword>("topr", "to");
+        same::<LegendPos>("topleft", "middle");
+        same::<Units>("cm", "pt");
+    }
+}

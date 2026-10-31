@@ -43,17 +43,13 @@ fn page<B: Backend>(dev: &mut Device<B>, k: usize) {
         .draw();
 }
 
-/// Page `k` drawn alone, on the backend an opened device would use.
+/// Page `k` drawn alone, on an in-memory device like the opened one.
 fn alone(format: &str, k: usize, bg: Option<Color>) -> Vec<u8> {
-    let backend: AnyBackend = match format {
-        "png" => RasterBackend::new(4, 3, 72, bg.unwrap_or(Color::WHITE)).into(),
-        "pdf" => PdfBackend::new(4, 3).into(),
-        _ => SvgBackend::new(4, 3).into(),
-    };
-    let mut dev = Device::new(backend, Par::default());
+    let mut builder = Device::memory(format).width(4).height(3);
     if let Some(bg) = bg {
-        dev.par().bg(bg).draw();
+        builder = builder.bg(bg);
     }
+    let mut dev = builder.open().unwrap();
     page(&mut dev, k);
     dev.finish()
 }
@@ -94,7 +90,7 @@ fn pages_follow_the_page_layout() {
         .height(3)
         .open()
         .unwrap();
-    dev.par().mfrow(1, 2).draw();
+    dev.par().mfrow([1, 2]).draw();
     for k in 0..3 {
         page(&mut dev, k);
     }
@@ -267,7 +263,7 @@ fn names_with_other_conversions_are_refused() {
     let d = dir("invalid");
     for bad in ["a%s.png", "a%d%d.png", "a%.png", "a%f.png"] {
         let err = Device::png(d.join(bad)).open().map(|_| ()).unwrap_err();
-        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{bad}");
+        assert_eq!(err.kind(), ErrorKind::InvalidArgument, "{bad}");
         assert!(err.to_string().contains("invalid 'file' argument"), "{err}");
     }
     // `%%` is a `%`.

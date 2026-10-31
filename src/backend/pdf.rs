@@ -23,7 +23,8 @@
 //! on a one-figure page, a multi-figure page wrapping round, `par(fig = )`
 //! without `new = TRUE`) is a new PDF page, sharing the font objects.
 //! Like R's `pdf()` (`compress = TRUE`), each page's content stream is
-//! Flate-compressed by default; see [`PdfBackend::with_compression`].
+//! Flate-compressed by default; see
+//! [`DeviceBuilder::compress`](crate::device::DeviceBuilder::compress).
 //!
 //! Semi-transparent colours work as in R's `pdf()` (PDF 1.4 transparency):
 //! each alpha used gets an `ExtGState` resource, `/ca` for fills and text
@@ -36,24 +37,27 @@ use std::fmt::Write as _;
 use super::compress::{DEFLATE_LEVEL, zlib_compress};
 use super::numfmt::push_fixed;
 use super::{Backend, LineEnd, LineJoin, Stroke, TextStyle};
-use crate::afm::{self, FontFace};
+use crate::afm;
+use crate::font::FontFace;
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 /// A backend writing PDF, using the standard Helvetica (and Symbol) fonts
 /// that every PDF viewer has, so no fonts are embedded.
 ///
 /// Pages are kept as they are finished, so one file holds them all. Text
 /// sizes are rounded to whole points and the page is transparent by
-/// default, as in R's `pdf()` device. See the [module docs](self).
+/// default, as in R's `pdf()` device. Devices from
+/// [`Device::pdf`](crate::device::Device::pdf) and `Device::memory("pdf")`
+/// draw on one. See the [module docs](self).
 ///
 /// # Examples
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let pdf = PdfBackend::new(6, 4).with_background(Color::WHITE);
-/// let mut dev = Device::new(pdf, Par::default());
+/// let mut dev = Device::memory("pdf").width(6).height(4).bg("white").open().unwrap();
 /// dev.plot().x([1, 2, 3]).draw();
 /// assert!(dev.finish().starts_with(b"%PDF"));
 /// ```
@@ -99,8 +103,8 @@ struct LineState {
 impl PdfBackend {
     /// Creates a PDF backend for a `width_in` x `height_in` inch page, with a
     /// transparent background and compressed content.
-    pub fn new(width_in: impl Into<f64>, height_in: impl Into<f64>) -> Self {
-        let (width_in, height_in) = (width_in.into(), height_in.into());
+    pub(crate) fn new(width_in: impl Num, height_in: impl Num) -> Self {
+        let (width_in, height_in) = (width_in.to_f64(), height_in.to_f64());
         PdfBackend {
             width_in,
             height_in,
@@ -124,7 +128,7 @@ impl PdfBackend {
     /// Sets the page background; transparent by default.
     ///
     /// This is R's `pdf(bg = )`.
-    pub fn with_background(mut self, background: Color) -> Self {
+    pub(crate) fn with_background(mut self, background: Color) -> Self {
         self.background = background;
         self
     }
@@ -135,7 +139,7 @@ impl PdfBackend {
     /// read as text, as the tests comparing it with R's output do.
     ///
     /// This is R's `pdf(compress = )`.
-    pub fn with_compression(mut self, compress: bool) -> Self {
+    pub(crate) fn with_compression(mut self, compress: bool) -> Self {
         self.compress = compress;
         self
     }
@@ -217,10 +221,7 @@ impl PdfBackend {
             self.op(&[stroke.lmitre], 2, "M");
             self.last_line.mitre = Some(stroke.lmitre);
         }
-        let dash = stroke
-            .lty
-            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
-            .unwrap_or_default();
+        let dash = stroke.dash_pt().unwrap_or_default();
         if self.last_line.dash.as_ref() != Some(&dash) {
             self.content.push('[');
             for (i, &d) in dash.iter().enumerate() {
@@ -338,7 +339,7 @@ impl PdfBackend {
 
     /// Finishes the PDF and returns its bytes, with every page started,
     /// including the current one.
-    pub fn finish(self) -> Vec<u8> {
+    pub(crate) fn finish(self) -> Vec<u8> {
         let w_pt = self.width_in * 72.0;
         let h_pt = self.height_in * 72.0;
 
@@ -461,6 +462,14 @@ impl PdfBackend {
     }
 }
 
+/// The font size R's `pdf()` sets and measures text in: `requested_pt`
+/// rounded to whole points (`floor(x + 0.5)`; see
+/// [`PdfBackend`]'s `effective_font_size`). Shared with the null device,
+/// which measures as `pdf()` does.
+pub(crate) fn pdf_font_size(requested_pt: f64) -> f64 {
+    (requested_pt + 0.5).floor()
+}
+
 impl Backend for PdfBackend {
     fn into_bytes(self) -> Vec<u8> {
         self.finish()
@@ -476,7 +485,7 @@ impl Backend for PdfBackend {
     /// 14pt (not 14.4pt) and laid out with 14pt widths. Text whose rounded
     /// size is 0 is not drawn at all (callers check for a size `<= 0`).
     fn effective_font_size(&self, requested_pt: f64) -> f64 {
-        (requested_pt + 0.5).floor()
+        pdf_font_size(requested_pt)
     }
 
     fn default_bg(&self) -> Color {

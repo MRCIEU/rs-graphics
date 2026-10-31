@@ -15,20 +15,26 @@
 //! The device, the `Graphics` trait (R's graphics functions) and their
 //! options types, recorded `Figure`s, `par()`, points and rectangles in
 //! device inches, colours, line types, labels, layouts, the high-level
-//! plots' options and results, the backends, and [`ErrorKind`] (the
+//! plots' options and results, the [`Backend`] trait, [`AnyBackend`] and
+//! backend option types (the built-in backends themselves are in
+//! [`backend`](crate::backend)), and [`ErrorKind`] (the
 //! error type itself is [`rs_graphics::Error`](crate::Error), kept out of
 //! the glob import so it doesn't clash with other `Error`s).
+//!
+//! The traits that say what a setter accepts ([`Numbers`](crate::numbers::Numbers),
+//! [`Pair`](crate::numbers::Pair), [`Labels`](crate::plotmath::Labels),
+//! [`Pch`](crate::setters::Pch), [`Values`](crate::setters::Values), ...)
+//! aren't here: setters work without them. Import one from its module
+//! (`use rs_graphics::numbers::Numbers;`) to name it in your own functions
+//! or call its methods.
 
-pub use crate::backend::pdf::PdfBackend;
-pub use crate::backend::raster::RasterBackend;
-pub use crate::backend::svg::SvgBackend;
 pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
 pub use crate::device::{
     AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, DeviceBuilder,
-    LegendBty, LegendKeyword, LegendLayout, LegendOptions, LegendPch, LegendPos, MtextOptions,
-    PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, TextOptions,
-    StrUnits, TitleOptions, Units, XyOptions,
+    LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextOptions, PlotWindowOptions,
+    PolygonOptions, RectOptions, SegmentsOptions, Side, StrUnits, TextOptions, TitleOptions, Units,
+    XyOptions,
 };
 pub use crate::error::ErrorKind;
 pub use crate::font::FontFace;
@@ -40,7 +46,6 @@ pub use crate::highlevel::{
 };
 pub use crate::layout::{LayoutRespect, LayoutSize};
 pub use crate::lty::LineType;
-pub use crate::numbers::{Groups, Numbers, Pair};
 pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};
-pub use crate::plotmath::{Expression, Label, LabelValues, Labels};
+pub use crate::plotmath::{Expression, Label};
 pub use crate::recording::{Figure, FigureResult};

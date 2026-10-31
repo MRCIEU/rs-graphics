@@ -8,18 +8,21 @@
 
 //! Pages divided into several figures (panels): the column and row sizes
 //! ([`LayoutSize`]) and `respect` ([`LayoutRespect`]) of
-//! [`Device::layout`](crate::device::Device::layout), for figures of
+//! [`Graphics::layout`](crate::graphics::Graphics::layout), for figures of
 //! different sizes, and the grids that `par()`'s
 //! [`mfrow`](crate::graphics::ParCall::mfrow) and
 //! [`mfcol`](crate::graphics::ParCall::mfcol) set up.
 //!
-//! These are R's `layout()` and `par(mfrow = )`/`par(mfcol = )`. The
+//! These are R's `layout()` and [`par(mfrow)`]/[`par(mfcol)`]. The
 //! region arithmetic is a direct port of the "Code for layouts"
 //! section of `graphics.c` (`layoutRegions()` and friends, written by Paul
 //! Murrell for R's `layout()`), plus the `mfrow`/`mfcol` branch of
 //! `mapFigureRegion()`. Everything here works in NIC ("normalized inner
 //! region") coordinates, i.e. fractions of the device minus its outer
 //! margins; [`crate::device::Device`] turns them into inches.
+//!
+//! [`par(mfrow)`]: crate::graphics::ParCall::mfrow
+//! [`par(mfcol)`]: crate::graphics::ParCall::mfcol
 
 use std::fmt;
 
@@ -44,7 +47,7 @@ pub(crate) const MAX_LAYOUT_CELLS: usize = 500;
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.layout().mat(&[[1, 2]]).widths([LayoutSize::Cm(4.0), 1.into()]).draw();
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -92,7 +95,7 @@ impl LayoutSize {
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// dev.layout().mat(&[[1, 2]]).respect(true).draw();
 /// dev.layout().mat(&[[1, 2]]).respect(&[[true, false]]).draw();
 /// assert_eq!(LayoutRespect::from(false), LayoutRespect::No);
@@ -160,7 +163,7 @@ enum Respect {
 /// A page divided into figures of different sizes: which figure occupies
 /// each cell of a grid, with column widths, row heights and whether x and
 /// y units are kept equal. Built and applied by
-/// [`Device::layout`](crate::device::Device::layout)'s builder.
+/// [`Graphics::layout`](crate::graphics::Graphics::layout)'s builder.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Layout {
     nrow: usize,

@@ -8,7 +8,7 @@ usage, see [README.md](README.md).
 
 **Graphics engine** (`src/`):
 - `par()`-equivalent state (`src/par.rs`): margins (`mar`/`oma`), axis
-  styles, colors, line/point styles, fonts, `tcl`/`mgp`/`las`, etc.,
+  styles, colours, line/point styles, fonts, `tcl`/`mgp`/`las`, etc.,
   with R's exact default values.
 - Coordinate systems and clipping (`src/device.rs`): `plot.new()`/
   `plot.window()` equivalents (`plot_new()` alone leaves R's default
@@ -23,8 +23,8 @@ usage, see [README.md](README.md).
   R's `FALSE`/`TRUE`/`NA`).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
-  - each a `Graphics` method (`src/graphics.rs`) taking its data and
-  returning a call (`dev.points().x(&x).y(&y).pch(19).draw()`): the other
+  - each a `Graphics` method (`src/graphics.rs`) returning a call
+  (`dev.points().x(&x).y(&y).pch(19).draw()`): its data and other
   arguments are its setters, or an options struct passed with
   `.with(&opts)`, and `.draw()` runs it; the drawing code is in
   `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`;
@@ -39,7 +39,7 @@ usage, see [README.md](README.md).
   (`src/setters.rs`; `array` kind for `mgp`/`xaxp`, `pair` kinds for
   limits).
   `mtext()` (`Graphics::mtext` + `MtextOptions`, `src/device/mtext.rs`)
-  takes the side as an argument, like `axis()`, and
+  takes the side as `.side()` (default 3, as R), and
   covers all four sides of the figure and outer (`oma`) margins with
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
@@ -86,7 +86,7 @@ usage, see [README.md](README.md).
   `Device::xlog()`/`ylog()` tell which axes are logarithmic, and
   `user_to_inches`/`inches_to_user` convert between data units and
   device inches.
-- Multi-panel layouts (`src/layout.rs`, the `Device::layout()` builder,
+- Multi-panel layouts (`src/layout.rs`, the `layout()` builder,
   and `mfrow`/`mfcol`/`mfg` on a device's `par()` call):
   `par(mfrow=)`/`par(mfcol=)` (incl. R's automatic `cex` of
   0.83/0.66 for 2x2 / larger grids), `par(mfg=)`, `oma`, and
@@ -108,9 +108,9 @@ usage, see [README.md](README.md).
 - R's built-in plotting characters `pch = 0..25` (`src/pch.rs`) plus
   character symbols (`pch = "."`, `"a"`, ...), line
   types `lty` (`src/lty.rs`; `LineType::SOLID`, `DASHED`, ... for R's
-  codes 0-6), the R4 default color palette and all 657
-  named colors (`src/color.rs`, `src/named_colors.rs`; `"red".into()`
-  gives a `ColorSpec`), and the exact
+  codes 0-6), the R4 default colour palette and all 657
+  named colours (`src/color.rs`, `src/named_colors.rs`; setters take the
+  names, `.col("red")`, and `ColorSpec::try_from("red")` converts one), and the exact
   `pretty()`/`GEPretty()` axis tick-placement algorithms - both of
   which R uses, with **different constants** (`src/pretty.rs`).
 - Text layout (`src/afm.rs`): Helvetica and Symbol AFM metrics (the same tables
@@ -140,17 +140,17 @@ the corresponding `*.default` R function:
   outlined paths). Consecutive shapes with the same fill/stroke style are
   wrapped in one `<g>` carrying it, so a big scatter plot doesn't repeat
   the style on every point (about a third of the size).
-  `SvgBackend::finish_svgz()` returns the document gzip-compressed (`.svgz`,
-  about 4-6x smaller again) instead of `finish()`'s plain SVG. It isn't the
+  `Device::svg(file).compress(true)` writes the document gzip-compressed
+  (`.svgz`, about 4-6x smaller again) instead of plain SVG. It isn't the
   default: browsers display `.svgz` only when served with
   `Content-Encoding: gzip`, though Inkscape and Illustrator open it.
 - `pdf.rs` - hand-rolled PDF writer (one page per R page), using the 4 standard
   Type1 Helvetica faces (plus Symbol for plotmath) every PDF viewer bundles (no font embedding
   needed), matching R's own `pdf()` device's default font. Like R's
   `pdf()`, the content stream is Flate-compressed by default (deflated in
-  pieces on all cores); `PdfBackend::with_compression(false)` is R's
-  `compress = FALSE`, whose operators can be read as text (the
-  `*_matches_r` tests use it).
+  pieces on all cores); `.compress(false)` is R's `compress = FALSE`,
+  whose operators can be read as text (the `*_matches_r` tests use it,
+  through `common::r::device`).
 - `raster.rs` - PNG via [`tiny-skia`](https://docs.rs/tiny-skia) for
   shapes/paths/clipping and [`ab_glyph`](https://docs.rs/ab_glyph)
   (bundled Liberation Sans) for glyph rasterization.
@@ -161,10 +161,14 @@ To keep this a tractable "core functionality" port, the following R
 `graphics` features are **not implemented**: `split.screen()`,
 `persp()`/3D plotting,
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
-`image()`/raster images, `symbols()`, `smoothScatter()`,
-`cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
-fonts, and interactive input (`identify()`/`locator()`). These would be
-reasonable follow-ups but are left for future work.
+`image()`/raster images (`rasterImage()`), `symbols()`,
+`smoothScatter()`, `cdplot()`/`spineplot()`, `dotchart()`,
+`fourfoldplot()`, `contour()`, `matplot()`, `pairs()`, `stripchart()`,
+`sunflowerplot()`, `assocplot()`, `curve()`, `grid()`, `rug()`,
+`xspline()`, `polypath()`, `clip()`, `layout.show()`, font families
+(`par(family)`) and Hershey fonts, and interactive input
+(`identify()`/`locator()`). These would be reasonable follow-ups but are
+left for future work.
 
 ## Design notes
 
@@ -210,7 +214,7 @@ A few fidelity-relevant decisions worth calling out:
   par(cex) * 1.2 * startps / 72` inches (matching `cra[1] = 1.2 *
   pointsize`, `ipr[1] = 1/72` for the PDF/PostScript device family),
   where `startps` is the device's starting point size
-  (`DeviceBuilder::pointsize`, or `par.ps` at `Device::new`). A later
+  (`DeviceBuilder::pointsize`; 12 for `Device::new`). A later
   `par(ps)` doesn't change it, and it doesn't scale with the *current*
   `cex` of text drawn in the margins, only with `mex * par(cex)` (R's
   `cexbase`), which takes effect at the next `plot.new()`. This is
@@ -237,11 +241,10 @@ A few fidelity-relevant decisions worth calling out:
   or with `DeviceBuilder::onefile(false)` writes one file per page as PNG
   and SVG do.
 - **Page background.** As in R, `par("bg")` starts as the device's
-  background: transparent for PDF (R's `pdf()`), white for SVG, and the
-  canvas colour for PNG. Set one with `DeviceBuilder::bg`
-  (`Device::pdf(file).bg("white")`, R's `pdf(bg = )`), or with
-  `PdfBackend::with_background` / `RasterBackend::new`'s background when
-  building a backend for `Device::new`. New pages are filled with it, and `legend()`
+  background: transparent for PDF (R's `pdf()`), white for SVG and
+  PNG. Set one with `DeviceBuilder::bg`
+  (`Device::pdf(file).bg("white")`, R's `pdf(bg = )`; the same on
+  `Device::memory(..)`). New pages are filled with it, and `legend()`
   boxes by default.
 - **Latin-1 text.** Strings may contain Latin-1 characters (`±`, `é`,
   `×`, ...): string widths use each glyph's AFM metrics looked up by its
@@ -258,6 +261,35 @@ A few fidelity-relevant decisions worth calling out:
 - **Joint tick-label formatting.** Default axis labels are formatted as
   a vector, like `formatReal()` (`0.0 0.5 1.0`; scientific only when
   strictly narrower).
+- **Options not in R (`src/extra.rs`).** A few setters do in one step
+  what takes several calls in R (`label_srt` for rotated tick labels,
+  `panel_bg` for a plot-region background). They are kept apart from the
+  R ports so that every R-named setter still does exactly what R does.
+  - **Placement.** An extra is a setter on the R call where users would
+    look for it (`dev.axis().side(1).label_srt(45)`), not a separate namespace.
+    All its code is in `src/extra.rs`. The `extras!` macro there
+    declares the values and generates the setters on the options
+    structs and builders, in impl blocks documented "**Not in R.**".
+  - **Storage and behaviour.** The values live in a hidden `extra`
+    field of the call's options struct, so `.with(&opts)` and `Figure`
+    replay carry them with no further code. The R function's `*_impl`
+    makes one call into `src/extra.rs` at the point where R users would
+    write their workaround (for `panel_bg`, where R evaluates
+    `panel.first`). Unset, that call changes nothing; the gallery must
+    stay byte-identical.
+  - **Equal to R code.** Each extra's doc names the R code it replaces,
+    and `tests/all/extra_matches_r.rs` runs that code in R and compares
+    the output path by path. Prefer an exact R equivalent: rotated
+    labels are placed as R's `las = 2` labels are, so `label_srt(90)` on
+    side 1 is `las = 2`.
+  - **Documentation.** `tests/all/generated_docs.rs` reads the `extras!`
+    blocks and lists the setters as *not in R* rows in the R reference.
+    Add the extra to the table in `src/extra.rs`'s module doc and to
+    "Beyond R" in `src/guide/coming_from_r.md`.
+  - **What fits here.** An extra replaces an idiom that R users write
+    by hand: value labels on bars, a legend outside the plot, margins
+    fitted to the labels. R functions not yet ported, such as `grid()`
+    and `rug()`, belong in the R-faithful API, not here.
 
 ## Example gallery
 
@@ -301,6 +333,17 @@ runs every test in parallel threads. Add a new file there and a `mod`
 line to `tests/all/main.rs`. Tests that run R name their temporary files
 `rs_graphics_<module>_...` so parallel tests don't clash.
 
+The built-in backends' constructors are crate-private (users open
+devices through `DeviceBuilder`), so the tests that need a backend built
+by hand are unit tests in the crate (`cargo test --lib`):
+`src/backend/smoke_tests.rs` (each backend's output well formed;
+compressed PDF, `.svgz` and the PNG `pHYs` chunk; PNG output independent
+of the thread count; `AnyBackend` gives the wrapped backend's bytes) and
+`src/device/open_tests.rs` (every `DeviceBuilder` option byte-identical
+to the backend set up by hand, R's defaults, the format by name only,
+`open()` creating the file and `close()` writing it, `Device::memory`
+giving the file's bytes).
+
 Most tests are self-contained. Several integration tests
 (`tests/all/*_matches_r.rs`) additionally cross-check numeric output
 against a real R installation by shelling out to `Rscript`:
@@ -312,7 +355,9 @@ against a real R installation by shelling out to `Rscript`:
   margins (`par("mai")`), and the padded user coordinate system
   (`par("usr")`) after `plot.window()`, to 1e-6 tolerance.
 - `tests/all/hist_matches_r.rs` - bin edges/counts vs. `hist(x, plot =
-  FALSE)`.
+  FALSE)`: Sturges, Scott and FD rules, a number of classes, explicit and
+  unsorted edges, a breaks function, `right`/`include.lowest`/`fuzz`,
+  single and equal values, and R's errors for invalid breaks.
 - `tests/all/boxplot_matches_r.rs` - box/whisker/outlier stats vs.
   `boxplot.stats()`.
 - `tests/all/boxplot_draw_matches_r.rs` - every painted path of `boxplot()`
@@ -337,6 +382,11 @@ against a real R installation by shelling out to `Rscript`:
   `radius`, `par(xaxs = "i")`) vs. an uncompressed R `pdf()`.
 - `tests/all/text_matches_r.rs` - `text()` origins for single/two-element
   `adj`, rotation, `cex` and `font` vs. an uncompressed R `pdf()`.
+- `tests/all/multiline_text_matches_r.rs` - text with newlines drawn
+  line by line and measured line by line, as R's `GEText()`/
+  `strwidth()`: `text()` (`adj`, `srt`, `cex`, `par(lheight)`),
+  `mtext()`, `title()`, `legend()` labels and title, `axis()` labels
+  (incl. `gap.axis`) and `barplot()` names: every path and text item.
 - `tests/all/strwidth_matches_r.rs` - `Device::strwidth`/`strheight` vs.
   R's `strwidth()`/`strheight()` in inches, user (incl. a reversed axis)
   and figure units: `cex`, `font`, multi-line text, `par(ps)`,
@@ -438,17 +488,8 @@ against a real R installation by shelling out to `Rscript`:
   font, size and colour vs. R `pdf()`.
 - `tests/all/integer_args.rs` (no R needed) - integers wherever R takes
   numbers (data vectors, ranges, recycled and single setters, limits,
-  arrays, pairs, `layout()` sizes, `fig()`, backend constructors) draw byte
+  arrays, pairs, `layout()` sizes, `fig()`, device sizes and `res`) draw byte
   for byte what the same `f64`s do, on a device and in a `Figure`.
-- `tests/all/device_open.rs` (no R needed) - `Device::pdf/svg/png/format`
-  and `DeviceBuilder`: every option byte-identical to `Device::new` with
-  the same settings, R's defaults, the format by name only (never the
-  file name's), `open()` creating the file (and failing on a bad path)
-  and `close()` writing it.
-- `tests/all/backend_smoke.rs` (no R needed) - each backend's output is well
-  formed; compressed PDF, `.svgz` and the PNG `pHYs` chunk; PNG output
-  independent of the thread count; `AnyBackend` gives the wrapped
-  backend's bytes; format names.
 - `tests/all/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
   `plot_new()` move nothing until the next plot (R would move margin
   text but not the data).
@@ -525,6 +566,20 @@ against a real R installation by shelling out to `Rscript`:
   style vectors of points, lines, segments, arrows, rect, polygon, text,
   mtext, abline, boxplot and legend: where R defines `NA`, R's drawing;
   otherwise R drawing the skipped element or the default.
+- `tests/all/errors_matches_r.rs` - R's errors as values: `try_draw()`'s
+  messages vs R's `conditionMessage()` (device and `Figure`), errors found
+  while drawing, setter values that don't convert (kept for `try_draw()`,
+  also through `.with()`), `?`, plotmath delimiters, log `axp`, `open()`.
+- `tests/all/generated_docs.rs` (no R needed) - the generated files are up
+  to date: the R-to-Rust table `src/guide/r_reference.md` (from the
+  `call!`/`options!` declarations and `tests/data/r_formals.txt`, R's
+  arguments; refresh that with `Rscript tests/data/r_formals.R >
+  tests/data/r_formals.txt`), the chart SVGs `src/charts/*.svg` and
+  `llms.txt`, and `tests/all/readme_examples.rs` (README.md's code blocks,
+  compiled with the tests); `par(x)` mentions in docs are links.
+  `RS_GRAPHICS_BLESS=1 cargo test --test all generated_docs` rewrites
+  them (if a README fix leaves `readme_examples.rs` not compiling, empty
+  it first).
 - `tests/all/required_args.rs` (no R needed) - every required argument left
   out is an error with R's message (`argument "x" is missing, with no
   default`) and the call's name, on a device and in a `Figure`; `.draw()`
@@ -535,12 +590,40 @@ against a real R installation by shelling out to `Rscript`:
   `text()` labels, `box(which = )`, `plot.window(asp = )` and `plot()`'s
   axes following `par(col.axis)` etc.: every painted path and text item in
   order.
+- `tests/all/pch_strings_matches_r.rs` - `pch` given as strings in
+  `points()`, `plot()` and `boxplot()` (first character, `""`/`NA` none,
+  non-ASCII as text).
+- `tests/all/label_na_matches_r.rs` - `NA` (`None`) in `barplot()` and
+  `boxplot()` names, `barplot()`'s legend text and `pie()` labels.
+- `tests/all/extra_matches_r.rs` - the options not in R (`label_srt`,
+  `panel_bg`) against the R code each replaces, in R; also in a `Figure`
+  and through `.with()`.
+- `tests/all/figure_pages.rs` (no R needed) - a `Figure` holding a whole
+  plot (page layout, `layout()`, several pages) draws what the same calls
+  draw on a device, on every format; record-time errors.
+- `tests/all/null_device.rs` (no R needed) - `Device::null()` gives the
+  same values and errors as a PDF device of the same size, and writes
+  nothing.
 
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but
 for any change touching layout, tick placement, or text metrics, please
 run with R available if you can. Setting `RS_GRAPHICS_REQUIRE_R=1` makes
 them fail instead of skipping (`tests/all/common.rs`).
+
+Most of them share their machinery: `tests/all/common/r.rs` runs the R
+cases in one `Rscript` and draws ours (`run_r`, `ours`), and
+`tests/all/common/pdf.rs` reads both uncompressed PDFs (`parse`: every
+painted path and text item per page, with colours, alpha, line style,
+clip and the text matrix) and compares them in order (`assert_same_pdf`,
+with per-file tolerances and exclusions in `Compare`).
+
+Scripts in `tools/` (Python 3; `-h` for usage) help check a change:
+`verify.py` regenerates the generated docs (listing what changed), then
+runs the tests with R, rustdoc, clippy, the Rust 1.85 build and the
+gallery against a base revision; `fmt_own.py` runs rustfmt on
+changed lines only; `mutate.py` checks that a test fails when the code
+it covers is broken.
 
 ### Continuous integration
 

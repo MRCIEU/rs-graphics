@@ -8,18 +8,19 @@
 
 //! Exercises each backend directly (bypassing `Device`) with a handful of
 //! primitives, to catch runtime panics/obviously wrong output early. Also
-//! checks PDF compression, `.svgz` output, the PNG `pHYs` chunk, and that
-//! PNG output doesn't depend on the thread count, that `AnyBackend` gives
-//! the wrapped backend's bytes, and parsing format names. (Opening devices
-//! for files: `tests/device_open.rs`.)
+//! checks PDF compression, `.svgz` output, the PNG `pHYs` chunk, that PNG
+//! output doesn't depend on the thread count, and that `AnyBackend` gives
+//! the wrapped backend's bytes. (Opening devices: `device/open_tests.rs`.)
 
-use rs_graphics::afm::FontFace;
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::backend::raster::RasterBackend;
-use rs_graphics::backend::svg::SvgBackend;
-use rs_graphics::backend::{Backend, Stroke, TextStyle};
-use rs_graphics::color::Color;
-use rs_graphics::geometry::{Point, Rect};
+use super::pdf::PdfBackend;
+use super::raster::RasterBackend;
+use super::svg::SvgBackend;
+use super::{AnyBackend, Backend, Stroke, TextStyle};
+use crate::color::Color;
+use crate::device::Device;
+use crate::font::FontFace;
+use crate::geometry::{Point, Rect};
+use crate::par::Par;
 
 fn exercise(b: &mut dyn Backend) {
     let stroke = Stroke::simple(Color::BLACK, 1.0);
@@ -168,13 +169,13 @@ fn raster_backend_produces_valid_png_of_expected_size() {
     assert_eq!(decoded.height(), (4.0f64 * 96.0).round() as u32);
 
     // Somewhere inside the clipped rect we drew a blue-ish filled circle;
-    // confirm at least one non-background pixel exists near its center.
+    // confirm at least one non-background pixel exists near its centre.
     let cx = (4.5 * 96.0) as u32;
     let cy_from_top = ((4.0 - 1.0) * 96.0) as u32;
     let px = decoded.pixel(cx, cy_from_top).expect("in bounds");
     assert!(
         px.red() != 255 || px.green() != 255 || px.blue() != 255,
-        "expected non-white pixel at circle center, got {px:?}"
+        "expected non-white pixel at circle centre, got {px:?}"
     );
 }
 
@@ -222,15 +223,13 @@ fn raster_output_is_independent_of_thread_count() {
 /// Two pages through `Device`: text (PDF's size rounding), a legend box
 /// (the default background), a new page and tiny `pch = "."` points
 /// (PNG's device unit).
-fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
-    use rs_graphics::prelude::*;
+fn draw_two_pages<B: Backend>(dev: &mut Device<B>) {
+    use crate::prelude::*;
     let x = [1.0, 2.5, 4.0];
-    let opts = PlotOptions {
-        pch: vec![Some(21)],
-        cex: vec![Some(1.3)],
-        main: Some(Label::math("alpha^2")),
-        ..PlotOptions::default()
-    };
+    let opts = PlotOptions::default()
+        .pch(vec![Some(21)])
+        .cex(vec![Some(1.3)])
+        .main(Label::math("alpha^2"));
     dev.plot().x(x).y(x).with(&opts).draw();
     dev.legend()
         .pos(LegendPos::Keyword(LegendKeyword::TopLeft))
@@ -239,62 +238,27 @@ fn draw_two_pages<B: Backend>(dev: &mut rs_graphics::device::Device<B>) {
         .pch(46)
         .draw();
     // `pch = "."` small enough that its one-device-unit minimum applies.
-    let dots = PlotOptions {
-        pch: vec![Some(46)],
-        cex: vec![Some(0.5)],
-        ..PlotOptions::default()
-    };
+    let dots = PlotOptions::default()
+        .pch(vec![Some(46)])
+        .cex(vec![Some(0.5)]);
     dev.plot().x(x).y([3.0, 1.0, 2.0]).with(&dots).draw();
 }
 
 #[test]
 fn any_backend_output_is_the_wrapped_backends() {
-    use rs_graphics::backend::{AnyBackend, Format};
-    use rs_graphics::device::Device;
-    use rs_graphics::par::Par;
-    let render = |b: AnyBackend| {
-        let mut dev = Device::new(b, Par::default());
+    fn render<B: Backend>(backend: B) -> Vec<u8> {
+        let mut dev = Device::with_par(backend, Par::default());
         draw_two_pages(&mut dev);
         dev.finish()
-    };
-    let mut pdf = Device::new(PdfBackend::new(5.0, 4.0), Par::default());
-    draw_two_pages(&mut pdf);
-    assert_eq!(
-        render(AnyBackend::new(Format::Pdf, 5.0, 4.0, 72.0)),
-        pdf.finish()
-    );
-
-    let mut svg = Device::new(SvgBackend::new(5.0, 4.0), Par::default());
-    draw_two_pages(&mut svg);
-    let svg = svg.into_backend().finish();
-    assert_eq!(
-        render(AnyBackend::new(Format::Svg, 5.0, 4.0, 72.0)),
-        svg.into_bytes()
-    );
-
+    }
+    let pdf = || PdfBackend::new(5.0, 4.0);
+    assert_eq!(render(AnyBackend::from(pdf())), render(pdf()));
+    let svg = || SvgBackend::new(5.0, 4.0);
+    assert_eq!(render(AnyBackend::from(svg())), render(svg()));
     // Not 72 dpi, where a pixel is the default device unit (1/72 in).
-    let mut png = Device::new(
-        RasterBackend::new(5.0, 4.0, 150.0, Color::WHITE),
-        Par::default(),
-    );
-    draw_two_pages(&mut png);
-    assert_eq!(
-        render(AnyBackend::new(Format::Png, 5.0, 4.0, 150.0)),
-        png.finish()
-    );
-
+    let png = || RasterBackend::new(5.0, 4.0, 150.0, Color::WHITE);
+    assert_eq!(render(AnyBackend::from(png())), render(png()));
     let bg = Color::rgb(255, 255, 224);
     let custom = || PdfBackend::new(5.0, 4.0).with_background(bg);
-    let mut direct = Device::new(custom(), Par::default());
-    draw_two_pages(&mut direct);
-    assert_eq!(render(AnyBackend::from(custom())), direct.finish());
-}
-
-#[test]
-fn format_names_parse_ignoring_case() {
-    use rs_graphics::backend::Format;
-    assert_eq!("Png".parse::<Format>(), Ok(Format::Png));
-    assert_eq!(Format::parse("pdf"), Some(Format::Pdf));
-    assert_eq!(Format::try_from("SVG").unwrap(), Format::Svg);
-    assert!("jpg".parse::<Format>().is_err());
+    assert_eq!(render(AnyBackend::from(custom())), render(custom()));
 }

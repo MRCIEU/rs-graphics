@@ -24,14 +24,22 @@
 //! Each nibble is a segment length in units of `lwd` (line width), with
 //! even indices "pen down" and odd indices "pen up".
 //!
-//! These are R's `lty` values (`par(lty = )`).
+//! These are R's `lty` values ([`par(lty)`]).
+//!
+//! [`par(lty)`]: crate::par::Par::lty
 
 /// A line type: blank (nothing drawn) or a dash pattern in units of `lwd`.
 ///
 /// An empty pattern means solid, the default. The named constants
-/// ([`LineType::DASHED`], ...) are R's codes 0 to 6; [`LineType::parse`]
-/// and `TryFrom<&str>` take R's names and hex strings (`"dashed"`, `"42"`),
-/// `TryFrom<i32>` R's codes.
+/// ([`LineType::DASHED`], ...) are R's codes 0 to 6; `TryFrom<i32>` takes
+/// R's codes.
+///
+/// From a string (`"dashed".parse::<LineType>()` or `TryFrom<&str>`): a name
+/// (`"blank"`, `"solid"`, `"dashed"`, `"dotted"`, `"dotdash"`, `"longdash"`,
+/// `"twodash"`, in any case, where R matches the exact case) or 2, 4, 6
+/// or 8 hex digits (1-9, A-F; no zeros), each a segment length in `lwd`
+/// units (`"42"`, `"1343"`); surrounding whitespace is ignored. A single digit is a numeric code (`"2"`), which R
+/// rejects as a string. Anything else is an error.
 ///
 /// This is R's `lty`.
 ///
@@ -42,9 +50,12 @@
 /// assert_eq!(LineType::try_from("dashed"), Ok(LineType::DASHED));
 /// assert_eq!(LineType::try_from(2), Ok(LineType::DASHED));
 /// assert_eq!(LineType::try_from("42"), Ok(LineType::Pattern(&[4, 2])));
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// # dev.plot_new();
 /// dev.abline().h(0.5).lty("dotted").draw();
+/// assert_eq!("longdash".parse::<LineType>().unwrap(), LineType::LONGDASH);
+/// assert_eq!("1343".parse::<LineType>().unwrap(), LineType::Pattern(&[1, 3, 4, 3]));
+/// assert!("10".parse::<LineType>().is_err()); // zeros aren't allowed
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LineType {
@@ -71,27 +82,9 @@ impl LineType {
     /// Short and long dashes (2, 2, 6, 2 `lwd`); R's `lty = 6` / `"twodash"`.
     pub const TWODASH: LineType = LineType::Pattern(&[2, 2, 6, 2]);
 
-    /// Parses a line type string, or returns `None` for anything R rejects.
-    ///
-    /// Takes a name (`"blank"`, `"solid"`, `"dashed"`, `"dotted"`,
-    /// `"dotdash"`, `"longdash"`, `"twodash"`) or 2, 4, 6 or 8 hex digits
-    /// (1-9, A-F; no zeros), each a segment length in `lwd` units, e.g.
-    /// `"42"` or `"1343"`. Surrounding whitespace is ignored and names may
-    /// be in any case. One extra form: a single digit is a numeric code
-    /// (`"2"` = [`LineType::from_code`]`(2)`; `"7"` to `"9"` recycle as it
-    /// does), which R rejects as a string.
-    ///
-    /// This is how R's `par(lty = )` reads strings.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineType::parse("longdash"), Some(LineType::LONGDASH));
-    /// assert_eq!(LineType::parse("1343"), Some(LineType::Pattern(&[1, 3, 4, 3])));
-    /// assert_eq!(LineType::parse("10"), None); // zeros aren't allowed
-    /// ```
-    pub fn parse(spec: &str) -> Option<LineType> {
+    /// R's `lty` string, `None` for anything R rejects; the public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(spec: &str) -> Option<LineType> {
         let s = spec.trim();
         if s.len() == 1 {
             if let Some(n) = s.chars().next().and_then(|c| c.to_digit(10)) {
@@ -129,23 +122,9 @@ impl LineType {
         Some(Self::from_packed_nibbles(code))
     }
 
-    /// Returns the line type for a numeric code.
-    ///
-    /// `0` is blank, `1` solid, `2..=6` the named dash patterns. Codes above
-    /// 6 recycle as R does (`(code - 1) % 6 + 1`: `7` is solid, `8` dashed,
-    /// ...).
-    ///
-    /// These are R's numeric `lty` codes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(LineType::from_code(3), Some(LineType::DOTTED));
-    /// assert_eq!(LineType::from_code(8), Some(LineType::DASHED));
-    /// assert_eq!(LineType::from_code(-1), None);
-    /// ```
-    pub fn from_code(code: i32) -> Option<LineType> {
+    /// The line type for a numeric code, `None` for a negative one; the
+    /// public route is `TryFrom<i32>`.
+    pub(crate) fn from_code(code: i32) -> Option<LineType> {
         if code < 0 {
             return None;
         }
@@ -194,9 +173,9 @@ impl LineType {
     /// segments one `lwd` longer, as `PDFSetLineTexture()` in `devPS.c`
     /// does for round and square caps. Lengths below 0 become 0. `None`
     /// for blank and solid, and when every length is <= 0.01pt (R then
-    /// writes an empty, i.e. solid, dash array).
-    #[doc(hidden)]
-    pub fn dash_lengths_pt(&self, lwd: f64, butt_cap: bool) -> Option<Vec<f64>> {
+    /// writes an empty, i.e. solid, dash array). Backends use it through
+    /// [`Stroke::dash_pt`](crate::backend::Stroke::dash_pt).
+    pub(crate) fn dash_lengths_pt(&self, lwd: f64, butt_cap: bool) -> Option<Vec<f64>> {
         match self {
             LineType::Blank => None,
             LineType::Pattern(p) if p.is_empty() => None,
@@ -227,7 +206,9 @@ impl LineType {
 }
 
 impl Default for LineType {
-    /// Returns [`LineType::SOLID`], R's default `par(lty)`.
+    /// Returns [`LineType::SOLID`], R's default [`par(lty)`].
+    ///
+    /// [`par(lty)`]: crate::par::Par::lty
     fn default() -> Self {
         LineType::SOLID
     }
@@ -236,8 +217,18 @@ impl Default for LineType {
 impl TryFrom<i32> for LineType {
     type Error = crate::error::Error;
 
-    /// The line type for a numeric code, as [`LineType::from_code`] (codes
-    /// above 6 recycle).
+    /// The line type for one of R's numeric `lty` codes: `0` is blank, `1`
+    /// solid, `2..=6` the named dash patterns. Codes above 6 recycle as R
+    /// does (`(code - 1) % 6 + 1`: `7` is solid, `8` dashed, ...).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineType::try_from(3).unwrap(), LineType::DOTTED);
+    /// assert_eq!(LineType::try_from(8).unwrap(), LineType::DASHED);
+    /// assert!(LineType::try_from(-1).is_err());
+    /// ```
     ///
     /// # Errors
     ///
@@ -247,7 +238,6 @@ impl TryFrom<i32> for LineType {
     }
 }
 
-crate::error::from_str_via_parse!(LineType, "line type");
 crate::error::from_r_string!(
     LineType,
     "line type",
@@ -280,8 +270,13 @@ mod tests {
         }
         assert_eq!(LineType::default(), LineType::SOLID);
         assert_eq!("dotdash".parse::<LineType>(), Ok(LineType::DOTDASH));
+        // `FromStr` and `TryFrom` give the same error.
         let err = "wavy".parse::<LineType>().unwrap_err();
-        assert_eq!(err.to_string(), "invalid line type: \"wavy\"");
+        assert_eq!(err, LineType::try_from("wavy").unwrap_err());
+        assert!(
+            err.message()
+                .starts_with("\"wavy\" is not a valid line type")
+        );
     }
 
     #[test]

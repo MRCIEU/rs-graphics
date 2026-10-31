@@ -46,13 +46,20 @@ pub struct PchGeometry {
     /// bg=)`) and stroked with `col` (the pch 21-25 family).
     pub filled_with_bg: Vec<Shape>,
     /// Plain line segments, always stroked with `col` at `lty = "solid"`
-    /// regardless of `par(lty)` (matches `gc.lty = LTY_SOLID;` forced by
+    /// regardless of [`par(lty)`] (matches `gc.lty = LTY_SOLID;` forced by
     /// `GSymbol()`).
+    ///
+    /// [`par(lty)`]: crate::par::Par::lty
     pub lines: Vec<((f64, f64), (f64, f64))>,
+    /// Draw `lines` before the shapes, as `GESymbol()` does for pch 9 and
+    /// 12 (after them for every other symbol).
+    pub lines_first: bool,
 }
 
 /// `size_inches` for `GESymbol`, given the device's starting point size
-/// (`cra`, not the current `par(ps)`) and `cex`. See module docs.
+/// (`cra`, not the current [`par(ps)`]) and `cex`. See module docs.
+///
+/// [`par(ps)`]: crate::par::Par::ps
 pub fn symbol_size_inches(pointsize: f64, cex: f64) -> f64 {
     pointsize * cex / 120.0
 }
@@ -162,6 +169,7 @@ pub fn pch_geometry(pch: i32, x: f64, y: f64, size: f64) -> Option<PchGeometry> 
         9 => {
             let xc = SQRT2 * RADIUS * gstr0;
             let yc = xc;
+            g.lines_first = true;
             g.lines.push(((x - xc, y), (x + xc, y)));
             g.lines.push(((x, y - yc), (x, y + yc)));
             g.outline_only.push(Shape::Polygon(vec![
@@ -199,6 +207,7 @@ pub fn pch_geometry(pch: i32, x: f64, y: f64, size: f64) -> Option<PchGeometry> 
         }
         12 => {
             let (xc, yc) = (RADIUS * gstr0, RADIUS * gstr0);
+            g.lines_first = true;
             g.lines.push(((x - xc, y), (x + xc, y)));
             g.lines.push(((x, y - yc), (x, y + yc)));
             g.outline_only.push(Shape::Rect {

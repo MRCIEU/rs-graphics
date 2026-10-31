@@ -6,16 +6,20 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Opening devices for files (`Device::pdf`/`svg`/`png`/`format` and
+//! Opening devices (`Device::pdf`/`svg`/`png`/`format`/`memory` and
 //! `DeviceBuilder`): every option gives byte for byte the output of the
-//! equivalent `Device::new` route, R's defaults apply when options are
-//! left out, the format never comes from the file name, `open()` creates
-//! the file (failing on a bad path), and `close()` writes it (or fails for
-//! a device without one).
+//! backend set up by hand, R's defaults apply when options are left out,
+//! the format never comes from the file name, `open()` creates the file
+//! (failing on a bad path), `close()` writes it (or fails for a device
+//! without one), and an in-memory device gives the file's bytes.
 
 use std::path::PathBuf;
 
-use rs_graphics::prelude::*;
+use crate::backend::pdf::PdfBackend;
+use crate::backend::raster::RasterBackend;
+use crate::backend::svg::SvgBackend;
+use crate::par::Par;
+use crate::prelude::*;
 
 /// The same drawing on any device: text (pointsize matters), a symbol
 /// (`startps` matters) and the page background.
@@ -35,7 +39,7 @@ fn opened(builder: DeviceBuilder) -> Vec<u8> {
 }
 
 fn direct<B: Backend>(backend: B, par: Par) -> Vec<u8> {
-    let mut dev = Device::new(backend, par);
+    let mut dev = Device::with_par(backend, par);
     draw(&mut dev);
     dev.finish()
 }
@@ -105,7 +109,7 @@ fn size_pointsize_and_res() {
 
 #[test]
 fn backgrounds() {
-    let yellow = Color::parse("yellow").unwrap();
+    let yellow = Color::try_from("yellow").unwrap();
     assert_eq!(
         opened(Device::pdf(temp("a.pdf")).bg("white")),
         direct(
@@ -145,8 +149,8 @@ fn backgrounds() {
     );
 }
 
-/// An explicit `.bg()` is the device's `par(bg)` on every format, also
-/// white (which `Device::new` would otherwise take as "not set" and replace
+/// An explicit `.bg()` sets the starting background on every format, also
+/// white (which the device would otherwise take as "not set" and replace
 /// by the backend's default).
 #[test]
 fn explicit_background_is_kept() {
@@ -158,7 +162,7 @@ fn explicit_background_is_kept() {
                 .unwrap();
             assert_eq!(
                 dev.current_par().bg,
-                Color::parse(bg).unwrap(),
+                Color::try_from(bg).unwrap(),
                 "{format}, bg {bg}"
             );
         }
@@ -166,7 +170,7 @@ fn explicit_background_is_kept() {
 }
 
 #[test]
-fn compress_is_pdf_only_and_res_png_only() {
+fn compress_and_res_apply_where_they_mean_something() {
     assert_eq!(
         opened(Device::pdf(temp("a.pdf")).compress(false)),
         direct(
@@ -190,6 +194,11 @@ fn compress_is_pdf_only_and_res_png_only() {
     assert_eq!(
         opened(Device::svg(temp("a.svg")).compress(false)),
         opened(Device::svg(temp("a.svg")))
+    );
+    // For SVG, `compress(true)` gzips the document (`.svgz`).
+    assert_eq!(
+        opened(Device::svg(temp("a.svg")).compress(true)),
+        direct(SvgBackend::new(7.0, 7.0).with_gzip(true), Par::default())
     );
     assert_eq!(
         opened(Device::png(temp("a.png")).compress(false)),
@@ -218,9 +227,10 @@ fn unknown_format_name_fails_at_open() {
     let path = temp("unknown_format.jpg");
     let _ = std::fs::remove_file(&path);
     let e = Device::format("jpg", &path).open().err().unwrap();
-    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(e.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(e.call(), "pdf");
     assert!(
-        e.to_string()
+        e.message()
             .starts_with("\"jpg\" is not a valid output format"),
         "{e}"
     );
@@ -250,9 +260,10 @@ fn close_writes_the_finished_file_whatever_its_extension() {
 
 #[test]
 fn close_without_a_file_fails() {
-    let dev = Device::new(PdfBackend::new(7.0, 7.0), Par::default());
+    let dev = Device::memory("pdf").width(7.0).height(7.0).open().unwrap();
     let err = dev.close().unwrap_err();
-    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(err.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(err.call(), "dev.off");
 }
 
 #[test]
@@ -278,8 +289,15 @@ fn open_creates_the_file_and_close_fills_it() {
 fn open_fails_on_a_bad_path_and_names_it() {
     let path = temp("no_such_directory").join("plot.pdf");
     let err = Device::pdf(&path).open().err().expect("open should fail");
-    assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(err.kind(), ErrorKind::Io);
+    assert_eq!(err.call(), "pdf");
+    assert_eq!(err.io_error().unwrap().kind(), std::io::ErrorKind::NotFound);
     assert!(err.to_string().contains("no_such_directory"), "{err}");
+    // As an `io::Error` (for `?` in `io::Result` functions) it keeps the
+    // I/O kind and the message.
+    let io: std::io::Error = err.clone().into();
+    assert_eq!(io.kind(), std::io::ErrorKind::NotFound);
+    assert_eq!(io.to_string(), err.to_string());
     assert!(!path.exists());
 }
 
@@ -309,7 +327,7 @@ fn units_convert_sizes_to_inches() {
             Device::png(temp("a.png"))
                 .width(5)
                 .height(4)
-                .units(Units::In)
+                .units(Units::Inches)
         ),
         opened(Device::png(temp("a.png")).width(5).height(4))
     );
@@ -364,7 +382,7 @@ fn pixels_need_a_png_device() {
             .open()
             .err()
             .expect("open should fail");
-        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+        assert_eq!(err.kind(), ErrorKind::InvalidArgument);
         assert!(err.to_string().contains("px"), "{err}");
         assert!(!path.exists());
     }
@@ -372,13 +390,13 @@ fn pixels_need_a_png_device() {
 
 #[test]
 fn units_parse_like_match_arg() {
-    assert_eq!(Units::parse("px"), Some(Units::Px));
-    assert_eq!(Units::parse("i"), Some(Units::In));
-    assert_eq!(Units::parse("c"), Some(Units::Cm));
-    assert_eq!(Units::parse("m"), Some(Units::Mm));
-    assert_eq!(Units::parse(""), None);
-    assert_eq!(Units::parse("pt"), None);
-    assert_eq!("mm".parse::<Units>(), Ok(Units::Mm));
+    assert_eq!("px".parse::<Units>().ok(), Some(Units::Pixels));
+    assert_eq!("i".parse::<Units>().ok(), Some(Units::Inches));
+    assert_eq!("c".parse::<Units>().ok(), Some(Units::Centimetres));
+    assert_eq!("m".parse::<Units>().ok(), Some(Units::Millimetres));
+    assert_eq!("".parse::<Units>().ok(), None);
+    assert_eq!("pt".parse::<Units>().ok(), None);
+    assert_eq!("mm".parse::<Units>(), Ok(Units::Millimetres));
 }
 
 #[test]
@@ -386,12 +404,46 @@ fn unknown_units_and_colours_fail_at_open() {
     let path = temp("unknown_units.pdf");
     let _ = std::fs::remove_file(&path);
     let e = Device::pdf(&path).units("pt").open().err().unwrap();
-    assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(e.kind(), ErrorKind::InvalidArgument);
     assert!(
-        e.to_string().starts_with("\"pt\" is not a valid units"),
+        e.message().starts_with("\"pt\" is not a valid units"),
         "{e}"
     );
     let e = Device::pdf(&path).bg("notacolour").open().err().unwrap();
-    assert_eq!(e.to_string(), "invalid color name 'notacolour'");
+    assert_eq!(e.to_string(), "pdf(): invalid color name 'notacolour'");
     assert!(!path.exists());
+}
+
+#[test]
+fn memory_devices_give_the_files_bytes() {
+    for format in ["pdf", "svg", "png"] {
+        let builder = |b: DeviceBuilder| b.width(5).height(4).pointsize(10).bg("ivory");
+        assert_eq!(
+            opened(builder(Device::memory(format))),
+            opened(builder(Device::format(
+                format,
+                temp(&format!("m.{format}"))
+            ))),
+            "{format}"
+        );
+    }
+    // No file is created, and closing is an error (use `finish()`).
+    let dev = Device::memory("png").open().unwrap();
+    assert_eq!(dev.close().unwrap_err().kind(), ErrorKind::InvalidArgument);
+}
+
+#[test]
+fn threads_reach_the_png_backend() {
+    assert_eq!(
+        opened(Device::memory("png").width(5).height(4).threads(3)),
+        direct(
+            RasterBackend::new(5.0, 4.0, 72.0, Color::WHITE).with_threads(3),
+            Par::default()
+        )
+    );
+    // Ignored by the other formats.
+    assert_eq!(
+        opened(Device::memory("pdf").threads(3)),
+        opened(Device::memory("pdf"))
+    );
 }

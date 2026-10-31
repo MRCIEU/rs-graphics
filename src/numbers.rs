@@ -7,14 +7,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Traits for numeric arguments that take integers as well as `f64`: data
-//! vectors ([`Numbers`]), groups of them ([`Groups`]) and pairs
-//! ([`Pair`]).
+//! vectors ([`Numbers`]), groups of them ([`Groups`]), pairs ([`Pair`]),
+//! one number or a pair ([`OneOrPair`]), and the number types they accept
+//! ([`Num`]).
 //!
 //! As in R, where all numbers are doubles, any number type works:
 //! `dev.plot().x([1, 2, 3]).y(&y)`, or `dev.plot().x(1..=10).y(&y)` for
 //! R's `plot(1:10, y)`. One number is a vector of one
 //! (`dev.plot().x(1).y(1)` for R's `plot(1, 1)`). For `boxplot()`, one
-//! vector is one group. Pairs are tuples such as `(5, 20)`.
+//! vector is one group. Pairs are arrays `[5, 20]` or tuples `(5, 20.5)`.
 //!
 //! Data may be passed by reference or by value (`&x` or `x`, `&[1, 2]` or
 //! `[1, 2]`), as may the recycled option vectors (`.h([1, 2])`,
@@ -25,9 +26,9 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::new(SvgBackend::new(4, 4), Par::default());
+//! # let mut dev = Device::null().width(4).height(4).open().unwrap();
 //! let y = vec![2.0, 3.5, 1.0];
-//! dev.plot().x(1..=3).y(&y).xlim(0, 4).draw();
+//! dev.plot().x(1..=3).y(&y).xlim([0, 4]).draw();
 //! ```
 
 use std::borrow::Cow;
@@ -51,6 +52,53 @@ mod sealed {
 pub trait Num: Copy + sealed::Sealed {
     /// The value as an `f64` (rounded for 64-bit integers beyond 2^53).
     fn to_f64(self) -> f64;
+
+    /// A slice as `f64`s: borrowed for `f64`, else converted.
+    #[doc(hidden)]
+    fn slice_to_f64(s: &[Self]) -> Cow<'_, [f64]> {
+        Cow::Owned(s.iter().map(|v| v.to_f64()).collect())
+    }
+
+    /// A `Vec` as `f64`s: taken over for `f64`, else converted.
+    #[doc(hidden)]
+    fn vec_to_f64(v: Vec<Self>) -> Vec<f64> {
+        v.into_iter().map(Num::to_f64).collect()
+    }
+
+    /// Groups as `f64` vectors: borrowed for `f64`, else converted.
+    #[doc(hidden)]
+    fn groups_to_f64(g: &[Vec<Self>]) -> Cow<'_, [Vec<f64>]> {
+        Cow::Owned(
+            g.iter()
+                .map(|v| Self::slice_to_f64(v).into_owned())
+                .collect(),
+        )
+    }
+
+    /// Owned groups as `f64` vectors: taken over for `f64`, else converted.
+    #[doc(hidden)]
+    fn vecs_to_f64(g: Vec<Vec<Self>>) -> Vec<Vec<f64>> {
+        g.into_iter().map(Self::vec_to_f64).collect()
+    }
+}
+
+impl sealed::Sealed for f64 {}
+impl Num for f64 {
+    fn to_f64(self) -> f64 {
+        self
+    }
+    fn slice_to_f64(s: &[f64]) -> Cow<'_, [f64]> {
+        Cow::Borrowed(s)
+    }
+    fn vec_to_f64(v: Vec<f64>) -> Vec<f64> {
+        v
+    }
+    fn groups_to_f64(g: &[Vec<f64>]) -> Cow<'_, [Vec<f64>]> {
+        Cow::Borrowed(g)
+    }
+    fn vecs_to_f64(g: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+        g
+    }
 }
 
 macro_rules! num {
@@ -65,7 +113,7 @@ macro_rules! num {
         )*
     };
 }
-num!(f64, f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
+num!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 
 /// A data vector, such as the `x` and `y` of a plot.
 ///
@@ -82,6 +130,7 @@ num!(f64, f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
+/// # use rs_graphics::numbers::Numbers;
 /// assert_eq!(&*(1..=3_i32).into_numbers(), &[1.0, 2.0, 3.0]);
 /// assert_eq!(&*[1_i32, 2].into_numbers(), &[1.0, 2.0]);
 /// assert_eq!(&*2.5_f64.into_numbers(), &[2.5]);
@@ -97,86 +146,42 @@ impl<'a> Numbers<'a> for Cow<'a, [f64]> {
     }
 }
 
-impl<'a> Numbers<'a> for &'a [f64] {
+impl<'a, T: Num> Numbers<'a> for &'a [T] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(self)
+        T::slice_to_f64(self)
     }
 }
 
-impl<'a> Numbers<'a> for &'a Vec<f64> {
+impl<'a, T: Num> Numbers<'a> for &'a Vec<T> {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(self)
+        T::slice_to_f64(self)
     }
 }
 
 /// A reference to a slice reference, e.g. from iterating over `&[&[f64]]`.
-impl<'a, 'b: 'a> Numbers<'a> for &'a &'b [f64] {
+impl<'a, 'b: 'a, T: Num> Numbers<'a> for &'a &'b [T] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(*self)
+        T::slice_to_f64(self)
     }
 }
 
-impl<'a, const N: usize> Numbers<'a> for &'a [f64; N] {
+impl<'a, T: Num, const N: usize> Numbers<'a> for &'a [T; N] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Borrowed(self)
+        T::slice_to_f64(self)
     }
 }
 
-impl<'a> Numbers<'a> for Vec<f64> {
+impl<'a, T: Num> Numbers<'a> for Vec<T> {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Owned(self)
+        Cow::Owned(T::vec_to_f64(self))
     }
 }
 
-impl<'a, const N: usize> Numbers<'a> for [f64; N] {
+impl<'a, T: Num, const N: usize> Numbers<'a> for [T; N] {
     fn into_numbers(self) -> Cow<'a, [f64]> {
-        Cow::Owned(self.to_vec())
+        Cow::Owned(T::vec_to_f64(self.into()))
     }
 }
-
-/// Converting impls for the number types other than `f64`.
-macro_rules! converted_numbers {
-    ($($t:ty),*) => {
-        $(
-            impl<'a> Numbers<'a> for &'a [$t] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
-                }
-            }
-
-            impl<'a, 'b: 'a> Numbers<'a> for &'a &'b [$t] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    (*self).into_numbers()
-                }
-            }
-
-            impl<'a> Numbers<'a> for &'a Vec<$t> {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    self.as_slice().into_numbers()
-                }
-            }
-
-            impl<'a, const N: usize> Numbers<'a> for &'a [$t; N] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    self.as_slice().into_numbers()
-                }
-            }
-
-            impl<'a> Numbers<'a> for Vec<$t> {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
-                }
-            }
-
-            impl<'a, const N: usize> Numbers<'a> for [$t; N] {
-                fn into_numbers(self) -> Cow<'a, [f64]> {
-                    Cow::Owned(self.iter().map(|v| v.to_f64()).collect())
-                }
-            }
-        )*
-    };
-}
-converted_numbers!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
 
 /// One number, as R's length-one vector (`plot(1, 1)` is
 /// `.x(1).y(1)`), by value or by reference.
@@ -233,6 +238,7 @@ range_numbers!(i32, i64, u32, u64, usize);
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
+/// # use rs_graphics::numbers::Groups;
 /// let groups = [vec![1, 2], vec![3]].into_groups();
 /// assert_eq!(&*groups, &[vec![1.0, 2.0], vec![3.0]]);
 /// assert_eq!([1_i32, 2, 3].into_groups().len(), 1);
@@ -242,33 +248,33 @@ pub trait Groups<'a> {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]>;
 }
 
-impl<'a> Groups<'a> for &'a [Vec<f64>] {
+impl<'a, T: Num> Groups<'a> for &'a [Vec<T>] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Borrowed(self)
+        T::groups_to_f64(self)
     }
 }
 
-impl<'a> Groups<'a> for &'a Vec<Vec<f64>> {
+impl<'a, T: Num> Groups<'a> for &'a Vec<Vec<T>> {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Borrowed(self)
+        T::groups_to_f64(self)
     }
 }
 
-impl<'a, const N: usize> Groups<'a> for &'a [Vec<f64>; N] {
+impl<'a, T: Num, const N: usize> Groups<'a> for &'a [Vec<T>; N] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Borrowed(self)
+        T::groups_to_f64(self)
     }
 }
 
-impl<'a> Groups<'a> for Vec<Vec<f64>> {
+impl<'a, T: Num> Groups<'a> for Vec<Vec<T>> {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Owned(self)
+        Cow::Owned(T::vecs_to_f64(self))
     }
 }
 
-impl<'a, const N: usize> Groups<'a> for [Vec<f64>; N] {
+impl<'a, T: Num, const N: usize> Groups<'a> for [Vec<T>; N] {
     fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-        Cow::Owned(self.into())
+        Cow::Owned(T::vecs_to_f64(self.into()))
     }
 }
 
@@ -279,59 +285,19 @@ impl<'a, N: Numbers<'a>> Groups<'a> for N {
     }
 }
 
-fn convert_groups<T: Num>(groups: &[Vec<T>]) -> Vec<Vec<f64>> {
-    groups
-        .iter()
-        .map(|g| g.iter().map(|v| v.to_f64()).collect())
-        .collect()
-}
-
-macro_rules! converted_groups {
-    ($($t:ty),*) => {
-        $(
-            impl<'a> Groups<'a> for &'a [Vec<$t>] {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(self))
-                }
-            }
-
-            impl<'a> Groups<'a> for &'a Vec<Vec<$t>> {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(self))
-                }
-            }
-
-            impl<'a, const N: usize> Groups<'a> for &'a [Vec<$t>; N] {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(self))
-                }
-            }
-
-            impl<'a> Groups<'a> for Vec<Vec<$t>> {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(&self))
-                }
-            }
-
-            impl<'a, const N: usize> Groups<'a> for [Vec<$t>; N] {
-                fn into_groups(self) -> Cow<'a, [Vec<f64>]> {
-                    Cow::Owned(convert_groups(&self))
-                }
-            }
-        )*
-    };
-}
-converted_groups!(f32, i8, i16, i32, i64, u8, u16, u32, u64, usize, isize);
-
-/// Two numbers, such as limits `(0, 10)` or a point `(5.0, 20.0)`.
+/// Two numbers, such as limits `[0, 10]` or a point `(5.0, 20.0)`: what
+/// every two-value setting takes (`.xlim([0, 10])`, `.mfrow([1, 2])`), as R
+/// takes `c(a, b)`.
 ///
-/// Implemented for tuples of `f64`s and/or `i32`s.
+/// Implemented for arrays of two [`Num`]s and for tuples of any two `Num`
+/// types; a tuple can mix them (`(0, 10.5)`), an array can't.
 ///
 /// # Examples
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// assert_eq!((5, 20).into_pair(), (5.0, 20.0));
+/// # use rs_graphics::numbers::Pair;
+/// assert_eq!([5, 20].into_pair(), (5.0, 20.0));
 /// assert_eq!((0.5, 2).into_pair(), (0.5, 2.0));
 /// ```
 pub trait Pair {
@@ -339,18 +305,53 @@ pub trait Pair {
     fn into_pair(self) -> (f64, f64);
 }
 
-macro_rules! pair {
-    ($(($a:ty, $b:ty)),*) => {
+impl<A: Num, B: Num> Pair for (A, B) {
+    fn into_pair(self) -> (f64, f64) {
+        (self.0.to_f64(), self.1.to_f64())
+    }
+}
+
+impl<N: Num> Pair for [N; 2] {
+    fn into_pair(self) -> (f64, f64) {
+        (self[0].to_f64(), self[1].to_f64())
+    }
+}
+
+/// One number used for both values, or a [`Pair`]: what `legend()`'s
+/// `inset` takes, as R recycles `inset = 0.05` to both directions.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # use rs_graphics::numbers::OneOrPair;
+/// assert_eq!(0.05.into_one_or_pair(), (0.05, 0.05));
+/// assert_eq!([0.05, 0.1].into_one_or_pair(), (0.05, 0.1));
+/// ```
+pub trait OneOrPair {
+    /// The two values as `f64`s.
+    fn into_one_or_pair(self) -> (f64, f64);
+}
+
+impl<P: Pair> OneOrPair for P {
+    fn into_one_or_pair(self) -> (f64, f64) {
+        self.into_pair()
+    }
+}
+
+macro_rules! one_or_pair_single {
+    ($($t:ty),*) => {
         $(
-            impl Pair for ($a, $b) {
-                fn into_pair(self) -> (f64, f64) {
-                    (self.0.to_f64(), self.1.to_f64())
+            impl OneOrPair for $t {
+                fn into_one_or_pair(self) -> (f64, f64) {
+                    let v = self.to_f64();
+                    (v, v)
                 }
             }
         )*
     };
 }
-pair!((f64, f64), (f64, i32), (i32, f64), (i32, i32));
+one_or_pair_single!(f64, f32, i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 
 #[cfg(test)]
 // The tests use the reference forms on purpose; clippy would drop the `&`.

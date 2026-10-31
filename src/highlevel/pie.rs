@@ -23,8 +23,9 @@ use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::par::Xpd;
 use crate::plotmath::Label;
+use crate::recycle::nth;
 
-/// R's default pie slice color cycle (used when neither `col` nor
+/// R's default pie slice colour cycle (used when neither `col` nor
 /// `density` is given).
 const DEFAULT_COLORS: [&str; 6] = [
     "white",
@@ -37,51 +38,74 @@ const DEFAULT_COLORS: [&str; 6] = [
 
 crate::setters::options! {
     /// Options for [`Graphics::pie`](crate::graphics::Graphics::pie), covering the subset of `pie()`'s arguments this
-    /// crate implements. Unset fields are R's defaults, given for each.
+    /// crate implements. Settings left unset are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct PieOptions => [PieCall] {
-        /// Slice labels (text or plotmath expressions). `None`: `1, 2, ...`.
-        /// An empty text label, or a missing one (fewer labels than slices,
-        /// R's `NA`), draws no label or tick for its slice.
-        pub labels: Option<Vec<Label>> => list Label,
+        /// Slice labels (text or plotmath expressions). Unset: `1, 2, ...`.
+        /// An empty text label, a `None` element (R's `NA`) or a missing one
+        /// (fewer labels than slices) draws no label or tick for its slice.
+        pub labels: Option<Vec<Option<Label>>> => labels Label,
         /// Rotation of the labels in degrees, counterclockwise. `None`:
-        /// `par(srt)`.
-        pub srt: Option<f64> => option f64,
+        /// [`par(srt)`].
+        ///
+        /// [`par(srt)`]: crate::par::Par::srt
+        pub srt: Option<f64> => number f64,
         /// Size of the labels (the title keeps `cex_main`). `None`: 1.
-        pub cex: Option<f64> => option f64,
-        /// Font of the labels. `None`: `par(font)`.
+        pub cex: Option<f64> => number f64,
+        /// Font of the labels. `None`: [`par(font)`].
+        ///
+        /// [`par(font)`]: crate::par::Par::font
         pub font: Option<FontFace> => option FontFace,
         /// Pie radius in user units, where the plot region's shorter side
         /// spans `[-1, 1]` before the usual 4% axis extension. `None`: 0.8.
-        pub radius: Option<f64> => option f64,
+        pub radius: Option<f64> => number f64,
         /// Slice fill colours, recycled over the slices. Empty: a cycle of 6
-        /// pastel colours, or `par(fg)` (the shading lines' colour) when
+        /// pastel colours, or [`par(fg)`] (the shading lines' colour) when
         /// `density` is given.
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Slice borders, recycled over the slices. Empty: `par(fg)`
+        /// Slice borders, recycled over the slices. Empty: [`par(fg)`]
         /// (`polygon()`'s default), or with shading the slice's `col` (R's
         /// `border = NULL`).
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Line types of the slice borders, recycled over the slices. Empty:
-        /// `par(lty)`; `None`: that slice has no border.
+        /// [`par(lty)`]; `None`: that slice has no border and no shading
+        /// lines (its fill stays).
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Shading lines per inch in the slices, recycled over the slices (as
         /// [`PolygonOptions::density`]); the lines take `col`, whose default
-        /// is then `par(fg)`. Empty: no shading.
+        /// is then [`par(fg)`]. `None` or a negative value fills the slice
+        /// instead, 0 leaves it empty. Empty: no shading.
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled over the slices.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Title, as for `plot()` (text or a plotmath expression). `None`:
-        /// none. Drawn whatever `par(ann)` is, as in R.
+        /// none. Drawn whatever [`par(ann)`] is, as in R.
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
         pub main: Option<Label> => option Label,
-        /// Size of the title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
-        pub cex_main: Option<f64> => option f64,
-        /// Colour of the title. `None`: `par(col.main)`. R's `col.main`.
-        pub col_main: Option<ColorSpec> => option ColorSpec,
-        /// Font of the title (a [`FontFace`]). `None`: `par(font.main)`.
+        /// Size of the title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
+        pub cex_main: Option<f64> => number f64,
+        /// Colour of the title. `None`: [`par(col.main)`]. R's `col.main`.
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of the title (a [`FontFace`]). `None`: [`par(font.main)`].
         /// R's `font.main`.
+        ///
+        /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
         /// Approximate number of polygon edges for a full circle. `None`:
         /// 200.
@@ -90,7 +114,7 @@ crate::setters::options! {
         pub clockwise: bool => value bool,
         /// Starting angle in degrees. `None`: 90 (12 o'clock) when
         /// `clockwise`, else 0 (3 o'clock). R's `init.angle`.
-        pub init_angle: Option<f64> => option f64,
+        pub init_angle: Option<f64> => number f64,
     }
 }
 
@@ -128,10 +152,10 @@ impl<B: Backend> Device<B> {
         let nx = x.len();
         let total: f64 = x.iter().sum();
 
-        let labels: Vec<Label> = opts
+        let labels: Vec<Option<Label>> = opts
             .labels
             .clone()
-            .unwrap_or_else(|| (1..=nx).map(|i| Label::from(i.to_string())).collect());
+            .unwrap_or_else(|| (1..=nx).map(|i| Some(Label::from(i.to_string()))).collect());
 
         self.plot_new_impl()?;
 
@@ -214,8 +238,10 @@ impl<B: Backend> Device<B> {
 
             let mid = 0.5 * (cum[i] + cum[i + 1]);
             let (px, py) = t2xy(mid);
-            // `labels[i]` is NA past the end of `labels`: no label.
-            let Some(label) = labels.get(i) else {
+            // `labels[i]` is NA past the end of `labels`, or an `NA` (`None`)
+            // element: no label and no tick line, as `pie.R`'s
+            // `!is.na(lab) && nzchar(lab)`.
+            let Some(Some(label)) = labels.get(i) else {
                 continue;
             };
             if !matches!(label, Label::Text(t) if t.is_empty()) {
@@ -258,9 +284,5 @@ pub(crate) fn check_pie(x: &[f64]) -> Result<(), Error> {
 /// `v[i]` (recycled) as a one-element vector; empty stays empty (R's
 /// `NULL`, the default).
 fn each<T: Copy>(v: &[T], i: usize) -> Vec<T> {
-    if v.is_empty() {
-        Vec::new()
-    } else {
-        vec![v[i % v.len()]]
-    }
+    nth(v, i).into_iter().collect()
 }

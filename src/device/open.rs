@@ -6,9 +6,10 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Opening a device for a file, as R's `pdf()`, `svg()` and `png()` do:
+//! Opening a device, as R's `pdf()`, `svg()` and `png()` do: for a file with
 //! [`Device::pdf`], [`Device::svg`], [`Device::png`] and, for a format
-//! chosen at run time, [`Device::format`].
+//! chosen at run time, [`Device::format`]; in memory with
+//! [`Device::memory`]; and for no output with [`Device::null`].
 
 use std::fs::File;
 use std::io::Write;
@@ -16,20 +17,23 @@ use std::path::{Path, PathBuf};
 
 use super::Device;
 use crate::backend::Backend;
+use crate::backend::null::NullBackend;
 use crate::backend::pdf::PdfBackend;
 use crate::backend::raster::RasterBackend;
 use crate::backend::svg::SvgBackend;
 use crate::backend::{AnyBackend, Format};
 use crate::color::{Color, ColorSpec};
+use crate::error::Error;
 use crate::par::Par;
 use crate::setters::IntoArg;
 
 crate::setters::options! {
-    /// The options of a device being opened for a file.
+    /// The options of a device being opened.
     ///
     /// Start one with [`Device::pdf`], [`Device::svg`], [`Device::png`] or
-    /// [`Device::format`], set its options and finish with
-    /// [`open`](DeviceBuilder::open). Unset options take R's defaults, given
+    /// [`Device::format`] (for a file), [`Device::memory`] (output kept in
+    /// memory) or [`Device::null`] (no output), set its options and finish
+    /// with [`open`](DeviceBuilder::open). Unset options take R's defaults, given
     /// for each. Sizes are in inches for every format unless
     /// [`units`](DeviceBuilder::units) says otherwise. The default PNG is 6.67
     /// x 6.67 inches, R's default 480 x 480 pixels at 72 ppi; it stays 6.67
@@ -41,12 +45,13 @@ crate::setters::options! {
     #[derive(Clone, Debug)]
     pub struct DeviceBuilder {
         format: Format => no_setter,
-        file: PathBuf => no_setter,
+        /// Where the output goes.
+        target: Target => no_setter,
         /// Page width in [`units`](DeviceBuilder::units). `None`: 7 inches for
         /// PDF and SVG, 480/72 inches for PNG, whatever the units.
-        pub width: Option<f64> => option f64,
+        pub width: Option<f64> => number f64,
         /// Page height in [`units`](DeviceBuilder::units). `None`: as `width`.
-        pub height: Option<f64> => option f64,
+        pub height: Option<f64> => number f64,
         /// Units of `width` and `height`. `None`: inches. Inches, centimetres
         /// and millimetres work for every format; pixels only for PNG, where
         /// they are divided by `res` (so `.width(1200).units("px").res(300)` is
@@ -54,20 +59,29 @@ crate::setters::options! {
         /// or SVG device make [`open`](DeviceBuilder::open) fail. In R only
         /// bitmap devices such as `png()` take `units`, defaulting to pixels.
         pub units: Option<Units> => option Units,
-        /// Starting text size, `par(ps)`, in big points; it also fixes the
+        /// Starting text size, [`par(ps)`], in big points; it also fixes the
         /// size of plotting symbols and margin lines from the start. `None`:
         /// 12.
-        pub pointsize: Option<f64> => option f64,
-        /// Page background, and the starting `par(bg)`; a colour that draws
+        ///
+        /// [`par(ps)`]: crate::par::Par::ps
+        pub pointsize: Option<f64> => number f64,
+        /// Page background, and the starting [`par(bg)`]; a colour that draws
         /// nothing (`ColorSpec::None`, `"transparent"`) is transparent. `None`:
         /// transparent for PDF, white for SVG and PNG (R's defaults).
-        pub bg: Option<ColorSpec> => option ColorSpec,
+        ///
+        /// [`par(bg)`]: crate::par::Par::bg
+        pub bg: Option<ColorSpec> => option_value ColorSpec,
         /// Resolution in pixels per inch, PNG only (ignored for PDF and SVG).
-        /// `None`: 72. R's `res`.
-        pub res: Option<f64> => option f64,
-        /// Compresses the page contents, PDF only (ignored for SVG and PNG).
-        /// `None`: `true`.
+        /// `None`: 72.
+        pub res: Option<f64> => number f64,
+        /// Compresses the output: a PDF's page contents (`None`: `true`), or
+        /// a whole SVG document, gzipped as a `.svgz` file (`None`: `false`).
+        /// Ignored for PNG, which is always compressed.
         pub compress: Option<bool> => option bool,
+        /// Threads drawing a PNG, PNG only. `None`: one per CPU core. `1`
+        /// draws on the calling thread. The output is the same for any
+        /// number above 1.
+        pub threads: Option<usize> => count usize,
         /// Puts all pages in one file, PDF only. `false` writes a file per
         /// page, named with the page number in `file` (as `"Rplot%03d.pdf"`;
         /// without one, the file holds the last page, as in R). `None`:
@@ -75,6 +89,17 @@ crate::setters::options! {
         /// when `file` has a page number.
         pub onefile: Option<bool> => option bool,
     }
+}
+
+/// Where a device's output goes.
+#[derive(Clone, Debug)]
+pub(crate) enum Target {
+    /// A file (possibly one per page).
+    File(PathBuf),
+    /// Kept in memory, for [`Device::finish`].
+    Memory,
+    /// Nowhere: the null device.
+    Null,
 }
 
 impl DeviceBuilder {
@@ -93,7 +118,8 @@ impl DeviceBuilder {
     /// per page as PNG and SVG do.
     ///
     /// As in R, opening the device creates the file; the page-number format is
-    /// R's `checkIntFormat()`.
+    /// R's `checkIntFormat()`. A device from [`Device::memory`] or
+    /// [`Device::null`] has no file, so opening it creates nothing.
     ///
     /// # Examples
     ///
@@ -101,7 +127,7 @@ impl DeviceBuilder {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::png("panel%02d.png").open()?;
     /// dev.plot().x([1, 2, 3]).draw(); // panel01.png
     /// dev.plot().x([3, 2, 1]).draw(); // panel02.png
@@ -112,49 +138,58 @@ impl DeviceBuilder {
     ///
     /// # Errors
     ///
-    /// If the file can't be created (the error names the file); if `file` has
-    /// any other `%`, or more than one page-number format, an
-    /// [`InvalidInput`](std::io::ErrorKind::InvalidInput) error ("invalid 'file'
-    /// argument"); for a format name that names no format, a setter's value
-    /// that isn't one (`.bg("notacolour")`, `.units("ft")`),
-    /// [`units`](DeviceBuilder::units) of pixels on a PDF or SVG device, or a
-    /// negative palette number as `bg`, an `InvalidInput` error, before the
-    /// file is created.
-    pub fn open(self) -> std::io::Result<Device<AnyBackend>> {
+    /// The errors are named for R's device function (`pdf()`, `svg()` or
+    /// `png()`; a format name that names no format is reported as `pdf()`). If the file can't be created, an [`ErrorKind::Io`] error
+    /// naming the file. Before the file is created, an
+    /// [`ErrorKind::InvalidArgument`] error if `file` has any other `%`, or
+    /// more than one page-number format ("invalid 'file' argument"); for a
+    /// format name that names no format, a setter's value that isn't one
+    /// (`.bg("notacolour")`, `.units("ft")`), [`units`](DeviceBuilder::units)
+    /// of pixels on a PDF or SVG device, or a negative palette number as
+    /// `bg`.
+    ///
+    /// [`ErrorKind::Io`]: crate::ErrorKind::Io
+    /// [`ErrorKind::InvalidArgument`]: crate::ErrorKind::InvalidArgument
+    pub fn open(self) -> Result<Device<AnyBackend>, Error> {
+        let call = match self.format {
+            Format::Pdf => "pdf",
+            Format::Svg => "svg",
+            Format::Png => "png",
+        };
         if let Some(e) = &self.deferred_error {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                e.to_string(),
-            ));
+            return Err(e.clone().in_call(call));
         }
-        let units = self.units.unwrap_or(Units::In);
-        if units == Units::Px && self.format != Format::Png {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "units = \"px\" needs a PNG device",
-            ));
+        let units = self.units.unwrap_or(Units::Inches);
+        if units == Units::Pixels && self.format != Format::Png {
+            return Err(Error::invalid("units = \"px\" needs a PNG device").in_call(call));
         }
         if let Some(ColorSpec::Index(i)) = self.bg {
             if i < 0 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("numerical color values must be >= 0, found {i}"),
-                ));
+                return Err(Error::invalid(format!(
+                    "numerical color values must be >= 0, found {i}"
+                ))
+                .in_call(call));
             }
         }
-        let name = FileName::parse(&self.file)?;
-        let first = name.for_page(1);
-        let file = create(&first)?;
+        // The file, for a file device.
+        let (name, file) = match &self.target {
+            Target::File(path) => {
+                let name = FileName::parse(path).map_err(|e| e.in_call(call))?;
+                let file = create(&name.for_page(1)).map_err(|e| Error::io(call, e))?;
+                (Some(name), Some(file))
+            }
+            Target::Memory | Target::Null => (None, None),
+        };
         let default_size = match self.format {
             Format::Png => 480.0 / 72.0,
             Format::Pdf | Format::Svg => 7.0,
         };
         let res = self.res.unwrap_or(72.0);
         let inches = |size: f64| match units {
-            Units::In => size,
-            Units::Cm => size / 2.54,
-            Units::Mm => size / 25.4,
-            Units::Px => size / res,
+            Units::Inches => size,
+            Units::Centimetres => size / 2.54,
+            Units::Millimetres => size / 25.4,
+            Units::Pixels => size / res,
         };
         let width = self.width.map_or(default_size, inches);
         let height = self.height.map_or(default_size, inches);
@@ -163,6 +198,9 @@ impl DeviceBuilder {
             .bg
             .map(|c| c.resolve(&par.palette).unwrap_or(Color::TRANSPARENT));
         let backend: AnyBackend = match self.format {
+            _ if matches!(self.target, Target::Null) => NullBackend::new(width, height)
+                .with_background(bg.unwrap_or(Color::TRANSPARENT))
+                .into(),
             Format::Pdf => {
                 let pdf =
                     PdfBackend::new(width, height).with_compression(self.compress.unwrap_or(true));
@@ -171,20 +209,29 @@ impl DeviceBuilder {
                     None => pdf.into(),
                 }
             }
-            Format::Svg => SvgBackend::new(width, height).into(),
+            Format::Svg => SvgBackend::new(width, height)
+                .with_gzip(self.compress.unwrap_or(false))
+                .into(),
             Format::Png => {
-                RasterBackend::new(width, height, res, bg.unwrap_or(Color::WHITE)).into()
+                let png = RasterBackend::new(width, height, res, bg.unwrap_or(Color::WHITE));
+                match self.threads {
+                    Some(n) => png.with_threads(n).into(),
+                    None => png.into(),
+                }
             }
         };
         if let Some(ps) = self.pointsize {
             par.ps = ps;
         }
-        let mut dev = Device::new(backend, par);
+        let mut dev = Device::with_par(backend, par);
         // The SVG backend has no background of its own: the page is
         // painted in `par(bg)`. Set after `Device::new`, which takes a
         // white `par.bg` as "not set" and uses the backend's default.
         if let Some(c) = bg {
             dev.par.bg = c;
+        }
+        if matches!(self.target, Target::Memory) {
+            return Ok(dev);
         }
         dev.output = Some(Output {
             file,
@@ -193,9 +240,10 @@ impl DeviceBuilder {
             // keeps every page in its one file unless `onefile = FALSE`, as
             // R's `pdf()` (then, without a page number, each page replaces
             // the last in the same file).
-            per_page: match self.format {
-                Format::Pdf => !self.onefile.unwrap_or(true),
-                Format::Png | Format::Svg => name.numbered(),
+            per_page: match (&name, self.format) {
+                (None, _) => false,
+                (Some(_), Format::Pdf) => !self.onefile.unwrap_or(true),
+                (Some(name), Format::Png | Format::Svg) => name.numbered(),
             },
             name,
             page: 1,
@@ -207,28 +255,40 @@ impl DeviceBuilder {
 
 /// The units of a device's `width` and `height`
 /// ([`DeviceBuilder::units`]): R's `units` of `png()`.
+///
+/// From a string (`"cm".parse::<Units>()` or `TryFrom<&str>`): `"px"`,
+/// `"in"`, `"cm"` or `"mm"`, or a unique prefix (R's `match.arg()`). Anything
+/// else is an error.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("c".parse::<Units>().unwrap(), Units::Centimetres);
+/// assert!("pt".parse::<Units>().is_err());
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Units {
     /// `"in"`: inches (the default here; R's `png()` defaults to pixels).
     #[default]
-    In,
+    Inches,
     /// `"cm"`: centimetres.
-    Cm,
+    Centimetres,
     /// `"mm"`: millimetres.
-    Mm,
+    Millimetres,
     /// `"px"`: pixels, at the device's `res` (PNG only).
-    Px,
+    Pixels,
 }
 
 impl Units {
-    /// `"px"`, `"in"`, `"cm"` or `"mm"`, or a unique prefix of one (R's
-    /// `match.arg()`); `None` for anything else.
-    pub fn parse(s: &str) -> Option<Units> {
+    /// `"px"`, `"in"`, `"cm"` or `"mm"`, or a unique prefix; `None`
+    /// otherwise. The public routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<Units> {
         let all = [
-            ("px", Units::Px),
-            ("in", Units::In),
-            ("cm", Units::Cm),
-            ("mm", Units::Mm),
+            ("px", Units::Pixels),
+            ("in", Units::Inches),
+            ("cm", Units::Centimetres),
+            ("mm", Units::Millimetres),
         ];
         let mut hits = all
             .iter()
@@ -240,7 +300,6 @@ impl Units {
     }
 }
 
-crate::error::from_str_via_parse!(Units, "units");
 crate::error::from_r_string!(Units, "units", "\"px\", \"in\", \"cm\" or \"mm\"");
 
 /// Creates (or empties) `path`, with R's message on failure.
@@ -278,13 +337,8 @@ struct Conversion {
 }
 
 impl FileName {
-    pub(crate) fn parse(path: &Path) -> std::io::Result<FileName> {
-        let invalid = || {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("invalid 'file' argument '{}'", path.display()),
-            )
-        };
+    pub(crate) fn parse(path: &Path) -> Result<FileName, Error> {
+        let invalid = || Error::invalid(format!("invalid 'file' argument '{}'", path.display()));
         // A name that isn't UTF-8 has no `%` to interpret.
         let Some(s) = path.to_str() else {
             return Ok(FileName {
@@ -409,9 +463,10 @@ impl FileName {
 
 /// The file(s) of a device opened for a file.
 pub(crate) struct Output {
-    /// The current page's file (the only one unless `per_page`).
-    file: File,
-    name: FileName,
+    /// The current page's file (the only one unless `per_page`); `None`
+    /// for the null device, which writes nothing.
+    file: Option<File>,
+    name: Option<FileName>,
     /// One file per page: each finished page is written to its file and
     /// the next page's file is created.
     per_page: bool,
@@ -424,17 +479,19 @@ impl Output {
     /// Writes a finished page's `bytes` to the current file and creates the
     /// next page's (after the first error, does nothing).
     fn next_page(&mut self, bytes: &[u8]) {
+        let (Some(file), Some(name)) = (&mut self.file, &self.name) else {
+            return;
+        };
         if self.error.is_some() {
             return;
         }
-        let result = self
-            .file
+        let result = file
             .write_all(bytes)
-            .and_then(|_| self.file.flush())
-            .and_then(|_| create(&self.name.for_page(self.page + 1)));
+            .and_then(|_| file.flush())
+            .and_then(|_| create(&name.for_page(self.page + 1)));
         match result {
-            Ok(file) => {
-                self.file = file;
+            Ok(next) => {
+                self.file = Some(next);
                 self.page += 1;
             }
             Err(e) => self.error = Some(e),
@@ -446,8 +503,13 @@ impl Output {
         if let Some(e) = self.error.take() {
             return Err(e);
         }
-        self.file.write_all(bytes)?;
-        self.file.flush()
+        match &mut self.file {
+            Some(file) => {
+                file.write_all(bytes)?;
+                file.flush()
+            }
+            None => Ok(()),
+        }
     }
 }
 
@@ -470,13 +532,16 @@ impl Device<AnyBackend> {
     /// [`open`](DeviceBuilder::open), which creates the file;
     /// [`close`](Device::close) writes it.
     ///
+    /// A `format` string that names no format is an error of
+    /// [`open`](DeviceBuilder::open).
+    ///
     /// This is R's `pdf()`, `svg()` or `png()`, chosen at run time.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let format = "png"; // e.g. from a command-line option
     /// let mut dev = Device::format(format, "plot.png").res(300).open()?;
     /// dev.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
@@ -484,9 +549,6 @@ impl Device<AnyBackend> {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// A `format` string that names no format is an error of
-    /// [`open`](DeviceBuilder::open).
     pub fn format(format: impl IntoArg<Format>, file: impl AsRef<Path>) -> DeviceBuilder {
         let (format, deferred_error) = match format.into_arg() {
             Ok(f) => (f, None),
@@ -495,7 +557,7 @@ impl Device<AnyBackend> {
         DeviceBuilder {
             deferred_error,
             format,
-            file: file.as_ref().to_path_buf(),
+            target: Target::File(file.as_ref().to_path_buf()),
             width: None,
             height: None,
             units: None,
@@ -503,6 +565,7 @@ impl Device<AnyBackend> {
             bg: None,
             res: None,
             compress: None,
+            threads: None,
             onefile: None,
         }
     }
@@ -518,7 +581,7 @@ impl Device<AnyBackend> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::pdf("scatter.pdf").width(7).height(5).open()?;
     /// dev.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
     /// dev.close()?;
@@ -541,7 +604,7 @@ impl Device<AnyBackend> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::svg("plot.svg").width(5).height(5).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// dev.close()?;
@@ -567,7 +630,7 @@ impl Device<AnyBackend> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::png("plot.png").width(6).height(4).res(300).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// dev.close()?;
@@ -577,4 +640,78 @@ impl Device<AnyBackend> {
     pub fn png(file: impl AsRef<Path>) -> DeviceBuilder {
         Device::format(Format::Png, file)
     }
+
+    /// Starts opening a device that draws nothing and writes no file.
+    ///
+    /// Everything works as on a PDF device of the same size: calls return
+    /// the same values (`legend()`'s box, `axis()`'s ticks, `strwidth()`),
+    /// and the same errors (margins too large for the page), but nothing is
+    /// drawn or written, so it is also the fastest way to run drawing code.
+    /// Use it to check that a [`Figure`](crate::recording::Figure) fits a
+    /// page before opening a file, or to measure. It takes
+    /// [`Device::pdf`]'s options (`width`, `height`, `units`, `pointsize`,
+    /// `bg`); [`open`](DeviceBuilder::open) creates nothing, and
+    /// [`close`](Device::close) succeeds without writing.
+    ///
+    /// This is R's `pdf(NULL)`.
+    ///
+    /// # Examples
+    ///
+    /// Does a figure fit a 1.5 x 1.5 inch page?
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut fig = Figure::new();
+    /// fig.plot().x([1, 2, 3]).main("A").draw();
+    ///
+    /// let mut dev = Device::null().width(1.5).height(1.5).open()?;
+    /// let e = dev.try_add_figure(&fig).unwrap_err();
+    /// assert_eq!(e.kind(), ErrorKind::DoesNotFit); // figure margins too large
+    /// dev.close()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn null() -> DeviceBuilder {
+        let mut builder = Device::format(Format::Pdf, "");
+        builder.target = Target::Null;
+        builder
+    }
+
+    /// Starts opening a device whose output is kept in memory: get it with
+    /// [`finish`](Device::finish) when done.
+    ///
+    /// `format` is a [`Format`] or its name (`"pdf"`, `"svg"`, `"png"`,
+    /// ignoring case), and every option of [`Device::format`] works except
+    /// the file ones (one file per page): the bytes are the last page for
+    /// PNG and SVG, all pages for PDF. [`open`](DeviceBuilder::open) creates
+    /// nothing, and [`close`](Device::close) is an error (there is no file).
+    /// Use it to serve a plot, embed it, or write it yourself.
+    ///
+    /// A `format` string that names no format is an error of
+    /// [`open`](DeviceBuilder::open).
+    ///
+    /// R draws to files or screens; this has no R equivalent.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// # fn main() -> Result<(), rs_graphics::Error> {
+    /// let mut dev = Device::memory("svg").width(5).height(4).open()?;
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// let svg = String::from_utf8(dev.finish()).unwrap();
+    /// assert!(svg.contains("<svg"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn memory(format: impl IntoArg<Format>) -> DeviceBuilder {
+        let mut builder = Device::format(format, "");
+        builder.target = Target::Memory;
+        builder
+    }
 }
+
+#[cfg(test)]
+#[path = "open_tests.rs"]
+mod tests;

@@ -13,7 +13,10 @@
 //! "Figure" has its meaning in R's base graphics: the **figure region**,
 //! one plot together with its margins (one panel of an `mfrow`/`layout`
 //! page). A `Figure` usually holds the contents of one: a high-level call
-//! such as `plot()` or `hist()` and what is drawn on top of it.
+//! such as `plot()` or `hist()` and what is drawn on top of it. It can
+//! also hold a whole plot: a page layout (`par()`'s `mfrow`, `layout()`,
+//! ...) with its panels, over as many pages as it fills, recorded once and
+//! drawn on any device.
 //!
 //! ```no_run
 //! use rs_graphics::prelude::*;
@@ -25,11 +28,11 @@
 //!
 //! // ...and draw it later, as often as needed.
 //! let mut dev = Device::pdf("plot.pdf").width(8.0).height(4.0).open()?;
-//! dev.par().mfrow(1, 2).draw();
+//! dev.par().mfrow([1, 2]).draw();
 //! dev.add_figure(&fig); // panel 1
 //! dev.add_figure(&fig); // panel 2
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! - **Same output.** Drawing a `Figure` calls the same code, in the same
@@ -50,10 +53,15 @@
 //!   [`par()`](Graphics::par) calls in the figure (before the high-level
 //!   call for `mar`, `pty`, ...). `add_figure` restores the device's `par`
 //!   afterwards, so a figure's settings don't leak into the next one.
+//! - **Whole plots.** A figure that sets a page layout (`mfrow`, `mfcol`,
+//!   `mfg`, `fig`, `fin` or `layout()`) sets it on the device when added
+//!   and leaves the device as it left it, `par` included (R's
+//!   `replayPlot()`); it can't go into a panel
+//!   ([`add_figure_at`](Device::add_figure_at)), as R's layouts don't
+//!   nest. Errors in its layout arguments are found when recording, except
+//!   an `mfg` outside the device's grid, found when added.
 //! - **What isn't recorded:** device queries (`usr()`, `plot_region()`,
-//!   `strwidth()`, ...) and page layout (`mfrow`, `layout`, `fig`,
-//!   ...) are [`Device`] methods only, and a figure's `par()` call has
-//!   no `mfrow`/`mfcol` setters (a figure is one panel).
+//!   `strwidth()`, ...) are [`Device`] methods only.
 //! - **Data is copied** into the figure. For very large plots, draw on
 //!   the device directly.
 //!
@@ -62,17 +70,20 @@
 //! A figure has no page size, format or resolution, so there is no
 //! `Figure::save`: open a device for the file, add the figure, and close
 //! the device, as in R (`png(...); replayPlot(p); dev.off()`). The same
-//! figure can go to several files:
+//! figure, here a whole two-panel plot, can go to several files:
 //!
 //! ```no_run
 //! use rs_graphics::prelude::*;
 //!
-//! # fn main() -> std::io::Result<()> {
+//! # fn main() -> Result<(), rs_graphics::Error> {
+//! let x = [2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8];
 //! let mut fig = Figure::new();
-//! fig.hist().x(&[2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8]).draw();
+//! fig.par().mfrow([1, 2]).draw();
+//! fig.hist().x(&x).draw(); // left panel
+//! fig.boxplot().x(&x).draw(); // right panel
 //!
 //! for format in ["pdf", "png"] {
-//!     let mut dev = Device::format(format, format!("hist.{format}"))
+//!     let mut dev = Device::format(format, format!("summary.{format}"))
 //!         .width(7.0)
 //!         .height(5.0)
 //!         .res(300.0) // PNG only
@@ -102,20 +113,21 @@ use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions,
 };
-use crate::par::ParOptions;
+use crate::layout::{LayoutRespect, LayoutSize};
+use crate::par::{Par, ParOptions};
 use crate::plotmath::Label;
 
-/// A figure built without a device: a plot and its margins, recorded as a
-/// list of [`Graphics`] calls and drawn later with [`Device::add_figure`].
+/// A figure built without a device: a plot and its margins, or a whole
+/// multi-panel, multi-page plot, recorded as a list of [`Graphics`] calls
+/// and drawn later with [`Device::add_figure`].
 ///
-/// A figure is one panel: its `par()` call has no page layout setters. See
-/// the [module docs](self) for more.
+/// See the [module docs](self) for more.
 ///
 /// # Examples
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let mut fig = Figure::new();
 /// fig.plot().x([1, 2, 3]).y([2, 4, 3]).main("Recorded").draw();
 /// fig.abline().h(3).lty("dashed").draw();
@@ -167,6 +179,17 @@ impl Figure {
     pub fn is_empty(&self) -> bool {
         self.calls.is_empty()
     }
+
+    /// Whether the figure sets the page layout (`par()`'s `mfrow`, `mfcol`,
+    /// `mfg`, `fig`, `fin`, or `layout()`), so is a whole plot rather than
+    /// one panel.
+    fn sets_page_layout(&self) -> bool {
+        self.calls.iter().any(|c| match c {
+            Call::Par(_, page) => !page.is_empty(),
+            Call::Layout(..) => true,
+            _ => false,
+        })
+    }
 }
 
 /// One recorded call, with copies of its data and options.
@@ -178,7 +201,13 @@ impl Figure {
 #[derive(Clone, Debug)]
 enum Call {
     PlotNew,
-    Par(ParOptions),
+    Par(ParOptions, ParPage),
+    Layout(
+        Vec<Vec<usize>>,
+        Vec<LayoutSize>,
+        Vec<LayoutSize>,
+        LayoutRespect,
+    ),
     Plot(Vec<f64>, Vec<f64>, PlotOptions),
     Hist(Vec<f64>, HistOptions),
     // Boxed, as `BoxplotOptions`: much larger than the other options.
@@ -211,7 +240,8 @@ impl Call {
     fn r_name(&self) -> &'static str {
         match self {
             Call::PlotNew => "plot.new",
-            Call::Par(_) => "par",
+            Call::Par(..) => "par",
+            Call::Layout(..) => "layout",
             Call::Plot(..) => "plot",
             Call::Hist(..) => "hist",
             Call::Barplot(..) => "barplot",
@@ -393,9 +423,18 @@ impl Graphics for Figure {
         Ok(())
     }
     fn emit_par(&mut self, opts: ParOptions, page: ParPage) -> Result<(), Error> {
-        // Only a device's `par()` call has page layout setters.
-        debug_assert!(page.is_empty());
-        self.calls.push(Call::Par(opts));
+        self.calls.push(Call::Par(opts, page));
+        Ok(())
+    }
+    fn emit_layout(
+        &mut self,
+        rows: Vec<Vec<usize>>,
+        widths: Vec<LayoutSize>,
+        heights: Vec<LayoutSize>,
+        respect: LayoutRespect,
+    ) -> Result<(), Error> {
+        self.calls
+            .push(Call::Layout(rows, widths, heights, respect));
         Ok(())
     }
 }
@@ -419,10 +458,16 @@ impl<B: Backend> Device<B> {
     /// A figure starting with a high-level call (other than one with `add`) or
     /// `plot_new()` moves to the next panel, as that call would. The graphical
     /// parameters are restored afterwards, so the figure's `par()` calls don't
-    /// affect what is drawn next; the panel position, `par(new)` and the
-    /// coordinates (`plot_window()`, `par(usr/xlog/ylog)`) are device state and
-    /// are not restored. Returns what the figure's `legend()` and `axis()`
-    /// calls returned (see [`FigureResult`]).
+    /// affect what is drawn next; the panel position, [`par(new)`] and the
+    /// coordinates (`plot_window()`, [`par(usr)`] and its `xlog`/`ylog`) are
+    /// device state and are not restored. Returns what the figure's
+    /// `legend()` and `axis()` calls returned (see [`FigureResult`]).
+    ///
+    /// A figure that sets a page layout (`mfrow`, `mfcol`, `mfg`, `fig`,
+    /// `fin` or `layout()`) is a whole plot: it sets that layout on the
+    /// device, fills its panels and pages, and leaves the device as it left
+    /// it, `par` included, as R's `replayPlot()` does (restoring `par` would
+    /// undo the `cex` and `mex` the layout set).
     ///
     /// The restoring of `par()` is R's `op <- par(...); on.exit(par(op))`.
     ///
@@ -432,10 +477,10 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let mut fig = Figure::new();
     /// fig.plot().x([1, 2, 3]).y([2, 4, 3]).draw();
-    /// dev.par().mfrow(1, 2).draw();
+    /// dev.par().mfrow([1, 2]).draw();
     /// dev.add_figure(&fig); // left
     /// dev.add_figure(&fig); // right
     /// ```
@@ -445,6 +490,9 @@ impl<B: Backend> Device<B> {
     /// With the first R error a recorded call raises on the device, as
     /// [`try_add_figure`](Device::try_add_figure) would return it (for
     /// example `plot.new(): figure margins too large` on a small page).
+    ///
+    /// [`par(new)`]: crate::par::ParOptions::new
+    /// [`par(usr)`]: crate::par::ParOptions::usr
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
         self.try_add_figure(fig).unwrap_or_else(|e| panic!("{e}"))
     }
@@ -461,15 +509,26 @@ impl<B: Backend> Device<B> {
     /// The first R error a recorded call raises on the device. The calls
     /// before it have been drawn, and `par` is restored, as in R.
     pub fn try_add_figure(&mut self, fig: &Figure) -> Result<FigureResult, Error> {
-        // `par` comes back afterwards, also after an error or a panic.
-        let mut dev = self.par_scope(|now, saved| *now = saved.clone());
+        // `par` comes back afterwards, also after an error or a panic;
+        // except after a figure with a page layout, which sets the device up
+        // as a whole plot (R's `replayPlot()`): restoring `par` there would
+        // undo the `cex`/`mex` its layout set while the layout stays.
+        let restore: fn(&mut Par, &Par) = if fig.sets_page_layout() {
+            |_, _| {}
+        } else {
+            |now, saved| *now = saved.clone()
+        };
+        let mut dev = self.par_scope(restore);
         let mut out = FigureResult::default();
         // Each call goes through the same `emit_*` as a device's `.draw()`.
         for call in &fig.calls {
             let d = &mut *dev;
             let r: Result<(), Error> = match call {
                 Call::PlotNew => d.try_plot_new(),
-                Call::Par(o) => d.emit_par(o.clone(), ParPage::default()),
+                Call::Par(o, page) => d.emit_par(o.clone(), *page),
+                Call::Layout(rows, w, h, r) => {
+                    d.emit_layout(rows.clone(), w.clone(), h.clone(), r.clone())
+                }
                 Call::Plot(x, y, o) => d.emit_plot(x, y, o.clone()),
                 Call::Hist(x, o) => d.emit_hist(x, o.clone()).map(|_| ()),
                 Call::Barplot(h, o) => d.emit_barplot(h.clone(), (**o).clone()).map(|_| ()),
@@ -513,10 +572,10 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// let mut fig = Figure::new();
     /// fig.plot().x([1, 2, 3]).draw();
-    /// dev.par().mfrow(2, 2).draw();
+    /// dev.par().mfrow([2, 2]).draw();
     /// dev.add_figure_at(2, 2, &fig); // bottom right
     /// ```
     ///
@@ -535,7 +594,9 @@ impl<B: Backend> Device<B> {
     ///
     /// # Errors
     ///
-    /// If `row` or `col` is outside the arrangement, or as
+    /// If `row` or `col` is outside the arrangement, if the figure sets a
+    /// page layout (it fills the whole device: use
+    /// [`add_figure`](Device::add_figure)), or as
     /// [`try_add_figure`](Device::try_add_figure).
     pub fn try_add_figure_at(
         &mut self,
@@ -543,10 +604,17 @@ impl<B: Backend> Device<B> {
         col: usize,
         fig: &Figure,
     ) -> Result<FigureResult, Error> {
+        if fig.sets_page_layout() {
+            // R's layouts don't nest.
+            return Err(Error::invalid(
+                "a figure with a page layout (mfrow, mfcol, fig, fin or layout()) \
+                 can't be added into a panel; use add_figure",
+            ));
+        }
         if !self.is_used() {
             self.try_plot_new()?;
         }
-        self.par().mfg(row, col).try_draw()?;
+        self.par().mfg((row, col)).try_draw()?;
         self.try_add_figure(fig)
     }
 }

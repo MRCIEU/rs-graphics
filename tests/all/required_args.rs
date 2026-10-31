@@ -15,8 +15,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use rs_graphics::Error;
 use rs_graphics::prelude::*;
 
-fn device() -> Device<SvgBackend> {
-    let mut dev = Device::new(SvgBackend::new(5.0, 5.0), Par::default());
+fn device() -> Device<AnyBackend> {
+    let mut dev = Device::null().width(5).height(5).open().unwrap();
     dev.plot_new();
     dev
 }
@@ -42,10 +42,10 @@ fn calls<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> {
         ("boxplot", "x", |g| g.boxplot().try_draw().map(drop)),
         ("pie", "x", |g| g.pie().try_draw()),
         ("plot.window", "xlim", |g| {
-            g.plot_window().ylim(0, 1).try_draw()
+            g.plot_window().ylim([0, 1]).try_draw()
         }),
         ("plot.window", "ylim", |g| {
-            g.plot_window().xlim(0, 1).try_draw()
+            g.plot_window().xlim([0, 1]).try_draw()
         }),
         ("points", "x", |g| g.points().y([1.0]).try_draw()),
         ("lines", "x", |g| g.lines().try_draw()),
@@ -114,7 +114,7 @@ fn draw_panics_with_the_error() {
 fn arguments_with_r_defaults_can_be_left_out() {
     // `y` (one-vector form), `x1`/`y1`, `labels` and `mtext`'s `side`.
     let mut dev = device();
-    dev.plot_window().xlim(0, 5).ylim(0, 5).draw();
+    dev.plot_window().xlim([0, 5]).ylim([0, 5]).draw();
     dev.points().x([1.0, 2.0]).draw();
     dev.segments().x0([1.0]).y0([1.0]).draw();
     dev.arrows().x0([1.0]).y0([1.0]).y1([3.0]).draw();

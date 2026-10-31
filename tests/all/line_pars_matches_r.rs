@@ -9,13 +9,12 @@
 //! Cross-checks R's inline `lend`/`ljoin`/`lmitre` on every primitive
 //! (`lines()`, `points()`, `segments()`, `arrows()`, `rect()`, `polygon()`,
 //! `box()`, `abline()`) against a real R `pdf()` device's uncompressed
-//! output: the line cap, join, mitre limit and width in effect at every
-//! stroke, in order, and that they don't outlast the call. Skipped if
-//! `Rscript` isn't available.
+//! output: every painted path in order with its line cap, join, mitre
+//! limit and width (see `common::pdf::assert_same`), so also that they
+//! don't outlast the call. Skipped if `Rscript` isn't available.
 
 use crate::common;
-
-use std::process::Command;
+use crate::common::{pdf, r};
 
 use rs_graphics::prelude::*;
 
@@ -30,9 +29,9 @@ const R_CALLS: &str = "plot.new(); plot.window(c(0, 10), c(0, 10))\n\
     abline(h = 4, lwd = 5, lend = 'butt')\n\
     lines(c(7, 8, 9), c(9, 5, 9), lwd = 6)\n";
 
-fn ours(d: &mut Device<PdfBackend>) {
+fn ours(d: &mut Device<AnyBackend>) {
     d.plot_new();
-    d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+    d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
     d.lines()
         .x([1, 2, 3])
         .y([1, 5, 2])
@@ -91,84 +90,28 @@ fn ours(d: &mut Device<PdfBackend>) {
     d.lines().x([7, 8, 9]).y([9, 5, 9]).lwd(6).draw();
 }
 
-/// `(cap, join, mitre, width)` in effect at each stroking operator.
-fn strokes(pdf: &str) -> Vec<(i32, i32, f64, f64)> {
-    let mut out = Vec::new();
-    let mut rest = pdf;
-    while let Some(i) = rest.find("stream\n") {
-        let body = &rest[i + 7..];
-        let Some(j) = body.find("endstream") else {
-            break;
-        };
-        let content = &body[..j];
-        rest = &body[j + 9..];
-        // PDF's initial state: butt caps, mitre joins, limit 10, width 1.
-        let mut gs = (0, 0, 10.0, 1.0);
-        let mut stack = Vec::new();
-        let mut nums: Vec<f64> = Vec::new();
-        for t in content.split_whitespace() {
-            if let Ok(v) = t.parse::<f64>() {
-                nums.push(v);
-                continue;
-            }
-            let last = nums.last().copied();
-            match t {
-                "q" => stack.push(gs),
-                "Q" => gs = stack.pop().unwrap(),
-                "J" => gs.0 = last.unwrap() as i32,
-                "j" => gs.1 = last.unwrap() as i32,
-                "M" => gs.2 = last.unwrap(),
-                "w" => gs.3 = last.unwrap(),
-                "S" | "s" | "B" | "B*" | "b" | "b*" => out.push(gs),
-                _ => {}
-            }
-            nums.clear();
-        }
-    }
-    out
-}
-
 #[test]
 fn inline_line_pars_match_r() {
     if !common::r_available() {
         return;
     }
-    let path = std::env::temp_dir().join("rs_graphics_line_pars.pdf");
-    let script = format!(
-        "pdf(file = '{}', width = 6, height = 6, compress = FALSE)\n{R_CALLS}invisible(dev.off())\n",
-        path.display()
-    );
-    let out = Command::new("Rscript")
-        .args(["-e", &script])
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let r = strokes(&String::from_utf8_lossy(&std::fs::read(&path).unwrap()));
-
-    let mut dev = Device::new(
-        PdfBackend::new(6, 6).with_compression(false),
-        Par::default(),
-    );
-    ours(&mut dev);
-    let ours = strokes(&String::from_utf8_lossy(&dev.into_backend().finish()));
-
-    assert_eq!(ours.len(), r.len(), "stroke count\nours={ours:?}\nr={r:?}");
-    for (k, (a, b)) in ours.iter().zip(&r).enumerate() {
-        assert!(
-            a.0 == b.0 && a.1 == b.1 && (a.2 - b.2).abs() < 1e-6 && (a.3 - b.3).abs() < 0.01,
-            "stroke {k}: ours (cap, join, mitre, width) = {a:?}, R = {b:?}\nours={ours:?}\nr={r:?}"
-        );
-    }
+    let page = (6.0, 6.0);
+    let r_pdf = r::run_r("line_pars", page, "", &[("all", R_CALLS)])
+        .pdfs
+        .remove(0);
+    let (ours, ()) = r::ours(page, ours);
+    // R writes widths to 2 decimals.
+    let how = pdf::Compare {
+        lwd: 0.0051,
+        ..Default::default()
+    };
+    pdf::assert_same_pdf("line_pars", pdf::parse(&ours), pdf::parse(&r_pdf), &how);
 }
 
 #[test]
 #[should_panic(expected = "invalid value specified for graphical parameter \"lmitre\"")]
 fn lmitre_below_one_panics_like_r() {
-    let mut dev = Device::new(PdfBackend::new(6, 6), Par::default());
+    let mut dev = Device::memory("pdf").width(6).height(6).open().unwrap();
     dev.plot_new();
     dev.lines().x([1, 2]).y([1, 2]).lmitre(0.5).draw();
 }

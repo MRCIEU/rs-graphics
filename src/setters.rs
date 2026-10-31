@@ -9,24 +9,28 @@
 //! Chainable setters for the options structs, and the traits ([`Values`],
 //! [`NaValues`]) that let them take one value or several.
 //!
-//! Setting fields through the setters is the same as filling them in:
+//! The fields are private: setters are the one way to fill an options
+//! struct, so every value goes through the setter's conversion and checks.
+//! A struct is built once and reused with `.with(&opts)`:
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
+//! # let mut dev = Device::null().open().unwrap();
+//! # dev.plot_new();
 //! let opts = XyOptions::default().pch(19).col(["red", "blue"]).cex(1.5);
-//! assert_eq!(opts.pch, vec![Some(19)]);
-//! assert_eq!(opts.col.len(), 2);
+//! dev.points().x([0.2, 0.8]).y([0.5, 0.5]).with(&opts).draw();
 //! ```
 //!
-//! Each setter is named after its
-//! field and carries the field's doc. `Option` fields take the value itself
-//! (`.las(1)`, `.main("Title")`); fields R recycles per element take one
+//! Each setter is named after R's argument and documents it. Optional
+//! settings take the value itself (`.las(1)`, `.main("Title")`) or an
+//! `Option` of it (see [`OptionArg`]); settings R recycles per element take one
 //! value or several (see [`Values`]), and in style vectors (symbols, line
 //! types and widths, sizes, fonts, colours) an element may be `None`,
 //! R's `NA`: `.pch([Some(19), None])`, `.col([Some("red"), None])` (see
-//! [`NaValues`]); limits take two numbers
-//! (`.xlim(0.0, 10.0)`). As in R, numbers may be integers or floats
-//! (`.cex(2)`, `.xlim(0, 10)`, `.mar([5, 4, 4, 2])`). Fields holding one of R's string-valued choices
+//! [`NaValues`]); a setting of two or more numbers takes one array
+//! (`.xlim([0, 10])`, `.mar([5, 4, 4, 2])`), and a pair a tuple too, whose
+//! numbers may mix types (`.xlim((0, 10.5))`). As in R, numbers may be
+//! integers or floats (`.cex(2)`). Settings holding one of R's string-valued choices
 //! also take R's string (`.lty("dashed")`, `.type_("b")`, `.bty("n")`,
 //! `.order_h("decr")`).
 //!
@@ -38,7 +42,7 @@
 //!
 //! ```
 //! # use rs_graphics::prelude::*;
-//! # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+//! # let mut dev = Device::null().open().unwrap();
 //! # dev.plot().x([1, 2, 3]).draw();
 //! let e = dev.lines().x([1, 2]).y([1, 2]).lty("wavy").try_draw().unwrap_err();
 //! assert_eq!(e.call(), "lines");
@@ -85,26 +89,168 @@ where
     }
 }
 
-/// One value or several, for a field R recycles per element.
+/// Marker types that let a setter take a value or an `Option` of one
+/// ([`OptionArg`], [`OptionNum`]); they are inferred, never written.
+pub mod markers {
+    /// A value (the setting is set to it).
+    pub struct Value;
+    /// An `Option` of a value (`None` leaves the setting unset).
+    pub struct OptionOf;
+}
+
+/// A value, or an `Option` of one, for a setting R may leave unset.
 ///
-/// Takes a single value or a `Vec`, array or slice of them, by value or
-/// by reference: `"red"`, `["red", "blue"]`, `vec![1.0, 2.0]`,
-/// `&cex[..]`, `2`, `[1, 2]`, ... Numeric fields take `f64`, `f32`, `i32`
-/// or `u32` values; colours take anything that converts to a
-/// [`ColorSpec`] (one palette index as an `i32`); line types take a
-/// [`LineType`], R's string or code; a character `pch` is its ASCII code,
-/// or minus its Unicode code point for other characters (`'é'` is -233),
-/// as in R.
+/// Takes anything that converts to the setting's type ([`IntoArg`]), or an
+/// `Option` of it: `None` leaves the setting at its default (for
+/// [`par()`](crate::graphics::Graphics::par), unchanged), so an
+/// `Option` held in a variable can be passed as it is. A bare `None`
+/// needs its type (`None::<&str>`). The marker `M` is inferred.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// let title: Option<&str> = None; // no title
+/// dev.plot().x([1, 2, 3]).main(title).xlab("x").draw();
+/// ```
+pub trait OptionArg<T, M> {
+    /// The value, `None`, or why it isn't one.
+    ///
+    /// # Errors
+    ///
+    /// If the conversion fails; see [`IntoArg`].
+    fn into_option_arg(self) -> Result<Option<T>, Error>;
+}
+
+impl<T, U: IntoArg<T>> OptionArg<T, markers::Value> for U {
+    fn into_option_arg(self) -> Result<Option<T>, Error> {
+        self.into_arg().map(Some)
+    }
+}
+
+impl<T, U: IntoArg<T>> OptionArg<T, markers::OptionOf> for Option<U> {
+    fn into_option_arg(self) -> Result<Option<T>, Error> {
+        self.map(IntoArg::into_arg).transpose()
+    }
+}
+
+/// A number of any type ([`Num`](crate::numbers::Num)), or an
+/// `Option<f64>` (`None`: the setting's default, or R's `NA` where the
+/// setting has one), for a numeric setting R may leave unset. A bare `None`
+/// works; `Some(..)` holds an `f64` (`Some(2.0)`). The marker `M` is
+/// inferred.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot_new();
+/// let tck: Option<f64> = Some(0.02);
+/// dev.axis().side(1).tck(tck).line(2).draw();
+/// ```
+pub trait OptionNum<M> {
+    /// The number as an `f64`, or `None`.
+    fn into_option_num(self) -> Option<f64>;
+}
+
+impl<N: crate::numbers::Num> OptionNum<markers::Value> for N {
+    fn into_option_num(self) -> Option<f64> {
+        Some(self.to_f64())
+    }
+}
+
+impl OptionNum<markers::OptionOf> for Option<f64> {
+    fn into_option_num(self) -> Option<f64> {
+        self
+    }
+}
+
+/// Numbers ([`Numbers`](crate::numbers::Numbers)), or an `Option` of
+/// them (`None`: the setting's default), for a numeric vector R may leave
+/// unset. The marker `M` is inferred.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// let at: Option<Vec<f64>> = Some(vec![1.0, 2.0]);
+/// let mut dev = Device::null().open().unwrap();
+/// dev.plot_new();
+/// let ticks = dev.axis().side(1).at(at).draw();
+/// assert_eq!(ticks, [1.0, 2.0]);
+/// ```
+pub trait OptionNumbers<'a, M> {
+    /// The numbers as `f64`s, or `None`.
+    fn into_option_numbers(self) -> Option<Vec<f64>>;
+}
+
+impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::Value> for N {
+    fn into_option_numbers(self) -> Option<Vec<f64>> {
+        Some(self.into_numbers().into_owned())
+    }
+}
+
+impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::OptionOf> for Option<N> {
+    fn into_option_numbers(self) -> Option<Vec<f64>> {
+        self.map(|n| n.into_numbers().into_owned())
+    }
+}
+
+/// A fixed-size array of numbers of any type, or an `Option` of an `f64`
+/// array, for a setting whose `None` is a value of its own:
+/// [`par(plt)`]'s `None` is the `mar`-based plot region.
+///
+/// `T` is the setting's type, `Option<[f64; N]>`. A bare `None` works;
+/// `Some(..)` holds `f64`s (`Some([0.1, 0.9, 0.1, 0.9])`).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// dev.par().plt([0, 1, 0, 1]).draw();
+/// dev.par().plt(None).draw();
+/// ```
+///
+/// [`par(plt)`]: crate::par::Par::plt
+pub trait OptionArray<T> {
+    /// The array as `f64`s, or `None`.
+    fn into_option_array(self) -> T;
+}
+
+impl<U: crate::numbers::Num, const N: usize> OptionArray<Option<[f64; N]>> for [U; N] {
+    fn into_option_array(self) -> Option<[f64; N]> {
+        Some(self.map(crate::numbers::Num::to_f64))
+    }
+}
+
+impl<const N: usize> OptionArray<Option<[f64; N]>> for Option<[f64; N]> {
+    fn into_option_array(self) -> Option<[f64; N]> {
+        self
+    }
+}
+
+/// One value or several: colours and `text()`'s `pos` (recycled per
+/// element, as R does), and `layout()`'s `widths` and `heights`.
+///
+/// Takes a single value (a colour or a `pos` code) or a `Vec`, array or
+/// slice of them, by value or by reference: `"red"`, `["red", "blue"]`,
+/// `[1, 2]`, ... Colours take anything that converts to a [`ColorSpec`]
+/// (one palette index as an `i32`; a `None` element is R's `NA`, nothing
+/// drawn). Settings whose other elements may be `NA` take [`NaValues`],
+/// numeric data [`Numbers`](crate::numbers::Numbers), and `pch` [`Pch`].
 ///
 /// # Examples
 ///
 /// ```
 /// use rs_graphics::setters::Values;
 /// # use rs_graphics::prelude::*;
-/// let one: Vec<f64> = 2_i32.into_values().unwrap();
-/// assert_eq!(one, [2.0]);
+/// let one: Vec<ColorSpec> = "red".into_values().unwrap();
+/// assert_eq!(one.len(), 1);
 /// let cols: Vec<ColorSpec> = ["red", "blue"].into_values().unwrap();
-/// assert_eq!(cols[1], ColorSpec::Color(Color::parse("blue").unwrap()));
+/// assert_eq!(cols[1], ColorSpec::Color("blue".parse().unwrap()));
 /// ```
 pub trait Values<T> {
     /// The values, in order.
@@ -160,17 +306,7 @@ macro_rules! single_values {
 }
 
 single_values!(ColorSpec: ColorSpec, Color, &str, String, &String, i32);
-single_values!(f64: f64, f32, i32, u32);
 single_values!(i32: i32);
-single_values!(LineType: LineType, &str, String, &String, i32);
-
-/// A character `pch`, e.g. `'.'` or `'+'`: its ASCII code, or minus its
-/// Unicode code point for other characters (`'é'` is -233), as in R.
-impl Values<i32> for char {
-    fn into_values(self) -> Result<Vec<i32>, Error> {
-        Ok(vec![char_pch(self)])
-    }
-}
 
 /// One value or several for a recycled style vector whose elements may be
 /// missing (`None`, R's `NA`).
@@ -178,22 +314,28 @@ impl Values<i32> for char {
 /// Takes a single value, an `Option` of one, or an array, `Vec` or slice
 /// of either, by value or by reference: `19`, `[1, 2]`,
 /// `[Some(19), None]`, `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`,
-/// ... Rust arrays hold one element type, so once one element is `None`
-/// the others are written `Some(..)`.
+/// ... Numeric settings take any number type ([`Num`](crate::numbers::Num))
+/// and integer ranges (`1..=3`). Rust arrays hold one element type, so
+/// once one element is `None` the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
-/// (for text sizes and fonts, and `legend()`'s spacing, it means the
-/// default instead; each field says which).
+/// (for text sizes and fonts, positions such as `mtext()`'s `at`, and
+/// `legend()`'s spacing, it means the default instead; each setter says
+/// which). Settings use `None` for `NA` so that "missing" is explicit;
+/// data and coordinates (`x`, `y`, segment ends, ...) use `f64::NAN`
+/// instead, as a missing value in an `f64` column already is.
 ///
 /// # Examples
 ///
 /// ```
 /// use rs_graphics::setters::NaValues;
 /// # use rs_graphics::prelude::*;
-/// let pch: Vec<Option<i32>> = [Some(19_i32), None].into_na_values().unwrap();
-/// assert_eq!(pch, [Some(19), None]);
-/// let opts = XyOptions::default().pch([Some(19), None]);
-/// assert_eq!(opts.pch, pch);
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot_new();
+/// let lwd: Vec<Option<f64>> = [Some(2), None].into_na_values().unwrap();
+/// assert_eq!(lwd, [Some(2.0), None]);
+/// // The second segment isn't drawn.
+/// dev.segments().x0([0.2, 0.2]).y0([0.3, 0.7]).x1(0.8).lwd([Some(2), None]).draw();
 /// ```
 pub trait NaValues<T> {
     /// The values, in order (`None`: R's `NA`).
@@ -256,20 +398,238 @@ macro_rules! na_values {
     };
 }
 
-na_values!(f64: IntoArg::<f64>::into_arg; f64, f32, i32, u32);
-na_values!(i32: IntoArg::<i32>::into_arg; i32, i16, u8, u16);
-na_values!(i32: |c: char| Ok::<i32, Error>(char_pch(c)); char);
+/// `NaValues<f64>` for one number, or a collection, of any [`Num`] type,
+/// also as `Option`s; integer ranges.
+mod na_numbers {
+    use super::{Error, NaValues};
+    use crate::numbers::{Num, Numbers};
+    use std::ops::{Range, RangeInclusive};
+
+    impl<N: Num> NaValues<f64> for N {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(vec![Some(self.to_f64())])
+        }
+    }
+    /// A lone `Option` is an `Option<f64>`, so a bare `None` (one `NA`)
+    /// needs no type; in arrays and `Vec`s the other elements give it.
+    impl NaValues<f64> for Option<f64> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(vec![self])
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for [N; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for [Option<N>; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num> NaValues<f64> for Vec<N> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.into_iter().map(|v| Some(v.to_f64())).collect())
+        }
+    }
+    impl<N: Num> NaValues<f64> for Vec<Option<N>> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.into_iter().map(|v| v.map(Num::to_f64)).collect())
+        }
+    }
+    impl<N: Num> NaValues<f64> for &[N] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.iter().map(|v| Some(v.to_f64())).collect())
+        }
+    }
+    impl<N: Num> NaValues<f64> for &[Option<N>] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            Ok(self.iter().map(|v| v.map(Num::to_f64)).collect())
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for &[N; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num, const M: usize> NaValues<f64> for &[Option<N>; M] {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num> NaValues<f64> for &Vec<N> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    impl<N: Num> NaValues<f64> for &Vec<Option<N>> {
+        fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+            self.as_slice().into_na_values()
+        }
+    }
+    macro_rules! ranges {
+        ($($t:ty),*) => {
+            $(
+                impl NaValues<f64> for Range<$t> {
+                    fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+                        Ok(self.into_numbers().iter().map(|&v| Some(v)).collect())
+                    }
+                }
+                impl NaValues<f64> for RangeInclusive<$t> {
+                    fn into_na_values(self) -> Result<Vec<Option<f64>>, Error> {
+                        Ok(self.into_numbers().iter().map(|&v| Some(v)).collect())
+                    }
+                }
+            )*
+        };
+    }
+    ranges!(i32, i64, u32, u64, usize);
+}
 na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
 na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
 
-/// Element `i` of a recycled [`NaValues`] vector: `Some(default)` when
-/// the vector is empty (R's default), `None` for an `NA` element.
-pub(crate) fn pick_na<T: Copy>(v: &[Option<T>], i: usize, default: T) -> Option<T> {
-    if v.is_empty() {
-        Some(default)
-    } else {
-        v[i % v.len()]
+/// Plotting symbols for a `pch` setter: numbers, characters or strings.
+///
+/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
+/// `['a', 'b']`) or strings (`"a"`, `["a", "b"]`), by value or by
+/// reference; `None` elements are R's `NA`, no symbol (`[Some(19), None]`,
+/// `[Some("x"), None]`). Numbers are R's symbol codes 0 to 25 (see
+/// [`charts::pch`](crate::charts::pch)). A character is drawn as itself:
+/// ASCII ones are their character codes, other characters are stored as
+/// minus their Unicode code point (R's negative `pch`), so `'é'` is `-233`.
+/// A string's first character is its symbol, and `""` draws none, as in R.
+///
+/// `legend()` reads one case differently, as R's does: when the first
+/// string has several characters, it alone is used, one character per key
+/// (`"abc"` gives keys `a`, `b`, `c`; [`into_legend_pch`](Pch::into_legend_pch)).
+///
+/// This is R's `pch` argument.
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::prelude::*;
+/// use rs_graphics::setters::Pch;
+///
+/// assert_eq!([19, 1].into_pch(), [Some(19), Some(1)]);
+/// assert_eq!("abc".into_pch(), [Some(97)]);
+/// assert_eq!("abc".into_legend_pch(), [Some(97), Some(98), Some(99)]);
+/// assert_eq!([Some("x"), None].into_pch(), [Some(120), None]);
+/// assert_eq!('é'.into_pch(), [Some(-233)]);
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot_new();
+/// dev.points().x([0.2, 0.5, 0.8]).y([0.5; 3]).pch(["a", "b", "c"]).draw();
+/// ```
+pub trait Pch {
+    /// The `pch` codes as `points()` reads them, in order; `None` for no
+    /// symbol.
+    fn into_pch(self) -> Vec<Option<i32>>;
+
+    /// The `pch` codes as `legend()` reads them: as [`into_pch`](Pch::into_pch),
+    /// except that a first string of several characters gives one code per
+    /// character.
+    fn into_legend_pch(self) -> Vec<Option<i32>>;
+}
+
+/// An element a [`Pch`] value is made of: an integer symbol code, a
+/// character or a string.
+///
+/// Sealed: implemented only in this crate.
+pub trait PchElement: pch_sealed::Sealed + Sized {
+    /// The codes of `items` (`None` = `NA`); `legend` applies `legend()`'s
+    /// rule for a first string of several characters.
+    #[doc(hidden)]
+    fn codes(items: &[Option<Self>], legend: bool) -> Vec<Option<i32>>;
+}
+
+mod pch_sealed {
+    pub trait Sealed {}
+}
+
+macro_rules! pch_codes {
+    ($($t:ty),*) => {
+        $(
+            impl pch_sealed::Sealed for $t {}
+            impl PchElement for $t {
+                fn codes(items: &[Option<Self>], _legend: bool) -> Vec<Option<i32>> {
+                    items.iter().map(|v| v.map(i32::from)).collect()
+                }
+            }
+        )*
+    };
+}
+pch_codes!(i32, i16, u8, u16);
+
+impl pch_sealed::Sealed for char {}
+impl PchElement for char {
+    fn codes(items: &[Option<Self>], _legend: bool) -> Vec<Option<i32>> {
+        items.iter().map(|c| c.map(char_pch)).collect()
     }
+}
+
+macro_rules! pch_strings {
+    ($($t:ty),*) => {
+        $(
+            impl pch_sealed::Sealed for $t {}
+            impl PchElement for $t {
+                fn codes(items: &[Option<Self>], legend: bool) -> Vec<Option<i32>> {
+                    string_pch(items, legend)
+                }
+            }
+        )*
+    };
+}
+pch_strings!(&str, String, &String);
+
+/// R's `pch` codes for strings (`None` = `NA`): each string's first
+/// character (`""`: none), or with `legend` a first string of several
+/// characters split into one code per character.
+fn string_pch<S: AsRef<str>>(strings: &[Option<S>], legend: bool) -> Vec<Option<i32>> {
+    match strings.first() {
+        Some(Some(first)) if legend && first.as_ref().chars().count() > 1 => {
+            first.as_ref().chars().map(|c| Some(char_pch(c))).collect()
+        }
+        _ => strings
+            .iter()
+            .map(|s| {
+                s.as_ref()
+                    .and_then(|s| s.as_ref().chars().next())
+                    .map(char_pch)
+            })
+            .collect(),
+    }
+}
+
+/// `Pch` for one shape of value: `$items` turns it into `Option` elements.
+macro_rules! pch_shape {
+    ($([$($g:tt)*] $ty:ty => |$v:ident| $items:expr;)*) => {
+        $(
+            impl<$($g)*> Pch for $ty {
+                fn into_pch(self) -> Vec<Option<i32>> {
+                    let $v = self;
+                    E::codes(&$items, false)
+                }
+                fn into_legend_pch(self) -> Vec<Option<i32>> {
+                    let $v = self;
+                    E::codes(&$items, true)
+                }
+            }
+        )*
+    };
+}
+pch_shape! {
+    [E: PchElement] E => |v| [Some(v)];
+    [E: PchElement] Option<E> => |v| [v];
+    [E: PchElement, const N: usize] [E; N] => |v| v.map(Some);
+    [E: PchElement, const N: usize] [Option<E>; N] => |v| v;
+    [E: PchElement] Vec<E> => |v| v.into_iter().map(Some).collect::<Vec<_>>();
+    [E: PchElement] Vec<Option<E>> => |v| v;
+    [E: PchElement + Clone] &[E] => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
+    [E: PchElement] &[Option<E>] => |v| v;
+    [E: PchElement + Clone, const N: usize] &[E; N] => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
+    [E: PchElement, const N: usize] &[Option<E>; N] => |v| v.as_slice();
+    [E: PchElement + Clone] &Vec<E> => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
+    [E: PchElement] &Vec<Option<E>> => |v| v;
 }
 
 /// A character's `pch` code, as R's `GEstring_to_pch()` in a UTF-8 locale:
@@ -293,29 +653,43 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// }
 /// ```
 ///
-/// gives the struct, a setter per field on it, and the same setters on
-/// each listed builder in [`crate::graphics`] (writing to its `opts`),
-/// plus `with(&Struct)` there. Each setter's doc is the field's own doc,
-/// then (for kinds that take several forms) a line on what it takes.
-/// Field docs should therefore have no headings (`# Panics`): that line
-/// would land under them. Every field
-/// needs its `=> kind Type`, so a field can't be added without a setter
-/// by mistake; one set by a constructor is marked `=> no_setter`. The
-/// builder list `=> [..]` may be left out.
+/// gives the struct, a setter per field on it, and the same setters on each
+/// listed builder in [`crate::graphics`] (writing to its `opts`), plus
+/// `with(&Struct)` there. Fields are `pub(crate)` (whatever the declaration
+/// says), so outside the crate the setters are the one way in. Each setter's
+/// doc is the field's own doc, then (for kinds that take several forms) a
+/// line on what it takes. Field docs should therefore have no headings (`#
+/// Panics`): that line would land under them. Every field needs its `=> kind
+/// Type`, so a field can't be added without a setter by mistake; one set by a
+/// constructor is marked `=> no_setter`. The builder list `=> [..]` may be
+/// left out.
 ///
-/// Setter kinds: `value` (plain field), `option` (`Option<T>`, set to
-/// `Some`), `values` (`Vec<T>` recycled by R), `na_values`
+/// Setter kinds: `value` (plain field), `option` (`Option<T>` from a
+/// value or an `Option`, [`OptionArg`]), `option_value`
+/// (`Option<T>` from a value only, for types where an `Option` is a value
+/// itself: a colour's `None` is R's `NA`, as in colour vectors),
+/// `number` (`Option<f64>` from any [`Num`](crate::numbers::Num) or an
+/// `Option` of one, [`OptionNum`]),
+/// `values` (`Vec<T>` recycled by R), `numbers` (`Vec<f64>` recycled by
+/// R, from [`Numbers`](crate::numbers::Numbers)), `na_values`
 /// (`Vec<Option<T>>` recycled by R, `None` = `NA`), `option_values`
-/// (`Option<Vec<T>>`), `list` (`Option<Vec<Label>>` from one label or
-/// several, [`LabelValues`](crate::plotmath::LabelValues)), `labels`
+/// (`Option<Vec<T>>`), `option_numbers` (`Option<Vec<f64>>` from
+/// [`Numbers`](crate::numbers::Numbers)), `labels`
 /// (`Option<Vec<Option<Label>>>` from [`Labels`](crate::plotmath::Labels),
-/// `None` = `NA`), `pair` (`Option<(f64, f64)>` from two
-/// numbers), `option_pair` (`Option<(f64, f64)>` from one
-/// [`Pair`](crate::numbers::Pair) tuple), `array` (`Option<[f64; N]>`
-/// from an array of any numbers), `na` (`Option<Option<f64>>`, R's
-/// `NA`-able number, from one number; `f64::NAN` is `NA`), `count`
-/// (`Option<usize>` from any integer) and `legend_pch` (`legend()`'s `pch`, a `Vec<i32>` from
-/// [`LegendPch`](crate::device::LegendPch)).
+/// `None` = `NA`), `pair` (`Option<(f64, f64)>` from a
+/// [`Pair`](crate::numbers::Pair): an array or tuple of two numbers),
+/// `pair_array` (`[f64; 2]` from a `Pair`), `one_or_pair`
+/// (`Option<(f64, f64)>` from one number used twice or a `Pair`, see
+/// [`OneOrPair`](crate::numbers::OneOrPair)), `array` (`Option<[f64; N]>`
+/// from an array of any numbers), `option_array` (`Option<Option<[f64;
+/// N]>>`, for [`par(plt)`], from an array of any numbers or an `Option`,
+/// [`OptionArray`]), `int_array` (an integer array from any numbers,
+/// truncated), `na` (`Option<Option<f64>>`, R's
+/// `NA`-able number, from a number or `None` for `NA`), `count`
+/// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
+/// [`Pch`]) and `legend_pch` (the same, read as `legend()` does).
+///
+/// [`par(plt)`]: crate::par::Par::plt
 macro_rules! options {
     (
         $(#[$sattr:meta])*
@@ -333,11 +707,10 @@ macro_rules! options {
     }) => {
         $($sattr)*
         $($svis)* struct $ty {
-            $( $(#[$fattr])* $fvis $field: $fty, )*
+            $( $(#[$fattr])* pub(crate) $field: $fty, )*
             /// The first value a setter couldn't convert, returned by the
             /// call's `try_draw()`.
-            #[doc(hidden)]
-            pub deferred_error: Option<$crate::error::Error>,
+            pub(crate) deferred_error: Option<$crate::error::Error>,
         }
     };
     (@opts $ty:ident {
@@ -389,11 +762,50 @@ macro_rules! options {
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option $t:ty) => {
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes a value or an `Option` of one; `None` leaves it unset (see [`OptionArg`](crate::setters::OptionArg))."]
+        pub fn $field<M>(mut self, value: impl $crate::setters::OptionArg<$t, M>) -> Self {
+            match value.into_option_arg() {
+                Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_value $t:ty) => {
+        $($a)*
         pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
             match value.into_arg() {
                 Ok(v) => self$(.$p)?.$field = Some(v),
                 Err(e) => self$(.$p)?.defer(e),
             }
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident number $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes any number, or an `Option` of one; `None` leaves it unset (see [`OptionNum`](crate::setters::OptionNum))."]
+        pub fn $field<M>(mut self, value: impl $crate::setters::OptionNum<M>) -> Self {
+            self$(.$p)?.$field = value.into_option_num();
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident numbers $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number or several, of any number type (see [`Numbers`](crate::numbers::Numbers))."]
+        pub fn $field<'n>(mut self, values: impl $crate::numbers::Numbers<'n>) -> Self {
+            self$(.$p)?.$field = values.into_numbers().into_owned();
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_numbers $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number or several, of any number type, or an `Option` of them; `None` leaves it unset (see [`OptionNumbers`](crate::setters::OptionNumbers))."]
+        pub fn $field<'n, M>(mut self, values: impl $crate::setters::OptionNumbers<'n, M>) -> Self {
+            self$(.$p)?.$field = values.into_option_numbers();
             self
         }
     };
@@ -427,12 +839,21 @@ macro_rules! options {
             self
         }
     };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pch $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes numbers, characters or strings; `None` is R's `NA` (see [`Pch`](crate::setters::Pch))."]
+        pub fn $field(mut self, values: impl $crate::setters::Pch) -> Self {
+            self$(.$p)?.$field = values.into_pch();
+            self
+        }
+    };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident legend_pch $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes numbers, characters or strings (see [`LegendPch`](crate::device::LegendPch))."]
-        pub fn $field(mut self, values: impl $crate::device::LegendPch) -> Self {
-            self$(.$p)?.$field = values.into_pch();
+        #[doc = "Takes numbers, characters or strings; `None` is R's `NA` (see [`Pch`](crate::setters::Pch))."]
+        pub fn $field(mut self, values: impl $crate::setters::Pch) -> Self {
+            self$(.$p)?.$field = values.into_legend_pch();
             self
         }
     };
@@ -460,15 +881,6 @@ macro_rules! options {
             self
         }
     };
-    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident list $t:ty) => {
-        $($a)*
-        #[doc = ""]
-        #[doc = "Takes one label or several (see [`LabelValues`](crate::plotmath::LabelValues))."]
-        pub fn $field(mut self, values: impl $crate::plotmath::LabelValues) -> Self {
-            self$(.$p)?.$field = Some(values.into_label_values());
-            self
-        }
-    };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident labels $t:ty) => {
         $($a)*
         #[doc = ""]
@@ -480,35 +892,72 @@ macro_rules! options {
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pair $t:ty) => {
         $($a)*
-        pub fn $field(mut self, a: impl Into<f64>, b: impl Into<f64>) -> Self {
-            self$(.$p)?.$field = Some((a.into(), b.into()));
+        #[doc = ""]
+        #[doc = "Takes an array or tuple of two numbers (see [`Pair`](crate::numbers::Pair))."]
+        pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
+            self$(.$p)?.$field = Some(value.into_pair());
             self
         }
     };
-    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_pair $t:ty) => {
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident pair_array $t:ty) => {
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes an array or tuple of two numbers (see [`Pair`](crate::numbers::Pair))."]
         pub fn $field(mut self, value: impl $crate::numbers::Pair) -> Self {
-            self$(.$p)?.$field = Some(value.into_pair());
+            let (a, b) = value.into_pair();
+            self$(.$p)?.$field = Some([a, b]);
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident one_or_pair $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number for both, or an array or tuple of two (see [`OneOrPair`](crate::numbers::OneOrPair))."]
+        pub fn $field(mut self, value: impl $crate::numbers::OneOrPair) -> Self {
+            self$(.$p)?.$field = Some(value.into_one_or_pair());
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident na $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "`f64::NAN` is R's `NA`."]
-        pub fn $field(mut self, value: impl Into<f64>) -> Self {
-            let v: f64 = value.into();
-            self$(.$p)?.$field = Some(v.is_finite().then_some(v));
+        #[doc = "Takes any number, or `None` for R's `NA` (see [`OptionNum`](crate::setters::OptionNum))."]
+        pub fn $field<M>(mut self, value: impl $crate::setters::OptionNum<M>) -> Self {
+            // A non-finite number is `NA` too, as in R.
+            let v = value.into_option_num().filter(|v| v.is_finite());
+            self$(.$p)?.$field = Some(v);
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_array $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes an array of any numbers, or an `Option` of an `f64` array (see [`OptionArray`](crate::setters::OptionArray))."]
+        pub fn $field(mut self, value: impl $crate::setters::OptionArray<$t>) -> Self {
+            self$(.$p)?.$field = Some(value.into_option_array());
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident int_array $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes an array of any numbers; fractions are truncated, as R's `as.integer()`."]
+        pub fn $field<U: $crate::numbers::Num, const N: usize>(mut self, values: [U; N]) -> Self
+        where
+            [i32; N]: Into<$t>,
+        {
+            let values: [i32; N] = values.map(|v| $crate::numbers::Num::to_f64(v) as i32);
+            self$(.$p)?.$field = Some(values.into());
             self
         }
     };
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident array $t:ty) => {
         $($a)*
-        pub fn $field<U: Into<f64>, const N: usize>(mut self, values: [U; N]) -> Self
+        pub fn $field<U: $crate::numbers::Num, const N: usize>(mut self, values: [U; N]) -> Self
         where
             [f64; N]: Into<$t>,
         {
-            let values: [f64; N] = values.map(Into::into);
+            let values: [f64; N] = values.map($crate::numbers::Num::to_f64);
             self$(.$p)?.$field = Some(values.into());
             self
         }
@@ -531,13 +980,12 @@ mod tests {
         assert_eq!(values::<ColorSpec>(2), vec![ColorSpec::Index(2)]);
         assert_eq!(values::<ColorSpec>(["red", "blue"]).len(), 2);
         assert_eq!(values::<ColorSpec>(vec![red, red]), vec![red, red]);
-        assert_eq!(values::<f64>(1.5), vec![1.5]);
-        assert_eq!(values::<f64>(&[1.0, 2.0][..]), vec![1.0, 2.0]);
-        assert_eq!(values::<i32>('.'), vec![46]);
+        assert_eq!(values::<i32>(3), vec![3]);
+        assert_eq!(values::<i32>(&[1, 2][..]), vec![1, 2]);
         assert_eq!(values::<LineType>([1, 2]).len(), 2);
         // A value that doesn't convert is an error, not a panic.
         assert!(Values::<ColorSpec>::into_values(["red", "notacolour"]).is_err());
-        assert!(Values::<LineType>::into_values(-1).is_err());
+        assert!(Values::<LineType>::into_values([-1]).is_err());
     }
 
     #[test]
@@ -556,6 +1004,91 @@ mod tests {
         let xy = XyOptions::default().pch(&[1, 2]).lwd(&[Some(1.0), None]);
         assert_eq!(xy.pch, vec![Some(1), Some(2)]);
         assert_eq!(xy.lwd, vec![Some(1.0), None]);
+    }
+
+    #[test]
+    #[allow(clippy::needless_borrows_for_generic_args)] // the `&` forms on purpose
+    fn pch_setters_take_every_shape() {
+        use crate::device::XyOptions;
+        let abc = vec![Some("a"), None, Some("bc")];
+        let codes = [Some(97), None, Some(98)];
+        assert_eq!(abc.clone().into_pch(), codes);
+        assert_eq!((&abc).into_pch(), codes);
+        assert_eq!(abc.as_slice().into_pch(), codes);
+        assert_eq!((&[Some('a'), None]).into_pch(), [Some(97), None]);
+        assert_eq!((&vec![1_u8, 2]).into_pch(), [Some(1), Some(2)]);
+        assert_eq!(Some(String::from("z")).into_pch(), [Some(122)]);
+        // The setters of points/lines/plot/boxplot take them all, and read
+        // strings as `points()` does.
+        assert_eq!(XyOptions::default().pch("abc").pch, [Some(97)]);
+        assert_eq!(XyOptions::default().pch(&abc).pch, codes);
+    }
+
+    #[test]
+    fn option_setters_take_a_value_or_an_option() {
+        use crate::device::{AxisOptions, TitleOptions};
+        use crate::par::ParOptions;
+        use crate::plotmath::Label;
+        let main: Option<String> = Some("Title".into());
+        let t = TitleOptions::default().main(main).xlab(None::<&str>);
+        assert_eq!(t.main, Some(Label::from("Title")));
+        assert!(t.xlab.is_none());
+        // `None` resets a value set before.
+        let t = TitleOptions::default().main("a").main(None::<Label>);
+        assert!(t.main.is_none());
+        // Numbers, and enums from R's strings, the same way.
+        let a = AxisOptions::default()
+            .line(Some(2.0))
+            .las(Some(1))
+            .lend(Some("butt"));
+        assert_eq!((a.line, a.las), (Some(2.0), Some(1)));
+        assert_eq!(a.lend, Some(crate::backend::LineEnd::Butt));
+        // A bare `None` resets a number.
+        assert!(AxisOptions::default().line(2).line(None).line.is_none());
+        // Where R has an `NA` (`par(tck)`, legend `vadj`), `None` is it.
+        let p = ParOptions::default().tck(0.02);
+        assert_eq!(p.tck, Some(Some(0.02)));
+        assert_eq!(p.tck(None).tck, Some(None));
+        let l = crate::device::LegendOptions::default().vadj(None);
+        assert_eq!(l.vadj, Some(None));
+        assert_eq!(ParOptions::default().tck(f64::NAN).tck, Some(None));
+        assert_eq!(ParOptions::default().cex(Some(1.5)).cex, Some(1.5));
+        // A failed conversion inside the `Option` is kept for `try_draw()`.
+        assert!(
+            AxisOptions::default()
+                .lend(Some("wavy"))
+                .deferred_error
+                .is_some()
+        );
+        // Colours keep `None` as R's `NA` (draw nothing), as colour vectors do.
+        let a = AxisOptions::default().col(None::<&str>);
+        assert_eq!(a.col, Some(ColorSpec::None));
+    }
+
+    #[test]
+    fn numeric_setters_take_any_number_type() {
+        use crate::device::{AblineOptions, AxisOptions, LegendOptions, XyOptions};
+        use crate::par::ParOptions;
+        // Vectors: any number type, ranges, by value or by reference.
+        let ab = AblineOptions::default().h(1_i64).v(vec![2_u64, 3]);
+        assert_eq!((ab.h, ab.v), (vec![1.0], vec![2.0, 3.0]));
+        let axis = AxisOptions::default()
+            .at(1..=3)
+            .tck(1_usize)
+            .mgp([3_u8, 1, 0]);
+        assert_eq!(axis.at, Some(vec![1.0, 2.0, 3.0]));
+        assert_eq!((axis.tck, axis.mgp), (Some(1.0), Some([3.0, 1.0, 0.0])));
+        // `NA`-able vectors: the same, plus `Option`s.
+        let xy = XyOptions::default().cex(2_u8).lwd([Some(1_i64), None]);
+        assert_eq!((xy.cex, xy.lwd), (vec![Some(2.0)], vec![Some(1.0), None]));
+        assert_eq!(XyOptions::default().cex(1..3).cex, [Some(1.0), Some(2.0)]);
+        // Pairs and single values.
+        let legend = LegendOptions::default()
+            .inset((0.1_f32, 1_u8))
+            .cex(&[1_i16][..]);
+        assert_eq!(legend.inset, Some((0.1_f32 as f64, 1.0)));
+        assert_eq!(legend.cex, [Some(1.0)]);
+        assert_eq!(ParOptions::default().cex(2_i64).cex, Some(2.0));
     }
 
     #[test]
@@ -581,13 +1114,6 @@ mod tests {
             seg.col,
             vec![ColorSpec::try_from("red").unwrap(), ColorSpec::None]
         );
-        // `None` survives recycling; an empty vector gives the default.
-        let v = [Some(1.0), None];
-        assert_eq!(
-            (0..4).map(|i| pick_na(&v, i, 9.0)).collect::<Vec<_>>(),
-            vec![Some(1.0), None, Some(1.0), None]
-        );
-        assert_eq!(pick_na(&[], 3, 9.0), Some(9.0));
     }
 
     #[test]
@@ -600,13 +1126,19 @@ mod tests {
         let bars = BarplotOptions::default()
             .names("A")
             .legend_text(String::from("A"));
-        assert_eq!(bars.names, Some(vec![a.clone()]));
-        assert_eq!(bars.legend_text, Some(vec![a.clone()]));
+        assert_eq!(bars.names, Some(vec![Some(a.clone())]));
+        assert_eq!(bars.legend_text, Some(vec![Some(a.clone())]));
         let names = vec!["A".to_string(), "B".to_string()];
         let boxes = BoxplotOptions::default().names(&names);
-        assert_eq!(boxes.names, Some(vec![a.clone(), Label::from("B")]));
+        assert_eq!(
+            boxes.names,
+            Some(vec![Some(a.clone()), Some(Label::from("B"))])
+        );
         let pie = PieOptions::default().labels(Label::math("x^2"));
-        assert_eq!(pie.labels, Some(vec![Label::math("x^2")]));
+        assert_eq!(pie.labels, Some(vec![Some(Label::math("x^2"))]));
+        // Every label list may hold R's `NA`.
+        let bars = BarplotOptions::default().names([Some("a"), None]);
+        assert_eq!(bars.names, Some(vec![Some(Label::from("a")), None]));
         // Axis labels may hold R's `NA`.
         let axis = AxisOptions::default().labels("A");
         assert_eq!(axis.labels, Some(vec![Some(a.clone())]));
@@ -649,7 +1181,7 @@ mod tests {
         assert_eq!((ab.a, ab.b, ab.h), (vec![1.0], vec![2.0, 3.0], vec![3.0]));
 
         let plot = PlotOptions::default()
-            .xlim(0.0, 10.0)
+            .xlim([0.0, 10.0])
             .main(Label::math("x^2"))
             .axes(false);
         assert_eq!(plot.xlim, Some((0.0, 10.0)));
@@ -657,7 +1189,10 @@ mod tests {
         assert!(!plot.axes);
 
         let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
-        assert_eq!(bars.names, Some(vec![Label::from("a"), Label::from("b")]));
+        assert_eq!(
+            bars.names,
+            Some(vec![Some(Label::from("a")), Some(Label::from("b"))])
+        );
         assert_eq!(bars.col, vec![ColorSpec::try_from("grey").unwrap()]);
 
         assert_eq!(TextOptions::default().srt(45.0).srt, Some(45.0));
@@ -665,12 +1200,10 @@ mod tests {
 
     #[test]
     fn calls_have_the_same_setters_and_with() {
-        use crate::backend::svg::SvgBackend;
         use crate::device::{AxisOptions, Device};
         use crate::graphics::Graphics;
-        use crate::par::Par;
 
-        let mut dev = Device::new(SvgBackend::new(4.0, 4.0), Par::default());
+        let mut dev = Device::memory("svg").width(4.0).height(4.0).open().unwrap();
         let saved = AxisOptions::default().las(1).at([1.0, 2.0]).lwd(3.0);
 
         let call = dev.axis().side(2).las(2).tick(false);
@@ -713,7 +1246,7 @@ mod tests {
     #[test]
     fn setters_take_r_strings() {
         use crate::backend::{LineEnd, LineJoin};
-        use crate::device::{AxisOptions, LegendBty, LegendOptions, XyOptions};
+        use crate::device::{AxisOptions, LegendOptions, XyOptions};
         use crate::highlevel::{BarplotOptions, BoxplotOptions, OrderH, PlotOptions, PlotType};
         use crate::par::{AxisStyle, AxisType, ParOptions, Pty};
 
@@ -726,7 +1259,7 @@ mod tests {
             (Some(PlotType::Histogram), Some(AxisType::None))
         );
         assert_eq!(AxisOptions::default().axt("n").axt, Some(AxisType::None));
-        assert_eq!(LegendOptions::default().bty("n").bty, Some(LegendBty::None));
+        assert_eq!(LegendOptions::default().bty("n").bty, Some(Bty::N));
         assert_eq!(
             BarplotOptions::default().order_h("decr").order_h,
             OrderH::Decr

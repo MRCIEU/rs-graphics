@@ -10,18 +10,14 @@
 //! `pdf()` device's uncompressed output: the gapped line segments between
 //! points (each shortened by half a character height at both ends, short
 //! ones left out, broken at `NA`), with `par(cex)` and a log axis. Compares
-//! every stroked two-point path in order and the number of points (none
-//! for `"c"`). Skipped if
-//! `Rscript` isn't available.
+//! every painted path in order, the points too (none for `"c"`; see
+//! `common::pdf::assert_same`). Skipped if `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
-
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::device::Device;
 use rs_graphics::highlevel::{PlotOptions, PlotType};
-use rs_graphics::par::Par;
+use rs_graphics::par::ParOptions;
 use rs_graphics::graphics::Graphics;
 
 const PAGE_W: f64 = 6.0;
@@ -59,19 +55,23 @@ const CASES: [Case; 3] = [
     },
 ];
 
-fn r_script(c: &Case, path: &str) -> String {
+fn r_code(c: &Case) -> String {
     let v = |a: &[f64]| {
         let s: Vec<String> = a
             .iter()
-            .map(|x| if x.is_nan() { "NA".into() } else { x.to_string() })
+            .map(|x| {
+                if x.is_nan() {
+                    "NA".into()
+                } else {
+                    x.to_string()
+                }
+            })
             .collect();
         format!("c({})", s.join(", "))
     };
     format!(
-        "pdf(file = '{path}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
-         par(cex = {cex})\n\
-         plot({x}, {y}, type = '{t}', log = '{log}', axes = FALSE, ann = FALSE)\n\
-         invisible(dev.off())\n",
+        "par(cex = {cex})\n\
+         plot({x}, {y}, type = '{t}', log = '{log}', axes = FALSE, ann = FALSE)",
         cex = c.cex,
         t = c.type_,
         x = v(&X),
@@ -80,51 +80,16 @@ fn r_script(c: &Case, path: &str) -> String {
     )
 }
 
-fn draw_ours(c: &Case) -> String {
-    let par = Par {
-        cex: c.cex,
-        ..Par::default()
-    };
-    let mut dev = Device::new(PdfBackend::new(PAGE_W, PAGE_H).with_compression(false), par);
-    let opts = PlotOptions {
-        type_: Some(PlotType::parse(c.type_).unwrap()),
-        ylog: c.ylog,
-        axes: false,
-        ..PlotOptions::default()
-    };
-    dev.plot().x(X).y(Y).with(&opts).draw();
-    String::from_utf8_lossy(&dev.into_backend().finish()).into_owned()
-}
-
-/// Every stroked two-point path, in order, and the number of curved paths.
-fn extract(pdf: &str) -> (Vec<Vec<f64>>, usize) {
-    let mut segments = Vec::new();
-    let mut curves = 0;
-    let mut path: Vec<f64> = Vec::new();
-    let mut curved = false;
-    let mut nums: Vec<f64> = Vec::new();
-    for t in pdf.split_whitespace() {
-        if let Ok(v) = t.parse::<f64>() {
-            nums.push(v);
-            continue;
-        }
-        match t {
-            "m" | "l" if nums.len() >= 2 => path.extend(&nums[nums.len() - 2..]),
-            "c" => curved = true,
-            "S" | "s" | "f" | "B" | "b" | "n" => {
-                if curved && t != "n" {
-                    curves += 1;
-                } else if t == "S" && path.len() == 4 {
-                    segments.push(path.clone());
-                }
-                path.clear();
-                curved = false;
-            }
-            _ => {}
-        }
-        nums.clear();
-    }
-    (segments, curves)
+fn draw_ours(c: &Case) -> Vec<u8> {
+    let par = ParOptions::default().cex(c.cex);
+    let opts = PlotOptions::default()
+        .type_(PlotType::try_from(c.type_).unwrap())
+        .ylog(c.ylog)
+        .axes(false);
+    r::ours_with((PAGE_W, PAGE_H), par, |dev| {
+        dev.plot().x(X).y(Y).with(&opts).draw();
+    })
+    .0
 }
 
 #[test]
@@ -132,42 +97,27 @@ fn type_b_matches_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
-    let mut script = String::new();
-    for c in &CASES {
-        let path = dir.join(format!("rs_graphics_type_b_{}.pdf", c.name));
-        script.push_str(&r_script(c, &path.display().to_string()));
-    }
-    let script_path = dir.join("rs_graphics_type_b.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &CASES {
-        let path = dir.join(format!("rs_graphics_type_b_{}.pdf", c.name));
-        let (r_segs, r_curves) = extract(&String::from_utf8_lossy(&std::fs::read(&path).unwrap()));
-        let (our_segs, our_curves) = extract(&draw_ours(c));
-        let name = c.name;
-        assert_eq!(our_curves, r_curves, "{name}: points drawn");
-        assert!(!r_segs.is_empty(), "{name}: no segments from R");
-        assert_eq!(r_curves == 0, c.type_ == "c", "{name}: points only for type b");
+    let codes: Vec<String> = CASES.iter().map(r_code).collect();
+    let r_cases: Vec<_> = CASES
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, r.as_str()))
+        .collect();
+    let r = r::run_r("type_b", (PAGE_W, PAGE_H), "", &r_cases);
+    for (c, r_pdf) in CASES.iter().zip(&r.pdfs) {
+        let theirs = pdf::parse(r_pdf);
+        let points = theirs.pages[0].paths.iter().filter(|p| p.curved).count();
         assert_eq!(
-            our_segs.len(),
-            r_segs.len(),
-            "{name}: segment count\nours={our_segs:?}\nr={r_segs:?}"
+            points == 0,
+            c.type_ == "c",
+            "{}: points only for type b",
+            c.name
         );
-        for (a, b) in our_segs.iter().zip(&r_segs) {
-            assert!(
-                a.iter().zip(b).all(|(p, q)| (p - q).abs() < 0.05),
-                "{name}: segment differs: ours={a:?} r={b:?}"
-            );
-        }
+        pdf::assert_same_pdf(
+            c.name,
+            pdf::parse(&draw_ours(c)),
+            theirs,
+            &pdf::Compare::default(),
+        );
     }
 }

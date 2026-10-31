@@ -12,15 +12,11 @@
 //! ones) of `plot()`, `title()`, `hist()`, `barplot()`, `boxplot()`
 //! (which, as R's `bxp()`, passes only the `cex` and `col` ones) and
 //! `pie()` against a real R `pdf()` device's uncompressed output. Compares
-//! every painted path in order (vertices or, for curves, bounding boxes;
-//! fill, stroke colour, width, cap, dash) and every text item's string,
-//! origin, font, size and fill colour. Skipped if `Rscript` isn't
-//! available.
+//! every painted path and text item in order (see
+//! `common::pdf::assert_same`). Skipped if `Rscript` isn't available.
 
 use crate::common;
-
-use std::collections::HashMap;
-use std::process::Command;
+use crate::common::{pdf, r};
 
 use rs_graphics::prelude::*;
 
@@ -31,7 +27,7 @@ const X: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
 const Y: [f64; 5] = [2.0, 4.0, 3.0, 5.0, 1.0];
 const H: [f64; 12] = [1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 5.0, 6.0, 6.5, 7.0];
 
-type Draw = fn(&mut Device<PdfBackend>);
+type Draw = fn(&mut Device<AnyBackend>);
 
 struct Case {
     name: &'static str,
@@ -51,7 +47,7 @@ fn cases() -> Vec<Case> {
             r: "par(mfrow = c(2, 4)); for (b in c('o', 'l', '7', 'c', 'u', ']', 'n', '[')) \
                 plot(x, y, ann = FALSE, bty = b)",
             ours: |d| {
-                d.par().mfrow(2, 4).draw();
+                d.par().mfrow([2, 4]).draw();
                 for b in ["o", "l", "7", "c", "u", "]", "n", "["] {
                     d.plot().x(X).y(Y).bty(b).draw();
                 }
@@ -137,7 +133,7 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), main = 'title', sub = 'sub', xlab = 'xlab', ylab = 'ylab', \
                 font.main = 1, col.sub = 'blue', cex.sub = 1.3, col.lab = 'grey40')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.hist()
                     .x(H)
                     .main("title")
@@ -208,7 +204,7 @@ fn cases() -> Vec<Case> {
                 title(main = expression(alpha^2), adj = 0.75)",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.par().adj(0).draw();
                 d.title().main("M").sub("S").xlab("X").ylab("Y").draw();
                 d.title().main("N").xlab("W").ylab("Z").adj(1).draw();
@@ -227,7 +223,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.par().oma([2, 3, 3, 1]).draw();
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.title()
                     .main("M")
                     .sub("S")
@@ -259,7 +255,7 @@ fn cases() -> Vec<Case> {
                 axis(1); axis(2)\n\
                 plot.window(c(0, 10), c(0, 10)); axis(3)",
             ours: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 d.plot().x(X).y(Y).asp(1).draw();
                 d.plot()
                     .x(X)
@@ -275,15 +271,15 @@ fn cases() -> Vec<Case> {
                 d.plot().x(X).y(Y).panel_first(grid).panel_last(mark).draw();
                 d.plot_new();
                 d.plot_window()
-                    .xlim(0, 10)
-                    .ylim(0, 10)
+                    .xlim([0, 10])
+                    .ylim([0, 10])
                     .xaxs("i")
                     .lab([3, 8, 7])
                     .draw();
                 d.axis().side(1).draw();
                 d.axis().side(2).draw();
                 // The inline xaxs and lab didn't last.
-                d.plot_window().xlim(0, 10).ylim(0, 10).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
                 d.axis().side(3).draw();
             },
         },
@@ -297,7 +293,7 @@ fn cases() -> Vec<Case> {
                 mtext(expression(alpha, beta), side = 4, at = c(1, 4))",
             ours: |d| {
                 d.plot_new();
-                d.plot_window().xlim(0, 10).ylim(0, 5).draw();
+                d.plot_window().xlim([0, 10]).ylim([0, 5]).draw();
                 d.mtext()
                     .text(["a", "b", "c"])
                     .side(1)
@@ -337,7 +333,7 @@ fn cases() -> Vec<Case> {
                 hist(h, breaks = c(0, 3, 7), labels = TRUE, ann = FALSE)\n\
                 hist(h, breaks = c(0, 4, 7), labels = c('p', 'q'), ann = FALSE)",
             ours: |d| {
-                d.par().mfrow(1, 3).draw();
+                d.par().mfrow([1, 3]).draw();
                 d.hist()
                     .x(H)
                     .labels(true)
@@ -370,7 +366,7 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), ylim = c(0, 4), xpd = FALSE)\n\
                 invisible(hist(h, plot = FALSE)); invisible(barplot(c(1, 2), plot = FALSE))",
             ours: |d| {
-                d.par().mfrow(2, 3).draw();
+                d.par().mfrow([2, 3]).draw();
                 d.plot().x(X).y(Y).frame_plot(false).draw();
                 d.plot().x(X).y(Y).axes(false).frame_plot(true).draw();
                 d.boxplot()
@@ -384,7 +380,7 @@ fn cases() -> Vec<Case> {
                     .show_names(false)
                     .frame_plot(false)
                     .draw();
-                d.barplot().height([3, 5, 2]).ylim(0, 4).xpd(false).draw();
+                d.barplot().height([3, 5, 2]).ylim([0, 4]).xpd(false).draw();
                 d.hist().x(H).plot(false).draw();
                 d.barplot().height([1, 2]).plot(false).draw();
             },
@@ -395,7 +391,7 @@ fn cases() -> Vec<Case> {
                 plot(y, ylab = '')\n\
                 plot(c(3, 1, 4, 1, 5, 9, 2), type = 'b', xlab = 'i', ylab = '')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot().x(Y).draw();
                 d.plot()
                     .x([3, 1, 4, 1, 5, 9, 2])
@@ -443,7 +439,7 @@ fn cases() -> Vec<Case> {
                      mgp = c(2, 0.6, 0), tck = 0.02, xlab = 'X', ylab = 'Y')\n\
                 plot(x, y, tcl = -0.2, las = 2, ann = FALSE)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.plot()
                     .x(X)
                     .y(Y)
@@ -467,7 +463,7 @@ fn cases() -> Vec<Case> {
                 barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), las = 2, cex.axis = 0.7,\n\
                         col.axis = 'red', mgp = c(2, 0.5, 0), ylab = 'Y')",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.hist()
                     .x(H)
                     .las(1)
@@ -497,7 +493,7 @@ fn cases() -> Vec<Case> {
                         cex.axis = 0.7)\n\
                 barplot(c(3, 5, 2), names.arg = c('a', 'b', 'c'), axisnames = FALSE, horiz = TRUE)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 d.barplot()
                     .height([3, 5, 2])
                     .names(["a", "b", "c"])
@@ -521,7 +517,7 @@ fn cases() -> Vec<Case> {
                 boxplot(list(a = c(1, 2, 3, 9), b = c(2, 3, 4)), horizontal = TRUE, las = 1,\n\
                         xaxp = c(0, 10, 2), gap.axis = 0)",
             ours: |d| {
-                d.par().mfrow(1, 2).draw();
+                d.par().mfrow([1, 2]).draw();
                 let groups = [vec![1.0, 2.0, 3.0, 9.0], vec![2.0, 3.0, 4.0]];
                 d.boxplot()
                     .x(&groups)
@@ -549,352 +545,26 @@ fn cases() -> Vec<Case> {
 // font, size and fill colour.
 // -------------------------------------------------------------------
 
-#[derive(Clone, Debug)]
-struct Gs {
-    fill: [f64; 3],
-    stroke: [f64; 3],
-    lwd: f64,
-    cap: i32,
-    dash: Vec<f64>,
-}
-
-#[derive(Debug)]
-struct Painted {
-    vertices: Vec<(f64, f64)>,
-    curved: bool,
-    fill: Option<[f64; 3]>,
-    /// `(colour, line width, line cap, dash array)`.
-    stroke: Option<([f64; 3], f64, i32, Vec<f64>)>,
-}
-
-impl Painted {
-    fn bbox(&self) -> [f64; 4] {
-        let xs = self.vertices.iter().map(|p| p.0);
-        let ys = self.vertices.iter().map(|p| p.1);
-        [
-            xs.clone().fold(f64::INFINITY, f64::min),
-            ys.clone().fold(f64::INFINITY, f64::min),
-            xs.fold(f64::NEG_INFINITY, f64::max),
-            ys.fold(f64::NEG_INFINITY, f64::max),
-        ]
-    }
-}
-
-#[derive(Debug)]
-struct Text {
-    string: String,
-    origin: (f64, f64),
-    font: String,
-    size: f64,
-    fill: [f64; 3],
-}
-
-enum Tok {
-    Str(String),
-    Word(String),
-}
-
-/// Tokens of a content stream; `(...)` strings (with `\` escapes) are
-/// one token each.
-fn tokens(content: &str) -> Vec<Tok> {
-    let b = content.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < b.len() {
-        match b[i] {
-            b'(' => {
-                let mut s = String::new();
-                i += 1;
-                while i < b.len() && b[i] != b')' {
-                    if b[i] == b'\\' {
-                        i += 1;
-                    }
-                    s.push(b[i] as char);
-                    i += 1;
-                }
-                i += 1;
-                out.push(Tok::Str(s));
-            }
-            b'[' | b']' => {
-                out.push(Tok::Word((b[i] as char).to_string()));
-                i += 1;
-            }
-            c if c.is_ascii_whitespace() => i += 1,
-            _ => {
-                let start = i;
-                while i < b.len() && !b[i].is_ascii_whitespace() && !b"([]".contains(&b[i]) {
-                    i += 1;
-                }
-                out.push(Tok::Word(content[start..i].to_string()));
-            }
-        }
-    }
-    out
-}
-
-/// Font resource name -> base font, from the PDF's font objects (R's
-/// `/Name /F2 /BaseFont /Helvetica-Bold`) or, for ours, the fixed ones.
-fn base_fonts(pdf: &str) -> HashMap<String, String> {
-    let mut map: HashMap<String, String> = [
-        ("/F1", "Helvetica"),
-        ("/F2", "Helvetica-Bold"),
-        ("/F3", "Helvetica-Oblique"),
-        ("/F4", "Helvetica-BoldOblique"),
-        ("/F5", "Symbol"),
-    ]
-    .into_iter()
-    .map(|(a, b)| (a.to_string(), b.to_string()))
-    .collect();
-    if pdf.contains("/Name /F") {
-        map.clear();
-        for part in pdf.split("/Name ").skip(1) {
-            let mut w = part.split_whitespace();
-            if let (Some(name), Some("/BaseFont"), Some(base)) = (w.next(), w.next(), w.next()) {
-                map.insert(name.to_string(), base.trim_start_matches('/').to_string());
-            }
-        }
-    }
-    map
-}
-
-fn interpret(pdf: &str) -> (Vec<Painted>, Vec<Text>) {
-    let fonts = base_fonts(pdf);
-    let mut painted = Vec::new();
-    let mut texts = Vec::new();
-    let mut rest = pdf;
-    while let Some(i) = rest.find("stream\n") {
-        let body = &rest[i + 7..];
-        let Some(j) = body.find("endstream") else {
-            break;
-        };
-        let content = &body[..j];
-        rest = &body[j + 9..];
-        if !content.contains(" m") && !content.contains(" re") && !content.contains(" Tf") {
-            continue;
-        }
-        let mut gs = Gs {
-            fill: [0.0; 3],
-            stroke: [0.0; 3],
-            lwd: 1.0,
-            cap: 0,
-            dash: Vec::new(),
-        };
-        let mut stack: Vec<Gs> = Vec::new();
-        let mut nums: Vec<f64> = Vec::new();
-        let mut array: Option<Vec<f64>> = None;
-        let mut pending_array: Vec<f64> = Vec::new();
-        let mut path: Vec<(f64, f64)> = Vec::new();
-        let mut curved = false;
-        let (mut font, mut tf_size, mut m) = (String::new(), 0.0, [0.0; 6]);
-        let mut last_name = String::new();
-        let mut last_str = String::new();
-        for t in tokens(content) {
-            let t = match t {
-                Tok::Str(s) => {
-                    // Inside a `TJ` array the pieces make up one string.
-                    if array.is_some() {
-                        last_str.push_str(&s);
-                    } else {
-                        last_str = s;
-                    }
-                    continue;
-                }
-                Tok::Word(w) => w,
-            };
-            if let Ok(v) = t.parse::<f64>() {
-                match &mut array {
-                    Some(a) => a.push(v),
-                    None => nums.push(v),
-                }
-                continue;
-            }
-            let last = |k: usize| nums[nums.len() - k..].to_vec();
-            match t.as_str() {
-                "[" => {
-                    array = Some(Vec::new());
-                    last_str.clear();
-                }
-                // The array is a dash pattern (`d`) or `TJ`'s kerning.
-                "]" => {
-                    pending_array = array.take().unwrap_or_default();
-                    continue;
-                }
-                "d" => gs.dash = std::mem::take(&mut pending_array),
-                "q" => stack.push(gs.clone()),
-                "Q" => gs = stack.pop().unwrap(),
-                "rg" | "scn" => gs.fill = last(3).try_into().unwrap(),
-                "RG" | "SCN" => gs.stroke = last(3).try_into().unwrap(),
-                "g" => gs.fill = [nums[nums.len() - 1]; 3],
-                "G" => gs.stroke = [nums[nums.len() - 1]; 3],
-                "w" => gs.lwd = nums[nums.len() - 1],
-                "J" => gs.cap = nums[nums.len() - 1] as i32,
-                "m" | "l" => path.push((nums[nums.len() - 2], nums[nums.len() - 1])),
-                "c" => {
-                    let n = last(6);
-                    path.extend([(n[0], n[1]), (n[2], n[3]), (n[4], n[5])]);
-                    curved = true;
-                }
-                "re" => {
-                    // Normalised to a positive width and height.
-                    let mut n = last(4);
-                    if n[2] < 0.0 {
-                        n[0] += n[2];
-                        n[2] = -n[2];
-                    }
-                    if n[3] < 0.0 {
-                        n[1] += n[3];
-                        n[3] = -n[3];
-                    }
-                    path.extend([
-                        (n[0], n[1]),
-                        (n[0] + n[2], n[1]),
-                        (n[0] + n[2], n[1] + n[3]),
-                        (n[0], n[1] + n[3]),
-                    ]);
-                }
-                "Tf" => {
-                    font = fonts.get(&last_name).cloned().unwrap_or_default();
-                    tf_size = nums[nums.len() - 1];
-                }
-                "Tm" => m = last(6).try_into().unwrap(),
-                "Tj" | "TJ" => texts.push(Text {
-                    string: std::mem::take(&mut last_str),
-                    origin: (m[4], m[5]),
-                    font: font.clone(),
-                    size: tf_size * (m[0] * m[0] + m[1] * m[1]).sqrt(),
-                    fill: gs.fill,
-                }),
-                "W" | "W*" | "h" => {}
-                "n" => {
-                    path.clear();
-                    curved = false;
-                }
-                "S" | "s" | "f" | "F" | "f*" | "B" | "B*" | "b" | "b*" => {
-                    let fill = t.starts_with(['f', 'F', 'B', 'b']);
-                    let stroke = t.starts_with(['S', 's', 'B', 'b']);
-                    let p = Painted {
-                        vertices: std::mem::take(&mut path),
-                        curved: std::mem::take(&mut curved),
-                        fill: fill.then_some(gs.fill),
-                        stroke: stroke.then(|| (gs.stroke, gs.lwd, gs.cap, gs.dash.clone())),
-                    };
-                    // Skip only a full-page background fill (neither side
-                    // draws one by default, but keep the figure box).
-                    let b = p.bbox();
-                    if p.stroke.is_some() || b[2] - b[0] < 0.99 * PAGE_W * 72.0 {
-                        painted.push(p);
-                    }
-                }
-                w if w.starts_with('/') => last_name = w.to_string(),
-                _ => {}
-            }
-            nums.clear();
-        }
-    }
-    (painted, texts)
-}
-
-fn close(a: &[f64], b: &[f64], tol: f64) -> bool {
-    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < tol)
-}
-
-fn r_vec(v: &[f64]) -> String {
-    let v: Vec<String> = v.iter().map(|x| x.to_string()).collect();
-    format!("c({})", v.join(", "))
-}
-
 #[test]
 fn bty_and_title_pars_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = format!(
-        "x <- {}\ny <- {}\nh <- {}\n",
-        r_vec(&X),
-        r_vec(&Y),
-        r_vec(&H)
+    let page = (PAGE_W, PAGE_H);
+    let r_cases: Vec<_> = cases.iter().map(|c| (c.name, c.r)).collect();
+    let prelude = format!(
+        "x <- {}\ny <- {}\nh <- {}",
+        r::r_vec(&X),
+        r::r_vec(&Y),
+        r::r_vec(&H)
     );
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_bty_title_{}.pdf", c.name));
-        script.push_str(&format!(
-            "pdf(file = '{}', width = {PAGE_W}, height = {PAGE_H}, compress = FALSE)\n\
-             {}\ninvisible(dev.off())\n",
-            path.display(),
-            c.r
-        ));
-    }
-    let script_path = dir.join("rs_graphics_bty_title.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_bty_title_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-        let (r_paths, r_texts) = interpret(&r_pdf);
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        );
-        (c.ours)(&mut dev);
-        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-        let (our_paths, our_texts) = interpret(&ours);
-        let name = c.name;
-
-        assert_eq!(
-            our_paths.len(),
-            r_paths.len(),
-            "{name}: painted path count\nours={our_paths:#?}\nr={r_paths:#?}"
-        );
-        for (k, (a, b)) in our_paths.iter().zip(&r_paths).enumerate() {
-            let ctx = format!("{name}, path {k}:\n ours={a:?}\n r=   {b:?}");
-            assert_eq!(a.curved, b.curved, "curvedness differs. {ctx}");
-            if a.curved {
-                assert!(close(&a.bbox(), &b.bbox(), 0.05), "bbox differs. {ctx}");
-            } else {
-                let flat = |p: &Painted| -> Vec<f64> {
-                    p.vertices.iter().flat_map(|&(x, y)| [x, y]).collect()
-                };
-                assert!(close(&flat(a), &flat(b), 0.05), "vertices differ. {ctx}");
-            }
-            assert_eq!(a.fill.is_some(), b.fill.is_some(), "fill differs. {ctx}");
-            assert_eq!(
-                a.stroke.is_some(),
-                b.stroke.is_some(),
-                "stroke differs. {ctx}"
-            );
-            if let (Some(fa), Some(fb)) = (a.fill, b.fill) {
-                assert!(close(&fa, &fb, 0.005), "fill colour differs. {ctx}");
-            }
-            if let (Some(sa), Some(sb)) = (&a.stroke, &b.stroke) {
-                assert!(close(&sa.0, &sb.0, 0.005), "stroke colour differs. {ctx}");
-                assert!((sa.1 - sb.1).abs() < 0.005, "line width differs. {ctx}");
-                assert_eq!(sa.2, sb.2, "line cap differs. {ctx}");
-                assert!(close(&sa.3, &sb.3, 0.005), "dash pattern differs. {ctx}");
-            }
-        }
-
-        let strings = |t: &[Text]| t.iter().map(|t| t.string.clone()).collect::<Vec<_>>();
-        assert_eq!(strings(&our_texts), strings(&r_texts), "{name}: text items");
-        for (a, b) in our_texts.iter().zip(&r_texts) {
-            let ctx = format!("{name}: text\n ours={a:?}\n r=   {b:?}");
-            assert_eq!(a.font, b.font, "font differs. {ctx}");
-            assert!((a.size - b.size).abs() < 0.01, "size differs. {ctx}");
-            assert!(close(&a.fill, &b.fill, 0.005), "text colour differs. {ctx}");
-            assert!(
-                close(&[a.origin.0, a.origin.1], &[b.origin.0, b.origin.1], 0.05),
-                "origin differs. {ctx}"
-            );
-        }
+    let r = r::run_r("bty_title", page, &prelude, &r_cases);
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let (ours_pdf, ()) = r::ours(page, c.ours);
+        let ours = pdf::parse(&ours_pdf);
+        let theirs = pdf::parse(r_pdf);
+        pdf::assert_same_pdf(c.name, ours, theirs, &pdf::Compare::default());
     }
 }
 
@@ -902,22 +572,23 @@ fn bty_and_title_pars_match_r() {
 /// `nan` coordinate, which makes the PDF invalid (an R bug, not copied).
 #[test]
 fn mtext_nan_line_skips_the_label() {
-    let mut dev = Device::new(
-        PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-        Par::default(),
-    );
+    let mut dev = Device::memory("pdf")
+        .width(PAGE_W)
+        .height(PAGE_H)
+        .compress(false)
+        .open()
+        .unwrap();
     dev.plot_new();
     dev.mtext()
         .text(["p", "q"])
         .side(2)
-        .line([1.0, f64::NAN])
+        .line([Some(1.0), None])
         .draw();
-    let pdf = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-    let (_, texts) = interpret(&pdf);
+    let texts = pdf::parse(&dev.finish()).page().texts;
     let strings: Vec<&str> = texts.iter().map(|t| t.string.as_str()).collect();
     assert_eq!(strings, ["p"]);
     for t in &texts {
-        assert!(t.origin.0.is_finite() && t.origin.1.is_finite());
+        assert!(t.origin().0.is_finite() && t.origin().1.is_finite());
     }
 }
 
@@ -925,10 +596,12 @@ fn mtext_nan_line_skips_the_label() {
 #[test]
 fn plot_false_returns_the_result_without_drawing() {
     let blank = || {
-        Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        )
+        Device::memory("pdf")
+            .width(PAGE_W)
+            .height(PAGE_H)
+            .compress(false)
+            .open()
+            .unwrap()
     };
     let (mut a, mut b) = (blank(), blank());
     assert_eq!(
@@ -938,6 +611,9 @@ fn plot_false_returns_the_result_without_drawing() {
     let h = a.hist().x(H).plot(false).draw();
     let drawn = b.hist().x(H).draw();
     assert_eq!((h.breaks, h.counts), (drawn.breaks, drawn.counts));
-    let (paths, texts) = interpret(&String::from_utf8_lossy(&a.into_backend().finish()));
-    assert!(paths.is_empty() && texts.is_empty());
+    let drawn = pdf::parse(&a.finish());
+    for page in drawn.pages {
+        let page = page.without_background();
+        assert!(page.paths.is_empty() && page.texts.is_empty());
+    }
 }

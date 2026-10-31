@@ -15,7 +15,8 @@
 //! pieces (whole strings, or one character at a time for names, as R
 //! does), with sizes from the TeX-like styles (`STYLE_D` ... `STYLE_SS1`).
 
-use crate::afm::{self, FontFace};
+use crate::afm;
+use crate::font::FontFace;
 use crate::backend::{Backend, TextStyle};
 use crate::color::{Color, ColorSpec};
 use crate::geometry::Point;
@@ -152,21 +153,24 @@ impl<B: Backend> Device<B> {
         (bbox.height, bbox.depth, bbox.width)
     }
 
-    /// `strwidth(label, "inches", cex = cex, font = font)`, single-line
-    /// text or an expression; `cex` is multiplied by `par(cex)`, as in
+    /// `strwidth(label, "inches", cex = cex, font = font)`, text (the
+    /// widest line) or an expression; `cex` is multiplied by [`par(cex)`], as in
     /// [`Graphics::text`](crate::graphics::Graphics::text).
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     pub(super) fn label_width(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(t) => afm::str_width_inches(t, font, self.font_size_pt(cex), 1.0),
+            Label::Text(t) => self.text_size_inches(t, font, cex).0,
             Label::Math(e) => self.expression_metrics(e, self.par.cex * cex).2,
         }
     }
 
-    /// `strheight(label, "inches", cex = cex, font = font)`: the height of
-    /// "M" for single-line text, height + depth for an expression.
+    /// `strheight(label, "inches", cex = cex, font = font)`: for text the
+    /// height of "M" plus a line height per newline, for an expression its
+    /// height + depth.
     pub(super) fn label_height(&mut self, label: &Label, font: FontFace, cex: f64) -> f64 {
         match label {
-            Label::Text(_) => afm::m_height_inches(font, self.font_size_pt(cex), 1.0),
+            Label::Text(t) => self.text_size_inches(t, font, cex).1,
             Label::Math(e) => {
                 let (h, d, _) = self.expression_metrics(e, self.par.cex * cex);
                 h + d
@@ -177,7 +181,9 @@ impl<B: Backend> Device<B> {
     /// Draws text (`GEText`) or an expression (`GEMathText`, in the plain
     /// font) at `anchor`. `xc`/`yc` align text as in `text_at_clipped`
     /// and an expression's bounding box; `yc = None` is R's `NA`. `cex` is
-    /// multiplied by `par(cex)`.
+    /// multiplied by [`par(cex)`].
+    ///
+    /// [`par(cex)`]: crate::par::Par::cex
     #[allow(clippy::too_many_arguments)]
     pub(super) fn draw_label(
         &mut self,
@@ -636,7 +642,7 @@ impl<'d, B: Backend> Math<'d, B> {
         }
         if n > 1 {
             // Kerning makes the sum of the glyphs' widths wrong.
-            result.width = afm::str_width_inches(s, self.face(), self.size_pt(), 1.0);
+            result.width = afm::str_width_inches(s, self.face(), self.size_pt());
         }
         if draw {
             self.text(s);

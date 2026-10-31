@@ -154,8 +154,8 @@ fn layered<G: Graphics>(g: &mut G) {
     g.par().oma([0.0, 0.0, 2.0, 0.0]).draw();
     g.plot_new();
     g.plot_window()
-        .xlim(1.0, 1000.0)
-        .ylim(0.0, 1.0)
+        .xlim([1.0, 1000.0])
+        .ylim([0.0, 1.0])
         .xlog(true)
         .draw();
     g.points()
@@ -193,12 +193,13 @@ fn scenes() -> Vec<(&'static str, Scene, Direct)> {
 }
 
 fn device(format: Format) -> Device<AnyBackend> {
-    let backend = match format {
-        Format::Pdf => AnyBackend::Pdf(PdfBackend::new(7.0, 6.0).with_compression(false)),
-        Format::Svg => AnyBackend::Svg(SvgBackend::new(7.0, 6.0)),
-        Format::Png => AnyBackend::Png(RasterBackend::new(7.0, 6.0, 72.0, Color::WHITE)),
-    };
-    Device::new(backend, Par::default())
+    // `compress(false)`: an uncompressed PDF, a plain SVG; ignored for PNG.
+    Device::memory(format)
+        .width(7.0)
+        .height(6.0)
+        .compress(false)
+        .open()
+        .unwrap()
 }
 
 const FORMATS: [Format; 3] = [Format::Pdf, Format::Svg, Format::Png];
@@ -230,15 +231,15 @@ fn a_plot_can_be_added_many_times_and_mixed_with_direct_calls() {
         // mfrow(2, 2): direct, recorded, recorded again, then a recorded
         // plot placed with add_figure_at - against all direct, with mfg.
         let mut a = device(format);
-        a.par().mfrow(2, 2).draw();
+        a.par().mfrow([2, 2]).draw();
         scatter(&mut a);
         bars(&mut a);
         scatter(&mut a);
-        a.par().mfg(1, 2).draw();
+        a.par().mfg([1, 2]).draw();
         bars(&mut a);
 
         let mut b = device(format);
-        b.par().mfrow(2, 2).draw();
+        b.par().mfrow([2, 2]).draw();
         scatter(&mut b);
         b.add_figure(&bars_fig);
         b.add_figure(&fig);
@@ -252,13 +253,13 @@ fn add_figure_at_on_a_fresh_device_starts_the_page_first() {
     // R ignores par(mfg) until something is drawn, so add_figure_at opens
     // the page as plot_new() would, then picks the panel.
     let mut a = device(Format::Pdf);
-    a.par().mfrow(2, 2).draw();
+    a.par().mfrow([2, 2]).draw();
     a.plot_new();
-    a.par().mfg(2, 1).draw();
+    a.par().mfg([2, 1]).draw();
     pie(&mut a);
 
     let mut b = device(Format::Pdf);
-    b.par().mfrow(2, 2).draw();
+    b.par().mfrow([2, 2]).draw();
     b.add_figure_at(2, 1, &recorded(pie::<Figure>));
     assert!(a.finish() == b.finish());
 }
@@ -483,7 +484,7 @@ fn barplot_shading_on_a_log_axis_panics() {
                 let mut fig = Figure::new();
                 fig.barplot().height([1, 2]).ylog(true).density(10).draw();
             } else {
-                let mut dev = Device::new(PdfBackend::new(5, 5), Par::default());
+                let mut dev = Device::memory("pdf").width(5).height(5).open().unwrap();
                 dev.barplot().height([1, 2]).ylog(true).density(10).draw();
             }
         });

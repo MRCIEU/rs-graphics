@@ -9,7 +9,9 @@
 //! Cross-checks the bin edges and counts `hist()` returns against R's own
 //! `hist(x, plot = FALSE)` for a handful of fixed datasets, with the
 //! default Sturges breaks (also for one value and for all values equal),
-//! a number of classes (`breaks = 20`) and unsorted edges.
+//! a number of classes (`breaks = 20`) and unsorted edges; the Scott and
+//! FD rules and a breaks function; `right`, `include.lowest` and `fuzz`;
+//! and R's errors for invalid breaks and unknown rules.
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.
 
@@ -17,11 +19,9 @@ use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::HistBreaks;
-use rs_graphics::par::Par;
 
 /// R's `hist(x, breaks = <breaks>, plot = FALSE)` (`breaks` an R
 /// expression, or "" for the default): breaks and counts.
@@ -90,8 +90,7 @@ fn breaks_and_counts_match_r_sturges() {
     for data in datasets {
         let (expected_breaks, expected_counts) = r_hist(data, "");
 
-        let backend = PdfBackend::new(6.0, 4.0).with_compression(false);
-        let mut dev = Device::new(backend, Par::default());
+        let mut dev = Device::memory("pdf").width(6).height(4).open().unwrap();
         let result = dev.hist().x(data).draw();
 
         assert_eq!(
@@ -133,7 +132,7 @@ fn breaks_as_a_count_or_unsorted_edges_match_r() {
     ];
     for (r_breaks, breaks) in cases {
         let (expected_breaks, expected_counts) = r_hist(&data, r_breaks);
-        let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+        let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
         let result = dev.hist().x(data).breaks(breaks).draw();
         assert_eq!(
             result.breaks.len(),
@@ -154,14 +153,14 @@ fn breaks_as_a_count_or_unsorted_edges_match_r() {
 #[test]
 #[should_panic(expected = "invalid number of 'breaks'")]
 fn zero_breaks_panics_like_r() {
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
     dev.hist().x([1.0, 2.0, 3.0]).breaks(0).draw();
 }
 
 #[test]
 #[should_panic(expected = "invalid number of 'breaks'")]
 fn nan_breaks_panics_like_r() {
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
     dev.hist().x([1.0, 2.0, 3.0]).breaks(f64::NAN).draw();
 }
 
@@ -214,7 +213,7 @@ fn breaks_rules_and_functions_match_r() {
                 data,
                 &format!("hist(x, breaks = {r_breaks}, plot = FALSE)$breaks"),
             );
-            let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+            let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
             let result = dev.hist().x(data).breaks(breaks.clone()).draw();
             assert_eq!(
                 result.breaks, expected,
@@ -227,7 +226,7 @@ fn breaks_rules_and_functions_match_r() {
         &skewed,
         "hist(x, breaks = function(x) c(max(x), -10, 0, 20), plot = FALSE)$breaks",
     );
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
     let result = dev
         .hist()
         .x(skewed)
@@ -246,7 +245,7 @@ fn breaks_rules_and_functions_match_r() {
         &skewed,
         "hist(x, breaks = function(x) 4, plot = FALSE)$breaks",
     );
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
     let result = dev
         .hist()
         .x(skewed)
@@ -259,9 +258,9 @@ fn breaks_rules_and_functions_match_r() {
         &skewed,
         "{ pdf(NULL); hist(x, xlim = c(-20, 30), ylim = c(0, 10)); par('usr') }",
     );
-    let mut dev = Device::new(PdfBackend::new(7.0, 7.0), Par::default());
-    dev.hist().x(skewed).xlim(-20, 30).ylim(0, 10).draw();
-    let (a, b, c, d) = dev.usr();
+    let mut dev = Device::memory("pdf").width(7.0).height(7.0).open().unwrap();
+    dev.hist().x(skewed).xlim([-20, 30]).ylim([0, 10]).draw();
+    let [a, b, c, d] = dev.usr();
     for (ours, r) in [a, b, c, d].iter().zip(&usr) {
         assert!((ours - r).abs() < 1e-9, "usr {:?} vs {usr:?}", (a, b, c, d));
     }
@@ -302,7 +301,7 @@ fn right_include_lowest_and_fuzz_match_r() {
             &data,
             &format!("hist(x, breaks = c(0, 1, 2, 3, 5), {r_args}, plot = FALSE)$counts"),
         );
-        let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+        let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
         let mut call = dev.hist().x(data).breaks(edges);
         if let Some(r) = right {
             call = call.right(r);
@@ -320,7 +319,7 @@ fn right_include_lowest_and_fuzz_match_r() {
 #[test]
 #[should_panic(expected = "some 'x' not counted")]
 fn breaks_not_covering_the_data_panic_like_r() {
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
     dev.hist().x([1.0, 2.0, 5.0]).breaks([1, 2, 3]).draw();
 }
 
@@ -329,7 +328,7 @@ fn breaks_not_covering_the_data_panic_like_r() {
 #[test]
 #[should_panic(expected = "some 'x' not counted")]
 fn include_lowest_false_leaves_the_first_edge_out_like_r() {
-    let mut dev = Device::new(PdfBackend::new(6.0, 4.0), Par::default());
+    let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
     dev.hist()
         .x([0.0, 1.0, 2.0])
         .breaks([0, 1, 2])

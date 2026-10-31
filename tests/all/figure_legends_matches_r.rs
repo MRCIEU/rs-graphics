@@ -11,14 +11,13 @@
 //! uncompressed R `pdf()`: `mfrow` with `add_figure_at` on a fresh device
 //! (R's `plot.new(); par(mfg = )`), a figure's own `par()` not leaking into
 //! the next, a shared-key panel in a `layout()`, and one figure added three
-//! times to a 3x2 page (panels advance; `cex` 0.66). Compares every text
-//! item (string, origin, size) and every legend box, and each
+//! times to a 3x2 page (panels advance; `cex` 0.66). Compares every painted
+//! path and text item in order (see `common::pdf::assert_same`), and each
 //! `FigureResult::legends` entry with R's `legend()` return value.
 //! Skipped if `Rscript` isn't available.
 
 use crate::common;
-
-use std::process::Command;
+use crate::common::{pdf, r};
 
 use rs_graphics::prelude::*;
 
@@ -73,7 +72,7 @@ fn fit_figure(pos: LegendPos, opts: &LegendOptions) -> Figure {
 }
 
 /// A legend's layout and the `usr` of the panel it was drawn in.
-type Drawn = (LegendLayout, (f64, f64, f64, f64));
+type Drawn = (LegendLayout, [f64; 4]);
 
 struct Case {
     name: &'static str,
@@ -82,10 +81,10 @@ struct Case {
     r: &'static str,
     /// Draws the page; returns each legend's layout and the `usr` of the
     /// panel it was drawn in, in drawing order.
-    draw: fn(&mut Device<PdfBackend>) -> Vec<Drawn>,
+    draw: fn(&mut Device<AnyBackend>) -> Vec<Drawn>,
 }
 
-fn layouts(r: FigureResult, usr: (f64, f64, f64, f64)) -> Vec<Drawn> {
+fn layouts(r: FigureResult, usr: [f64; 4]) -> Vec<Drawn> {
     r.legends.into_iter().map(|l| (l, usr)).collect()
 }
 
@@ -101,7 +100,7 @@ fit("mfrow_at.1", 1.5, 6.8)
 par(op)
 par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
             draw: |d| {
-                d.par().mfrow(2, 2).draw();
+                d.par().mfrow([2, 2]).draw();
                 let a = fit_figure(
                     LegendPos::Keyword(LegendKeyword::BottomRight),
                     &keys().title("Key"),
@@ -125,7 +124,7 @@ par(mfg = c(2, 2)); plot(dose, fitted, type = "l", main = "After")"#,
                     .with(&keys())
                     .draw();
                 out.extend(layouts(d.add_figure_at(2, 1, &b), d.usr()));
-                d.par().mfg(2, 2).draw();
+                d.par().mfg([2, 2]).draw();
                 d.plot()
                     .x(DOSE)
                     .y(FITTED)
@@ -189,7 +188,7 @@ fit("mfrow_3x2.0", "topleft", inset = 0.05)
 fit("mfrow_3x2.1", "topleft", inset = 0.05)
 fit("mfrow_3x2.2", "topleft", inset = 0.05)"#,
             draw: |d| {
-                d.par().mfrow(3, 2).draw();
+                d.par().mfrow([3, 2]).draw();
                 let fig = fit_figure(
                     LegendPos::Keyword(LegendKeyword::TopLeft),
                     &keys().inset((0.05, 0.05)),
@@ -204,194 +203,23 @@ fit("mfrow_3x2.2", "topleft", inset = 0.05)"#,
     ]
 }
 
-/// One text item: string (kerned `TJ` pieces joined), origin and size.
-#[derive(Debug)]
-struct Text {
-    string: String,
-    x: f64,
-    y: f64,
-    size: f64,
-}
-
-/// Text items from each `BT ... ET` block. R writes `/F2 1 Tf a b c d x y
-/// Tm (..) Tj` on one line (size in the matrix); we write the size in
-/// `Tf` and a unit matrix, over several lines. Size = `Tf` size times the
-/// matrix scale.
-fn texts(pdf: &str) -> Vec<Text> {
-    let mut out = Vec::new();
-    let mut rest = pdf;
-    while let Some(bt) = rest.find("BT\n") {
-        let block_start = bt + 3;
-        let Some(et) = rest[block_start..].find("ET\n") else {
-            break;
-        };
-        let block = &rest[block_start..block_start + et];
-        rest = &rest[block_start + et + 3..];
-
-        // String: the parenthesised pieces after Tm, joined (R's kerned
-        // `TJ` arrays split it).
-        let Some(tm) = block.find(" Tm") else {
-            continue;
-        };
-        let mut string = String::new();
-        let mut depth = 0;
-        let mut chars = block[tm + 3..].chars();
-        while let Some(c) = chars.next() {
-            match c {
-                '\\' if depth > 0 => {
-                    if let Some(n) = chars.next() {
-                        string.push(n);
-                    }
-                }
-                '(' => depth += 1,
-                ')' => depth -= 1,
-                _ if depth > 0 => string.push(c),
-                _ => {}
-            }
-        }
-        let tokens: Vec<&str> = block[..tm].split_whitespace().collect();
-        let Some(tf) = tokens.iter().position(|&t| t == "Tf") else {
-            continue;
-        };
-        let num = |t: &str| t.parse::<f64>().unwrap();
-        let tf_size = num(tokens[tf - 1]);
-        let m: Vec<f64> = tokens[tf + 1..].iter().map(|t| num(t)).collect();
-        assert_eq!(m.len(), 6, "text matrix in {block:?}");
-        out.push(Text {
-            string,
-            x: m[4],
-            y: m[5],
-            size: tf_size * (m[0].powi(2) + m[1].powi(2)).sqrt(),
-        });
-    }
-    out
-}
-
-/// `[x, y_bottom, w, h]` of every rectangle (`re`), normalised so h > 0.
-fn rects(pdf: &str) -> Vec<[f64; 4]> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let line = line.trim();
-        if !line.ends_with(" re") {
-            continue;
-        }
-        let n: Vec<f64> = line
-            .split_whitespace()
-            .filter_map(|t| t.parse().ok())
-            .collect();
-        if n.len() == 4 {
-            out.push(if n[3] < 0.0 {
-                [n[0], n[1] + n[3], n[2], -n[3]]
-            } else {
-                [n[0], n[1], n[2], n[3]]
-            });
-        }
-    }
-    out
-}
-
-/// Clip rectangles (`re W n`) are on lines of their own followed by `W n`;
-/// those are skipped by matching only rectangles that are stroked or
-/// filled. R and we write a drawn rectangle as `x y w h re` then a paint
-/// operator on the next line.
-fn drawn_rects(pdf: &str) -> Vec<[f64; 4]> {
-    let lines: Vec<&str> = pdf.lines().map(str::trim).collect();
-    let mut out = Vec::new();
-    for (i, line) in lines.iter().enumerate() {
-        if !line.ends_with(" re") {
-            continue;
-        }
-        let next = lines.get(i + 1).copied().unwrap_or("");
-        if next.starts_with('W') {
-            continue;
-        }
-        out.extend(rects(line));
-    }
-    out
-}
-
 #[test]
 fn figure_legends_in_panels_match_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = String::from(R_PRELUDE);
-    for c in &cases {
-        script.push_str(&format!(
-            "pdf(file = '{}/rs_graphics_figure_legends_{}.pdf', width = {PAGE_W}, \
-             height = {PAGE_H}, compress = FALSE)\n{}\ninvisible(dev.off())\n",
-            dir.display(),
-            c.name,
-            c.r
-        ));
-    }
-    let path = dir.join("rs_graphics_figure_legends.R");
-    std::fs::write(&path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let r_stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+    let page = (PAGE_W, PAGE_H);
+    let r_cases: Vec<_> = cases.iter().map(|c| (c.name, c.r)).collect();
+    let run = r::run_r("figure_legends", page, R_PRELUDE, &r_cases);
+    let r_stdout = run.stdout;
 
-    for c in &cases {
-        let r_pdf = String::from_utf8_lossy(
-            &std::fs::read(dir.join(format!("rs_graphics_figure_legends_{}.pdf", c.name))).unwrap(),
-        )
-        .into_owned();
-        let mut dev = Device::new(
-            PdfBackend::new(PAGE_W, PAGE_H).with_compression(false),
-            Par::default(),
-        );
-        let legends = (c.draw)(&mut dev);
-        let ours = String::from_utf8_lossy(&dev.finish()).into_owned();
-
-        // Every text item, in drawing order.
-        let (r_t, our_t) = (texts(&r_pdf), texts(&ours));
-        assert!(
-            r_t.len() > 20,
-            "{}: R drew only {} text items",
-            c.name,
-            r_t.len()
-        );
-        let strings = |t: &[Text]| t.iter().map(|t| t.string.clone()).collect::<Vec<_>>();
-        assert_eq!(strings(&our_t), strings(&r_t), "{}: text strings", c.name);
-        for (a, b) in our_t.iter().zip(&r_t) {
-            assert!(
-                (a.x - b.x).abs() < 0.05
-                    && (a.y - b.y).abs() < 0.05
-                    && (a.size - b.size).abs() < 0.01,
-                "{}: {:?} differs: ours={a:?} r={b:?}",
-                c.name,
-                a.string
-            );
-        }
-
-        // Legend boxes: every rectangle R draws (R draws the plot frame as
-        // a polyline, we as a rectangle, so ours may have extra ones).
-        let our_r = drawn_rects(&ours);
-        let r_rects = drawn_rects(&r_pdf);
-        assert_eq!(
-            r_rects.len(),
-            legends.len(),
-            "{}: one rectangle (the legend box) per legend in R's output",
-            c.name
-        );
-        for b in r_rects {
-            assert!(
-                our_r
-                    .iter()
-                    .any(|a| (0..4).all(|k| (a[k] - b[k]).abs() < 0.05)),
-                "{}: R's rectangle {b:?} not drawn by us: {our_r:?}",
-                c.name
-            );
-        }
+    for (c, r_pdf_bytes) in cases.iter().zip(&run.pdfs) {
+        let (ours, legends) = r::ours(page, c.draw);
+        let theirs = pdf::parse(r_pdf_bytes);
+        let texts: usize = theirs.pages.iter().map(|p| p.texts.len()).sum();
+        assert!(texts > 20, "{}: R drew only {texts} text items", c.name);
+        pdf::assert_same_pdf(c.name, pdf::parse(&ours), theirs, &pdf::Compare::default());
 
         // Each legend's return value, as R's legend() returns it.
         for (k, (layout, usr)) in legends.iter().enumerate() {
@@ -406,8 +234,8 @@ fn figure_legends_in_panels_match_r() {
                 .map(|v| v.parse().unwrap())
                 .collect();
             let (tx, ty) = (
-                (usr.1 - usr.0).abs() / 5000.0,
-                (usr.3 - usr.2).abs() / 5000.0,
+                (usr[1] - usr[0]).abs() / 5000.0,
+                (usr[3] - usr[2]).abs() / 5000.0,
             );
             let mut flat = vec![
                 (layout.left, tx),

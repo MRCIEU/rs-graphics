@@ -6,11 +6,12 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! [`AnyBackend`]: one type for all three output formats, chosen at run
-//! time (e.g. from a command-line option), so drawing code needs no
-//! generic `B`. [`Device::format`](crate::device::Device::format) and
+//! [`AnyBackend`]: one type for every output format (and the null device),
+//! chosen at run time (e.g. from a command-line option), so drawing code
+//! needs no generic `B`. [`Device::format`](crate::device::Device::format) and
 //! [`Device::pdf`](crate::device::Device::pdf) & co. open devices on it.
 
+use super::null::NullBackend;
 use super::pdf::PdfBackend;
 use super::raster::RasterBackend;
 use super::svg::SvgBackend;
@@ -22,6 +23,14 @@ use crate::geometry::{Point, Rect};
 ///
 /// Strings work too (`"pdf"`, `"svg"`, `"png"`, ignoring case), so
 /// `Device::format("png", file)` works.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("PNG".parse::<Format>().unwrap(), Format::Png);
+/// assert!("jpeg".parse::<Format>().is_err());
+/// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Format {
     /// PDF, a vector format.
@@ -33,17 +42,9 @@ pub enum Format {
 }
 
 impl Format {
-    /// Reads `"pdf"`, `"svg"` or `"png"`, ignoring case; `None` for anything
-    /// else.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// assert_eq!(Format::parse("PNG"), Some(Format::Png));
-    /// assert_eq!(Format::parse("jpeg"), None);
-    /// ```
-    pub fn parse(name: &str) -> Option<Format> {
+    /// `"pdf"`, `"svg"` or `"png"`, ignoring case; `None` otherwise. The
+    /// public routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(name: &str) -> Option<Format> {
         match name.to_ascii_lowercase().as_str() {
             "pdf" => Some(Format::Pdf),
             "svg" => Some(Format::Svg),
@@ -53,28 +54,28 @@ impl Format {
     }
 }
 
-crate::error::from_str_via_parse!(Format, "output format");
 crate::error::from_r_string!(Format, "output format", "\"pdf\", \"svg\" or \"png\"");
 
-/// A PDF, SVG or PNG backend behind one type, for a format chosen at run
-/// time.
+/// A PDF, SVG, PNG or null backend behind one type, for a format chosen at
+/// run time.
 ///
 /// Every [`Backend`] method is forwarded, so the output is byte for byte
-/// that of the wrapped backend. Devices opened with
-/// [`Device::format`](crate::device::Device::format) or
-/// [`Device::pdf`](crate::device::Device::pdf) & co. use it. For options
-/// those don't cover (PNG threads, ...), build the backend, convert it
-/// with `AnyBackend::from` and pass it to
-/// [`Device::new`](crate::device::Device::new).
+/// that of the wrapped backend. Every device the builder opens
+/// ([`Device::pdf`](crate::device::Device::pdf),
+/// [`Device::format`](crate::device::Device::format),
+/// [`Device::memory`](crate::device::Device::memory), ...) is a
+/// `Device<AnyBackend>`, so code taking one works with any format.
 ///
 /// # Examples
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let png = RasterBackend::new(5, 5, 150, Color::WHITE).with_threads(2);
-/// let mut dev = Device::new(AnyBackend::from(png), Par::default());
-/// dev.plot().x([1, 2, 3]).draw();
-/// let bytes = dev.finish();
+/// fn scatter(dev: &mut Device<AnyBackend>) {
+///     dev.plot().x([1, 2, 3]).draw();
+/// }
+/// let mut dev = Device::memory("png").res(150).threads(2).open().unwrap();
+/// scatter(&mut dev);
+/// assert_eq!(dev.into_backend().format(), Some(Format::Png));
 /// ```
 pub enum AnyBackend {
     /// A PDF backend.
@@ -83,43 +84,20 @@ pub enum AnyBackend {
     Svg(SvgBackend),
     /// A PNG backend.
     Png(RasterBackend),
+    /// The null backend: no output, PDF's measurements (see
+    /// [`Device::null`](crate::device::Device::null)).
+    Null(NullBackend),
 }
 
 impl AnyBackend {
-    /// Creates a backend for a `width_in` x `height_in` inch page in `format`.
-    ///
-    /// `dpi` is used only for PNG, which gets a white background (R's `png()`
-    /// default).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use rs_graphics::prelude::*;
-    /// let backend = AnyBackend::new(Format::Svg, 6, 4, 72);
-    /// assert_eq!(backend.format(), Format::Svg);
-    /// ```
-    pub fn new(
-        format: Format,
-        width_in: impl Into<f64>,
-        height_in: impl Into<f64>,
-        dpi: impl Into<f64>,
-    ) -> Self {
-        let (width_in, height_in, dpi) = (width_in.into(), height_in.into(), dpi.into());
-        match format {
-            Format::Pdf => AnyBackend::Pdf(PdfBackend::new(width_in, height_in)),
-            Format::Svg => AnyBackend::Svg(SvgBackend::new(width_in, height_in)),
-            Format::Png => {
-                AnyBackend::Png(RasterBackend::new(width_in, height_in, dpi, Color::WHITE))
-            }
-        }
-    }
-
-    /// Returns the wrapped backend's format.
-    pub fn format(&self) -> Format {
+    /// Returns the wrapped backend's format, or `None` for the null
+    /// backend, which has no output.
+    pub fn format(&self) -> Option<Format> {
         match self {
-            AnyBackend::Pdf(_) => Format::Pdf,
-            AnyBackend::Svg(_) => Format::Svg,
-            AnyBackend::Png(_) => Format::Png,
+            AnyBackend::Pdf(_) => Some(Format::Pdf),
+            AnyBackend::Svg(_) => Some(Format::Svg),
+            AnyBackend::Png(_) => Some(Format::Png),
+            AnyBackend::Null(_) => None,
         }
     }
 }
@@ -142,6 +120,12 @@ impl From<RasterBackend> for AnyBackend {
     }
 }
 
+impl From<NullBackend> for AnyBackend {
+    fn from(b: NullBackend) -> Self {
+        AnyBackend::Null(b)
+    }
+}
+
 /// Calls `$call` on whichever backend is wrapped.
 macro_rules! forward {
     ($self:expr, $b:ident => $call:expr) => {
@@ -149,6 +133,7 @@ macro_rules! forward {
             AnyBackend::Pdf($b) => $call,
             AnyBackend::Svg($b) => $call,
             AnyBackend::Png($b) => $call,
+            AnyBackend::Null($b) => $call,
         }
     };
 }

@@ -24,13 +24,13 @@
 //! Drawing calls are not painted immediately. Each is recorded as a
 //! command (already in pixel space, with its clip state and pixel bounding
 //! box), and the canvas is held as square tiles of `TILE` pixels. Every
-//! `FLUSH_AT` commands, and in [`RasterBackend::finish`], the pending
+//! `FLUSH_AT` commands, and when the image is finished, the pending
 //! commands are binned into the tiles they touch and the tiles are painted
 //! on separate threads, each in command order. Paths are only translated
 //! by whole pixels, so shapes are anti-aliased as on one big canvas, apart
 //! from the small edge effects described at `PAD`. The output does not
 //! depend on the number of threads (above one; see
-//! [`RasterBackend::with_threads`]).
+//! [`DeviceBuilder::threads`](crate::device::DeviceBuilder::threads)).
 //!
 //! Small shapes that repeat, such as plotting symbols, are not rasterized
 //! one by one: each distinct shape is rasterized once per sub-pixel
@@ -51,10 +51,12 @@ use tiny_skia::{
 };
 
 use super::{Backend, LineEnd, LineJoin as BeLineJoin, Stroke, TextStyle};
-use crate::afm::{self, FontFace};
+use crate::afm;
+use crate::font::FontFace;
 use crate::color::Color;
 use crate::geometry::{Point, Rect};
 use crate::lty::LineType;
+use crate::numbers::Num;
 
 struct Fonts {
     plain: FontArc,
@@ -851,15 +853,15 @@ struct Prepainted {
 /// and drawn with the bundled Liberation Sans fonts, which have the same
 /// widths, so text sits where it does in PDF and SVG. Drawing is spread
 /// over all CPU cores by default (see
-/// [`with_threads`](RasterBackend::with_threads)). See the
-/// [module docs](self).
+/// [`DeviceBuilder::threads`](crate::device::DeviceBuilder::threads)).
+/// Devices from [`Device::png`](crate::device::Device::png) and
+/// `Device::memory("png")` draw on one. See the [module docs](self).
 ///
 /// # Examples
 ///
 /// ```
 /// # use rs_graphics::prelude::*;
-/// let png = RasterBackend::new(6, 4, 300, Color::WHITE);
-/// let mut dev = Device::new(png, Par::default());
+/// let mut dev = Device::memory("png").width(6).height(4).res(300).open().unwrap();
 /// dev.plot().x([1, 2, 3]).draw();
 /// assert!(dev.finish().starts_with(b"\x89PNG"));
 /// ```
@@ -892,13 +894,13 @@ impl RasterBackend {
     ///
     /// A higher `dpi` gives a sharper image with more pixels; R's `png()`
     /// default is 72.
-    pub fn new(
-        width_in: impl Into<f64>,
-        height_in: impl Into<f64>,
-        dpi: impl Into<f64>,
+    pub(crate) fn new(
+        width_in: impl Num,
+        height_in: impl Num,
+        dpi: impl Num,
         background: Color,
     ) -> Self {
-        let (width_in, height_in, dpi) = (width_in.into(), height_in.into(), dpi.into());
+        let (width_in, height_in, dpi) = (width_in.to_f64(), height_in.to_f64(), dpi.to_f64());
         let w_px = (width_in * dpi).round().max(1.0) as u32;
         let h_px = (height_in * dpi).round().max(1.0) as u32;
         let mut canvas = Pixmap::new(w_px, h_px).expect("nonzero pixmap size");
@@ -932,7 +934,7 @@ impl RasterBackend {
     /// With one thread the output is exactly that of drawing onto a single
     /// canvas. With more, edge pixels of some shapes can differ from that by up
     /// to a few dozen levels, but not between thread counts above one.
-    pub fn with_threads(mut self, threads: usize) -> Self {
+    pub(crate) fn with_threads(mut self, threads: usize) -> Self {
         self.flush();
         let canvas = self.canvas();
         self.set_threads(threads, &canvas);
@@ -999,13 +1001,10 @@ impl RasterBackend {
             BeLineJoin::Round => tiny_skia::LineJoin::Round,
             BeLineJoin::Bevel => tiny_skia::LineJoin::Bevel,
         };
-        let dash = stroke
-            .lty
-            .dash_lengths_pt(stroke.lwd, stroke.lend == LineEnd::Butt)
-            .and_then(|pts| {
-                let px: Vec<f32> = pts.iter().map(|d| (d / 72.0 * dpi) as f32).collect();
-                tiny_skia::StrokeDash::new(px, 0.0)
-            });
+        let dash = stroke.dash_pt().and_then(|pts| {
+            let px: Vec<f32> = pts.iter().map(|d| (d / 72.0 * dpi) as f32).collect();
+            tiny_skia::StrokeDash::new(px, 0.0)
+        });
         SkStroke {
             width: width_px.max(0.05),
             miter_limit: stroke.lmitre as f32,
@@ -1248,7 +1247,7 @@ impl RasterBackend {
 
     /// Finishes the image and returns it as PNG bytes, with its resolution
     /// recorded in the file.
-    pub fn finish(mut self) -> Vec<u8> {
+    pub(crate) fn finish(mut self) -> Vec<u8> {
         self.flush();
         let png = self.canvas().encode_png().expect("PNG encoding failed");
         with_resolution(png, self.dpi)
@@ -1621,7 +1620,7 @@ impl Backend for RasterBackend {
         // this is what actually determines each glyph's position, so
         // multi-character strings line up exactly where the SVG/PDF
         // backends would place them.
-        let offsets = afm::char_x_offsets_inches(text, style.face, style.size_pt, 1.0);
+        let offsets = afm::char_x_offsets_inches(text, style.face, style.size_pt);
         let theta = style.rotation_deg.to_radians();
         let (cos_t, sin_t) = (theta.cos(), theta.sin());
         let dpi = self.dpi;

@@ -28,8 +28,9 @@ use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::AxisType;
 use crate::plotmath::Label;
+use crate::recycle::nth;
 
-use super::{Device, Side, Xpd, format_axis_labels};
+use super::{Device, Side, Xpd, default_padj, format_axis_labels, las_perpendicular, las_rotation};
 
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
@@ -38,14 +39,15 @@ crate::setters::options! {
     /// The arguments of R's `axis()` other than `side`, plus the inline
     /// graphical parameters it uses, with R's defaults. `None` is R's `NA` (or
     /// `NULL`), which falls back to the matching `par()` value unless the
-    /// field says otherwise.
+    /// setter says otherwise.
     #[derive(Clone, Debug)]
     pub struct AxisOptions => [AxisCall] {
         /// Tick positions, in user coordinates (data units, also on a log
         /// axis). `None`: the default ticks from `axp` (else
         /// `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
-        pub at: Option<Vec<f64>> => option_values f64,
-        /// Labels for the ticks in `at` (requires `at`): text or plotmath
+        pub at: Option<Vec<f64>> => option_numbers f64,
+        /// Labels for the ticks in `at` (requires `at`, as many; otherwise an
+        /// error of the call): text or plotmath
         /// expressions (`Some("a".into())`, `Some(Label::math("10^5"))`).
         /// `None`: `at` formatted like R's `formatReal()`. An inner `None` (a
         /// character `NA`) draws the tick but not its label, and doesn't count
@@ -59,78 +61,127 @@ crate::setters::options! {
         /// Distance of the axis line from the plot region (inner region for
         /// `outer`), in margin lines; the labels sit `mgp[1]` lines beyond it.
         /// `None`: the axis line at `mgp[2]` and the labels at `mgp[1]` lines.
-        pub line: Option<f64> => option f64,
+        pub line: Option<f64> => number f64,
         /// Where to draw the axis line, as a user coordinate on the other
         /// axis; overrides `line`. The labels sit `mgp[1]` lines beyond it.
         /// `None`: use `line`.
-        pub pos: Option<f64> => option f64,
+        pub pos: Option<f64> => number f64,
         /// Whether to measure `line` from the inner region (inside
-        /// `par(oma)`) rather than the plot region. Default `false`.
+        /// [`par(oma)`]) rather than the plot region. Default `false`.
+        ///
+        /// [`par(oma)`]: crate::par::Par::oma
         pub outer: bool => value bool,
-        /// Font of the labels. `None`: `par(font.axis)`.
+        /// Font of the labels. `None`: [`par(font.axis)`].
+        ///
+        /// [`par(font.axis)`]: crate::par::Par::font_axis
         pub font: Option<FontFace> => option FontFace,
         /// Line type of the axis line and ticks. `None`: solid (R's default,
-        /// not `par(lty)`).
+        /// not [`par(lty)`]).
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Option<LineType> => option LineType,
         /// Width of the axis line; 0 or less draws no axis line. `None`: 1
-        /// (R's default, not `par(lwd)`).
-        pub lwd: Option<f64> => option f64,
+        /// (R's default, not [`par(lwd)`]).
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
+        pub lwd: Option<f64> => number f64,
         /// Width of the tick marks; 0 or less draws no ticks. `None`: `lwd`.
         /// R's `lwd.ticks`.
-        pub lwd_ticks: Option<f64> => option f64,
-        /// Colour of the axis line. `None`: `par(fg)`.
-        pub col: Option<ColorSpec> => option ColorSpec,
+        pub lwd_ticks: Option<f64> => number f64,
+        /// Colour of the axis line. `None`: [`par(fg)`].
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
+        pub col: Option<ColorSpec> => option_value ColorSpec,
         /// Colour of the tick marks. `None`: `col`. R's `col.ticks`.
-        pub col_ticks: Option<ColorSpec> => option ColorSpec,
+        pub col_ticks: Option<ColorSpec> => option_value ColorSpec,
         /// Justification of every label along its reading direction. `None`:
         /// centred for labels parallel to the axis, otherwise right-justified
         /// on sides 1 and 2 and left-justified on 3 and 4.
-        pub hadj: Option<f64> => option f64,
+        pub hadj: Option<f64> => number f64,
         /// Justification across each label, recycled over the ticks in
-        /// increasing order of `at`. `NaN` entries and an empty vector mean
-        /// the default, which depends on `side` and `las` (0, i.e. baseline
-        /// on the line, for `las = 0`).
-        pub padj: Vec<f64> => values f64,
+        /// increasing order of `at`. `None` entries (R's `NA`) and an empty
+        /// vector mean the default, which depends on `side` and `las` (0,
+        /// i.e. baseline on the line, for `las = 0`).
+        pub padj: Vec<Option<f64>> => na_values f64,
         /// Minimum gap between labels, in "m" widths (labels parallel to the
         /// axis) or "M" heights (perpendicular); a label closer than that to
         /// the previous one is dropped. `None`: 1 or 0.25. R's `gap.axis`.
-        pub gap_axis: Option<f64> => option f64,
-        /// Size of the labels. `None`: `par(cex.axis)`; overrides it for this
+        pub gap_axis: Option<f64> => number f64,
+        /// Size of the labels. `None`: [`par(cex.axis)`]; overrides it for this
         /// call only.
-        pub cex_axis: Option<f64> => option f64,
-        /// Colour of the labels. `None`: `par(col.axis)`; overrides it for
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
+        pub cex_axis: Option<f64> => number f64,
+        /// Colour of the labels. `None`: [`par(col.axis)`]; overrides it for
         /// this call only.
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
-        /// Orientation of the labels. `None`: `par(las)`; overrides it for
+        ///
+        /// [`par(col.axis)`]: crate::par::Par::col_axis
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
+        /// Orientation of the labels. `None`: [`par(las)`]; overrides it for
         /// this call only.
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
         /// Range and number of the default ticks, used when `at` is `None`.
-        /// `None`: `par(xaxp)` (sides 1, 3) or `par(yaxp)` (sides 2, 4);
+        /// `None`: [`par(xaxp)`] (sides 1, 3) or [`par(yaxp)`] (sides 2, 4);
         /// overrides it for this call only.
+        ///
+        /// [`par(xaxp)`]: crate::par::Par::xaxp
+        /// [`par(yaxp)`]: crate::par::Par::yaxp
         pub axp: Option<[f64; 3]> => array [f64; 3],
         /// Margin lines for the axis title, labels and line (only the labels
-        /// and line are used here). `None`: `par(mgp)`; overrides it for this
+        /// and line are used here). `None`: [`par(mgp)`]; overrides it for this
         /// call only.
+        ///
+        /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
         /// Whether to draw the axis at all: `AxisType::None` draws nothing.
-        /// `None`: `par(xaxt)` (sides 1, 3) or `par(yaxt)` (sides 2, 4).
+        /// `None`: [`par(xaxt)`] (sides 1, 3) or [`par(yaxt)`] (sides 2, 4).
+        ///
+        /// [`par(xaxt)`]: crate::par::Par::xaxt
+        /// [`par(yaxt)`]: crate::par::Par::yaxt
         pub axt: Option<AxisType> => option AxisType,
         /// Tick length as a fraction of the plot region (of its height for an
         /// x axis if above 0.5, else of its smaller side); positive points
-        /// inwards. Overrides `tcl`. `None`: `par(tck)`, which is `NA` by
+        /// inwards. Overrides `tcl`. `None`: [`par(tck)`], which is `NA` by
         /// default, meaning `tcl` is used.
-        pub tck: Option<f64> => option f64,
+        ///
+        /// [`par(tck)`]: crate::par::Par::tck
+        pub tck: Option<f64> => number f64,
         /// Tick length in margin lines; negative points outwards. `None`:
-        /// `par(tcl)`.
-        pub tcl: Option<f64> => option f64,
+        /// [`par(tcl)`].
+        ///
+        /// [`par(tcl)`]: crate::par::Par::tcl
+        pub tcl: Option<f64> => number f64,
         /// How far ticks and labels may reach along the axis: the plot
-        /// region, figure region or device, as for `par(xpd)`. The axis is
-        /// always clipped to the device, as R does. `None`: `par(xpd)`.
+        /// region, figure region or device, as for [`par(xpd)`]. The axis is
+        /// always clipped to the device, as R does. `None`: [`par(xpd)`].
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
         /// Ends of the axis line and ticks (`"round"`, `"butt"`,
-        /// `"square"`). `None`: `par(lend)`.
+        /// `"square"`). `None`: [`par(lend)`].
+        ///
+        /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::AxisExtras => no_setter,
     }
+}
+
+/// How `axis()` sets its labels: worked out from `side` and `las`, then
+/// adjusted by the extras ([`crate::extra::axis_labels`]).
+pub(crate) struct AxisLabelStyle {
+    /// Rotation, in degrees.
+    pub angle: f64,
+    /// Whether the labels read along the axis (they get `GMtext()`'s line
+    /// bias, are centred on their tick and measured by width).
+    pub parallel: bool,
+    /// The default `padj`.
+    pub padj: f64,
+    /// Whether labels closer than `gap.axis` to the previous one are
+    /// dropped.
+    pub drop_overlaps: bool,
 }
 
 impl Default for AxisOptions {
@@ -163,18 +214,8 @@ impl Default for AxisOptions {
             tcl: None,
             xpd: None,
             lend: None,
+            extra: Default::default(),
         }
-    }
-}
-
-/// `ComputePAdjValue()`: the default `padj` for `side` and `las`.
-fn default_padj(side: Side, las: i32) -> f64 {
-    let x_axis = side.is_horizontal();
-    match las {
-        1 if !x_axis => 0.5,
-        2 => 0.5,
-        3 if x_axis => 0.5,
-        _ => 0.0,
     }
 }
 
@@ -200,11 +241,14 @@ impl<B: Backend> Device<B> {
         let x_axis = side.is_horizontal();
         let las = opts.las.unwrap_or(self.par.las);
         let mgp = opts.mgp.unwrap_or(self.par.mgp);
-        let perpendicular = if x_axis {
-            las == 2 || las == 3
-        } else {
-            las == 1 || las == 2
+        let mut style = AxisLabelStyle {
+            angle: las_rotation(side, las),
+            parallel: !las_perpendicular(side, las),
+            padj: default_padj(side, las),
+            drop_overlaps: true,
         };
+        crate::extra::axis_labels(&opts.extra, &mut style);
+        let perpendicular = !style.parallel;
 
         // `line` = NA: the axis line sits at `mgp[2]`, and the labels'
         // `mgp[1]` is not taken relative to it.
@@ -264,12 +308,9 @@ impl<B: Backend> Device<B> {
         // `getxlimits`/`getylimits` (from the caller's `xpd`, before
         // `C_axis` forces it to NA) widened by `GetAxisLimits`, in `usr`
         // units: ticks outside are skipped.
-        let (u0, u1) = if x_axis {
-            (self.usr.0, self.usr.1)
-        } else {
-            (self.usr.2, self.usr.3)
-        };
-        let (left, right) = self.xpd_limits(x_axis, opts.xpd.unwrap_or(self.par.xpd));
+        let map = self.axis_map(x_axis);
+        let (u0, u1) = (map.u0, map.u1);
+        let (left, right) = self.xpd_limits(x_axis, self.clip_for(opts.xpd));
         let (left, right) = (left.min(right), left.max(right));
         let eps = if right == left {
             0.5 * FLT_EPSILON
@@ -279,12 +320,7 @@ impl<B: Backend> Device<B> {
         let (low, high) = (left - eps, right + eps);
 
         // Device position (inches) along the axis of a `usr` value.
-        let (d0, d1) = if x_axis {
-            (self.plt.x0, self.plt.x1)
-        } else {
-            (self.plt.y0, self.plt.y1)
-        };
-        let along = move |v: f64| d0 + (v - u0) / (u1 - u0) * (d1 - d0);
+        let along = move |v: f64| map.inches(v);
         let point = |perp: f64, along: f64| {
             if x_axis {
                 Point::new(along, perp)
@@ -379,14 +415,14 @@ impl<B: Backend> Device<B> {
         let col_axis = opts.col_axis.unwrap_or(ColorSpec::Color(self.par.col_axis));
         let face = font;
         let size_pt = self.font_size_pt(cex);
-        let m_h = afm::m_height_inches(face, size_pt, 1.0);
+        let m_h = afm::m_height_inches(face, size_pt);
         let gap = opts
             .gap_axis
             .unwrap_or(if perpendicular { 0.25 } else { 1.0 })
             * if perpendicular {
                 m_h
             } else {
-                afm::str_width_inches("m", face, size_pt, 1.0)
+                afm::str_width_inches("m", face, size_pt)
             };
         let hadj = opts
             .hadj
@@ -397,8 +433,8 @@ impl<B: Backend> Device<B> {
                 0.5
             });
         // `GMtext()`'s rotation and `yLineBias` nudge.
-        let angle = if x_axis == perpendicular { 90.0 } else { 0.0 };
-        let bias = self.line_bias(side, !perpendicular);
+        let angle = style.angle;
+        let bias = self.line_bias(side, style.parallel);
         let label_perp = axis_base + outward * (mgp[1] - lineoff + bias) * lh;
 
         // Labels left to right (bottom to top), skipping those within `gap`
@@ -415,15 +451,10 @@ impl<B: Backend> Device<B> {
             if !(low < v && v < high) {
                 continue;
             }
-            let padj = match opts.padj.len() {
-                0 => f64::NAN,
-                n => opts.padj[i % n],
-            };
-            let padj = if padj.is_finite() {
-                padj
-            } else {
-                default_padj(side, las)
-            };
+            let padj = nth(&opts.padj, i)
+                .flatten()
+                .filter(|p| p.is_finite())
+                .unwrap_or(style.padj);
             let temp = along(v);
             let label = match label {
                 Label::Text(t) => t.as_str(),
@@ -438,13 +469,11 @@ impl<B: Backend> Device<B> {
                     continue;
                 }
             };
-            let labw = if perpendicular {
-                m_h
-            } else {
-                afm::str_width_inches(label, face, size_pt, 1.0)
-            };
+            // `GStrHeight()`/`GStrWidth()`: multi-line labels count every line.
+            let (w, h) = self.text_size_inches(label, face, cex);
+            let labw = if perpendicular { h } else { w };
             let tnew = temp - 0.5 * labw;
-            if tnew - tlast >= gap {
+            if !style.drop_overlaps || tnew - tlast >= gap {
                 self.text_at_clipped(
                     Xpd::Device,
                     point(label_perp, temp),

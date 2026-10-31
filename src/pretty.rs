@@ -14,7 +14,7 @@
 //!
 //! - `GEPretty()` in `r-source/src/main/engine.c` - used (through
 //!   `GAxisPars()`, see [`axis_pars`]) by `plot.window()` to set
-//!   `par("xaxp")`/`par("yaxp")`, from which `axis()` places its default
+//!   [`par("xaxp")`]/[`par("yaxp")`], from which `axis()` places its default
 //!   ticks ([`create_at_vector`]). See [`ge_pretty`].
 //! - `pretty.default()` in `r-source/src/library/base/R/pretty.R` - the
 //!   user-facing `pretty()` function, also used internally by
@@ -24,6 +24,9 @@
 //! shrink_sml, high_u_bias, u5_bias, f_min, eps_correction, bounds)`
 //! parameters, kept here as a single generic function so the shared
 //! structure is easy to check line-by-line against the original.
+//!
+//! [`par("xaxp")`]: crate::par::Par::xaxp
+//! [`par("yaxp")`]: crate::par::Par::yaxp
 
 const ROUNDING_EPS: f64 = 1e-10;
 
@@ -239,27 +242,7 @@ pub fn ge_pretty(lo_in: f64, up_in: f64, ndiv_in: i32) -> (f64, f64, i32) {
     (ns * unit, nu * unit, ndiv)
 }
 
-/// Convenience wrapper returning the actual tick values, mirroring what
-/// `axis()` / `axTicks()` would show for a default (`n = 5`) linear axis.
-///
-/// Ticks are placed as `CreateAtVector()` (`main/plot.c`) does for a linear
-/// axis: `lo + (i / ndiv) * (up - lo)`, with any tick closer to zero than
-/// `|up - lo| / (100 * ndiv)` set to exactly 0 (otherwise e.g. -0.2..0.4
-/// would get a `2.775558e-17` tick).
-pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
-    let (lo, up, ndiv) = ge_pretty(lo, up, ndiv);
-    let dn = ndiv.max(1) as f64;
-    let range = up - lo;
-    let small = range.abs() / (100.0 * dn);
-    (0..=ndiv)
-        .map(|i| {
-            let at = lo + (i as f64 / dn) * range;
-            if at.abs() < small { 0.0 } else { at }
-        })
-        .collect()
-}
-
-/// `GAxisPars()` (`main/graphics.c`): `par("xaxp")`/`par("yaxp")` for a `usr`
+/// `GAxisPars()` (`main/graphics.c`): [`par("xaxp")`]/[`par("yaxp")`] for a `usr`
 /// range `min..max` (log10 units on a log axis; may be decreasing) and
 /// `n = par("lab")` intervals: `[first tick, last tick, intervals]`.
 ///
@@ -269,6 +252,9 @@ pub fn pretty_ticks(lo: f64, up: f64, ndiv: i32) -> Vec<f64> {
 /// only); under about two decades it is the negated interval count of
 /// linear `pretty()` ticks instead. A range too small for `pretty()` gives
 /// the range itself, less 0.5% at each end, with 1 interval (R warns).
+///
+/// [`par("xaxp")`]: crate::par::Par::xaxp
+/// [`par("yaxp")`]: crate::par::Par::yaxp
 pub fn axis_pars(min: f64, max: f64, n: i32, log: bool) -> [f64; 3] {
     const EPS_FAC_2: f64 = 16.0;
     let swap = min > max;
@@ -446,14 +432,6 @@ pub fn create_at_vector(axp: [f64; 3], umin: f64, umax: f64, nint: i32, log: boo
     at
 }
 
-/// Default tick values, in data units, for a log axis whose `usr` range is
-/// `log_lo..log_hi` (log10 units) with `nint` intervals: [`axis_pars`] then
-/// [`create_at_vector`].
-pub fn log_axis_ticks(log_lo: f64, log_hi: f64, nint: i32) -> Vec<f64> {
-    let axp = axis_pars(log_lo, log_hi, nint, true);
-    create_at_vector(axp, 10f64.powf(log_lo), 10f64.powf(log_hi), nint, true)
-}
-
 /// Port of base R's `pretty.default()` (the user-facing `pretty()`
 /// function), used by e.g. `hist.default()` to choose bin edges. Unlike
 /// [`ge_pretty`], this uses `pretty.default()`'s own constants
@@ -506,10 +484,21 @@ pub fn pretty_r(lo_in: f64, up_in: f64, n: i32, min_n: i32) -> Vec<f64> {
 mod tests {
     use super::*;
 
+    /// Default ticks for the `usr` range `lo..hi` (data units), as
+    /// `axTicks()`: [`axis_pars`] then [`create_at_vector`].
+    fn ax_ticks(lo: f64, hi: f64, log: bool) -> Vec<f64> {
+        let (ulo, uhi) = if log {
+            (lo.log10(), hi.log10())
+        } else {
+            (lo, hi)
+        };
+        create_at_vector(axis_pars(ulo, uhi, 5, log), lo, hi, 5, log)
+    }
+
     /// Values as R's `axTicks()` gives them for these `usr` ranges.
     #[test]
     fn log_axis_ticks_follow_r_rules() {
-        let ticks = |lo: f64, hi: f64| log_axis_ticks(lo.log10(), hi.log10(), 5);
+        let ticks = |lo: f64, hi: f64| ax_ticks(lo, hi, true);
         // Under 2 decades between powers inside: 1, 2, 5.
         assert_eq!(
             ticks(3.0, 700.0),
@@ -524,13 +513,13 @@ mod tests {
         assert_eq!(ticks(1.0, 1e6), [1.0, 10.0, 100.0, 1e3, 1e4, 1e5, 1e6]);
         assert_eq!(ticks(1e-5, 1e5), [1e-5, 1e-3, 1e-1, 1e1, 1e3, 1e5]);
         // Less than a decade: linear pretty() ticks.
-        assert_eq!(ticks(2.0, 15.0), pretty_ticks(2.0, 15.0, 5));
+        assert_eq!(ticks(2.0, 15.0), ax_ticks(2.0, 15.0, false));
     }
 
     #[test]
     fn matches_known_r_output() {
         // R: pretty(c(0, 10)) -> 0 2 4 6 8 10
-        let ticks = pretty_ticks(0.0, 10.0, 5);
+        let ticks = ax_ticks(0.0, 10.0, false);
         assert_eq!(ticks, vec![0.0, 2.0, 4.0, 6.0, 8.0, 10.0]);
     }
 

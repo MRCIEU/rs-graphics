@@ -7,59 +7,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks `pie()` against a real R `pdf()` device's uncompressed
-//! output: every vertex of every slice polygon and label tick line, and
-//! every label/title text origin, for square, wide and tall pages,
+//! output: every slice polygon, label tick line and text item in order
+//! (see `common::pdf::assert_same`), for square, wide and tall pages,
 //! `clockwise`/`init.angle`/`radius`, and `par(xaxs = "i")` (which
 //! exercises `plot.window(asp = 1)`'s own range widening). Skipped if
 //! `Rscript` isn't available.
 
 use crate::common;
+use crate::common::{pdf, r};
 
-use std::process::Command;
-
-use rs_graphics::backend::pdf::PdfBackend;
-use rs_graphics::device::Device;
-use rs_graphics::highlevel::PieOptions;
-use rs_graphics::par::{AxisStyle, Par};
 use rs_graphics::graphics::Graphics;
-
-/// Every stroked/filled `m`/`l` path's vertices, in drawing order (clips
-/// and rectangles are skipped).
-fn paths(pdf: &str) -> Vec<Vec<(f64, f64)>> {
-    let mut out = Vec::new();
-    let mut cur: Vec<(f64, f64)> = Vec::new();
-    for tok_line in pdf.lines() {
-        let toks: Vec<&str> = tok_line.split_whitespace().collect();
-        for (i, t) in toks.iter().enumerate() {
-            let num = |k: usize| toks[i - k].parse::<f64>().unwrap();
-            match *t {
-                "m" | "l" => cur.push((num(2), num(1))),
-                "re" | "n" => cur.clear(),
-                "S" | "s" | "f" | "B" | "b" | "f*" | "B*" | "b*" => {
-                    if !cur.is_empty() {
-                        out.push(std::mem::take(&mut cur));
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    out
-}
-
-/// `(x, y)` of every text matrix, in drawing order.
-fn text_origins(pdf: &str) -> Vec<(f64, f64)> {
-    let mut out = Vec::new();
-    for line in pdf.lines() {
-        let toks: Vec<&str> = line.split_whitespace().collect();
-        for (i, t) in toks.iter().enumerate() {
-            if *t == "Tm" {
-                out.push((toks[i - 2].parse().unwrap(), toks[i - 1].parse().unwrap()));
-            }
-        }
-    }
-    out
-}
+use rs_graphics::highlevel::PieOptions;
+use rs_graphics::par::{AxisStyle, ParOptions};
 
 struct Case {
     name: &'static str,
@@ -129,76 +88,44 @@ fn pie_matches_r() {
     if !common::r_available() {
         return;
     }
-    let dir = std::env::temp_dir();
     let cases = cases();
-    let mut script = String::new();
-    for c in &cases {
-        script.push_str(&format!(
-            "pdf(file = '{}', width = {}, height = {}, compress = FALSE)\n\
-             par(xaxs = '{ax}', yaxs = '{ax}')\n\
-             pie(c(18, 25, 12, 30, 15), labels = c('Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'), \
-             main = 'pie()'{})\ninvisible(dev.off())\n",
-            dir.join(format!("rs_graphics_pie_{}.pdf", c.name)).display(),
-            c.width,
-            c.height,
-            c.r_args,
-            ax = if c.exact_axes { "i" } else { "r" },
-        ));
-    }
-    let script_path = dir.join("rs_graphics_pie.R");
-    std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&script_path)
-        .output()
-        .expect("run Rscript");
-    assert!(
-        out.status.success(),
-        "Rscript failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    for c in &cases {
-        let path = dir.join(format!("rs_graphics_pie_{}.pdf", c.name));
-        let r_pdf = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
-
-        let mut par = Par::default();
+    let codes: Vec<String> = cases
+        .iter()
+        .map(|c| {
+            format!(
+                "par(xaxs = '{ax}', yaxs = '{ax}')\n\
+                 pie(c(18, 25, 12, 30, 15), labels = c('Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'), \
+                 main = 'pie()'{})",
+                c.r_args,
+                ax = if c.exact_axes { "i" } else { "r" },
+            )
+        })
+        .collect();
+    let r_cases: Vec<_> = cases
+        .iter()
+        .zip(&codes)
+        .map(|(c, r)| (c.name, (c.width, c.height), r.as_str()))
+        .collect();
+    let r = r::run_r_sized("pie", "", &r_cases);
+    for (c, r_pdf) in cases.iter().zip(&r.pdfs) {
+        let mut par = ParOptions::default();
         if c.exact_axes {
-            par.xaxs = AxisStyle::Exact;
-            par.yaxs = AxisStyle::Exact;
+            par = par.xaxs(AxisStyle::Exact).yaxs(AxisStyle::Exact);
         }
-        let mut dev = Device::new(PdfBackend::new(c.width, c.height).with_compression(false), par);
-        let opts = PieOptions {
-            labels: Some(LABELS.iter().map(|&s| s.into()).collect()),
-            main: Some("pie()".into()),
-            clockwise: c.clockwise,
-            init_angle: c.init_angle,
-            radius: Some(c.radius),
-            ..PieOptions::default()
-        };
-        dev.pie().x(VALUES).with(&opts).draw();
-        let ours = String::from_utf8_lossy(&dev.into_backend().finish()).into_owned();
-
-        let (r_p, o_p) = (paths(&r_pdf), paths(&ours));
-        assert_eq!(o_p.len(), r_p.len(), "{}: path count", c.name);
-        for (k, (a, b)) in o_p.iter().zip(&r_p).enumerate() {
-            assert_eq!(a.len(), b.len(), "{}: path {k} vertex count", c.name);
-            for (p, q) in a.iter().zip(b) {
-                assert!(
-                    (p.0 - q.0).abs() < 0.05 && (p.1 - q.1).abs() < 0.05,
-                    "{}: path {k} vertex differs: ours={p:?} r={q:?}",
-                    c.name
-                );
-            }
-        }
-
-        let (r_t, o_t) = (text_origins(&r_pdf), text_origins(&ours));
-        assert_eq!(o_t.len(), r_t.len(), "{}: text count", c.name);
-        for (a, b) in o_t.iter().zip(&r_t) {
-            assert!(
-                (a.0 - b.0).abs() < 0.05 && (a.1 - b.1).abs() < 0.05,
-                "{}: text origin differs: ours={a:?} r={b:?}",
-                c.name
-            );
-        }
+        let opts = PieOptions::default()
+            .labels(LABELS)
+            .main("pie()")
+            .clockwise(c.clockwise)
+            .init_angle(c.init_angle)
+            .radius(c.radius);
+        let (ours, ()) = r::ours_with((c.width, c.height), par, |dev| {
+            dev.pie().x(VALUES).with(&opts).draw();
+        });
+        pdf::assert_same_pdf(
+            c.name,
+            pdf::parse(&ours),
+            pdf::parse(r_pdf),
+            &pdf::Compare::default(),
+        );
     }
 }

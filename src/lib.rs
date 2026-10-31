@@ -31,7 +31,7 @@
 //!     .draw();
 //! dev.abline().h(6.0).col("grey").lty("dashed").draw();
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! [`device::Device`] holds the page and `par()` state. Every R graphics
@@ -45,11 +45,18 @@
 //! [`error::Error`] instead. To reuse a set of arguments, build its options struct
 //! (`AxisOptions`, ...) once and pass it with `.with(&opts)`.
 //! [`prelude`] imports it all, including the trait. As in R, numbers may
-//! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim(0, 12)` (data
+//! be integers or floats: `dev.plot().x(1..=10).y(&y).cex(2).xlim([0, 12])` (data
 //! vectors are any [`Numbers`](numbers::Numbers), by reference or by
 //! value; `f64` data isn't copied either way; one number is a vector of
-//! one, as in R: `plot(1, 1)` is `.x(1).y(1)`). R's `NA` in a style vector is `None`:
-//! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`.
+//! one, as in R: `plot(1, 1)` is `.x(1).y(1)`). R's `NA` in a setting is `None`:
+//! `legend(pch = c(19, NA))` is `.pch([Some(19), None])`; in data and
+//! coordinates (`x`, `y`, ...) a missing value is `f64::NAN`, and is skipped.
+//!
+//! New to R's plotting words (`cex`, `pch`, margins, ...)? See
+//! [`guide::concepts`]. Translating R code? See [`guide::coming_from_r`]
+//! and [`guide::r_reference`], every R function and argument with its Rust
+//! form. [`charts`] shows the symbols, line types, colours and fonts to
+//! choose from.
 //!
 //! # Devices and files
 //!
@@ -69,9 +76,14 @@
 //! page number in a PNG or SVG file name (`"Rplot%03d.png"`) gives one
 //! file per page, as in R; for PDF, a page number plus `onefile(false)`
 //! (R's `pdf("Rplot%03d.pdf", onefile = FALSE)`).
-//! [`Device::new`](device::Device::new) takes a backend directly instead:
-//! for output kept in memory ([`finish`](device::Device::finish)) and
-//! backend options the builder doesn't cover.
+//! [`Device::null`](device::Device::null) (R's `pdf(NULL)`) opens a device
+//! that draws nothing and writes no file, but measures as a PDF device: to
+//! check that a figure fits a page, to measure, or to run drawing code
+//! fast. [`Device::memory`](device::Device::memory) keeps the output in
+//! memory ([`finish`](device::Device::finish) returns the bytes), with the
+//! same options as a file device. [`Device::new`](device::Device::new)
+//! takes a backend of your own (one implementing
+//! [`Backend`](backend::Backend)).
 //!
 //! # High-level and low-level functions
 //!
@@ -89,7 +101,7 @@
 //!
 //! `par()`'s [`mfrow`](graphics::ParCall::mfrow) and
 //! [`mfcol`](graphics::ParCall::mfcol), as in R, and
-//! [`Device::layout`](device::Device::layout) split the page into panels;
+//! [`layout()`](graphics::Graphics::layout) split the page into panels;
 //! each high-level call (or `plot_new()`) fills the next one, and
 //! low-level calls after it draw in that panel. `par()`'s
 //! [`mfg`](graphics::ParCall::mfg) picks the next panel,
@@ -102,20 +114,21 @@
 //!
 //! let x = [1.0, 2.0, 3.0, 4.0];
 //! let mut dev = Device::pdf("panels.pdf").width(8.0).height(4.0).open()?;
-//! dev.par().mfrow(1, 2).oma([0.0, 0.0, 2.0, 0.0]).draw();
+//! dev.par().mfrow([1, 2]).oma([0.0, 0.0, 2.0, 0.0]).draw();
 //! dev.plot().x(&x).y(&[1.0, 4.0, 9.0, 16.0]).draw(); // panel 1
 //! dev.abline().a(0).b(4).draw(); // still panel 1
 //! dev.hist().x(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
 //! dev.mtext().text("Two panels").side(3).outer(true).line(0.5).draw();
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! # Figures as values
 //!
 //! A [`recording::Figure`] implements the same trait but records the calls
 //! instead of drawing them, so a figure (a plot and its margins, as R's
-//! figure region) can be built without a device and drawn later with
+//! figure region, or a whole plot with its page layout and pages) can be
+//! built without a device and drawn later with
 //! [`Device::add_figure`](device::Device::add_figure) (or
 //! [`add_figure_at`](device::Device::add_figure_at) for a chosen panel),
 //! as often as needed and on any device. The output is identical to making
@@ -129,10 +142,10 @@
 //! fig.hist().x(&[1.0, 2.0, 2.5, 3.0, 3.2]).main("Recorded").draw();
 //!
 //! let mut dev = Device::pdf("figure.pdf").width(8.0).height(4.0).open()?;
-//! dev.par().mfrow(1, 2).draw();
+//! dev.par().mfrow([1, 2]).draw();
 //! dev.add_figure_at(1, 2, &fig); // right-hand panel
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! # Your own plots
@@ -160,32 +173,32 @@
 //! let mut dev = Device::svg("diagnostic.svg").width(5.0).height(5.0).open()?;
 //! dev.obs_vs_exp(&[1.0, 2.0, 3.0], &[1.1, 1.9, 3.3]);
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 
-#[doc(hidden)]
-pub mod afm;
+mod afm;
 pub mod backend;
+pub mod charts;
 pub mod color;
 pub mod device;
 pub mod error;
+pub mod extra;
 pub mod font;
 pub mod geometry;
 pub mod graphics;
+pub mod guide;
 pub mod highlevel;
 pub mod layout;
 pub mod lty;
-#[doc(hidden)]
-pub mod named_colors;
+mod named_colors;
 pub mod numbers;
 pub mod par;
-#[doc(hidden)]
-pub mod pch;
+mod pch;
 pub mod plotmath;
 pub mod prelude;
-#[doc(hidden)]
-pub mod pretty;
+mod pretty;
 pub mod recording;
+mod recycle;
 pub mod setters;
 
 pub use error::{Error, ErrorKind};

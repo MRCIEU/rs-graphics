@@ -10,10 +10,12 @@
 //!
 //! Lines span `getxlimits`/`getylimits` (the plot region, the figure
 //! region with `xpd = TRUE`, or the device with `xpd = NA`; inline or
-//! from `par(xpd)`) and are clipped to the same region.
+//! from [`par(xpd)`]) and are clipped to the same region.
 //! On log axes `h`/`v` are data values, and the `a`/`b` line is straight on
 //! the page (`untf = FALSE`) or `y = a + b * x` in data units (`untf =
 //! TRUE`).
+//!
+//! [`par(xpd)`]: crate::par::Par::xpd
 
 use crate::backend::{Backend, LineEnd, LineJoin};
 use crate::color::ColorSpec;
@@ -21,57 +23,78 @@ use crate::error::Error;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::Xpd;
-use crate::setters::pick_na;
+use crate::recycle::pick_na;
 
 use super::Device;
 
 crate::setters::options! {
     /// The arguments of R's `abline()`, with R's defaults. Empty
-    /// `col`/`lty`/`lwd` mean `par("col")`/`par("lty")`/`par("lwd")`;
+    /// `col`/`lty`/`lwd` mean [`par(col)`]/[`par(lty)`]/[`par(lwd)`];
     /// otherwise they are recycled over the lines in drawing order: each
     /// `a`/`b` line, then each `h`, then each `v`.
     ///
     /// Unlike R, `a` and `b` take several values (one line per pair), so every
     /// kind of line can be given several times. R's `coef = c(a, b)` (and
     /// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
+    ///
+    /// [`par(col)`]: crate::par::Par::col
+    /// [`par(lty)`]: crate::par::Par::lty
+    /// [`par(lwd)`]: crate::par::Par::lwd
     #[derive(Clone, Debug, Default)]
     pub struct AblineOptions => [AblineCall] {
         /// Intercepts of the lines `y = a + b * x`, paired with `b` (either
         /// may have a single value, used for every line). Empty (with `b`):
-        /// no such lines.
-        pub a: Vec<f64> => values f64,
-        /// Slopes of the lines `y = a + b * x`, paired with `a`.
-        pub b: Vec<f64> => values f64,
+        /// no such lines. It is an error of the call if only one of `a` and
+        /// `b` is given, if both have several values but not as many, or if a
+        /// value isn't finite.
+        pub a: Vec<f64> => numbers f64,
+        /// Slopes of the lines `y = a + b * x`, paired with `a` (see `a` for
+        /// the errors). Empty (with `a`): no such lines.
+        pub b: Vec<f64> => numbers f64,
         /// On log axes, draws each `y = a + b * x` in data units (a curve)
         /// rather than as a straight line in log units. Default `false`.
         pub untf: bool => value bool,
         /// Horizontal lines at these y values. Empty: none.
-        pub h: Vec<f64> => values f64,
+        pub h: Vec<f64> => numbers f64,
         /// Vertical lines at these x values. Empty: none.
-        pub v: Vec<f64> => values f64,
-        /// Line colours, recycled over the lines. Empty: `par(col)`.
+        pub v: Vec<f64> => numbers f64,
+        /// Line colours, recycled over the lines. Empty: [`par(col)`].
+        ///
+        /// [`par(col)`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Line types, recycled over the lines. Empty: `par(lty)`; `None`:
+        /// Line types, recycled over the lines. Empty: [`par(lty)`]; `None`:
         /// no line.
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
-        /// Line widths, recycled over the lines. Empty: `par(lwd)`; `None`:
+        /// Line widths, recycled over the lines. Empty: [`par(lwd)`]; `None`:
         /// no line.
+        ///
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
         /// How far the lines run and where they are clipped: the plot region
         /// for [`Xpd::Plot`], the figure region for [`Xpd::Figure`], the
         /// whole device for [`Xpd::Device`] (the setter also takes
-        /// `false`/`true`). `None`: `par(xpd)`; overrides it for this call
+        /// `false`/`true`). `None`: [`par(xpd)`]; overrides it for this call
         /// only.
+        ///
+        /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
         /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: `par(lend)`; overrides it for this call only.
+        /// `None`: [`par(lend)`]; overrides it for this call only.
+        ///
+        /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
         /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: `par(ljoin)`; overrides it for this call only.
+        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        ///
+        /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: `par(lmitre)`;
+        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
         /// overrides it for this call only.
-        pub lmitre: Option<f64> => option f64,
+        ///
+        /// [`par(lmitre)`]: crate::par::Par::lmitre
+        pub lmitre: Option<f64> => number f64,
     }
 }
 
@@ -131,8 +154,8 @@ impl<B: Backend> Device<B> {
             let lwd = pick_na(&opts.lwd, n, dev.par.lwd)?;
             dev.resolve(col).map(|c| dev.stroke_of(c, lwd, lty))
         };
-        let xpd = opts.xpd.unwrap_or(self.par.xpd);
-        self.push_clip_for(xpd);
+        let xpd = self.clip_for(opts.xpd);
+        self.push_clip_region(xpd);
         let (x0, x1) = self.xpd_limits(true, xpd);
         let (y0, y1) = self.xpd_limits(false, xpd);
         for &(a, b) in &lines {
@@ -209,8 +232,6 @@ impl<B: Backend> Device<B> {
         let pts: Vec<Point> = (start..=stop)
             .map(|i| self.data_to_inches(xx[i], yy[i]))
             .collect();
-        pts.iter()
-            .all(|p| p.x.is_finite() && p.y.is_finite())
-            .then_some(pts)
+        pts.iter().all(|p| p.is_finite()).then_some(pts)
     }
 }

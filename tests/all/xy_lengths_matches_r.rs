@@ -89,7 +89,7 @@ fn unequal_xy_lengths_fail_like_r() {
     assert!(expected.iter().any(|e| e == "'x' and 'y' lengths differ"));
 
     for (i, (r, e)) in R_CALLS.iter().zip(&expected).enumerate() {
-        let mut dev = Device::new(PdfBackend::new(6, 6), Par::default());
+        let mut dev = Device::memory("pdf").width(6).height(6).open().unwrap();
         dev.plot().x(1..=10).y(1..=10).draw();
         let on_device = call(&mut dev, i);
         // A `Figure` fails at the call, not only when it is added.

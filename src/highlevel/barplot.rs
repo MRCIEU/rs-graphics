@@ -18,8 +18,8 @@
 //! `axisnames`, `cex.names`, `axis.lty`, shading lines (`density`/
 //! `angle`) and R's inline axis parameters (`las`, `cex.axis`, ...).
 //!
-//! Also `xpd` and `plot = FALSE`. Not supported: `panel.first`/
-//! `panel.last`.
+//! Also `xpd` and `plot = FALSE`. Not supported: `inside`,
+//! `panel.first`/`panel.last` (see `panel_bg`).
 //!
 //! This is R's `barplot(height, ...)`, ported from `barplot.default` in
 //! `r-source/src/library/graphics/R/barplot.R`.
@@ -33,40 +33,46 @@
 //! recycled over every element of the matrix of stacked sums instead of
 //! once per column (so `offset = c(0, 10, 0)` on a 3-column matrix gives
 //! limits that cut off the bars it draws). We use
-//! each column's own offset, as R does when drawing the bars.
+//! each column's own offset, as R does when drawing the bars. On a log
+//! value axis R puts the default legend near the bottom (it passes the
+//! log10 `usr` values to `legend()` as data); ours goes in the top-right
+//! corner, as intended.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec, gray_colors};
 use crate::device::{
     AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions, TitleOptions,
 };
-use crate::error::{Error, from_r_string, from_str_via_parse};
+use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
 use crate::par::{AxisStyle, Xpd};
 use crate::plotmath::Label;
+use crate::recycle::rep_len;
 
 use super::InlineAxis;
 
 crate::setters::options! {
     /// Options for [`Graphics::barplot`](crate::graphics::Graphics::barplot), covering the subset of
-    /// `barplot.default`'s arguments this crate implements. Unset fields are
-    /// R's defaults, given for each.
+    /// `barplot.default`'s arguments this crate implements. Settings left
+    /// unset are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct BarplotOptions => [BarplotCall] {
         /// Labels under the bars, or beside them if `horiz`. For a `beside`
         /// matrix, either one name per bar or one per column (centred under
-        /// each group). `None`: no names (R takes them from
+        /// each group). Unset: no names (R takes them from
         /// `names(height)`/`colnames(height)`, which Rust data doesn't have).
-        /// R's `names.arg`.
-        pub names: Option<Vec<Label>> => list Label,
+        /// A `None` element (R's `NA`) leaves that name out. R's `names.arg`.
+        pub names: Option<Vec<Option<Label>>> => labels Label,
         /// Fill colours, recycled over the bars of a vector or the rows of a
         /// matrix. Empty: `"grey"` for a vector, `gray.colors(nrow)` for a
         /// matrix.
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Colour of the bar borders. `None`: `par(fg)`.
-        pub border: Option<ColorSpec> => option ColorSpec,
+        /// Colour of the bar borders. `None`: [`par(fg)`].
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
+        pub border: Option<ColorSpec> => option_value ColorSpec,
         /// Shading lines per inch in the bars, recycled as `col` is; the
         /// lines take the bar's `col`. `None` or a negative value fills the
         /// bar instead, 0 leaves it empty (see [`RectOptions::density`]).
@@ -75,27 +81,29 @@ crate::setters::options! {
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled as `density` is.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Bar widths, recycled. Empty: 1.
-        pub width: Vec<f64> => values f64,
+        pub width: Vec<f64> => numbers f64,
         /// Space before each bar, as a fraction of the mean bar width: one
         /// value, or `[within group, between groups]` for a `beside` matrix.
         /// `None` (or empty): `0.2`, or `[0, 1]` for a `beside` matrix.
-        pub space: Option<Vec<f64>> => option_values f64,
+        pub space: Option<Vec<f64>> => option_numbers f64,
         /// Matrix only: draws the bars side by side instead of stacked.
         /// Default `false`.
         pub beside: bool => value bool,
         /// Draws horizontal bars. Default `false`.
         pub horiz: bool => value bool,
         /// Legend labels, one per row of a matrix or per bar of a vector,
-        /// filled with `col`. `None`: no legend. R's `legend.text`.
-        pub legend_text: Option<Vec<Label>> => list Label,
+        /// filled with `col`. Unset: no legend. A `None` element (R's `NA`)
+        /// keeps its key, without a label. R's `legend.text`.
+        pub legend_text: Option<Vec<Option<Label>>> => labels Label,
         /// Position of the legend, e.g. `"topleft"` or `(x, y)`. `None`: 0.1
-        /// inch in from the top-right corner of the plot region, as R. R's
-        /// `args.legend = list(x = .., y = ..)`.
+        /// inch in from the top-right corner of the plot region, as R (also
+        /// on a log axis, where R misplaces it). R's `args.legend = list(x =
+        /// .., y = ..)`.
         pub legend_pos: Option<LegendPos> => option LegendPos,
         /// Legend options (e.g. `bty`, `inset`, `ncol`, `cex`, `title`,
-        /// `fill`); every field set here overrides barplot's choice (`fill`
+        /// `fill`); every setting made here overrides barplot's choice (`fill`
         /// from `col`, `xjust = yjust = 1`, otherwise `legend()`'s defaults).
         /// The labels always come from `legend_text`. Default: no overrides.
         /// The rest of R's `args.legend`.
@@ -115,7 +123,7 @@ crate::setters::options! {
         /// Shifts the bars along the value axis, recycled over the bars of a
         /// vector, the rows of a `beside` matrix, or the columns (stacks) of
         /// a stacked one. Empty: 0.
-        pub offset: Vec<f64> => values f64,
+        pub offset: Vec<f64> => numbers f64,
         /// Stacked bars only: order of the segments within each stack; each
         /// segment keeps its row's colour. Default [`OrderH::None`] (row
         /// order). R's `orderH`.
@@ -124,12 +132,16 @@ crate::setters::options! {
         /// plot or panel, no new coordinates; the names, legend and axis are
         /// still drawn. Default `false`. R's `add = TRUE`.
         pub add: bool => value bool,
-        /// Whether to draw the titles. `None`: `par(ann)`, unless `add` (R's
+        /// Whether to draw the titles. `None`: [`par(ann)`], unless `add` (R's
         /// default `ann = !add && par("ann")`).
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
         pub ann: Option<bool> => option bool,
         /// Main title, text or a plotmath expression, as for `plot()`.
         /// `None`: none. Titles are drawn when `ann` is (by default
-        /// `par(ann)`, and not with `add`).
+        /// [`par(ann)`], and not with `add`).
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
         pub main: Option<Label> => option Label,
         /// Subtitle. `None`: none.
         pub sub: Option<Label> => option Label,
@@ -137,68 +149,108 @@ crate::setters::options! {
         pub xlab: Option<Label> => option Label,
         /// Label of the y axis. `None`: none.
         pub ylab: Option<Label> => option Label,
-        /// Size of the main title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
-        pub cex_main: Option<f64> => option f64,
-        /// Colour of the main title. `None`: `par(col.main)`. R's `col.main`.
-        pub col_main: Option<ColorSpec> => option ColorSpec,
-        /// Font of the main title. `None`: `par(font.main)`. R's `font.main`.
+        /// Size of the main title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
+        pub cex_main: Option<f64> => number f64,
+        /// Colour of the main title. `None`: [`par(col.main)`]. R's `col.main`.
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of the main title. `None`: [`par(font.main)`]. R's `font.main`.
+        ///
+        /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
-        /// Size of the subtitle, relative to `par(cex)`. `None`:
-        /// `par(cex.sub)`. R's `cex.sub`.
-        pub cex_sub: Option<f64> => option f64,
-        /// Colour of the subtitle. `None`: `par(col.sub)`. R's `col.sub`.
-        pub col_sub: Option<ColorSpec> => option ColorSpec,
-        /// Font of the subtitle. `None`: `par(font.sub)`. R's `font.sub`.
+        /// Size of the subtitle, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.sub)`]. R's `cex.sub`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.sub)`]: crate::par::Par::cex_sub
+        pub cex_sub: Option<f64> => number f64,
+        /// Colour of the subtitle. `None`: [`par(col.sub)`]. R's `col.sub`.
+        ///
+        /// [`par(col.sub)`]: crate::par::Par::col_sub
+        pub col_sub: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of the subtitle. `None`: [`par(font.sub)`]. R's `font.sub`.
+        ///
+        /// [`par(font.sub)`]: crate::par::Par::font_sub
         pub font_sub: Option<FontFace> => option FontFace,
         /// Size of the axis labels `xlab` and `ylab`, relative to
-        /// `par(cex)`. `None`: `par(cex.lab)`. R's `cex.lab`.
-        pub cex_lab: Option<f64> => option f64,
-        /// Colour of `xlab` and `ylab`. `None`: `par(col.lab)`. R's
+        /// [`par(cex)`]. `None`: [`par(cex.lab)`]. R's `cex.lab`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.lab)`]: crate::par::Par::cex_lab
+        pub cex_lab: Option<f64> => number f64,
+        /// Colour of `xlab` and `ylab`. `None`: [`par(col.lab)`]. R's
         /// `col.lab`.
-        pub col_lab: Option<ColorSpec> => option ColorSpec,
-        /// Font of `xlab` and `ylab`. `None`: `par(font.lab)`. R's
+        ///
+        /// [`par(col.lab)`]: crate::par::Par::col_lab
+        pub col_lab: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of `xlab` and `ylab`. `None`: [`par(font.lab)`]. R's
         /// `font.lab`.
+        ///
+        /// [`par(font.lab)`]: crate::par::Par::font_lab
         pub font_lab: Option<FontFace> => option FontFace,
         /// Draws the value axis. Default `true`.
         pub axes: bool => value bool,
         /// Draws the names. Default `true`.
         pub axisnames: bool => value bool,
-        /// Size of the names. `None`: `par(cex.axis)`. R's `cex.names`.
-        pub cex_names: Option<f64> => option f64,
+        /// Size of the names. `None`: [`par(cex.axis)`]. R's `cex.names`.
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
+        pub cex_names: Option<f64> => number f64,
         /// Line type of the names axis's line and ticks. `None`: none drawn
         /// (R's 0). R's `axis.lty`.
         pub axis_lty: Option<LineType> => option LineType,
         /// Orientation of the axis labels: 0 parallel to the axis, 1
-        /// horizontal, 2 perpendicular, 3 vertical. `None`: `par(las)`.
+        /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
-        /// Size of the axis labels. `None`: `par(cex.axis)`. R's `cex.axis`.
-        pub cex_axis: Option<f64> => option f64,
-        /// Colour of the axis labels. `None`: `par(col.axis)`. R's
+        /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
+        pub cex_axis: Option<f64> => number f64,
+        /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
-        /// Font of the axis labels. `None`: `par(font.axis)`. R's
+        ///
+        /// [`par(col.axis)`]: crate::par::Par::col_axis
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of the axis labels. `None`: [`par(font.axis)`]. R's
         /// `font.axis`.
+        ///
+        /// [`par(font.axis)`]: crate::par::Par::font_axis
         pub font_axis: Option<FontFace> => option FontFace,
         /// Margin lines of the axis titles, labels and line, for the axes
-        /// and titles. `None`: `par(mgp)`.
+        /// and titles. `None`: [`par(mgp)`].
+        ///
+        /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
-        /// Tick length as a fraction of the plot region. `None`: `par(tck)`.
-        pub tck: Option<f64> => option f64,
-        /// Tick length in margin lines. `None`: `par(tcl)`.
-        pub tcl: Option<f64> => option f64,
-        /// Minimum gap between axis labels. `None`: R's default. R's
-        /// `gap.axis`.
-        pub gap_axis: Option<f64> => option f64,
+        /// Tick length as a fraction of the plot region. `None`: [`par(tck)`].
+        ///
+        /// [`par(tck)`]: crate::par::Par::tck
+        pub tck: Option<f64> => number f64,
+        /// Tick length in margin lines. `None`: [`par(tcl)`].
+        ///
+        /// [`par(tcl)`]: crate::par::Par::tcl
+        pub tcl: Option<f64> => number f64,
+        /// Minimum gap between axis labels, in "m" widths (labels parallel
+        /// to the axis) or "M" heights (perpendicular). `None`: 1 or 0.25.
+        /// R's `gap.axis`.
+        pub gap_axis: Option<f64> => number f64,
         /// Width of the axes' line and ticks (not the bars' borders, as in
         /// R). `None`: 1, `axis()`'s default.
-        pub lwd: Option<f64> => option f64,
+        pub lwd: Option<f64> => number f64,
         /// Clipping of the bars, names and legend; the setter also takes
         /// `false`/`true`. `None`: [`Xpd::Figure`] (R's `TRUE`).
         pub xpd: Option<Xpd> => option Xpd,
         /// `false` works out the bars' centres and returns them without
         /// drawing. `None`: `true`.
         pub plot: Option<bool> => option bool,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::PlotExtras => no_setter,
     }
 }
 
@@ -206,6 +258,7 @@ impl Default for BarplotOptions {
     fn default() -> Self {
         BarplotOptions {
             deferred_error: None,
+            extra: Default::default(),
             names: None,
             col: Vec::new(),
             border: None,
@@ -265,6 +318,10 @@ impl Default for BarplotOptions {
 /// unique prefix (`.order_h("decr")`); any other string is an error of the
 /// call.
 ///
+/// From a string (`"decr".parse::<OrderH>()` or `TryFrom<&str>`): `"none"`,
+/// `"incr"` or `"decr"`, or a unique prefix (R's `match.arg()`). Anything
+/// else is an error.
+///
 /// This is R's `barplot(orderH = )`.
 ///
 /// # Examples
@@ -272,10 +329,12 @@ impl Default for BarplotOptions {
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let columns = vec![vec![1, 4, 2], vec![3, 1, 5]];
 /// dev.barplot().height(&columns).order_h(OrderH::Decr).draw();
 /// dev.barplot().height(&columns).order_h("incr").draw();
+/// assert_eq!("d".parse::<OrderH>().unwrap(), OrderH::Decr);
+/// assert!("up".parse::<OrderH>().is_err());
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum OrderH {
@@ -289,20 +348,9 @@ pub enum OrderH {
 }
 
 impl OrderH {
-    /// Reads an order from its name: `"none"`, `"incr"` or `"decr"`, or a
-    /// unique prefix of one; `None` for anything else.
-    ///
-    /// This matches names as R's `match.arg()`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert_eq!(OrderH::parse("d"), Some(OrderH::Decr));
-    /// assert_eq!(OrderH::parse("up"), None);
-    /// ```
-    pub fn parse(s: &str) -> Option<OrderH> {
+    /// `"none"`, `"incr"` or `"decr"`, or a unique prefix; `None` otherwise.
+    /// The public routes are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<OrderH> {
         let all = [
             ("none", OrderH::None),
             ("incr", OrderH::Incr),
@@ -318,7 +366,6 @@ impl OrderH {
     }
 }
 
-from_str_via_parse!(OrderH, "orderH");
 from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 
 /// The heights of a bar chart: a vector (one bar per value) or a matrix
@@ -342,7 +389,7 @@ from_r_string!(OrderH, "orderH", "\"none\", \"incr\" or \"decr\"");
 /// // Two columns (stacks) of three rows (series) each.
 /// let columns = vec![vec![1.0, 4.0, 2.0], vec![3.0, 1.0, 5.0]];
 /// assert_eq!(BarHeights::from(&columns), BarHeights::Matrix(columns.clone()));
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let mids = dev.barplot().height(&columns).beside(true).draw();
 /// assert_eq!(mids.len(), 6);
 /// ```
@@ -403,10 +450,6 @@ impl<T: Num, const N: usize> From<&[Vec<T>; N]> for BarHeights {
     fn from(m: &[Vec<T>; N]) -> Self {
         BarHeights::Matrix(columns(m))
     }
-}
-
-fn recycle<T: Copy>(v: &[T], n: usize) -> Vec<T> {
-    (0..n).map(|k| v[k % v.len()]).collect()
 }
 
 /// Everything `barplot()` works out before drawing: bar positions, the
@@ -481,7 +524,7 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
             .flat_map(|_| std::iter::once(space[1]).chain(std::iter::repeat_n(space[0], nr - 1)))
             .collect()
     } else {
-        recycle(&space, nbars)
+        rep_len(&space, nbars)
     };
     let base_n = if beside { nr } else { nc };
     let width_v: Vec<f64> = (0..nbars)
@@ -504,7 +547,7 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
     let offset = if opts.offset.is_empty() {
         vec![0.0]
     } else {
-        recycle(&opts.offset, base_n)
+        rep_len(&opts.offset, base_n)
     };
     let offset_of = |i: usize, j: usize| {
         let k = if beside { i } else { j };
@@ -717,6 +760,7 @@ impl<B: Backend> Device<B> {
             };
             self.plot_window_impl(xlim, ylim, &window);
         }
+        crate::extra::panel_bg(self, &opts.extra)?;
 
         // R draws everything with `par(xpd = xpd)`, `TRUE` by default
         // (restored by `barplot_impl`).
@@ -785,12 +829,13 @@ impl<B: Backend> Device<B> {
             let lty = opts.axis_lty.filter(|&l| l != LineType::BLANK);
             let names = AxisOptions {
                 at: Some(at),
-                labels: Some(names.iter().cloned().map(Some).collect()),
+                labels: Some(names.clone()),
                 tick: lty.is_some(),
                 lty,
                 cex_axis: opts.cex_names,
                 ..AxisOptions::default()
             };
+            let names = crate::extra::rotated_axis(&opts.extra, names);
             self.axis_impl(if horiz { 2 } else { 1 }, &inline.apply(names))?;
         }
 
@@ -799,16 +844,8 @@ impl<B: Backend> Device<B> {
             let mut fill: Vec<ColorSpec> = (0..labels.len())
                 .map(|i| colors[i % colors.len()])
                 .collect();
-            let mut density: Vec<Option<f64>> = if opts.density.is_empty() {
-                Vec::new()
-            } else {
-                recycle(&opts.density, labels.len())
-            };
-            let mut angle: Vec<f64> = if opts.angle.is_empty() {
-                Vec::new()
-            } else {
-                recycle(&opts.angle, labels.len())
-            };
+            let mut density = rep_len(&opts.density, labels.len());
+            let mut angle = rep_len(&opts.angle, labels.len());
             // (R reverses `density` and `angle` before `legend()` recycles
             // them, so with fewer values than labels they don't follow
             // the reversed labels; we recycle first, as for `fill`.)
@@ -823,7 +860,7 @@ impl<B: Backend> Device<B> {
             // to `legend()` as data, which puts the legend near the bottom;
             // we don't copy that.)
             let pos = opts.legend_pos.unwrap_or_else(|| {
-                let (ux0, ux1, uy0, uy1) = self.usr();
+                let [ux0, ux1, uy0, uy1] = self.usr();
                 let plt = self.plot_region();
                 let data = |v: f64, log: bool| if log { 10f64.powf(v) } else { v };
                 let x = data(ux1 - 0.1 * (ux1 - ux0) / plt.width(), self.xlog());
@@ -843,7 +880,6 @@ impl<B: Backend> Device<B> {
             if lopts.angle.is_empty() {
                 lopts.angle = angle;
             }
-            let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
             self.legend_impl(pos, &labels, &lopts)?;
         }
 

@@ -17,10 +17,8 @@ use crate::common;
 
 use std::process::Command;
 
-use rs_graphics::backend::pdf::PdfBackend;
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
-use rs_graphics::par::Par;
 
 struct Case {
     text: &'static str,
@@ -131,14 +129,17 @@ fn strwidth_and_strheight_match_r() {
             .collect();
         // As R's `par(ps = , lheight = )` after `pdf()`: the device keeps
         // its starting point size (12), which sizes the margins.
-        let mut dev = Device::new(PdfBackend::new(7.0, 6.0), Par::default());
+        let mut dev = Device::memory("pdf").width(7.0).height(6.0).open().unwrap();
         dev.par().ps(c.ps).lheight(c.lheight).draw();
         if c.mfrow {
-            dev.par().mfrow(2, 2).draw();
+            dev.par().mfrow([2, 2]).draw();
         }
         dev.plot_new();
         let xlim = if c.mfrow { (10, 0) } else { (0, 10) };
-        dev.plot_window().xlim(xlim.0, xlim.1).ylim(-2, 5).draw();
+        dev.plot_window()
+            .xlim((xlim.0, xlim.1))
+            .ylim([-2, 5])
+            .draw();
         let mut ours = Vec::new();
         for height in [false, true] {
             for units in ["inches", "user", "figure"] {
@@ -161,7 +162,7 @@ fn strwidth_and_strheight_match_r() {
 #[test]
 #[should_panic(expected = "argument \"s\" is missing, with no default")]
 fn strwidth_without_s_panics() {
-    let mut dev = Device::new(PdfBackend::new(7.0, 6.0), Par::default());
+    let mut dev = Device::memory("pdf").width(7.0).height(6.0).open().unwrap();
     dev.plot_new();
     dev.strwidth().cex(2).get();
 }

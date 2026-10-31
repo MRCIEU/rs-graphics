@@ -14,7 +14,9 @@
 //! `"Sturges"`/`"Scott"`/`"FD"` rules, a function), `xlim`/`ylim`, R's
 //! binning with `right`/`include.lowest`/`fuzz`, `labels` and per-bar
 //! `col`/`border`/`lty`, shading lines (`density`/`angle`), and `plot =
-//! FALSE`. Not supported: `panel.first`.
+//! FALSE`. Not supported: `panel.first` (see `panel_bg`), `sub`,
+//! `warn.unused`; R's `probability` and `nclass` are `.freq(false)` and
+//! `.breaks(n)`.
 //!
 //! This is R's `hist(x, ...)`, ported from `hist.default`/`plot.histogram`
 //! in `r-source/src/library/graphics/R/hist.R`.
@@ -31,7 +33,7 @@ use crate::numbers::Num;
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
-use super::InlineAxis;
+use super::{InlineAxis, data_range};
 
 /// Sturges' rule (`nclass.Sturges()`): `ceiling(log2(length(x)) + 1)`.
 fn nclass_sturges(n: usize) -> f64 {
@@ -146,10 +148,15 @@ type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 ///
 /// A rule or a number of classes `k` gives the edges `pretty(range(x), n =
 /// k, min.n = 1)`; edges are used as given (after sorting). Setters take
-/// a rule's name (`.breaks("FD")`, see [`HistBreaks::parse`]; an unknown
-/// name is an error of the call), a number (`.breaks(20)`) or several numbers as edges
+/// a rule's name (`.breaks("FD")`, see below; an unknown name is an error of
+/// the call), a number (`.breaks(20)`) or several numbers as edges
 /// (`.breaks([0, 2, 5, 10])`; one value in an array, `Vec` or slice is a
 /// number of classes, as R's length rule).
+///
+/// From a string (`"FD".parse::<HistBreaks>()` or `TryFrom<&str>`): a rule's
+/// name, `"Sturges"`, `"Scott"`, `"FD"` or `"Freedman-Diaconis"`, in any case
+/// or as a unique prefix (R's `match.arg(tolower(breaks), ..)`). Anything
+/// else is an error.
 ///
 /// This is R's `hist(breaks = )`.
 ///
@@ -158,12 +165,14 @@ type BreaksFn = std::sync::Arc<dyn Fn(&[f64]) -> Vec<f64> + Send + Sync>;
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let x = [1, 2, 2, 3, 3, 3];
 /// let h = dev.hist().x(&x).breaks([0, 1, 2, 3]).draw();
 /// assert_eq!(h.counts, [1.0, 2.0, 3.0]);
 /// let h = dev.hist().x(&x).breaks(HistBreaks::Scott).draw();
 /// assert!(h.equidist);
+/// assert!(matches!("fd".parse::<HistBreaks>(), Ok(HistBreaks::FreedmanDiaconis)));
+/// assert!("F".parse::<HistBreaks>().is_err()); // "fd" or "freedman-diaconis"
 /// ```
 #[derive(Clone)]
 pub enum HistBreaks {
@@ -195,7 +204,7 @@ impl HistBreaks {
     /// ```
     /// use rs_graphics::prelude::*;
     ///
-    /// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+    /// # let mut dev = Device::null().open().unwrap();
     /// // Edges at the data's minimum, middle and maximum.
     /// let edges = HistBreaks::function(|x| {
     ///     let lo = x.iter().copied().fold(f64::INFINITY, f64::min);
@@ -209,22 +218,9 @@ impl HistBreaks {
         HistBreaks::Function(std::sync::Arc::new(f))
     }
 
-    /// Reads a rule from its name: `"Sturges"`, `"Scott"`, `"FD"` or
-    /// `"Freedman-Diaconis"` in any case, or a unique prefix; `None` for
-    /// anything else.
-    ///
-    /// This is R's `match.arg(tolower(breaks), ..)`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rs_graphics::prelude::*;
-    ///
-    /// assert!(matches!(HistBreaks::parse("fd"), Some(HistBreaks::FreedmanDiaconis)));
-    /// assert!(matches!(HistBreaks::parse("Sc"), Some(HistBreaks::Scott)));
-    /// assert!(HistBreaks::parse("F").is_none()); // "fd" or "freedman-diaconis"
-    /// ```
-    pub fn parse(s: &str) -> Option<HistBreaks> {
+    /// A rule's name or a unique prefix, `None` otherwise; the public routes
+    /// are `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<HistBreaks> {
         const ALL: [&str; 4] = ["sturges", "fd", "freedman-diaconis", "scott"];
         let s = s.to_lowercase();
         let name = ALL.iter().find(|&&a| a == s).copied().or_else(|| {
@@ -401,7 +397,7 @@ fn bin_counts(
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let x = [1, 2, 2, 3, 3, 3];
 /// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(true).draw();
 /// dev.hist().x(&x).breaks([0, 1, 2, 3]).labels(["low", "mid", "high"]).draw();
@@ -444,8 +440,8 @@ impl<L: Into<Label>> From<Vec<L>> for HistLabels {
 
 crate::setters::options! {
     /// Options for [`Graphics::hist`](crate::graphics::Graphics::hist), covering the subset of `hist.default`'s
-    /// and `plot.histogram`'s arguments this crate implements. Unset fields
-    /// are R's defaults, given for each.
+    /// and `plot.histogram`'s arguments this crate implements. Settings left
+    /// unset are R's defaults, given on each setter.
     #[derive(Clone, Debug)]
     pub struct HistOptions => [HistCall] {
         /// How to choose the bins: edges (`.breaks([0, 2, 5, 10])`, sorted
@@ -468,19 +464,25 @@ crate::setters::options! {
         /// Bar fills, recycled over the bars. Empty: `"lightgray"` (R's
         /// default).
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Bar borders, recycled over the bars. Empty: `par(fg)`, or with
+        /// Bar borders, recycled over the bars. Empty: [`par(fg)`], or with
         /// shading the bar's `col` (R's `border = NULL`).
+        ///
+        /// [`par(fg)`]: crate::par::Par::fg
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Line types of the bar borders, recycled over the bars. Empty:
-        /// `par(lty)`; `None`: that bar has no border.
+        /// [`par(lty)`]; `None`: that bar has no border and no shading lines
+        /// (its fill stays).
+        ///
+        /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Shading lines per inch in the bars, recycled over the bars; the
-        /// lines take the bar's `col` (see [`RectOptions::density`]). Empty:
-        /// no shading.
+        /// lines take the bar's `col` (see [`RectOptions::density`]). `None`
+        /// or a negative value fills the bar instead, 0 leaves it empty.
+        /// Empty: no shading.
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled as `density`.
         /// Empty: 45.
-        pub angle: Vec<f64> => values f64,
+        pub angle: Vec<f64> => numbers f64,
         /// Labels above the bars: [`HistLabels::Values`] writes each bar's
         /// count (or, with densities, its density to 3 decimals), `Text` the
         /// given labels. Default none.
@@ -494,7 +496,7 @@ crate::setters::options! {
         pub include_lowest: Option<bool> => option bool,
         /// How far, as a fraction of a typical bin width, values on an edge
         /// may stray and still count as on it. `None`: `1e-7`.
-        pub fuzz: Option<f64> => option f64,
+        pub fuzz: Option<f64> => number f64,
         /// Main title, as for `plot()` (text or a plotmath expression).
         /// `None`: "Histogram of x".
         pub main: Option<Label> => option Label,
@@ -502,26 +504,42 @@ crate::setters::options! {
         pub xlab: Option<Label> => option Label,
         /// y axis label. `None`: "Frequency" or "Density".
         pub ylab: Option<Label> => option Label,
-        /// Size of the main title, relative to `par(cex)`. `None`:
-        /// `par(cex.main)`. R's `cex.main`.
-        pub cex_main: Option<f64> => option f64,
-        /// Colour of the main title. `None`: `par(col.main)`. R's
+        /// Size of the main title, relative to [`par(cex)`]. `None`:
+        /// [`par(cex.main)`]. R's `cex.main`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.main)`]: crate::par::Par::cex_main
+        pub cex_main: Option<f64> => number f64,
+        /// Colour of the main title. `None`: [`par(col.main)`]. R's
         /// `col.main`.
-        pub col_main: Option<ColorSpec> => option ColorSpec,
+        ///
+        /// [`par(col.main)`]: crate::par::Par::col_main
+        pub col_main: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the main title (a [`FontFace`]). `None`:
-        /// `par(font.main)`. R's `font.main`.
+        /// [`par(font.main)`]. R's `font.main`.
+        ///
+        /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
         /// Size of the axis titles (`xlab` and `ylab`), relative to
-        /// `par(cex)`. `None`: `par(cex.lab)`. R's `cex.lab`.
-        pub cex_lab: Option<f64> => option f64,
+        /// [`par(cex)`]. `None`: [`par(cex.lab)`]. R's `cex.lab`.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
+        /// [`par(cex.lab)`]: crate::par::Par::cex_lab
+        pub cex_lab: Option<f64> => number f64,
         /// Colour of the axis titles (`xlab` and `ylab`). `None`:
-        /// `par(col.lab)`. R's `col.lab`.
-        pub col_lab: Option<ColorSpec> => option ColorSpec,
+        /// [`par(col.lab)`]. R's `col.lab`.
+        ///
+        /// [`par(col.lab)`]: crate::par::Par::col_lab
+        pub col_lab: Option<ColorSpec> => option_value ColorSpec,
         /// Font of the axis titles (`xlab` and `ylab`; a [`FontFace`]).
-        /// `None`: `par(font.lab)`. R's `font.lab`.
+        /// `None`: [`par(font.lab)`]. R's `font.lab`.
+        ///
+        /// [`par(font.lab)`]: crate::par::Par::font_lab
         pub font_lab: Option<FontFace> => option FontFace,
-        /// Whether to draw the titles. Default `true`, whatever `par(ann)`
+        /// Whether to draw the titles. Default `true`, whatever [`par(ann)`]
         /// is, as R's `ann`.
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
         pub ann: bool => value bool,
         /// Whether to draw the axes. Default `true`.
         pub axes: bool => value bool,
@@ -532,35 +550,52 @@ crate::setters::options! {
         /// warning). R's `log = "y"`.
         pub ylog: bool => value bool,
         /// Draws the bars on the current plot, without a new plot, window,
-        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog` and
-        /// `ylog` are ignored). Default `false`.
+        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`,
+        /// `xlim`, `ylim`, `ann` and `panel_bg` are ignored). Default `false`.
         pub add: bool => value bool,
         /// Orientation of the axis labels: 0 parallel to the axis, 1
-        /// horizontal, 2 perpendicular, 3 vertical. `None`: `par(las)`.
+        /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
-        /// Size of the axis labels. `None`: `par(cex.axis)`. R's `cex.axis`.
-        pub cex_axis: Option<f64> => option f64,
-        /// Colour of the axis labels. `None`: `par(col.axis)`. R's
+        /// Size of the axis labels. `None`: [`par(cex.axis)`]. R's `cex.axis`.
+        ///
+        /// [`par(cex.axis)`]: crate::par::Par::cex_axis
+        pub cex_axis: Option<f64> => number f64,
+        /// Colour of the axis labels. `None`: [`par(col.axis)`]. R's
         /// `col.axis`.
-        pub col_axis: Option<ColorSpec> => option ColorSpec,
-        /// Font of the axis labels. `None`: `par(font.axis)`. R's
+        ///
+        /// [`par(col.axis)`]: crate::par::Par::col_axis
+        pub col_axis: Option<ColorSpec> => option_value ColorSpec,
+        /// Font of the axis labels. `None`: [`par(font.axis)`]. R's
         /// `font.axis`.
+        ///
+        /// [`par(font.axis)`]: crate::par::Par::font_axis
         pub font_axis: Option<FontFace> => option FontFace,
         /// Margin lines of the axis titles, axis labels and axis line, for
-        /// the axes and titles. `None`: `par(mgp)`.
+        /// the axes and titles. `None`: [`par(mgp)`].
+        ///
+        /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
-        /// Tick length as a fraction of the plot region. `None`: `par(tck)`.
-        pub tck: Option<f64> => option f64,
-        /// Tick length in margin lines. `None`: `par(tcl)`.
-        pub tcl: Option<f64> => option f64,
-        /// Minimum gap between axis labels. `None`: R's default. R's
-        /// `gap.axis`.
-        pub gap_axis: Option<f64> => option f64,
+        /// Tick length as a fraction of the plot region. `None`: [`par(tck)`].
+        ///
+        /// [`par(tck)`]: crate::par::Par::tck
+        pub tck: Option<f64> => number f64,
+        /// Tick length in margin lines. `None`: [`par(tcl)`].
+        ///
+        /// [`par(tcl)`]: crate::par::Par::tcl
+        pub tcl: Option<f64> => number f64,
+        /// Minimum gap between axis labels, in "m" widths (labels parallel
+        /// to the axis) or "M" heights (perpendicular). `None`: 1 or 0.25.
+        /// R's `gap.axis`.
+        pub gap_axis: Option<f64> => number f64,
         /// Width of the axes' line and ticks (only the axes: the bars are
         /// unaffected). `None`: 1, `axis()`'s default.
-        pub lwd: Option<f64> => option f64,
+        pub lwd: Option<f64> => number f64,
         /// Whether to draw: `false` only returns the bins. `None`: `true`.
         pub plot: Option<bool> => option bool,
+        /// Options not in R ([`crate::extra`]).
+        pub extra: crate::extra::PlotExtras => no_setter,
     }
 }
 
@@ -568,6 +603,7 @@ impl Default for HistOptions {
     fn default() -> Self {
         HistOptions {
             deferred_error: None,
+            extra: Default::default(),
             breaks: None,
             freq: None,
             xlim: None,
@@ -622,7 +658,7 @@ impl Default for HistOptions {
 /// ```
 /// use rs_graphics::prelude::*;
 ///
-/// # let mut dev = Device::new(SvgBackend::new(7, 7), Par::default());
+/// # let mut dev = Device::null().open().unwrap();
 /// let h = dev.hist().x(&[1, 2, 2, 3, 3, 3]).breaks([0, 1, 2, 3]).plot(false).draw();
 /// assert_eq!(h.mids, [0.5, 1.5, 2.5]);
 /// assert_eq!(h.density, [1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0]);
@@ -673,24 +709,12 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> Result<HistResult, Err
             // R caps it (with a warning) so that pretty() gets an integer;
             // pretty() truncates it.
             let nclass = k.min(1e6) as i32;
-            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
-            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
-                (lo, hi)
-            } else {
-                (0.0, 1.0)
-            };
+            let (lo, hi) = data_range(&data);
             (pretty_r(lo, hi, nclass, 1), false)
         }
         // Fewer than two edges (none given): Sturges.
         _ => {
-            let lo = data.iter().cloned().fold(f64::INFINITY, f64::min);
-            let hi = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let (lo, hi) = if lo.is_finite() && hi.is_finite() && lo <= hi {
-                (lo, hi)
-            } else {
-                (0.0, 1.0)
-            };
+            let (lo, hi) = data_range(&data);
             (pretty_r(lo, hi, nclass_sturges(n) as i32, 1), false)
         }
     };
@@ -774,6 +798,7 @@ impl<B: Backend> Device<B> {
             let xlim = opts.xlim.unwrap_or((breaks[0], breaks[nb - 1]));
             let ylim = opts.ylim.unwrap_or((0.0, ymax));
             self.plot_window_impl(xlim, ylim, &window);
+            crate::extra::panel_bg(self, &opts.extra)?;
 
             if opts.ann {
                 let or = |l: &Option<Label>, default: &str| {
@@ -810,7 +835,8 @@ impl<B: Backend> Device<B> {
                     lwd: opts.lwd,
                     ..InlineAxis::default()
                 };
-                self.axis_impl(1, &inline.apply(AxisOptions::default()))?;
+                let x_axis = crate::extra::rotated_axis(&opts.extra, AxisOptions::default());
+                self.axis_impl(1, &inline.apply(x_axis))?;
                 // `yt[yt %% 1 == 0]` for counts: whole numbers only.
                 let yticks = if freq {
                     self.ax_ticks(2)
