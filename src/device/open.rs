@@ -72,7 +72,7 @@ crate::setters::options! {
         /// [`par(bg)`]: crate::par::Par::bg
         pub bg: Option<ColorSpec> => option_value ColorSpec,
         /// Resolution in pixels per inch, PNG only (ignored for PDF and SVG).
-        /// `None`: 72. R's `res`.
+        /// `None`: 72.
         pub res: Option<f64> => number f64,
         /// Compresses the output: a PDF's page contents (`None`: `true`), or
         /// a whole SVG document, gzipped as a `.svgz` file (`None`: `false`).
@@ -118,7 +118,8 @@ impl DeviceBuilder {
     /// per page as PNG and SVG do.
     ///
     /// As in R, opening the device creates the file; the page-number format is
-    /// R's `checkIntFormat()`.
+    /// R's `checkIntFormat()`. A device from [`Device::memory`] or
+    /// [`Device::null`] has no file, so opening it creates nothing.
     ///
     /// # Examples
     ///
@@ -126,7 +127,7 @@ impl DeviceBuilder {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::png("panel%02d.png").open()?;
     /// dev.plot().x([1, 2, 3]).draw(); // panel01.png
     /// dev.plot().x([3, 2, 1]).draw(); // panel02.png
@@ -137,11 +138,8 @@ impl DeviceBuilder {
     ///
     /// # Errors
     ///
-    /// A device from [`Device::memory`] or [`Device::null`] has no file, so
-    /// opening it creates nothing.
-    ///
     /// The errors are named for R's device function (`pdf()`, `svg()` or
-    /// `png()`). If the file can't be created, an [`ErrorKind::Io`] error
+    /// `png()`; a format name that names no format is reported as `pdf()`). If the file can't be created, an [`ErrorKind::Io`] error
     /// naming the file. Before the file is created, an
     /// [`ErrorKind::InvalidArgument`] error if `file` has any other `%`, or
     /// more than one page-number format ("invalid 'file' argument"); for a
@@ -534,13 +532,16 @@ impl Device<AnyBackend> {
     /// [`open`](DeviceBuilder::open), which creates the file;
     /// [`close`](Device::close) writes it.
     ///
+    /// A `format` string that names no format is an error of
+    /// [`open`](DeviceBuilder::open).
+    ///
     /// This is R's `pdf()`, `svg()` or `png()`, chosen at run time.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let format = "png"; // e.g. from a command-line option
     /// let mut dev = Device::format(format, "plot.png").res(300).open()?;
     /// dev.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
@@ -548,9 +549,6 @@ impl Device<AnyBackend> {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// A `format` string that names no format is an error of
-    /// [`open`](DeviceBuilder::open).
     pub fn format(format: impl IntoArg<Format>, file: impl AsRef<Path>) -> DeviceBuilder {
         let (format, deferred_error) = match format.into_arg() {
             Ok(f) => (f, None),
@@ -583,7 +581,7 @@ impl Device<AnyBackend> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::pdf("scatter.pdf").width(7).height(5).open()?;
     /// dev.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
     /// dev.close()?;
@@ -606,7 +604,7 @@ impl Device<AnyBackend> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::svg("plot.svg").width(5).height(5).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// dev.close()?;
@@ -632,7 +630,7 @@ impl Device<AnyBackend> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::png("plot.png").width(6).height(4).res(300).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// dev.close()?;
@@ -690,13 +688,16 @@ impl Device<AnyBackend> {
     /// nothing, and [`close`](Device::close) is an error (there is no file).
     /// Use it to serve a plot, embed it, or write it yourself.
     ///
+    /// A `format` string that names no format is an error of
+    /// [`open`](DeviceBuilder::open).
+    ///
     /// R draws to files or screens; this has no R equivalent.
     ///
     /// # Examples
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::memory("svg").width(5).height(4).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// let svg = String::from_utf8(dev.finish()).unwrap();
@@ -704,9 +705,6 @@ impl Device<AnyBackend> {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// A `format` string that names no format is an error of
-    /// [`open`](DeviceBuilder::open).
     pub fn memory(format: impl IntoArg<Format>) -> DeviceBuilder {
         let mut builder = Device::format(format, "");
         builder.target = Target::Memory;

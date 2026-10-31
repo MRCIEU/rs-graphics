@@ -331,7 +331,7 @@ crate::setters::options! {
         /// lines (`None`: 0.5), each line's baseline as above. R's `adj[2]`.
         pub vadj: Option<f64> => number f64,
         /// Rotation in degrees, anticlockwise. `None`: [`par(srt)`] (0 by
-        /// default). R's `srt`.
+        /// default).
         ///
         /// [`par(srt)`]: crate::par::Par::srt
         pub srt: Option<f64> => number f64,
@@ -357,10 +357,14 @@ crate::setters::options! {
         pub xpd: Option<Xpd> => option Xpd,
         /// Puts each label below (1), to the left of (2), above (3) or to
         /// the right of (4) its point, `offset` away, recycled per label;
-        /// overrides `adj`/`vadj`. Empty: not used.
+        /// overrides `adj`/`vadj`. Empty: not used. Another number is an
+        /// error of the call ("invalid 'pos' value").
         pub pos: Vec<i32> => values i32,
         /// Distance of a label from its point when `pos` is given, in
-        /// character widths. `None`: 0.5.
+        /// character heights (1.2 times the starting point size, times
+        /// [`par(cex)`]; R's docs call it a character width). `None`: 0.5.
+        ///
+        /// [`par(cex)`]: crate::par::Par::cex
         pub offset: Option<f64> => number f64,
     }
 }
@@ -371,18 +375,62 @@ crate::setters::options! {
 const Y_CHAR_OFFSET: f64 = 0.3333;
 
 /// Which region `box()` outlines.
+///
+/// From a string (`"outer".parse::<BoxWhich>()` or `TryFrom<&str>`):
+/// `"plot"`, `"figure"`, `"inner"` or `"outer"`, or a unique prefix (R's
+/// `match.arg()`). Anything else is an error.
+///
+/// This is R's `box(which = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// dev.plot().x([1, 2, 3]).draw();
+/// dev.box_().which("figure").lty("dashed").draw();
+/// assert_eq!("o".parse::<BoxWhich>().unwrap(), BoxWhich::Outer);
+/// assert!("x".parse::<BoxWhich>().is_err());
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum BoxWhich {
-    /// The plot region (R's default).
+    /// The plot region (the default). R's `"plot"`.
     #[default]
     Plot,
-    /// The current figure region.
+    /// The current figure region. R's `"figure"`.
     Figure,
-    /// The inner region: the device minus the outer margins.
+    /// The inner region: the device minus the outer margins. R's `"inner"`.
     Inner,
-    /// The whole device.
+    /// The whole device. R's `"outer"`.
     Outer,
 }
+
+impl BoxWhich {
+    /// `"plot"`, `"figure"`, `"inner"` or `"outer"`, or a unique prefix (R's
+    /// `match.arg()`); `None` otherwise. The public routes are
+    /// `FromStr`/`TryFrom<&str>`.
+    pub(crate) fn parse(s: &str) -> Option<BoxWhich> {
+        let all = [
+            ("plot", BoxWhich::Plot),
+            ("figure", BoxWhich::Figure),
+            ("inner", BoxWhich::Inner),
+            ("outer", BoxWhich::Outer),
+        ];
+        let mut hits = all
+            .iter()
+            .filter(|(name, _)| !s.is_empty() && name.starts_with(s));
+        match (hits.next(), hits.next()) {
+            (Some(&(_, w)), None) => Some(w),
+            _ => None,
+        }
+    }
+}
+
+crate::error::from_r_string!(
+    BoxWhich,
+    "box region",
+    "\"plot\", \"figure\", \"inner\" or \"outer\""
+);
 
 crate::setters::options! {
     /// Arguments of `box()`.
@@ -464,7 +512,7 @@ crate::setters::options! {
 }
 
 impl<B: Backend> Device<B> {
-    /// Draws R's `plot_window()`; the public entry is
+    /// Draws R's `plot.window()`; the public entry is
     /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window), whose docs
     /// describe it.
     pub(crate) fn plot_window_impl(

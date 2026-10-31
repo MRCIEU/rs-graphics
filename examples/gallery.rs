@@ -13,7 +13,8 @@
 //! comparison).
 //!
 //! Run with `cargo run --example gallery`; output lands in
-//! `gallery_output/` (relative to the crate root).
+//! `gallery_output/` in the current directory (run it from the crate
+//! root).
 
 use rs_graphics::prelude::*;
 

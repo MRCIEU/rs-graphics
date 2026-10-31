@@ -25,7 +25,7 @@ use crate::par::Xpd;
 use crate::plotmath::Label;
 use crate::recycle::nth;
 
-/// R's default pie slice color cycle (used when neither `col` nor
+/// R's default pie slice colour cycle (used when neither `col` nor
 /// `density` is given).
 const DEFAULT_COLORS: [&str; 6] = [
     "white",
@@ -72,13 +72,15 @@ crate::setters::options! {
         /// [`par(fg)`]: crate::par::Par::fg
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Line types of the slice borders, recycled over the slices. Empty:
-        /// [`par(lty)`]; `None`: that slice has no border.
+        /// [`par(lty)`]; `None`: that slice has no border and no shading
+        /// lines (its fill stays).
         ///
         /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Shading lines per inch in the slices, recycled over the slices (as
         /// [`PolygonOptions::density`]); the lines take `col`, whose default
-        /// is then [`par(fg)`]. Empty: no shading.
+        /// is then [`par(fg)`]. `None` or a negative value fills the slice
+        /// instead, 0 leaves it empty. Empty: no shading.
         ///
         /// [`par(fg)`]: crate::par::Par::fg
         pub density: Vec<Option<f64>> => na_values f64,

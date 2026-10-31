@@ -14,7 +14,7 @@
 //! against a real R `pdf()` device's uncompressed output. Compares every
 //! painted path and text item in order (see `common::pdf::assert_same`),
 //! except the origins of labels with a minus sign (R's `pdf()` draws `-`
-//! as a wider `/minus`; see CLAUDE.md). Skipped if `Rscript` isn't
+//! as a wider `/minus`, which we deliberately don't copy). Skipped if `Rscript` isn't
 //! available.
 
 use crate::common;

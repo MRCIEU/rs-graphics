@@ -169,13 +169,13 @@ fn raster_backend_produces_valid_png_of_expected_size() {
     assert_eq!(decoded.height(), (4.0f64 * 96.0).round() as u32);
 
     // Somewhere inside the clipped rect we drew a blue-ish filled circle;
-    // confirm at least one non-background pixel exists near its center.
+    // confirm at least one non-background pixel exists near its centre.
     let cx = (4.5 * 96.0) as u32;
     let cy_from_top = ((4.0 - 1.0) * 96.0) as u32;
     let px = decoded.pixel(cx, cy_from_top).expect("in bounds");
     assert!(
         px.red() != 255 || px.green() != 255 || px.blue() != 255,
-        "expected non-white pixel at circle center, got {px:?}"
+        "expected non-white pixel at circle centre, got {px:?}"
     );
 }
 

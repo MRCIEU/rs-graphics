@@ -12,7 +12,9 @@
 //!
 //! For a list of numeric groups, with positions (`at`), widths, `notch`,
 //! `varwidth`, `horizontal`, `add`, `outline`, log axes and the drawing
-//! parameters of R's `bxp()`.
+//! parameters of R's `bxp()`. Not supported: `plot = FALSE` (use
+//! [`boxplot_stats`]), `notch.frac`, `panel.first`/`panel.last` (see
+//! `panel_bg`).
 //!
 //! This is R's `boxplot(x, ...)`, ported from
 //! `boxplot.default`/`bxp`/`boxplot.stats` in
@@ -386,8 +388,9 @@ crate::setters::options! {
         ///
         /// [`par(col.axis)`]: crate::par::Par::col_axis
         pub col_axis: Option<ColorSpec> => option_value ColorSpec,
-        /// Minimum gap between axis labels. `None`: R's default. R's
-        /// `gap.axis`.
+        /// Minimum gap between axis labels, in "m" widths (labels parallel
+        /// to the axis) or "M" heights (perpendicular). `None`: 1 or 0.25.
+        /// R's `gap.axis`.
         pub gap_axis: Option<f64> => number f64,
         /// Type of the x axis: `AxisType::None` leaves it out. `None`:
         /// [`par(xaxt)`].

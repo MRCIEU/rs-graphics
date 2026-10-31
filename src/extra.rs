@@ -96,6 +96,8 @@ macro_rules! extras {
     };
     (@setter [$($p:ident)*] [$($d:ident)*] [$($a:tt)*] $field:ident color) => {
         $($a)*
+        #[doc = ""]
+        #[doc = "Takes a colour, a colour string or a palette number; one that isn't a colour is an error of the call."]
         pub fn $field(mut self, value: impl crate::setters::IntoArg<ColorSpec>) -> Self {
             match value.into_arg() {
                 Ok(v) => self$(.$p)*.$field = Some(v),
@@ -115,8 +117,11 @@ extras! {
         /// are, right-justified on sides 1 and 2 (left on 3 and 4) unless
         /// `hadj` says otherwise, centred across on the "M" height unless
         /// `padj` does, and none dropped for overlapping. So 90 on side 1 is
-        /// `las = 2`. R code: `axis(labels = FALSE)`, then `text(at, <the
-        /// labels' line>, labels, srt = deg, adj = c(1, 0.5), xpd = NA)`.
+        /// `las = 2`. `None` (the default): labels as [`par(las)`] sets them.
+        /// R code: `axis(labels = FALSE)`, then `text(at, <the labels' line>,
+        /// labels, srt = deg, adj = c(1, 0.5), xpd = NA)`.
+        ///
+        /// [`par(las)`]: crate::par::Par::las
         label_srt: Option<f64> => number,
     }
 }
@@ -127,12 +132,15 @@ extras! {
         => [PlotCall, HistCall, BarplotCall, BoxplotCall] {
         /// **Not in R.** Rotates the x axis's tick labels (`barplot()`,
         /// `boxplot()`: the names axis) by this many degrees; see
-        /// `axis()`'s `label_srt`.
+        /// `axis()`'s `label_srt`. `None` (the default): not rotated.
         label_srt: Option<f64> => number,
         /// **Not in R.** Fills the plot region with this colour before
         /// anything is drawn in it, so the data, grid lines and axes sit on
-        /// top. R code: `panel.first = rect(<par("usr")>, col = col, border
-        /// = NA)` (in data units on a log axis).
+        /// top. With `add(true)` on `barplot()` or `boxplot()` it covers what
+        /// is already drawn, as R's `panel.first` does (`hist()` ignores it
+        /// then). `None` (the default): no fill. R code: `panel.first =
+        /// rect(<par("usr")>, col = col, border = NA)` (in data units on a
+        /// log axis).
         panel_bg: Option<ColorSpec> => color,
     }
 }

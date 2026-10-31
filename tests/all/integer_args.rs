@@ -9,8 +9,8 @@
 //! Integers wherever R takes numbers: data vectors (`&[1, 2, 3]`, other
 //! integer types, ranges), recycled and single-value setters, limits,
 //! arrays (`mar`, `mgp`, `xaxp`), pairs (`plot_window`, legend positions,
-//! `inset`), legend `lwd`/`pt_cex`, `layout()` sizes, `fig()` and the
-//! backend constructors draw byte for byte what the same `f64` values do,
+//! `inset`), legend `lwd`/`pt_cex`, `layout()` sizes, `fig()` and device
+//! sizes and `res` draw byte for byte what the same `f64` values do,
 //! on a device and in a recorded `Figure`, and option setters take every
 //! number type (`i64`, `u8`, `usize`, ...) and ranges as data setters do.
 //! No R needed.

@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Reading an uncompressed PDF (R's `pdf(compress = FALSE)` or ours with
-//! `with_compression(false)`) into what it paints, and comparing two of
+//! `.compress(false)`) into what it paints, and comparing two of
 //! them. Shared by the `*_matches_r` tests.
 //!
 //! The reader follows the graphics state (`q`/`Q`, colours, alpha via

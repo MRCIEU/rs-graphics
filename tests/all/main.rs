@@ -74,6 +74,7 @@ mod plotmath_extras_matches_r;
 mod pretty_matches_r;
 mod primitives_matches_r;
 mod region_errors_matches_r;
+mod readme_examples;
 mod regions_matches_r;
 mod required_args;
 mod start_ps_matches_r;

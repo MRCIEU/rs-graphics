@@ -29,7 +29,7 @@ use super::Device;
 
 crate::setters::options! {
     /// The arguments of R's `abline()`, with R's defaults. Empty
-    /// `col`/`lty`/`lwd` mean [`par("col")`]/[`par("lty")`]/[`par("lwd")`];
+    /// `col`/`lty`/`lwd` mean [`par(col)`]/[`par(lty)`]/[`par(lwd)`];
     /// otherwise they are recycled over the lines in drawing order: each
     /// `a`/`b` line, then each `h`, then each `v`.
     ///
@@ -37,16 +37,19 @@ crate::setters::options! {
     /// kind of line can be given several times. R's `coef = c(a, b)` (and
     /// `reg = fit`, through its coefficients) is `.a(..).b(..)`.
     ///
-    /// [`par("col")`]: crate::par::Par::col
-    /// [`par("lty")`]: crate::par::Par::lty
-    /// [`par("lwd")`]: crate::par::Par::lwd
+    /// [`par(col)`]: crate::par::Par::col
+    /// [`par(lty)`]: crate::par::Par::lty
+    /// [`par(lwd)`]: crate::par::Par::lwd
     #[derive(Clone, Debug, Default)]
     pub struct AblineOptions => [AblineCall] {
         /// Intercepts of the lines `y = a + b * x`, paired with `b` (either
         /// may have a single value, used for every line). Empty (with `b`):
-        /// no such lines.
+        /// no such lines. It is an error of the call if only one of `a` and
+        /// `b` is given, if both have several values but not as many, or if a
+        /// value isn't finite.
         pub a: Vec<f64> => numbers f64,
-        /// Slopes of the lines `y = a + b * x`, paired with `a`.
+        /// Slopes of the lines `y = a + b * x`, paired with `a` (see `a` for
+        /// the errors). Empty (with `a`): no such lines.
         pub b: Vec<f64> => numbers f64,
         /// On log axes, draws each `y = a + b * x` in data units (a curve)
         /// rather than as a straight line in log units. Default `false`.

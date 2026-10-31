@@ -87,7 +87,7 @@ R's arguments not available: `lim2`, `ann` (use `dev.par().ann(false)`), `xgap.a
 | `plot` | `.plot()` | Whether to draw: `false` only returns the bins. |
 | `labels` | `.labels()` | Labels above the bars: `HistLabels::Values` writes each bar's count (or, with densities, its density to 3 decimals), `Text` the given labels. |
 | `lty` | `.lty()` | Line types of the bar borders, recycled over the bars. |
-| `add` | `.add()` | Draws the bars on the current plot, without a new plot, window, title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog` and `ylog` are ignored). |
+| `add` | `.add()` | Draws the bars on the current plot, without a new plot, window, title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`, `xlim`, `ylim`, `ann` and `panel_bg` are ignored). |
 | `ann` | `.ann()` | Whether to draw the titles. |
 | `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
 | `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
@@ -104,7 +104,7 @@ R's arguments not available: `lim2`, `ann` (use `dev.par().ann(false)`), `xgap.a
 | `mgp` | `.mgp()` | Margin lines of the axis titles, axis labels and axis line, for the axes and titles. |
 | `tck` | `.tck()` | Tick length as a fraction of the plot region. |
 | `tcl` | `.tcl()` | Tick length in margin lines. |
-| `gap.axis` | `.gap_axis()` | Minimum gap between axis labels. |
+| `gap.axis` | `.gap_axis()` | Minimum gap between axis labels, in "m" widths (labels parallel to the axis) or "M" heights (perpendicular). |
 | `lwd` | `.lwd()` | Width of the axes' line and ticks (only the axes: the bars are unaffected). |
 | *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
 | *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
@@ -164,7 +164,7 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `mgp` | `.mgp()` | Margin lines of the axis titles, labels and line, for the axes and titles. |
 | `tck` | `.tck()` | Tick length as a fraction of the plot region. |
 | `tcl` | `.tcl()` | Tick length in margin lines. |
-| `gap.axis` | `.gap_axis()` | Minimum gap between axis labels. |
+| `gap.axis` | `.gap_axis()` | Minimum gap between axis labels, in "m" widths (labels parallel to the axis) or "M" heights (perpendicular). |
 | `lwd` | `.lwd()` | Width of the axes' line and ticks (not the bars' borders, as in R). |
 | *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
 | *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
@@ -239,7 +239,7 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | `las` | `.las()` | Orientation of the axis labels: 0 parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical. |
 | `cex.axis` | `.cex_axis()` | Size of the axis labels. |
 | `col.axis` | `.col_axis()` | Colour of the axis labels. |
-| `gap.axis` | `.gap_axis()` | Minimum gap between axis labels. |
+| `gap.axis` | `.gap_axis()` | Minimum gap between axis labels, in "m" widths (labels parallel to the axis) or "M" heights (perpendicular). |
 | `xaxt` | `.xaxt()` | Type of the x axis: `AxisType::None` leaves it out. |
 | `yaxt` | `.yaxt()` | Type of the y axis, as `xaxt`. |
 | `xaxp` | `.xaxp()` | Default tick positions of the x axis (used by the value axis when `horizontal`). |
@@ -422,7 +422,7 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `labels` | `.labels()` | The labels: text or plotmath expressions, one or several (see `Labels`); a `None` element (R's `NA`) is skipped. |
 | `adj` | `.adj()` | Horizontal justification: 0 left, 0.5 centred, 1 right. |
 | `pos` | `.pos()` | Puts each label below (1), to the left of (2), above (3) or to the right of (4) its point, `offset` away, recycled per label; overrides `adj`/`vadj`. |
-| `offset` | `.offset()` | Distance of a label from its point when `pos` is given, in character widths. |
+| `offset` | `.offset()` | Distance of a label from its point when `pos` is given, in character heights (1.2 times the starting point size, times `par(cex)`; R's docs call it a character width). |
 | `cex` | `.cex()` | Text sizes, relative to `par(cex)`, recycled per label. |
 | `col` | `.col()` | Text colours, recycled per label. |
 | `font` | `.font()` | Fonts, recycled per label: R's numbers 1 to 5, names or `FontFace` values. |
@@ -454,9 +454,9 @@ R's arguments not available: `vfont`.
 
 | R | Rust | |
 |---|---|---|
-| `side` | `.side()` | The side to draw on: a `Side`, or its number (1 below, 2 left, 3 above, 4 right). |
+| `side` | `.side()` | The side to draw on: a `Side`, or its number (1 below, 2 left, 3 above, 4 right); another number is an error of the call. |
 | `at` | `.at()` | Tick positions, in user coordinates (data units, also on a log axis). |
-| `labels` | `.labels()` | Labels for the ticks in `at` (requires `at`): text or plotmath expressions (`Some("a".into())`, `Some(Label::math("10^5"))`). |
+| `labels` | `.labels()` | Labels for the ticks in `at` (requires `at`, as many; otherwise an error of the call): text or plotmath expressions (`Some("a".into())`, `Some(Label::math("10^5"))`). |
 | `tick` | `.tick()` | Whether to draw the axis line and tick marks. |
 | `line` | `.line()` | Distance of the axis line from the plot region (inner region for `outer`), in margin lines; the labels sit `mgp[1]` lines beyond it. |
 | `pos` | `.pos()` | Where to draw the axis line, as a user coordinate on the other axis; overrides `line`. |
@@ -490,7 +490,7 @@ R's arguments not available: `vfont`.
 | R | Rust | |
 |---|---|---|
 | `a` | `.a()` | Intercepts of the lines `y = a + b * x`, paired with `b` (either may have a single value, used for every line). |
-| `b` | `.b()` | Slopes of the lines `y = a + b * x`, paired with `a`. |
+| `b` | `.b()` | Slopes of the lines `y = a + b * x`, paired with `a` (see `a` for the errors). |
 | `h` | `.h()` | Horizontal lines at these y values. |
 | `v` | `.v()` | Vertical lines at these x values. |
 | `untf` | `.untf()` | On log axes, draws each `y = a + b * x` in data units (a curve) rather than as a straight line in log units. |
@@ -560,7 +560,7 @@ R's arguments not available: `trace`.
 | R | Rust | |
 |---|---|---|
 | `text` | `.text()` | The text: text or plotmath expressions, one or several (see `Labels`), recycled with the other arguments; a `None` element (R's `NA`) is skipped. |
-| `side` | `.side()` | The margin to write in: a `Side`, or its number (1 below, 2 left, 3 above, 4 right). |
+| `side` | `.side()` | The margin to write in: a `Side`, or its number (1 below, 2 left, 3 above, 4 right); another number is an error of the call. |
 | `line` | `.line()` | Margin line, recycled per label, counting from 0 next to the plot region (or the inner region for `outer`); may be negative or fractional. |
 | `outer` | `.outer()` | Draws in the outer margins (`par(oma)`) rather than the figure's. |
 | `at` | `.at()` | Position along the side, recycled per label: a user coordinate for inner margins, or a fraction (0 to 1) of the inner region for outer ones. |

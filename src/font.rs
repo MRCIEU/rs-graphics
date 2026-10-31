@@ -36,7 +36,7 @@
 /// per code (e.g. `'a'` is alpha, `'\u{B1}'` plus-minus), as R's
 /// `pdf()` writes it; devices that need Unicode map it.
 ///
-/// These are R's `font` numbers 1 to 5 (`par(font = )`).
+/// These are R's `font` numbers 1 to 5 ([`par(font)`]).
 ///
 /// # Examples
 ///
@@ -49,6 +49,8 @@
 /// assert_eq!("3".parse::<FontFace>().unwrap(), FontFace::Italic);
 /// assert!("heavy".parse::<FontFace>().is_err());
 /// ```
+///
+/// [`par(font)`]: crate::par::Par::font
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum FontFace {
     /// Plain (the default); 1, `"plain"`.

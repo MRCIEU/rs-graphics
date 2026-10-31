@@ -49,15 +49,11 @@ If you leave out an argument R requires, that's R's error (`dev.plot().try_draw(
 
 As in R, numbers may be integers or floats (a vector's elements must all be the same type):
 
-`dev.plot().x(1..=10).y(&y).cex(2).xlim([0, 12])`, 
+`dev.plot().x(1..=10).y(&y).cex(2).xlim([0, 12])`
 
 Vectors can be passed by reference or by value (`.x(&x)` or `.x(x)`, `.h([1, 2])`).
 
-Use `None` where R uses `NA` in a setting: 
-
-`pch = c(19, NA)` is `.pch([Some(19), None])` 
-
-(but `.pch([19, 20])` is fine when you intend no missing values). In data and coordinates (`x`, `y`, segment ends, `abline()`'s `h`/`v`, `axis()`'s `at`) a missing value is `f64::NAN` instead, as it usually already is in an `f64` column, and that value is skipped.
+Use `None` where R uses `NA` in a setting: `pch = c(19, NA)` is `.pch([Some(19), None])` (but `.pch([19, 20])` is fine when you intend no missing values). In data and coordinates (`x`, `y`, segment ends, `abline()`'s `h`/`v`, `axis()`'s `at`) a missing value is `f64::NAN` instead, as it usually already is in an `f64` column, and that value is skipped.
 
 ### Errors
 
@@ -67,7 +63,7 @@ Where R would stop with an error, so does the call: `.try_draw()` returns the er
 - a value isn't valid: `.lty("wavy")`, `.col("notacolour")`, `.side(5)`, or data that can't be drawn as given (`plot(): 'x' and 'y' lengths differ`). A setter doesn't fail on its own: it keeps the error, which the call returns;
 - the plot doesn't fit the page: margins too large for the page or the panel (`plot.new(): figure margins too large`).
 
-The error is an `rs_graphics::Error`: `call()` is the R function's name, `message()` R's message, and `kind()` one of `ErrorKind::MissingArgument`, `InvalidArgument` or `DoesNotFit`. It works with `?` in functions returning `Box<dyn Error>` or `anyhow::Result`, or can be matched:
+The error is an `rs_graphics::Error`: `call()` is the R function's name, `message()` R's message, and `kind()` one of `ErrorKind::MissingArgument`, `InvalidArgument`, `DoesNotFit` or `Io` (a device's file can't be created or written). It works with `?` in functions returning `Box<dyn Error>` or `anyhow::Result`, or can be matched:
 
 ```rust
 match dev.plot().x(&x).y(&y).try_draw() {
@@ -104,7 +100,7 @@ dev.legend().pos("topleft").labels(["control", "treated"]).pch(19).col([1, 2]).d
 dev.close()?;
 ```
 
-A device's arguments mostly have R's defaults, so `Device::pdf("plot.pdf").open()?` is as R's `pdf("plot.pdf")` (height = 7 inches, width = 7 inches). `Device::png(file)` defaults to 6.67 x 6.67 inches at 72 dpi, R's 480 x 480 pixels. With a higher `res`, the page stays 6.67 inches and gets more pixels, where R keeps 480 x 480 pixels. Sizes are in inches unless `units` is set: you can also use `"cm"` and `"mm"` for every format, as well as `"px"` for png, which sizes it in pixels as R does:
+A device's arguments mostly have R's defaults, so `Device::pdf("plot.pdf").open()?` is as R's `pdf("plot.pdf")` (height = 7 inches, width = 7 inches). `Device::png(file)` defaults to 6.67 x 6.67 inches at 72 ppi, R's 480 x 480 pixels. With a higher `res`, the page stays 6.67 inches and gets more pixels, where R keeps 480 x 480 pixels. Sizes are in inches unless `units` is set: you can also use `"cm"` and `"mm"` for every format, as well as `"px"` for png, which sizes it in pixels as R does:
 
 `Device::png(file).width(1200).height(900).units("px").res(150)` is R's `png(width = 1200, height = 900, res = 150)`.
 
@@ -255,7 +251,7 @@ The crate's documentation (`cargo doc --open`) has guides in `rs_graphics::guide
 
 For a more extensive run-down of what is implemented and what isn't, the design notes, the example gallery and the tests, see [DEVELOPER.md](DEVELOPER.md).
 
-## License
+## Licence
 
 GPL-3.0-or-later (see [LICENSE](LICENSE)). This crate ports R's own
 algorithms closely enough that it's derived from `r-source`, which is

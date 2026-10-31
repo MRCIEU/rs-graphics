@@ -30,7 +30,7 @@
 //! dev.plot().x(&[1.0, 2.0, 3.0]).y(&[2.0, 4.0, 3.0]).pch(19).main("Title").draw();
 //! dev.abline().h(3.0).col("grey").lty("dashed").draw();
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! The setters are those of the call's options struct ([`AblineOptions`]
@@ -127,9 +127,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// - **Overlaying:** after `dev.par().new(true).draw()` it stays in the
     ///   current figure and draws over it. The flag is not cleared here; any
     ///   drawing clears it.
-    /// - **Regions:** figure and plot regions are computed now from `par.mar`/
-    ///   `oma` (in lines of [`Device::line_height_inches`], so `par.cex`, `mex`
-    ///   and the starting `ps` count too), `par.pty` and `par.plt`. Changing
+    /// - **Regions:** figure and plot regions are computed now from
+    ///   [`par(mar)`]/[`par(oma)`] (in lines of
+    ///   [`Device::line_height_inches`], so [`par(cex)`], `mex` and the
+    ///   starting `ps` count too), [`par(pty)`] and [`par(plt)`]. Changing
     ///   these afterwards has no effect until the next call, also on margin
     ///   text (`title()`, `mtext()`, `axis(outer = )`), which R would place with
     ///   the new `mar`/`oma`.
@@ -140,7 +141,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   empty page, after writing the finished one to its own file if the file
     ///   name has a page number (`"plot%03d.png"`; see
     ///   [`DeviceBuilder::open`](crate::device::DeviceBuilder::open)), or else
-    ///   discarding it. The page is then filled with `par.bg`, unless that is
+    ///   discarding it. The page is then filled with [`par(bg)`], unless that is
     ///   fully transparent, which it is by default on PDF.
     ///
     /// This is R's `plot.new()`.
@@ -161,8 +162,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// With R's message when the regions don't fit: "figure margins too large"
     /// (the margins leave no room for the plot region, e.g. on a small page,
-    /// with many panels or with large `oma`), "figure region too large" (`fin()`
-    /// or `layout()` cm sizes beyond the inner region), "plot region too large"
+    /// with many panels or with large `oma`), "figure region too large"
+    /// ([`par(fin)`] or `layout()` cm sizes beyond the inner region), "plot
+    /// region too large"
     /// ([`par(pin)`] or [`par(plt)`] beyond the figure). Every high-level plot starts
     /// with `plot_new()`, so they fail the same way (on a
     /// [`Figure`](crate::recording::Figure), when it is added to a device). It
@@ -170,6 +172,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// next call retries the same figure. Use
     /// [`try_plot_new`](Graphics::try_plot_new) to handle the error.
     ///
+    /// [`par(mar)`]: crate::par::Par::mar
+    /// [`par(oma)`]: crate::par::Par::oma
+    /// [`par(cex)`]: crate::par::Par::cex
+    /// [`par(pty)`]: crate::par::Par::pty
+    /// [`par(bg)`]: crate::par::Par::bg
+    /// [`par(fin)`]: crate::graphics::ParCall::fin
     /// [`par(pin)`]: crate::par::Par::pin
     /// [`par(plt)`]: crate::par::Par::plt
     fn plot_new(&mut self) {
@@ -178,6 +186,17 @@ pub trait Graphics: sealed::Sealed + Sized {
 
     /// Starts a new plot as [`plot_new`](Graphics::plot_new) does, returning
     /// R's error instead of panicking.
+    ///
+    /// This is R's `plot.new()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::null().width(1).height(1).open().unwrap();
+    /// let e = dev.try_plot_new().unwrap_err();
+    /// assert_eq!(e.kind(), ErrorKind::DoesNotFit);
+    /// ```
     ///
     /// # Errors
     ///
@@ -326,7 +345,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// Starts a new plot and draws a pie chart with one slice per value of `x`.
     ///
     /// [`x`](PieCall::x) is required: the slice sizes, drawn in proportion to
-    /// their sum, counter-clockwise from 3 o'clock unless `clockwise` or
+    /// their sum, anticlockwise from 3 o'clock unless `clockwise` or
     /// `init_angle` say otherwise. The other arguments (labels, colours,
     /// `radius`, ...) are in [`PieOptions`]. On a multi-panel page it moves to
     /// the next panel.
@@ -366,15 +385,15 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// - `asp` (linear axes only): first widens whichever range is needed so
     ///   that one x unit is `asp` y units long on the page, centred on the given
     ///   limits.
-    /// - Each range is then extended: with `par(xaxs/yaxs) = "r"` (the default)
-    ///   by 4% at each end; with `"i"` the limits are used as given. A
+    /// - Each range is then extended: with [`par(xaxs)`]/[`par(yaxs)`] `"r"`
+    ///   (the default) by 4% at each end; with `"i"` the limits are used as given. A
     ///   zero-width range is widened, to -1..1 around 0, otherwise by 40% of the
     ///   value either side. Non-finite limits are replaced by huge finite ones;
     ///   on a log axis, a limit <= 0 gives a lower end of about 1e-307 (R warns
     ///   there; this doesn't).
-    /// - Sets `par.xaxp`/`par.yaxp` (the default tick range and count) from the
-    ///   new range and `par.lab`. Later calls to `axis()` without `at` read
-    ///   them; changing `par.lab` afterwards doesn't change them.
+    /// - Sets [`par(xaxp)`]/[`par(yaxp)`] (the default tick range and count)
+    ///   from the new range and [`par(lab)`]. Later calls to `axis()` without
+    ///   `at` read them; changing [`par(lab)`] afterwards doesn't change them.
     ///
     /// This is R's `plot.window()`; its `log = "x"` is `.xlog(true)`.
     ///
@@ -392,6 +411,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `xlim` or
     /// `ylim` is missing (R's message).
+    ///
+    /// [`par(xaxs)`]: crate::par::Par::xaxs
+    /// [`par(yaxs)`]: crate::par::Par::yaxs
+    /// [`par(xaxp)`]: crate::par::Par::xaxp
+    /// [`par(yaxp)`]: crate::par::Par::yaxp
+    /// [`par(lab)`]: crate::par::Par::lab
     fn plot_window(&mut self) -> PlotWindowCall<'_, Self> {
         PlotWindowCall::start(self)
     }
@@ -630,6 +655,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// dev.box_().bty("l").lwd(2).draw();
     /// ```
     ///
+    /// # Errors
+    ///
+    /// `.try_draw()` returns an error, and `.draw()` panics with it, if a
+    /// setter was given a value it couldn't convert (`.col("notacolour")`,
+    /// `.which("top")`).
+    ///
     /// [`par(bty)`]: crate::par::Par::bty
     fn box_(&mut self) -> BoxCall<'_, Self> {
         BoxCall::start(self)
@@ -792,6 +823,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// dev.title().main("Growth").xlab("Day").ylab("Height (cm)").draw();
     /// ```
     ///
+    /// # Errors
+    ///
+    /// `.try_draw()` returns an error, and `.draw()` panics with it, if a
+    /// setter was given a value it couldn't convert (`.col_main("notacolour")`).
+    ///
     /// [`par(mgp)`]: crate::par::Par::mgp
     fn title(&mut self) -> TitleCall<'_, Self> {
         TitleCall::start(self)
@@ -833,7 +869,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `.try_draw()` returns R's error, and `.draw()` panics with it (also when a
     /// `Figure` records the call), if `usr` has a `NaN` or `x0 == x1` or `y0 == y1`
     /// ("invalid value specified for graphical parameter \"usr\""), or `lmitre`
-    /// is below 1 (the same message, naming `lmitre`). Some page layout values
+    /// is below 1 (the same message, naming `lmitre`), or `xaxp`/`yaxp` is set
+    /// for a log axis with a third value that isn't 1 to 4 (R's `logAxpCheck`;
+    /// the same message, naming it). Some page layout values
     /// are checked on a device only (see [`mfrow`](ParCall::mfrow) and the
     /// other layout setters).
     fn par(&mut self) -> ParCall<'_, Self> {
@@ -869,6 +907,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
     /// dev.pie().x([1, 2]).draw(); // bottom right
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `mat`
+    /// is missing or invalid, or `widths`, `heights` or `respect` don't fit it;
+    /// see [`LayoutCall::try_draw`].
     ///
     /// [`par(cex)`]: crate::par::Par::cex
     fn layout(&mut self) -> LayoutCall<'_, Self> {
@@ -1478,7 +1522,7 @@ call!(
     }
 );
 call!(
-    /// A [`arrows()`](Graphics::arrows) call being built: it adds arrows.
+    /// An [`arrows()`](Graphics::arrows) call being built: it adds arrows.
     ///
     /// Set its arguments with the setters below, then run it with
     /// [`draw`](ArrowsCall::draw).
@@ -1594,25 +1638,25 @@ call!(
     |t, o| { t.emit_box(o) }
 );
 call!(
-    /// A [`axis()`](Graphics::axis) call being built: it adds an axis.
+    /// An [`axis()`](Graphics::axis) call being built: it adds an axis.
     ///
     /// Set its arguments with the setters below, then run it with
-    /// [`draw`](AxisCall::draw), which returns on a [`Device`], the tick
-    /// positions.
+    /// [`draw`](AxisCall::draw), which returns the tick positions on a
+    /// [`Device`].
     /// Without `.draw()`, nothing happens (the compiler warns).
     ///
     /// See [`Graphics::axis`] for the arguments and an example.
     AxisCall("axis"), AxisOptions => G::AxisResult,
     args {
         /// The side to draw on: a [`Side`], or its number (1 below, 2 left,
-        /// 3 above, 4 right). Required. Another number is an error of the
-        /// call.
+        /// 3 above, 4 right); another number is an error of the call.
+        /// Required.
         side: Side = (fallible impl IntoArg<Side> => IntoArg::into_arg),
     },
     |t, o| { t.emit_axis(required(side, "side")?, o) }
 );
 call!(
-    /// A [`abline()`](Graphics::abline) call being built: it adds straight
+    /// An [`abline()`](Graphics::abline) call being built: it adds straight
     /// lines across the plot.
     ///
     /// Set its arguments with the setters below, then run it with
@@ -1628,8 +1672,8 @@ call!(
     /// A [`legend()`](Graphics::legend) call being built: it adds a legend.
     ///
     /// Set its arguments with the setters below, then run it with
-    /// [`draw`](LegendCall::draw), which returns on a [`Device`], where the
-    /// legend went ([`LegendLayout`]).
+    /// [`draw`](LegendCall::draw), which returns where the legend went
+    /// ([`LegendLayout`]) on a [`Device`].
     /// Without `.draw()`, nothing happens (the compiler warns).
     ///
     /// See [`Graphics::legend`] for the arguments and an example.
@@ -1637,19 +1681,19 @@ call!(
     args {
         /// Where the legend goes: a keyword such as `"topright"`, a point
         /// `[x, y]` for its top-left corner, or two corners `[[xa, xb], [ya,
-        /// yb]]` (tuples work too; see [`LegendPos`]). Required. A string that isn't one of
-        /// the nine keywords (or a unique prefix of one) is an error of the
-        /// call. R's `x` and `y`.
+        /// yb]]` (tuples work too; see [`LegendPos`]). A string that isn't one
+        /// of the nine keywords (or a unique prefix of one) is an error of the
+        /// call. R's `x` and `y`. Required.
         pos: LegendPos = (fallible impl IntoArg<LegendPos> => IntoArg::into_arg),
         /// The keys' labels: text or plotmath expressions, one or several
         /// (see [`Labels`]); a `None` element (R's `NA`) keeps its key but
-        /// has no text and takes no room. Required. R's `legend`.
+        /// has no text and takes no room. R's `legend`. Required.
         labels: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
     },
     |t, o| { t.emit_legend(required(pos, "pos")?, required(labels, "labels")?, o) }
 );
 call!(
-    /// A [`mtext()`](Graphics::mtext) call being built: it writes text in a
+    /// An [`mtext()`](Graphics::mtext) call being built: it writes text in a
     /// margin.
     ///
     /// Set its arguments with the setters below, then run it with
@@ -1664,8 +1708,8 @@ call!(
         /// (R's `NA`) is skipped. Required.
         text: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
         /// The margin to write in: a [`Side`], or its number (1 below, 2
-        /// left, 3 above, 4 right). Default: 3, the top. Another number is
-        /// an error of the call.
+        /// left, 3 above, 4 right); another number is an error of the call.
+        /// Default: 3, the top.
         side: Side = (fallible impl IntoArg<Side> => IntoArg::into_arg),
     },
     |t, o| { t.emit_mtext(required(text, "text")?, side.unwrap_or(Side::Top), o) }
@@ -1755,9 +1799,6 @@ pub(crate) enum ParGrid {
     Cols(usize, usize),
 }
 
-/// Page layout: on a device, or recorded in a
-/// [`Figure`](crate::recording::Figure), which can then hold a whole
-/// multi-panel plot.
 /// A pair of grid counts (`mfrow`, `mfcol`, `mfg`) as R's `as.integer()`
 /// reads them: fractions truncated. A negative or non-finite value becomes
 /// 0, which R's checks reject ("invalid value specified for graphical
@@ -1774,6 +1815,9 @@ fn grid_pair(p: impl Pair) -> (usize, usize) {
     (count(a), count(b))
 }
 
+/// Page layout: on a device, or recorded in a
+/// [`Figure`](crate::recording::Figure), which can then hold a whole
+/// multi-panel plot.
 impl<G: Graphics> ParCall<'_, G> {
     /// Splits the page into a grid of `[nrow, ncol]` panels, filled row by
     /// row (an array or tuple of two counts; fractions are truncated, as in

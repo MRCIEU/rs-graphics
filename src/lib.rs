@@ -31,7 +31,7 @@
 //!     .draw();
 //! dev.abline().h(6.0).col("grey").lty("dashed").draw();
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! [`device::Device`] holds the page and `par()` state. Every R graphics
@@ -79,9 +79,11 @@
 //! [`Device::null`](device::Device::null) (R's `pdf(NULL)`) opens a device
 //! that draws nothing and writes no file, but measures as a PDF device: to
 //! check that a figure fits a page, to measure, or to run drawing code
-//! fast. [`Device::new`](device::Device::new) takes a backend directly
-//! instead: for output kept in memory ([`finish`](device::Device::finish))
-//! and backend options the builder doesn't cover.
+//! fast. [`Device::memory`](device::Device::memory) keeps the output in
+//! memory ([`finish`](device::Device::finish) returns the bytes), with the
+//! same options as a file device. [`Device::new`](device::Device::new)
+//! takes a backend of your own (one implementing
+//! [`Backend`](backend::Backend)).
 //!
 //! # High-level and low-level functions
 //!
@@ -118,7 +120,7 @@
 //! dev.hist().x(&[1.0, 2.0, 2.5, 3.0, 3.2]).draw(); // panel 2
 //! dev.mtext().text("Two panels").side(3).outer(true).line(0.5).draw();
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! # Figures as values
@@ -143,7 +145,7 @@
 //! dev.par().mfrow([1, 2]).draw();
 //! dev.add_figure_at(1, 2, &fig); // right-hand panel
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! # Your own plots
@@ -171,7 +173,7 @@
 //! let mut dev = Device::svg("diagnostic.svg").width(5.0).height(5.0).open()?;
 //! dev.obs_vs_exp(&[1.0, 2.0, 3.0], &[1.1, 1.9, 3.3]);
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 
 mod afm;

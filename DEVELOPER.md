@@ -8,7 +8,7 @@ usage, see [README.md](README.md).
 
 **Graphics engine** (`src/`):
 - `par()`-equivalent state (`src/par.rs`): margins (`mar`/`oma`), axis
-  styles, colors, line/point styles, fonts, `tcl`/`mgp`/`las`, etc.,
+  styles, colours, line/point styles, fonts, `tcl`/`mgp`/`las`, etc.,
   with R's exact default values.
 - Coordinate systems and clipping (`src/device.rs`): `plot.new()`/
   `plot.window()` equivalents (`plot_new()` alone leaves R's default
@@ -23,8 +23,8 @@ usage, see [README.md](README.md).
   R's `FALSE`/`TRUE`/`NA`).
 - Drawing primitives: `points`, `lines`, `segments`, `rect`, `polygon`,
   `text`, `mtext`, `box`, `abline`, `axis`, `title`, `legend`, `arrows`
-  - each a `Graphics` method (`src/graphics.rs`) taking its data and
-  returning a call (`dev.points().x(&x).y(&y).pch(19).draw()`): the other
+  - each a `Graphics` method (`src/graphics.rs`) returning a call
+  (`dev.points().x(&x).y(&y).pch(19).draw()`): its data and other
   arguments are its setters, or an options struct passed with
   `.with(&opts)`, and `.draw()` runs it; the drawing code is in
   `src/device.rs` and `src/device/*.rs` (R's `box()` is `box_()`;
@@ -39,7 +39,7 @@ usage, see [README.md](README.md).
   (`src/setters.rs`; `array` kind for `mgp`/`xaxp`, `pair` kinds for
   limits).
   `mtext()` (`Graphics::mtext` + `MtextOptions`, `src/device/mtext.rs`)
-  takes the side as an argument, like `axis()`, and
+  takes the side as `.side()` (default 3, as R), and
   covers all four sides of the figure and outer (`oma`) margins with
   `line`/`at`/`adj`/`padj`/`cex`/`font` and `par(las)`; `arrows()` draws
   R's open heads with `length`/`angle`/`code` (so `angle = 90, code = 3`
@@ -108,8 +108,8 @@ usage, see [README.md](README.md).
 - R's built-in plotting characters `pch = 0..25` (`src/pch.rs`) plus
   character symbols (`pch = "."`, `"a"`, ...), line
   types `lty` (`src/lty.rs`; `LineType::SOLID`, `DASHED`, ... for R's
-  codes 0-6), the R4 default color palette and all 657
-  named colors (`src/color.rs`, `src/named_colors.rs`; setters take the
+  codes 0-6), the R4 default colour palette and all 657
+  named colours (`src/color.rs`, `src/named_colors.rs`; setters take the
   names, `.col("red")`, and `ColorSpec::try_from("red")` converts one), and the exact
   `pretty()`/`GEPretty()` axis tick-placement algorithms - both of
   which R uses, with **different constants** (`src/pretty.rs`).
@@ -161,10 +161,14 @@ To keep this a tractable "core functionality" port, the following R
 `graphics` features are **not implemented**: `split.screen()`,
 `persp()`/3D plotting,
 `mosaicplot()`, `stars()`, `coplot()`, `filled.contour()`,
-`image()`/raster images, `symbols()`, `smoothScatter()`,
-`cdplot()`/`spineplot()`, `dotchart()`, `fourfoldplot()`, Hershey
-fonts, and interactive input (`identify()`/`locator()`). These would be
-reasonable follow-ups but are left for future work.
+`image()`/raster images (`rasterImage()`), `symbols()`,
+`smoothScatter()`, `cdplot()`/`spineplot()`, `dotchart()`,
+`fourfoldplot()`, `contour()`, `matplot()`, `pairs()`, `stripchart()`,
+`sunflowerplot()`, `assocplot()`, `curve()`, `grid()`, `rug()`,
+`xspline()`, `polypath()`, `clip()`, `layout.show()`, font families
+(`par(family)`) and Hershey fonts, and interactive input
+(`identify()`/`locator()`). These would be reasonable follow-ups but are
+left for future work.
 
 ## Design notes
 
@@ -210,7 +214,7 @@ A few fidelity-relevant decisions worth calling out:
   par(cex) * 1.2 * startps / 72` inches (matching `cra[1] = 1.2 *
   pointsize`, `ipr[1] = 1/72` for the PDF/PostScript device family),
   where `startps` is the device's starting point size
-  (`DeviceBuilder::pointsize`, or `par.ps` at `Device::new`). A later
+  (`DeviceBuilder::pointsize`; 12 for `Device::new`). A later
   `par(ps)` doesn't change it, and it doesn't scale with the *current*
   `cex` of text drawn in the margins, only with `mex * par(cex)` (R's
   `cexbase`), which takes effect at the next `plot.new()`. This is
@@ -237,8 +241,8 @@ A few fidelity-relevant decisions worth calling out:
   or with `DeviceBuilder::onefile(false)` writes one file per page as PNG
   and SVG do.
 - **Page background.** As in R, `par("bg")` starts as the device's
-  background: transparent for PDF (R's `pdf()`), white for SVG, and the
-  canvas colour for PNG. Set one with `DeviceBuilder::bg`
+  background: transparent for PDF (R's `pdf()`), white for SVG and
+  PNG. Set one with `DeviceBuilder::bg`
   (`Device::pdf(file).bg("white")`, R's `pdf(bg = )`; the same on
   `Device::memory(..)`). New pages are filled with it, and `legend()`
   boxes by default.
@@ -262,7 +266,7 @@ A few fidelity-relevant decisions worth calling out:
   `panel_bg` for a plot-region background). They are kept apart from the
   R ports so that every R-named setter still does exactly what R does.
   - **Placement.** An extra is a setter on the R call where users would
-    look for it (`dev.axis()..label_srt(45)`), not a separate namespace.
+    look for it (`dev.axis().side(1).label_srt(45)`), not a separate namespace.
     All its code is in `src/extra.rs`. The `extras!` macro there
     declares the values and generates the setters on the options
     structs and builders, in impl blocks documented "**Not in R.**".
@@ -351,7 +355,9 @@ against a real R installation by shelling out to `Rscript`:
   margins (`par("mai")`), and the padded user coordinate system
   (`par("usr")`) after `plot.window()`, to 1e-6 tolerance.
 - `tests/all/hist_matches_r.rs` - bin edges/counts vs. `hist(x, plot =
-  FALSE)`.
+  FALSE)`: Sturges, Scott and FD rules, a number of classes, explicit and
+  unsorted edges, a breaks function, `right`/`include.lowest`/`fuzz`,
+  single and equal values, and R's errors for invalid breaks.
 - `tests/all/boxplot_matches_r.rs` - box/whisker/outlier stats vs.
   `boxplot.stats()`.
 - `tests/all/boxplot_draw_matches_r.rs` - every painted path of `boxplot()`
@@ -482,7 +488,7 @@ against a real R installation by shelling out to `Rscript`:
   font, size and colour vs. R `pdf()`.
 - `tests/all/integer_args.rs` (no R needed) - integers wherever R takes
   numbers (data vectors, ranges, recycled and single setters, limits,
-  arrays, pairs, `layout()` sizes, `fig()`, backend constructors) draw byte
+  arrays, pairs, `layout()` sizes, `fig()`, device sizes and `res`) draw byte
   for byte what the same `f64`s do, on a device and in a `Figure`.
 - `tests/all/frozen_margins.rs` (no R needed) - `mar`/`oma` changed after
   `plot_new()` move nothing until the next plot (R would move margin
@@ -569,8 +575,11 @@ against a real R installation by shelling out to `Rscript`:
   `call!`/`options!` declarations and `tests/data/r_formals.txt`, R's
   arguments; refresh that with `Rscript tests/data/r_formals.R >
   tests/data/r_formals.txt`), the chart SVGs `src/charts/*.svg` and
-  `llms.txt`. `RS_GRAPHICS_BLESS=1 cargo test --test all generated_docs`
-  rewrites them.
+  `llms.txt`, and `tests/all/readme_examples.rs` (README.md's code blocks,
+  compiled with the tests); `par(x)` mentions in docs are links.
+  `RS_GRAPHICS_BLESS=1 cargo test --test all generated_docs` rewrites
+  them (if a README fix leaves `readme_examples.rs` not compiling, empty
+  it first).
 - `tests/all/required_args.rs` (no R needed) - every required argument left
   out is an error with R's message (`argument "x" is missing, with no
   default`) and the call's name, on a device and in a `Figure`; `.draw()`
@@ -581,6 +590,20 @@ against a real R installation by shelling out to `Rscript`:
   `text()` labels, `box(which = )`, `plot.window(asp = )` and `plot()`'s
   axes following `par(col.axis)` etc.: every painted path and text item in
   order.
+- `tests/all/pch_strings_matches_r.rs` - `pch` given as strings in
+  `points()`, `plot()` and `boxplot()` (first character, `""`/`NA` none,
+  non-ASCII as text).
+- `tests/all/label_na_matches_r.rs` - `NA` (`None`) in `barplot()` and
+  `boxplot()` names, `barplot()`'s legend text and `pie()` labels.
+- `tests/all/extra_matches_r.rs` - the options not in R (`label_srt`,
+  `panel_bg`) against the R code each replaces, in R; also in a `Figure`
+  and through `.with()`.
+- `tests/all/figure_pages.rs` (no R needed) - a `Figure` holding a whole
+  plot (page layout, `layout()`, several pages) draws what the same calls
+  draw on a device, on every format; record-time errors.
+- `tests/all/null_device.rs` (no R needed) - `Device::null()` gives the
+  same values and errors as a PDF device of the same size, and writes
+  nothing.
 
 These are **skipped (not failed)** if `Rscript` isn't found on `PATH`,
 so the suite stays green for contributors without R installed - but
@@ -596,8 +619,9 @@ clip and the text matrix) and compares them in order (`assert_same_pdf`,
 with per-file tolerances and exclusions in `Compare`).
 
 Scripts in `tools/` (Python 3; `-h` for usage) help check a change:
-`verify.py` runs the tests with R, rustdoc, clippy, the Rust 1.85 build
-and the gallery against a base revision; `fmt_own.py` runs rustfmt on
+`verify.py` regenerates the generated docs (listing what changed), then
+runs the tests with R, rustdoc, clippy, the Rust 1.85 build and the
+gallery against a base revision; `fmt_own.py` runs rustfmt on
 changed lines only; `mutate.py` checks that a test fails when the code
 it covers is broken.
 

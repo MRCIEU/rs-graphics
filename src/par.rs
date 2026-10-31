@@ -101,7 +101,7 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
 /// [`AxisStyle::Exact`]; `"r"`, `"s"`, `"e"` and `"d"` are
 /// [`AxisStyle::Regular`]. Anything else is an error.
 ///
-/// This is R's `par(xaxs = )` / `par(yaxs = )`.
+/// This is R's [`par(xaxs)`] / [`par(yaxs)`].
 ///
 /// # Examples
 ///
@@ -116,6 +116,9 @@ impl<T, U: Into<T>> From<[U; 4]> for Sides<T> {
 /// assert_eq!("i".parse::<AxisStyle>().unwrap(), AxisStyle::Exact);
 /// assert!("x".parse::<AxisStyle>().is_err());
 /// ```
+///
+/// [`par(xaxs)`]: crate::par::Par::xaxs
+/// [`par(yaxs)`]: crate::par::Par::yaxs
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AxisStyle {
     /// The range extended by 4% at each end (the default). R's `"r"`.
@@ -146,7 +149,7 @@ crate::error::from_r_string!(AxisStyle, "axis style", "\"r\" or \"i\"");
 /// From a string (`"s".parse::<Pty>()` or `TryFrom<&str>`): `"m"` or `"s"`.
 /// Anything else is an error.
 ///
-/// This is R's `par(pty = )`.
+/// This is R's [`par(pty)`].
 ///
 /// # Examples
 ///
@@ -160,6 +163,8 @@ crate::error::from_r_string!(AxisStyle, "axis style", "\"r\" or \"i\"");
 /// assert_eq!("s".parse::<Pty>().unwrap(), Pty::Square);
 /// assert!("q".parse::<Pty>().is_err());
 /// ```
+///
+/// [`par(pty)`]: crate::par::Par::pty
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Pty {
     /// As large as the margins allow (the default). R's `"m"`.
@@ -192,7 +197,7 @@ crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 /// character, `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"`
 /// (letters in either case). Anything else is an error.
 ///
-/// This is R's `par(bty = )`.
+/// This is R's [`par(bty)`].
 ///
 /// # Examples
 ///
@@ -206,6 +211,8 @@ crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 /// assert_eq!("[".parse::<Bty>().unwrap(), Bty::C);
 /// assert!("x".parse::<Bty>().is_err());
 /// ```
+///
+/// [`par(bty)`]: crate::par::Par::bty
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Bty {
     /// All four sides (the default). R's `"o"`.
@@ -253,7 +260,7 @@ crate::error::from_r_string!(
 ///
 /// `true`/`false` convert, so `.xpd(true)` is R's `xpd = TRUE`.
 ///
-/// This is R's `par(xpd = )`.
+/// This is R's [`par(xpd)`].
 ///
 /// # Examples
 ///
@@ -265,6 +272,8 @@ crate::error::from_r_string!(
 /// assert_eq!(dev.current_par().xpd, Xpd::Figure);
 /// dev.text().x(1.1).y(0.5).labels("in the margin").xpd(Xpd::Device).draw();
 /// ```
+///
+/// [`par(xpd)`]: crate::par::Par::xpd
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Xpd {
     /// The plot region (the default). R's `FALSE`.
@@ -295,7 +304,7 @@ impl From<bool> for Xpd {
 /// [`AxisType::None`]; `"s"`, `"l"` and `"t"` are [`AxisType::Standard`].
 /// Anything else is an error.
 ///
-/// This is R's `par(xaxt = )` / `par(yaxt = )`.
+/// This is R's [`par(xaxt)`] / [`par(yaxt)`].
 ///
 /// # Examples
 ///
@@ -307,6 +316,9 @@ impl From<bool> for Xpd {
 /// assert_eq!("n".parse::<AxisType>().unwrap(), AxisType::None);
 /// assert!("y".parse::<AxisType>().is_err());
 /// ```
+///
+/// [`par(xaxt)`]: crate::par::Par::xaxt
+/// [`par(yaxt)`]: crate::par::Par::yaxt
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AxisType {
     /// The axis is drawn (the default). R's `"s"` (also `"l"`, `"t"`).
@@ -377,7 +389,7 @@ macro_rules! par_options {
                     $(#[$fattr])*
                     #[doc = ""]
                     #[doc = concat!("New value of [`Par::", stringify!($field), "`]",
-                        $(" (set to `", stringify!($some), "`)",)? "; `None`: unchanged.")]
+                        $(" (set to `", stringify!($some), "`)",)? "; unset: unchanged.")]
                     pub $field: Option<$t> => $kind $t,
                 )*
                 /// Overlays the next plot: with `true`, the next `plot_new()` draws
@@ -385,7 +397,8 @@ macro_rules! par_options {
                 /// (e.g. for a second `plot_window()` with an axis on side 4). As
                 /// in R, drawing anything (other than `mtext(outer = TRUE)`)
                 /// resets it to `false`, `plot_new()` itself does not, and it is
-                /// ignored (R warns) before anything is plotted.
+                /// ignored (R warns) before anything is plotted. Unset:
+                /// unchanged.
                 pub new: Option<bool> => option bool,
                 /// User coordinates of the plot region, `[x0, x1, y0, y1]`, in
                 /// log10 units on a log axis (as [`par("usr")`] reads). The default
@@ -395,14 +408,17 @@ macro_rules! par_options {
                 /// `lab`, and replaces an `xaxp`/`yaxp` given there. A value
                 /// `NaN`, `x0 == x1` or `y0 == y1` is an error of the call (R's
                 /// "invalid value specified for graphical parameter \"usr\"").
+                /// Unset: unchanged.
                 ///
                 /// [`par("usr")`]: crate::device::Device::usr
                 pub usr: Option<[f64; 4]> => array [f64; 4],
                 /// Makes the x axis logarithmic, or linear again: from now on, x
                 /// values are mapped through `log10` first. As in R, `usr` stays
                 /// as it is, so set it too. The next `plot_new()` resets it.
+                /// Unset: unchanged.
                 pub xlog: Option<bool> => option bool,
-                /// As [`xlog`](ParOptions::xlog), for the y axis.
+                /// As [`xlog`](ParOptions::xlog), for the y axis. Unset:
+                /// unchanged.
                 pub ylog: Option<bool> => option bool,
             }
         }
@@ -483,7 +499,7 @@ par_options! {
         /// instead of the figure less `mar`. `None` (the default): use `mar`
         /// and `pty`. A `par()` call setting `mar`, `mai` or `pty` resets it
         /// to `None`, as in R. Applied at the next `plot_new()`.
-        pub plt: Option<[f64; 4]> => option_value Option<[f64; 4]>,
+        pub plt: Option<[f64; 4]> => option_array Option<[f64; 4]>,
         /// Plot region size in inches, `[width, height]`, centred in the
         /// figure, instead of the figure less `mar`. `None` (the default): use
         /// `plt`, or `mar` and `pty`; takes precedence over `plt`. A `par()`
@@ -504,22 +520,25 @@ par_options! {
         /// Range style of the y axis, as `xaxs`.
         pub yaxs: AxisStyle => option AxisStyle,
 
-        /// Default colour of points, lines, `abline()` and `box()`.
+        /// Default colour of points, lines, `abline()` and `box()`. Default
+        /// black.
         pub col: Color => option Color,
         /// Background colour: of new pages, of the default `legend()` box
-        /// fill, and of colour number 0.
+        /// fill, and of colour number 0. Default: the device's background
+        /// (white; transparent for PDF), or the `bg` it was opened with.
         pub bg: Color => option Color,
         /// Default colour of axes, segments, arrows and rectangle/polygon
-        /// borders. Unlike R's `par(fg = )`, doesn't set `col` too: set both
-        /// for the same effect.
+        /// borders. Default black. Unlike R's, setting it doesn't set `col`
+        /// too: set both for the same effect.
         pub fg: Color => option Color,
-        /// Colour of axis tick labels. R's `col.axis`.
+        /// Colour of axis tick labels. Default black. R's `col.axis`.
         pub col_axis: Color => option Color,
-        /// Colour of the axis titles (`xlab`/`ylab`). R's `col.lab`.
+        /// Colour of the axis titles (`xlab`/`ylab`). Default black. R's
+        /// `col.lab`.
         pub col_lab: Color => option Color,
-        /// Colour of the main title. R's `col.main`.
+        /// Colour of the main title. Default black. R's `col.main`.
         pub col_main: Color => option Color,
-        /// Colour of the subtitle. R's `col.sub`.
+        /// Colour of the subtitle. Default black. R's `col.sub`.
         pub col_sub: Color => option Color,
 
         /// Colours that colour numbers (`col = 2`) index, from 1. Default
@@ -543,13 +562,13 @@ par_options! {
         /// Base text size, in big points. Default 12. Its value when the
         /// device is created is the device's starting size
         /// ([`DeviceBuilder::pointsize`](crate::device::DeviceBuilder::pointsize)
-        /// or `ps` passed to `Device::new`; R's `pdf(pointsize = )`), from
+        /// or 12 for `Device::new`; R's `pdf(pointsize = )`), from
         /// which margin lines and symbols are sized; changing it later only
         /// changes text size, as in R.
         pub ps: f64 => number f64,
         /// Base magnification of text and symbols; also scales the margin
         /// "line" unit (see [`Device::line_height_inches`](crate::device::Device::line_height_inches)).
-        /// Default 1. R's `cexbase`.
+        /// Default 1.
         pub cex: f64 => number f64,
         /// Expansion factor for margin lines, a multiple of `cex`. Default 1.
         pub mex: f64 => number f64,
@@ -609,7 +628,7 @@ par_options! {
         /// Approximate number of tick intervals on the x and y axes for
         /// default ticks; the third value (label length) is unused, as in R.
         /// Default `c(5, 5, 7)`.
-        pub lab: [i32; 3] => option [i32; 3],
+        pub lab: [i32; 3] => int_array [i32; 3],
         /// First and last default x tick and the number of intervals between
         /// them. On a log axis the first two are powers of ten and the third
         /// a code, as R's: 3 for ticks at 1, 2 and 5 times each power, 2 for
@@ -720,7 +739,7 @@ impl Par {
     /// draws nothing when `bg` is transparent (the PDF default). Numbers index
     /// `palette`.
     ///
-    /// R's colour 0 is the background too.
+    /// This is how R resolves colours, colour 0 included.
     ///
     /// # Examples
     ///
@@ -818,5 +837,23 @@ mod tests {
         // `plt` back to the mar-based region.
         ParOptions::default().plt(None).apply(&mut par);
         assert_eq!(par.plt, None);
+    }
+
+    #[test]
+    fn plt_and_lab_take_any_numbers() {
+        let mut par = Par::default();
+        ParOptions::default()
+            .plt([0, 1, 0, 1])
+            .lab([5.9, 3.0, 7.2])
+            .apply(&mut par);
+        assert_eq!(par.plt, Some([0.0, 1.0, 0.0, 1.0]));
+        // Truncated, as R's `as.integer()`.
+        assert_eq!(par.lab, [5, 3, 7]);
+        ParOptions::default()
+            .plt(Some([0.1, 0.9, 0.1, 0.9]))
+            .lab([4_u8, 4, 4])
+            .apply(&mut par);
+        assert_eq!(par.plt, Some([0.1, 0.9, 0.1, 0.9]));
+        assert_eq!(par.lab, [4, 4, 4]);
     }
 }

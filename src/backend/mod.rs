@@ -8,8 +8,9 @@
 
 //! The `Backend` trait: a minimal drawing surface that the higher-level
 //! graphics engine (`crate::device`) renders onto. Implemented for SVG
-//! (`svg.rs`), PDF (`pdf.rs`), and PNG rasterization (`raster.rs`), and
-//! [`AnyBackend`], which wraps any of the three behind one type.
+//! (`svg.rs`), PDF (`pdf.rs`), PNG rasterization (`raster.rs`) and a null
+//! device that draws nothing (`null.rs`), and [`AnyBackend`], which wraps
+//! any of them behind one type.
 //!
 //! # Coordinate convention
 //! All coordinates passed to a `Backend` are in **inches**, origin at the
@@ -21,7 +22,7 @@
 //! Glyph *width* and *height* calculations always go through
 //! `crate::afm` (the same Helvetica AFM tables R's own `pdf()`/
 //! `postscript()` devices use), regardless of backend. That keeps layout
-//! math (label centering, legend sizing, tick offsets, ...) identical to
+//! math (label centring, legend sizing, tick offsets, ...) identical to
 //! R no matter which backend ends up rasterizing the glyphs. Only the
 //! actual glyph *painting* is backend-specific, via [`Backend::draw_text`].
 //!
@@ -51,7 +52,7 @@ use crate::numbers::Num;
 /// `"butt"` or `"square"`, or their codes as strings, `"0"` to `"2"` (R takes
 /// the codes only as numbers). Anything else is an error.
 ///
-/// This is R's `par(lend = )`.
+/// This is R's [`par(lend)`].
 ///
 /// # Examples
 ///
@@ -60,13 +61,15 @@ use crate::numbers::Num;
 /// assert_eq!("butt".parse::<LineEnd>().unwrap(), LineEnd::Butt);
 /// assert!("flat".parse::<LineEnd>().is_err());
 /// ```
+///
+/// [`par(lend)`]: crate::par::Par::lend
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineEnd {
-    /// Rounded ends (the default).
+    /// Rounded ends (the default). R's `"round"`.
     Round,
-    /// Flat ends, at the end points.
+    /// Flat ends, at the end points. R's `"butt"`.
     Butt,
-    /// Flat ends, extended by half the line width.
+    /// Flat ends, extended by half the line width. R's `"square"`.
     Square,
 }
 
@@ -92,7 +95,7 @@ crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"squa
 /// `"mitre"` or `"bevel"`, or their codes as strings, `"0"` to `"2"` (R takes
 /// the codes only as numbers). Anything else is an error.
 ///
-/// This is R's `par(ljoin = )`.
+/// This is R's [`par(ljoin)`].
 ///
 /// # Examples
 ///
@@ -100,13 +103,16 @@ crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"squa
 /// # use rs_graphics::prelude::*;
 /// assert_eq!("mitre".parse::<LineJoin>().unwrap(), LineJoin::Mitre);
 /// ```
+///
+/// [`par(ljoin)`]: crate::par::Par::ljoin
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LineJoin {
-    /// Rounded corners (the default).
+    /// Rounded corners (the default). R's `"round"`.
     Round,
-    /// Pointed corners, bevelled where longer than the mitre limit.
+    /// Pointed corners, bevelled where longer than the mitre limit. R's
+    /// `"mitre"`.
     Mitre,
-    /// Corners cut off.
+    /// Corners cut off. R's `"bevel"`.
     Bevel,
 }
 
@@ -216,10 +222,10 @@ pub struct TextStyle {
     pub color: Color,
     /// Font face: plain, bold, italic, bold italic or Symbol.
     pub face: FontFace,
-    /// Point size to paint at: `par(ps) * cex` after
+    /// Point size to paint at: `par(ps) * par(cex) * cex` after
     /// [`Backend::effective_font_size`] (so whole points on PDF).
     pub size_pt: f64,
-    /// Rotation in degrees, counterclockwise about the anchor point,
+    /// Rotation in degrees, anticlockwise about the anchor point,
     /// matching R's `srt` text-rotation convention.
     pub rotation_deg: f64,
 }
@@ -252,7 +258,8 @@ impl TextStyle {
 /// Coordinates are in inches from the page's bottom-left corner, y
 /// upwards (see the [module docs](self)). The crate's backends are
 /// [`PdfBackend`](pdf::PdfBackend), [`SvgBackend`](svg::SvgBackend),
-/// [`RasterBackend`](raster::RasterBackend) and [`AnyBackend`], made by
+/// [`RasterBackend`](raster::RasterBackend),
+/// [`NullBackend`](null::NullBackend) and [`AnyBackend`], made by
 /// the device builder ([`Device::pdf`](crate::device::Device::pdf),
 /// [`Device::memory`](crate::device::Device::memory), ...); code that works
 /// with any of them takes a `B: Backend`. To draw somewhere else, implement
@@ -317,7 +324,7 @@ pub trait Backend {
     fn device_unit_inches(&self) -> f64;
 
     /// Returns the point size this device actually sets text at, given the
-    /// requested size (`par(ps) * cex`).
+    /// requested size (`par(ps) * par(cex) * cex`).
     ///
     /// The device sends every text size through this, for measuring as well
     /// as drawing. It's the requested size for SVG and PNG, and rounded to a

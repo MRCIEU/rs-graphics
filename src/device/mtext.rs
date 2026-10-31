@@ -34,8 +34,8 @@ crate::setters::options! {
     /// R's defaults. As in R, the text and the vector arguments are recycled
     /// over the longest: `dev.mtext().text(["a", "b"]).at([1, 2]).draw()`
     /// writes two labels.
-    /// Empty: R's default for every label; a `None` entry is R's `NA`, the
-    /// default for that label.
+    /// Empty: R's default for every label; a `None` entry is R's `NA`, which
+    /// each setter describes (usually the default for that label).
     #[derive(Clone, Debug, Default)]
     pub struct MtextOptions => [MtextCall] {
         /// Margin line, recycled per label, counting from 0 next to the plot

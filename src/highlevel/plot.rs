@@ -12,10 +12,13 @@
 //!
 //! Only numeric x/y plots are supported: the vast majority of R's
 //! `plot.default` is dispatch logic and argument munging for other input
-//! types, which is out of scope here.
+//! types, which is out of scope here. Not supported: `lim2`, and `ann`
+//! (set [`par(ann)`] instead).
 //!
 //! This is R's `plot(x, y, ...)`, ported from `plot.default` in
 //! `r-source/src/library/graphics/R/plot.R`.
+//!
+//! [`par(ann)`]: crate::par::Par::ann
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;

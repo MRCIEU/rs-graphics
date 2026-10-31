@@ -80,7 +80,7 @@ dev.off()
 
 ```no_run
 # use rs_graphics::prelude::*;
-# fn main() -> std::io::Result<()> {
+# fn main() -> Result<(), rs_graphics::Error> {
 let mut dev = Device::pdf("plot.pdf").width(7).height(5).open()?;
 dev.plot().x(1..=10).draw();
 dev.close()?;

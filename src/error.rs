@@ -14,8 +14,10 @@
 use std::fmt;
 use std::sync::Arc;
 
-/// An R error from a drawing call: what R would stop with, such as a
-/// missing argument, an invalid value, or regions that don't fit the page.
+/// An error: R's error from a drawing call (what R would stop with, such
+/// as a missing argument, an invalid value, or regions that don't fit the
+/// page), a string that names no value (`"wavy".parse::<LineType>()`), or
+/// a device's file that can't be created or written.
 ///
 /// Returned by the builders' `try_draw()` (and [`Device`]'s
 /// `try_plot_new()`, `try_add_figure()`, ...); the matching `draw()`
@@ -136,7 +138,8 @@ impl Error {
     }
 
     /// Returns the name of the R function that raised the error, such as
-    /// `"plot.new"` or `"hist"`.
+    /// `"plot.new"` or `"hist"`; empty for an error from a string
+    /// conversion.
     pub fn call(&self) -> &str {
         self.call
     }
@@ -293,7 +296,7 @@ pub(crate) use from_str_via_try_from;
 mod string_route_tests {
     use crate::backend::{Format, LineEnd, LineJoin};
     use crate::color::{Color, ColorSpec};
-    use crate::device::{LegendKeyword, LegendPos, StrUnits, Units};
+    use crate::device::{BoxWhich, LegendKeyword, LegendPos, StrUnits, Units};
     use crate::font::FontFace;
     use crate::highlevel::{HistBreaks, OrderH, PlotType};
     use crate::lty::LineType;
@@ -323,6 +326,7 @@ mod string_route_tests {
         same::<Color>("red", "notacolour");
         same::<ColorSpec>("2", "notacolour");
         same::<StrUnits>("in", "cm");
+        same::<BoxWhich>("out", "x");
         same::<LineType>("dashed", "wavy");
         same::<PlotType>("b", "x");
         same::<HistBreaks>("FD", "F");

@@ -12,11 +12,11 @@
 //! `outwex`, the general `lty`/`lwd` and the `box*`/`med*`/`whisk*`/
 //! `staple*`/`out*` styles, recycled over boxes; outlier lines only with
 //! one box, as R draws them several times over with more), `add = TRUE`
-//! (with `ann`
-//! off by default), log value and position axes, and `xlim`/`ylim` with
+//! (with `ann` off by default), log value and position axes, and `xlim`/`ylim` with
 //! `horizontal`. Compares every painted path and text item in order (see
 //! `common::pdf::assert_same`), except the origins of labels with a minus
-//! sign (R's `pdf()` draws `-` as a wider `/minus`; see CLAUDE.md).
+//! sign (R's `pdf()` draws `-` as a wider `/minus`, which we deliberately
+//! don't copy).
 //! Skipped if `Rscript` isn't available.
 
 use crate::common;

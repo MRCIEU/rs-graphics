@@ -13,8 +13,8 @@
 //! turned every label scientific and made them overlap). Compares every
 //! painted path and text item (see `common::pdf::assert_same`), except the
 //! origins of negative labels, which are laid out slightly differently in
-//! PDF output because R's `pdf()` draws `-` as `/minus` (a deliberate
-//! difference, see CLAUDE.md); the page is wide enough that this doesn't
+//! PDF output because R's `pdf()` draws `-` as the wider `/minus` glyph
+//! (a quirk of R's PDF device we deliberately don't copy); the page is wide enough that this doesn't
 //! change which labels `gap.axis` drops. Skipped if `Rscript` isn't
 //! available.
 

@@ -426,7 +426,6 @@ pub fn palette<G: Graphics>(g: &mut G) -> Result<(), Error> {
 ///
 /// Drawn best on a page about 7 x 6 inches.
 ///
-///
 /// [`par(oma)`]: crate::par::Par::oma
 ///
 #[doc = include_str!("regions.svg")]

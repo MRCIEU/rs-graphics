@@ -18,8 +18,8 @@
 //! `axisnames`, `cex.names`, `axis.lty`, shading lines (`density`/
 //! `angle`) and R's inline axis parameters (`las`, `cex.axis`, ...).
 //!
-//! Also `xpd` and `plot = FALSE`. Not supported: `panel.first`/
-//! `panel.last`.
+//! Also `xpd` and `plot = FALSE`. Not supported: `inside`,
+//! `panel.first`/`panel.last` (see `panel_bg`).
 //!
 //! This is R's `barplot(height, ...)`, ported from `barplot.default` in
 //! `r-source/src/library/graphics/R/barplot.R`.
@@ -33,7 +33,10 @@
 //! recycled over every element of the matrix of stacked sums instead of
 //! once per column (so `offset = c(0, 10, 0)` on a 3-column matrix gives
 //! limits that cut off the bars it draws). We use
-//! each column's own offset, as R does when drawing the bars.
+//! each column's own offset, as R does when drawing the bars. On a log
+//! value axis R puts the default legend near the bottom (it passes the
+//! log10 `usr` values to `legend()` as data); ours goes in the top-right
+//! corner, as intended.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec, gray_colors};
@@ -95,8 +98,9 @@ crate::setters::options! {
         /// keeps its key, without a label. R's `legend.text`.
         pub legend_text: Option<Vec<Option<Label>>> => labels Label,
         /// Position of the legend, e.g. `"topleft"` or `(x, y)`. `None`: 0.1
-        /// inch in from the top-right corner of the plot region, as R. R's
-        /// `args.legend = list(x = .., y = ..)`.
+        /// inch in from the top-right corner of the plot region, as R (also
+        /// on a log axis, where R misplaces it). R's `args.legend = list(x =
+        /// .., y = ..)`.
         pub legend_pos: Option<LegendPos> => option LegendPos,
         /// Legend options (e.g. `bty`, `inset`, `ncol`, `cex`, `title`,
         /// `fill`); every setting made here overrides barplot's choice (`fill`
@@ -232,8 +236,9 @@ crate::setters::options! {
         ///
         /// [`par(tcl)`]: crate::par::Par::tcl
         pub tcl: Option<f64> => number f64,
-        /// Minimum gap between axis labels. `None`: R's default. R's
-        /// `gap.axis`.
+        /// Minimum gap between axis labels, in "m" widths (labels parallel
+        /// to the axis) or "M" heights (perpendicular). `None`: 1 or 0.25.
+        /// R's `gap.axis`.
         pub gap_axis: Option<f64> => number f64,
         /// Width of the axes' line and ticks (not the bars' borders, as in
         /// R). `None`: 1, `axis()`'s default.

@@ -32,8 +32,9 @@ use crate::named_colors::NAMED_COLORS;
 /// and spaces (`"Light Blue"`). Surrounding whitespace is ignored. `"NA"`,
 /// `""` and unknown names are errors (R: "invalid color name"), and so are
 /// numeric strings such as `"2"`: palette indices are a [`ColorSpec`]'s
-/// (whose string conversion takes them). This is how R's `col2rgb()` reads
-/// colour strings.
+/// (whose string conversion takes them).
+///
+/// This is how R's `col2rgb()` reads colour strings.
 ///
 /// # Examples
 ///
@@ -351,6 +352,7 @@ impl TryFrom<&String> for ColorSpec {
 macro_rules! from_option {
     ($($t:ty),*) => {
         $(
+            /// Converts a colour, or `None` for R's `NA` (draw nothing).
             impl From<Option<$t>> for ColorSpec {
                 fn from(c: Option<$t>) -> Self {
                     c.map_or(ColorSpec::None, Into::into)
@@ -365,6 +367,12 @@ from_option!(Color, ColorSpec, i32);
 macro_rules! try_from_option {
     ($($t:ty),*) => {
         $(
+            /// Converts a colour string, or `None` for R's `NA` (draw nothing).
+            ///
+            /// # Errors
+            ///
+            /// If the string isn't a colour (see [`ColorSpec`]'s
+            /// conversions).
             impl TryFrom<Option<$t>> for ColorSpec {
                 type Error = crate::error::Error;
 

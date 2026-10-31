@@ -32,7 +32,7 @@
 //! dev.add_figure(&fig); // panel 1
 //! dev.add_figure(&fig); // panel 2
 //! dev.close()?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), rs_graphics::Error>(())
 //! ```
 //!
 //! - **Same output.** Drawing a `Figure` calls the same code, in the same
@@ -75,7 +75,7 @@
 //! ```no_run
 //! use rs_graphics::prelude::*;
 //!
-//! # fn main() -> std::io::Result<()> {
+//! # fn main() -> Result<(), rs_graphics::Error> {
 //! let x = [2.1, 3.4, 3.9, 4.2, 5.0, 5.3, 6.8];
 //! let mut fig = Figure::new();
 //! fig.par().mfrow([1, 2]).draw();
@@ -459,9 +459,9 @@ impl<B: Backend> Device<B> {
     /// `plot_new()` moves to the next panel, as that call would. The graphical
     /// parameters are restored afterwards, so the figure's `par()` calls don't
     /// affect what is drawn next; the panel position, [`par(new)`] and the
-    /// coordinates (`plot_window()`, `par(usr/xlog/ylog)`) are device state and
-    /// are not restored. Returns what the figure's `legend()` and `axis()`
-    /// calls returned (see [`FigureResult`]).
+    /// coordinates (`plot_window()`, [`par(usr)`] and its `xlog`/`ylog`) are
+    /// device state and are not restored. Returns what the figure's
+    /// `legend()` and `axis()` calls returned (see [`FigureResult`]).
     ///
     /// A figure that sets a page layout (`mfrow`, `mfcol`, `mfg`, `fig`,
     /// `fin` or `layout()`) is a whole plot: it sets that layout on the
@@ -492,6 +492,7 @@ impl<B: Backend> Device<B> {
     /// example `plot.new(): figure margins too large` on a small page).
     ///
     /// [`par(new)`]: crate::par::ParOptions::new
+    /// [`par(usr)`]: crate::par::ParOptions::usr
     pub fn add_figure(&mut self, fig: &Figure) -> FigureResult {
         self.try_add_figure(fig).unwrap_or_else(|e| panic!("{e}"))
     }

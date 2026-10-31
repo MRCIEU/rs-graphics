@@ -27,7 +27,8 @@ Usage:
   tools/fmt_own.py [--rev REV] [--dry-run] [FILE...]
 
 With no FILE, every .rs file changed since REV (default HEAD), plus
-untracked ones, is formatted.
+untracked ones, is formatted. Generated files (a "don't edit" note in
+their first lines) are skipped.
 """
 
 import argparse
@@ -98,6 +99,9 @@ def import_tokens(text):
 def format_file(path, rev, dry_run):
     cur = open(path).read().splitlines(keepends=True)
     rel = os.path.relpath(os.path.abspath(path), ROOT)
+    if any("don't edit" in line for line in cur[:20]):
+        print(f"{rel}: generated, skipped")
+        return
     p = run(["git", "show", f"{rev}:{rel}"])
     old = p.stdout.splitlines(keepends=True) if p.returncode == 0 else []
     mine = changed_lines(old, cur)

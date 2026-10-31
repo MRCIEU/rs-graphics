@@ -24,7 +24,9 @@
 //! Each nibble is a segment length in units of `lwd` (line width), with
 //! even indices "pen down" and odd indices "pen up".
 //!
-//! These are R's `lty` values (`par(lty = )`).
+//! These are R's `lty` values ([`par(lty)`]).
+//!
+//! [`par(lty)`]: crate::par::Par::lty
 
 /// A line type: blank (nothing drawn) or a dash pattern in units of `lwd`.
 ///
@@ -34,9 +36,9 @@
 ///
 /// From a string (`"dashed".parse::<LineType>()` or `TryFrom<&str>`): a name
 /// (`"blank"`, `"solid"`, `"dashed"`, `"dotted"`, `"dotdash"`, `"longdash"`,
-/// `"twodash"`, in any case) or 2, 4, 6 or 8 hex digits (1-9, A-F; no zeros),
-/// each a segment length in `lwd` units (`"42"`, `"1343"`); surrounding
-/// whitespace is ignored. A single digit is a numeric code (`"2"`), which R
+/// `"twodash"`, in any case, where R matches the exact case) or 2, 4, 6
+/// or 8 hex digits (1-9, A-F; no zeros), each a segment length in `lwd`
+/// units (`"42"`, `"1343"`); surrounding whitespace is ignored. A single digit is a numeric code (`"2"`), which R
 /// rejects as a string. Anything else is an error.
 ///
 /// This is R's `lty`.

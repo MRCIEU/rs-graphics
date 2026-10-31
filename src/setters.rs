@@ -198,8 +198,42 @@ impl<'a, N: crate::numbers::Numbers<'a>> OptionNumbers<'a, markers::OptionOf> fo
     }
 }
 
-/// One value or several, for a setting R recycles per element: colours,
-/// `text()`'s `pos`, `layout()`'s `widths` and `heights`.
+/// A fixed-size array of numbers of any type, or an `Option` of an `f64`
+/// array, for a setting whose `None` is a value of its own:
+/// [`par(plt)`]'s `None` is the `mar`-based plot region.
+///
+/// `T` is the setting's type, `Option<[f64; N]>`. A bare `None` works;
+/// `Some(..)` holds `f64`s (`Some([0.1, 0.9, 0.1, 0.9])`).
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// dev.par().plt([0, 1, 0, 1]).draw();
+/// dev.par().plt(None).draw();
+/// ```
+///
+/// [`par(plt)`]: crate::par::Par::plt
+pub trait OptionArray<T> {
+    /// The array as `f64`s, or `None`.
+    fn into_option_array(self) -> T;
+}
+
+impl<U: crate::numbers::Num, const N: usize> OptionArray<Option<[f64; N]>> for [U; N] {
+    fn into_option_array(self) -> Option<[f64; N]> {
+        Some(self.map(crate::numbers::Num::to_f64))
+    }
+}
+
+impl<const N: usize> OptionArray<Option<[f64; N]>> for Option<[f64; N]> {
+    fn into_option_array(self) -> Option<[f64; N]> {
+        self
+    }
+}
+
+/// One value or several: colours and `text()`'s `pos` (recycled per
+/// element, as R does), and `layout()`'s `widths` and `heights`.
 ///
 /// Takes a single value (a colour or a `pos` code) or a `Vec`, array or
 /// slice of them, by value or by reference: `"red"`, `["red", "blue"]`,
@@ -633,8 +667,7 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// Setter kinds: `value` (plain field), `option` (`Option<T>` from a
 /// value or an `Option`, [`OptionArg`]), `option_value`
 /// (`Option<T>` from a value only, for types where an `Option` is a value
-/// itself: a colour's `None` is R's `NA`, as in colour vectors, and
-/// [`par(plt)`]'s `None` is the `mar`-based region),
+/// itself: a colour's `None` is R's `NA`, as in colour vectors),
 /// `number` (`Option<f64>` from any [`Num`](crate::numbers::Num) or an
 /// `Option` of one, [`OptionNum`]),
 /// `values` (`Vec<T>` recycled by R), `numbers` (`Vec<f64>` recycled by
@@ -648,7 +681,10 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// `pair_array` (`[f64; 2]` from a `Pair`), `one_or_pair`
 /// (`Option<(f64, f64)>` from one number used twice or a `Pair`, see
 /// [`OneOrPair`](crate::numbers::OneOrPair)), `array` (`Option<[f64; N]>`
-/// from an array of any numbers), `na` (`Option<Option<f64>>`, R's
+/// from an array of any numbers), `option_array` (`Option<Option<[f64;
+/// N]>>`, for [`par(plt)`], from an array of any numbers or an `Option`,
+/// [`OptionArray`]), `int_array` (an integer array from any numbers,
+/// truncated), `na` (`Option<Option<f64>>`, R's
 /// `NA`-able number, from a number or `None` for `NA`), `count`
 /// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
 /// [`Pch`]) and `legend_pch` (the same, read as `legend()` does).
@@ -727,7 +763,7 @@ macro_rules! options {
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes a value or an `Option` of one; `None` leaves the default (see [`OptionArg`](crate::setters::OptionArg))."]
+        #[doc = "Takes a value or an `Option` of one; `None` leaves it unset (see [`OptionArg`](crate::setters::OptionArg))."]
         pub fn $field<M>(mut self, value: impl $crate::setters::OptionArg<$t, M>) -> Self {
             match value.into_option_arg() {
                 Ok(v) => self$(.$p)?.$field = v,
@@ -749,7 +785,7 @@ macro_rules! options {
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident number $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes any number, or an `Option` of one; `None` leaves the default (see [`OptionNum`](crate::setters::OptionNum))."]
+        #[doc = "Takes any number, or an `Option` of one; `None` leaves it unset (see [`OptionNum`](crate::setters::OptionNum))."]
         pub fn $field<M>(mut self, value: impl $crate::setters::OptionNum<M>) -> Self {
             self$(.$p)?.$field = value.into_option_num();
             self
@@ -767,7 +803,7 @@ macro_rules! options {
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_numbers $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes one number or several, of any number type, or an `Option` of them; `None` leaves the default (see [`OptionNumbers`](crate::setters::OptionNumbers))."]
+        #[doc = "Takes one number or several, of any number type, or an `Option` of them; `None` leaves it unset (see [`OptionNumbers`](crate::setters::OptionNumbers))."]
         pub fn $field<'n, M>(mut self, values: impl $crate::setters::OptionNumbers<'n, M>) -> Self {
             self$(.$p)?.$field = values.into_option_numbers();
             self
@@ -890,6 +926,28 @@ macro_rules! options {
             // A non-finite number is `NA` too, as in R.
             let v = value.into_option_num().filter(|v| v.is_finite());
             self$(.$p)?.$field = Some(v);
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident option_array $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes an array of any numbers, or an `Option` of an `f64` array (see [`OptionArray`](crate::setters::OptionArray))."]
+        pub fn $field(mut self, value: impl $crate::setters::OptionArray<$t>) -> Self {
+            self$(.$p)?.$field = Some(value.into_option_array());
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident int_array $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes an array of any numbers; fractions are truncated, as R's `as.integer()`."]
+        pub fn $field<U: $crate::numbers::Num, const N: usize>(mut self, values: [U; N]) -> Self
+        where
+            [i32; N]: Into<$t>,
+        {
+            let values: [i32; N] = values.map(|v| $crate::numbers::Num::to_f64(v) as i32);
+            self$(.$p)?.$field = Some(values.into());
             self
         }
     };

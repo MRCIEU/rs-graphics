@@ -9,7 +9,9 @@
 //! Cross-checks the bin edges and counts `hist()` returns against R's own
 //! `hist(x, plot = FALSE)` for a handful of fixed datasets, with the
 //! default Sturges breaks (also for one value and for all values equal),
-//! a number of classes (`breaks = 20`) and unsorted edges.
+//! a number of classes (`breaks = 20`) and unsorted edges; the Scott and
+//! FD rules and a breaks function; `right`, `include.lowest` and `fuzz`;
+//! and R's errors for invalid breaks and unknown rules.
 //!
 //! Skipped (not failed) if `Rscript` isn't on `PATH`.
 

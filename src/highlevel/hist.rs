@@ -14,7 +14,9 @@
 //! `"Sturges"`/`"Scott"`/`"FD"` rules, a function), `xlim`/`ylim`, R's
 //! binning with `right`/`include.lowest`/`fuzz`, `labels` and per-bar
 //! `col`/`border`/`lty`, shading lines (`density`/`angle`), and `plot =
-//! FALSE`. Not supported: `panel.first`.
+//! FALSE`. Not supported: `panel.first` (see `panel_bg`), `sub`,
+//! `warn.unused`; R's `probability` and `nclass` are `.freq(false)` and
+//! `.breaks(n)`.
 //!
 //! This is R's `hist(x, ...)`, ported from `hist.default`/`plot.histogram`
 //! in `r-source/src/library/graphics/R/hist.R`.
@@ -468,13 +470,15 @@ crate::setters::options! {
         /// [`par(fg)`]: crate::par::Par::fg
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// Line types of the bar borders, recycled over the bars. Empty:
-        /// [`par(lty)`]; `None`: that bar has no border.
+        /// [`par(lty)`]; `None`: that bar has no border and no shading lines
+        /// (its fill stays).
         ///
         /// [`par(lty)`]: crate::par::Par::lty
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Shading lines per inch in the bars, recycled over the bars; the
-        /// lines take the bar's `col` (see [`RectOptions::density`]). Empty:
-        /// no shading.
+        /// lines take the bar's `col` (see [`RectOptions::density`]). `None`
+        /// or a negative value fills the bar instead, 0 leaves it empty.
+        /// Empty: no shading.
         pub density: Vec<Option<f64>> => na_values f64,
         /// Angle of the shading lines in degrees, recycled as `density`.
         /// Empty: 45.
@@ -546,8 +550,8 @@ crate::setters::options! {
         /// warning). R's `log = "y"`.
         pub ylog: bool => value bool,
         /// Draws the bars on the current plot, without a new plot, window,
-        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog` and
-        /// `ylog` are ignored). Default `false`.
+        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`,
+        /// `xlim`, `ylim`, `ann` and `panel_bg` are ignored). Default `false`.
         pub add: bool => value bool,
         /// Orientation of the axis labels: 0 parallel to the axis, 1
         /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
@@ -581,8 +585,9 @@ crate::setters::options! {
         ///
         /// [`par(tcl)`]: crate::par::Par::tcl
         pub tcl: Option<f64> => number f64,
-        /// Minimum gap between axis labels. `None`: R's default. R's
-        /// `gap.axis`.
+        /// Minimum gap between axis labels, in "m" widths (labels parallel
+        /// to the axis) or "M" heights (perpendicular). `None`: 1 or 0.25.
+        /// R's `gap.axis`.
         pub gap_axis: Option<f64> => number f64,
         /// Width of the axes' line and ticks (only the axes: the bars are
         /// unaffected). `None`: 1, `axis()`'s default.

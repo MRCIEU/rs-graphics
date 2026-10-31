@@ -12,8 +12,9 @@
 //!
 //! Devices are opened for a file with [`Device::pdf`], [`Device::svg`],
 //! [`Device::png`] or [`Device::format`] (a [`DeviceBuilder`]) and written
-//! by [`Device::close`]; [`Device::new`] with [`Device::finish`] keeps the
-//! output in memory. Draw on a device with the
+//! by [`Device::close`]; [`Device::memory`] keeps the output in memory
+//! ([`Device::finish`]), [`Device::null`] draws nothing, and
+//! [`Device::new`] wraps a backend of your own. Draw on a device with the
 //! [`Graphics`] methods. The module also holds
 //! the options structs of the low-level functions ([`XyOptions`],
 //! [`AxisOptions`], [`LegendOptions`], ...) and the types they use
@@ -80,9 +81,13 @@ pub use primitives::{
 /// other number is an error of the call ("invalid axis number").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
+    /// Side 1, below the plot.
     Bottom = 1,
+    /// Side 2, left of the plot.
     Left = 2,
+    /// Side 3, above the plot.
     Top = 3,
+    /// Side 4, right of the plot.
     Right = 4,
 }
 
@@ -126,15 +131,16 @@ impl TryFrom<i32> for Side {
 /// graphical parameters (`par()`) and the page layout.
 ///
 /// Open one for a file with [`Device::pdf`], [`Device::svg`],
-/// [`Device::png`] or [`Device::format`], or wrap a backend kept in memory
-/// with [`Device::new`]; draw on it with the
+/// [`Device::png`] or [`Device::format`], in memory with
+/// [`Device::memory`], or for nothing with [`Device::null`]
+/// ([`Device::new`] wraps a backend you implement); draw on it with the
 /// [`Graphics`] methods.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// # use rs_graphics::prelude::*;
-/// # fn main() -> std::io::Result<()> {
+/// # fn main() -> Result<(), rs_graphics::Error> {
 /// let mut dev = Device::pdf("plot.pdf").width(6).height(4).open()?;
 /// dev.plot().x([1, 2, 3]).y([2, 4, 3]).draw();
 /// dev.close()?;
@@ -248,7 +254,7 @@ impl<'a, G: Graphics> LayoutCall<'a, G> {
     /// reads on screen). Every figure number from 1 to the largest must
     /// appear; `0` marks an empty cell, and a number in several cells
     /// makes that figure span them. Fractions are truncated, as R does.
-    /// Required. R's `mat`.
+    /// Required.
     pub fn mat<R: AsRef<[T]>, T: crate::numbers::Num>(mut self, mat: &[R]) -> Self {
         self.mat = Some(
             mat.iter()
@@ -400,12 +406,13 @@ impl<B: Backend> Device<B> {
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum StrUnits {
     /// Data units along the axis (the default): x for a width, y for a
-    /// height; log10 values on a log axis, as [`Device::usr`] is.
+    /// height; log10 values on a log axis, as [`Device::usr`] is. R's
+    /// `"user"`.
     #[default]
     User,
-    /// Inches.
+    /// Inches. R's `"inches"`.
     Inches,
-    /// Fractions of the figure region's width or height.
+    /// Fractions of the figure region's width or height. R's `"figure"`.
     Figure,
 }
 
@@ -578,13 +585,13 @@ crate::setters::options! {
     /// `sub` and `lab` ones (`None`: the `par()` value).
     #[derive(Clone, Debug, Default)]
     pub struct TitleOptions => [TitleCall] {
-        /// Main title, above the plot.
+        /// Main title, above the plot. `None`: not drawn.
         pub main: Option<Label> => option Label,
-        /// Subtitle, below the x axis label.
+        /// Subtitle, below the x axis label. `None`: not drawn.
         pub sub: Option<Label> => option Label,
-        /// x axis label.
+        /// x axis label. `None`: not drawn.
         pub xlab: Option<Label> => option Label,
-        /// y axis label.
+        /// y axis label. `None`: not drawn.
         pub ylab: Option<Label> => option Label,
         /// Size of the main title, relative to [`par(cex)`]. `None`:
         /// [`par(cex.main)`]. R's `cex.main`.
@@ -731,12 +738,27 @@ impl<B: Backend> Device<B> {
         dev
     }
 
-    /// Returns the backend, to finish it yourself or set its options.
+    /// Returns the backend: your own one from [`Device::new`], or an
+    /// [`AnyBackend`](crate::backend::AnyBackend) to inspect
+    /// ([`AnyBackend::format`](crate::backend::AnyBackend::format)) or
+    /// finish with [`Backend::into_bytes`].
     ///
     /// On a device opened for a file this doesn't write the file: the current
     /// page's file stays empty (with one file per page, earlier pages' files
     /// are already written and the backend holds only the last page). Use
     /// [`close`](Device::close) for that.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// let mut dev = Device::memory("svg").open().unwrap();
+    /// dev.plot().x([1, 2, 3]).draw();
+    /// let backend = dev.into_backend();
+    /// assert_eq!(backend.format(), Some(Format::Svg));
+    /// let svg = backend.into_bytes();
+    /// assert!(String::from_utf8(svg).unwrap().contains("<svg"));
+    /// ```
     pub fn into_backend(self) -> B {
         self.backend
     }
@@ -752,7 +774,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::memory("pdf").width(5).height(4).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// let pdf: Vec<u8> = dev.finish();
@@ -778,7 +800,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let mut dev = Device::png("plot.png").res(150).open()?;
     /// dev.plot().x([1, 2, 3]).draw();
     /// dev.close()?;
@@ -1203,7 +1225,7 @@ impl<B: Backend> Device<B> {
         self.fig
     }
 
-    /// Draws R's `plot_new()`; the public entry is
+    /// Draws R's `plot.new()`; the public entry is
     /// [`Graphics::plot_new`], whose docs
     /// describe it.
     pub(crate) fn plot_new_impl(&mut self) -> Result<(), Error> {
@@ -1273,9 +1295,6 @@ impl<B: Backend> Device<B> {
         }
     }
 
-    /// The user coordinates for limits `xlim`/`ylim` (data units) on
-    /// linear or log axes, through `GScale()`, and `par.xaxp`/`yaxp`; see
-    /// [`Graphics::plot_window`].
     /// R's `par(xlog = , ylog = )` (`None`: unchanged): only the flags, as
     /// in R; `usr` and the mapping stay.
     pub(crate) fn set_log(&mut self, xlog: Option<bool>, ylog: Option<bool>) {
@@ -1577,7 +1596,7 @@ impl<B: Backend> Device<B> {
     /// Returns the device's starting point size.
     ///
     /// It is the [`pointsize`](DeviceBuilder::pointsize) the device was opened
-    /// with, or `par.ps` as passed to [`Device::new`]. Margin lines and
+    /// with (12 for [`Device::new`]). Margin lines and
     /// plotting symbols are sized from it; changing [`par(ps)`] later only
     /// changes the text size.
     ///
@@ -1587,7 +1606,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```no_run
     /// # use rs_graphics::prelude::*;
-    /// # fn main() -> std::io::Result<()> {
+    /// # fn main() -> Result<(), rs_graphics::Error> {
     /// let dev = Device::svg("plot.svg").pointsize(10).open()?;
     /// assert_eq!(dev.start_ps(), 10.0);
     /// # Ok(())
@@ -1608,7 +1627,7 @@ impl<B: Backend> Device<B> {
     ///
     /// ```
     /// # use rs_graphics::prelude::*;
-    /// # let mut dev = Device::null().open().unwrap();
+    /// # let dev = Device::null().open().unwrap();
     /// assert_eq!(dev.line_height_inches(), 1.2 * 12.0 / 72.0);
     /// ```
     pub fn line_height_inches(&self) -> f64 {

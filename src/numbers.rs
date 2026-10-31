@@ -7,14 +7,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Traits for numeric arguments that take integers as well as `f64`: data
-//! vectors ([`Numbers`]), groups of them ([`Groups`]) and pairs
-//! ([`Pair`]).
+//! vectors ([`Numbers`]), groups of them ([`Groups`]), pairs ([`Pair`]),
+//! one number or a pair ([`OneOrPair`]), and the number types they accept
+//! ([`Num`]).
 //!
 //! As in R, where all numbers are doubles, any number type works:
 //! `dev.plot().x([1, 2, 3]).y(&y)`, or `dev.plot().x(1..=10).y(&y)` for
 //! R's `plot(1:10, y)`. One number is a vector of one
 //! (`dev.plot().x(1).y(1)` for R's `plot(1, 1)`). For `boxplot()`, one
-//! vector is one group. Pairs are tuples such as `(5, 20)`.
+//! vector is one group. Pairs are arrays `[5, 20]` or tuples `(5, 20.5)`.
 //!
 //! Data may be passed by reference or by value (`&x` or `x`, `&[1, 2]` or
 //! `[1, 2]`), as may the recycled option vectors (`.h([1, 2])`,

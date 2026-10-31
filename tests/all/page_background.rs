@@ -8,7 +8,7 @@
 
 //! The page background follows the device, as R's `par("bg")` does: none
 //! on PDF (R's `pdf()` is transparent) unless the device has a `bg`,
-//! white on SVG and the canvas colour on PNG; and a new page is a new PDF
+//! white on SVG and PNG; and a new page is a new PDF
 //! page but replaces the SVG one.
 
 use rs_graphics::color::{Color, ColorSpec};

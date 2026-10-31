@@ -13,13 +13,16 @@
 //! [`mfrow`](crate::graphics::ParCall::mfrow) and
 //! [`mfcol`](crate::graphics::ParCall::mfcol) set up.
 //!
-//! These are R's `layout()` and `par(mfrow = )`/`par(mfcol = )`. The
+//! These are R's `layout()` and [`par(mfrow)`]/[`par(mfcol)`]. The
 //! region arithmetic is a direct port of the "Code for layouts"
 //! section of `graphics.c` (`layoutRegions()` and friends, written by Paul
 //! Murrell for R's `layout()`), plus the `mfrow`/`mfcol` branch of
 //! `mapFigureRegion()`. Everything here works in NIC ("normalized inner
 //! region") coordinates, i.e. fractions of the device minus its outer
 //! margins; [`crate::device::Device`] turns them into inches.
+//!
+//! [`par(mfrow)`]: crate::graphics::ParCall::mfrow
+//! [`par(mfcol)`]: crate::graphics::ParCall::mfcol
 
 use std::fmt;
 

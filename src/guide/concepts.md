@@ -4,7 +4,7 @@ The words the docs use come from R. In short:
 
 | Term | Meaning |
 |---|---|
-| device | Where drawing goes: a PDF, SVG or PNG file being written ([`Device`](crate::device::Device)). It has one or more pages. |
+| device | Where drawing goes: a PDF, SVG or PNG file being written, or the same kept in memory, or nothing at all (`Device::null()`, for measuring) ([`Device`](crate::device::Device)). It has one or more pages. |
 | plot region | The rectangle the data is drawn in. Axes run along its edges; drawing is clipped to it by default. |
 | margins | The space around the plot region, for the axes, their labels and the titles. Measured in **lines** of text: [`par().mar([5.1, 4.1, 4.1, 2.1])`](crate::par::Par::mar) (bottom, left, top, right), or in inches with [`mai`](crate::par::Par::mai). |
 | figure region | The plot region plus its margins: one panel. |
@@ -22,7 +22,7 @@ The words the docs use come from R. In short:
 | low-level call | A call that adds to the current plot: `points()`, `lines()`, `text()`, `abline()`, `legend()`, `axis()`, `title()`, `mtext()`, ... |
 | graphical parameters | Settings that apply to everything drawn after them, set with [`par()`](crate::graphics::Graphics::par) and held in [`Par`](crate::par::Par). Most can also be given to one call, for that call only (`plot().cex_axis(0.8)`). |
 | recycling | A vector argument shorter than the data is repeated: `.col(["red", "blue"])` on five points colours them red, blue, red, blue, red. |
-| `NA` | R's missing value: `None` here. In a style vector it skips that element (`.pch([Some(19), None])`); a missing data value leaves a gap. |
+| `NA` | R's missing value: `None` in a setting, where it skips that element of a style vector (`.pch([Some(19), None])`); `f64::NAN` in data, where it leaves a gap. |
 | plotmath | R's notation for mathematical labels: `Label::math("beta[1]^2")` (see [`plotmath`](crate::plotmath)). |
 
 # Sizes and styles

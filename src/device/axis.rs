@@ -46,7 +46,8 @@ crate::setters::options! {
         /// axis). `None`: the default ticks from `axp` (else
         /// `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
         pub at: Option<Vec<f64>> => option_numbers f64,
-        /// Labels for the ticks in `at` (requires `at`): text or plotmath
+        /// Labels for the ticks in `at` (requires `at`, as many; otherwise an
+        /// error of the call): text or plotmath
         /// expressions (`Some("a".into())`, `Some(Label::math("10^5"))`).
         /// `None`: `at` formatted like R's `formatReal()`. An inner `None` (a
         /// character `NA`) draws the tick but not its label, and doesn't count

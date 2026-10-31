@@ -38,9 +38,8 @@
 //!
 //! [`par(cex)`] scales everything as in `legend.R`: the character cell
 //! (`xc`/`yc`) and the measured and drawn text (R's `strwidth(cex = )` and
-//! `text(cex = )` both multiply by [`par("cex")`], i.e. `cexbase`).
+//! `text(cex = )` both multiply by [`par(cex)`], i.e. `cexbase`).
 //!
-//! [`par("cex")`]: crate::par::Par::cex
 //! [`par(cex)`]: crate::par::Par::cex
 //! [`par(srt)`]: crate::par::Par::srt
 
@@ -195,14 +194,23 @@ corners!(
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LegendKeyword {
+    /// R's `"bottomright"`.
     BottomRight,
+    /// R's `"bottom"`.
     Bottom,
+    /// R's `"bottomleft"`.
     BottomLeft,
+    /// R's `"left"`.
     Left,
+    /// R's `"topleft"`.
     TopLeft,
+    /// R's `"top"`.
     Top,
+    /// R's `"topright"`.
     TopRight,
+    /// R's `"right"`.
     Right,
+    /// R's `"center"`.
     Center,
 }
 
@@ -266,9 +274,9 @@ crate::setters::options! {
     /// [`par(fg)`]: crate::par::Par::fg
     #[derive(Clone, Debug, Default)]
     pub struct LegendOptions => [LegendCall] {
-        /// Colours of the lines and points. Empty: [`par("col")`].
+        /// Colours of the lines and points. Empty: [`par(col)`].
         ///
-        /// [`par("col")`]: crate::par::Par::col
+        /// [`par(col)`]: crate::par::Par::col
         pub col: Vec<ColorSpec> => values ColorSpec,
         /// Plotting symbols: R's symbol codes, characters or strings; a first
         /// string of several characters gives one symbol per key, as R's
@@ -279,10 +287,10 @@ crate::setters::options! {
         /// `None`: no line on that key.
         pub lty: Vec<Option<LineType>> => na_values LineType,
         /// Line widths of the lines; giving any draws lines. Empty:
-        /// [`par("lwd")`]; `None`: no line on that key (its point, if any, uses
+        /// [`par(lwd)`]; `None`: no line on that key (its point, if any, uses
         /// [`par(lwd)`]).
         ///
-        /// [`par("lwd")`]: crate::par::Par::lwd
+        /// [`par(lwd)`]: crate::par::Par::lwd
         /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
         /// Fill colours of box keys; giving any draws boxes. Empty: no fill,
@@ -315,10 +323,10 @@ crate::setters::options! {
         /// none, any other value the whole box (R's `legend()` draws no
         /// partial boxes). `None`: a box (R's `"o"`).
         pub bty: Option<Bty> => option Bty,
-        /// Fill colour of the legend box. `None`: [`par("bg")`] (transparent, so
+        /// Fill colour of the legend box. `None`: [`par(bg)`] (transparent, so
         /// unfilled, on PDF by default: see [`Backend::default_bg`]).
         ///
-        /// [`par("bg")`]: crate::par::Par::bg
+        /// [`par(bg)`]: crate::par::Par::bg
         pub bg: Option<ColorSpec> => option_value ColorSpec,
         /// Size of each key's text and symbol, times [`par(cex)`]. Empty and
         /// `None`: 1.
@@ -344,7 +352,9 @@ crate::setters::options! {
         /// Width of the label text, in x *user* units: one width for every
         /// column, or one per column; `None` (R's `NA`) makes each column as
         /// wide as its own widest label. Empty: every column as wide as the
-        /// widest label. R's `text.width`.
+        /// widest label. A negative width, or `None` among other values, is an
+        /// error of the call (R's "'text.width' must be numeric, >= 0, or a
+        /// scalar NA"). R's `text.width`.
         pub text_width: Vec<Option<f64>> => na_values f64,
         /// Horizontal adjustment of the labels. `None`: 0 (left). R's
         /// `adj[1]`.
@@ -376,27 +386,27 @@ crate::setters::options! {
         /// fractions of the plot region, `[x, y]` or one number for both.
         /// `None`: 0.
         pub inset: Option<(f64, f64)> => one_or_pair (f64, f64),
-        /// Colours of the labels. Empty: [`par("col")`]. R's `text.col`.
+        /// Colours of the labels. Empty: [`par(col)`]. R's `text.col`.
         ///
-        /// [`par("col")`]: crate::par::Par::col
+        /// [`par(col)`]: crate::par::Par::col
         pub text_col: Vec<ColorSpec> => values ColorSpec,
         /// Fonts of the labels (also for measuring them). Empty and `None`:
-        /// [`par("font")`]. R's `text.font`.
+        /// [`par(font)`]. R's `text.font`.
         ///
-        /// [`par("font")`]: crate::par::Par::font
+        /// [`par(font)`]: crate::par::Par::font
         pub text_font: Vec<Option<FontFace>> => na_values FontFace,
-        /// Line width of the legend box. `None`: [`par("lwd")`]. R's `box.lwd`.
+        /// Line width of the legend box. `None`: [`par(lwd)`]. R's `box.lwd`.
         ///
-        /// [`par("lwd")`]: crate::par::Par::lwd
+        /// [`par(lwd)`]: crate::par::Par::lwd
         pub box_lwd: Option<f64> => number f64,
-        /// Line type of the legend box. `None`: [`par("lty")`]. R's `box.lty`.
+        /// Line type of the legend box. `None`: [`par(lty)`]. R's `box.lty`.
         ///
-        /// [`par("lty")`]: crate::par::Par::lty
+        /// [`par(lty)`]: crate::par::Par::lty
         pub box_lty: Option<LineType> => option LineType,
         /// Colour of the legend box's border (`ColorSpec::None`: no border).
-        /// `None`: [`par("fg")`]. R's `box.col`.
+        /// `None`: [`par(fg)`]. R's `box.col`.
         ///
-        /// [`par("fg")`]: crate::par::Par::fg
+        /// [`par(fg)`]: crate::par::Par::fg
         pub box_col: Option<ColorSpec> => option_value ColorSpec,
         /// How far drawing may reach ([`Xpd`]; the setter also takes
         /// `false`/`true`). `None`: [`par(xpd)`]; overrides it for this call
@@ -439,15 +449,17 @@ pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Re
 /// list(w, h, left, top), text = list(x, y))`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LegendLayout {
-    /// `rect$left`, `rect$top`: the box's top-left corner.
+    /// The x of the box's left edge. R's `rect$left`.
     pub left: f64,
+    /// The y of the box's top edge. R's `rect$top`.
     pub top: f64,
-    /// `rect$w`, `rect$h`: the box's width and height.
+    /// The box's width. R's `rect$w`.
     pub w: f64,
+    /// The box's height. R's `rect$h`.
     pub h: f64,
-    /// `text$x`, `text$y`: each label's anchor (its left end and vertical
-    /// centre).
+    /// Each label's x: its left end. R's `text$x`.
     pub text_x: Vec<f64>,
+    /// Each label's y: its vertical centre. R's `text$y`.
     pub text_y: Vec<f64>,
 }
 

@@ -6,9 +6,9 @@
 // License, version 3 or (at your option) any later version; see LICENSE.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! [`AnyBackend`]: one type for all three output formats, chosen at run
-//! time (e.g. from a command-line option), so drawing code needs no
-//! generic `B`. [`Device::format`](crate::device::Device::format) and
+//! [`AnyBackend`]: one type for every output format (and the null device),
+//! chosen at run time (e.g. from a command-line option), so drawing code
+//! needs no generic `B`. [`Device::format`](crate::device::Device::format) and
 //! [`Device::pdf`](crate::device::Device::pdf) & co. open devices on it.
 
 use super::null::NullBackend;
@@ -56,8 +56,8 @@ impl Format {
 
 crate::error::from_r_string!(Format, "output format", "\"pdf\", \"svg\" or \"png\"");
 
-/// A PDF, SVG or PNG backend behind one type, for a format chosen at run
-/// time.
+/// A PDF, SVG, PNG or null backend behind one type, for a format chosen at
+/// run time.
 ///
 /// Every [`Backend`] method is forwarded, so the output is byte for byte
 /// that of the wrapped backend. Every device the builder opens
