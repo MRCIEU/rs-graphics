@@ -292,7 +292,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// let mids = dev.barplot().height([3, 5, 2]).names(["A", "B", "C"]).ylim([0, 6]).draw();
+    /// let mids = dev.barplot().height([3, 5, 2]).names_arg(["A", "B", "C"]).ylim([0, 6]).draw();
     /// dev.text().x(&mids).y([3.3, 5.3, 2.3]).labels(["3", "5", "2"]).draw();
     /// ```
     ///
@@ -300,9 +300,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `height`
     /// is missing or empty, or a matrix's columns are empty or of different
-    /// lengths; if `names` has neither one name per bar nor (for `beside`) one per
-    /// column; and, with a log value axis, if any `height + offset`, or a given
-    /// limit of a log axis, is <= 0.
+    /// lengths; if `names_arg` has neither one name per bar nor (for `beside`) one
+    /// per column; and, with a log value axis, if any `height + offset`, or a
+    /// given limit of a log axis, is <= 0.
     fn barplot(&mut self) -> BarplotCall<'_, Self> {
         BarplotCall::start(self)
     }

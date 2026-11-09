@@ -126,7 +126,7 @@ dev.abline().v(h.mids[2]).lty("dashed").draw();
 let centres = dev // panel 2: bar centres, for labelling the bars
     .barplot()
     .height([3.0, 5.0, 2.0])
-    .names(["A", "B", "C"])
+    .names_arg(["A", "B", "C"])
     .ylim([0.0, 6.0])
     .draw();
 dev.text().x(&centres).y(&[3.3, 5.3, 2.3]).labels(&["3", "5", "2"]).draw();

@@ -23,7 +23,7 @@
 //!
 //! // Build a figure without a device...
 //! let mut fig = Figure::new();
-//! fig.barplot().height([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
+//! fig.barplot().height([3.0, 5.0, 2.0]).names_arg(["a", "b", "c"]).draw();
 //! fig.abline().h(4.0).lty("dashed").draw();
 //!
 //! // ...and draw it later, as often as needed.

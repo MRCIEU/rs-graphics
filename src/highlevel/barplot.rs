@@ -65,7 +65,7 @@ crate::setters::options! {
         /// each group). Unset: no names (R takes them from
         /// `names(height)`/`colnames(height)`, which Rust data doesn't have).
         /// A `None` element (R's `NA`) leaves that name out. R's `names.arg`.
-        pub names: Option<Vec<Option<Label>>> => labels Label,
+        pub names_arg: Option<Vec<Option<Label>>> => labels Label,
         /// Fill colours, recycled over the bars of a vector or the rows of a
         /// matrix. Empty: `"grey"` for a vector, `gray.colors(nrow)` for a
         /// matrix.
@@ -261,7 +261,7 @@ impl Default for BarplotOptions {
         BarplotOptions {
             deferred_error: None,
             extra: Default::default(),
-            names: None,
+            names_arg: None,
             col: Vec::new(),
             border: Vec::new(),
             density: Vec::new(),
@@ -469,7 +469,7 @@ pub(crate) struct BarLayout {
     colors: Vec<ColorSpec>,
     xlim: (f64, f64),
     ylim: (f64, f64),
-    /// Where `names` go along the category axis, if given.
+    /// Where `names_arg` go along the category axis, if given.
     names_at: Option<Vec<f64>>,
 }
 
@@ -674,7 +674,7 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
     };
 
     let names_at = opts
-        .names
+        .names_arg
         .as_ref()
         .map(|names| {
             if names.len() == w_m.len() {
@@ -828,7 +828,7 @@ impl<B: Backend> Device<B> {
             lwd: opts.lwd,
             ..InlineAxis::default()
         };
-        if let (true, Some(names), Some(at)) = (opts.axisnames, &opts.names, names_at) {
+        if let (true, Some(names), Some(at)) = (opts.axisnames, &opts.names_arg, names_at) {
             // `axis(side, at = at, labels = names.arg, lty = axis.lty,
             // cex.axis = cex.names, ...)`: with R's default `axis.lty = 0`,
             // the names only.

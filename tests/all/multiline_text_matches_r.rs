@@ -160,7 +160,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.barplot()
                     .height([1, 2, 3])
-                    .names(["a", "b\nc", "d"])
+                    .names_arg(["a", "b\nc", "d"])
                     .draw();
             },
             clip: true,

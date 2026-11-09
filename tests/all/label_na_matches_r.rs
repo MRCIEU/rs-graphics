@@ -36,7 +36,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.barplot()
                     .height([3, 5, 2])
-                    .names([Some("a"), None, Some("c")])
+                    .names_arg([Some("a"), None, Some("c")])
                     .legend_text([Some("x"), None, Some("z")])
                     .draw();
             },

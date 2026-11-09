@@ -31,7 +31,7 @@ const R_PRELUDE: &str = "bp <- function(h, main) barplot(h, names.arg = LETTERS[
 
 fn bp(d: &mut Device<AnyBackend>, h: &[f64], main: &str) {
     let o = BarplotOptions::default()
-        .names(
+        .names_arg(
             (0..h.len())
                 .map(|i| Label::from(((b'A' + i as u8) as char).to_string()))
                 .collect::<Vec<_>>(),

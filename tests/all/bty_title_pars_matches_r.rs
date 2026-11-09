@@ -506,7 +506,7 @@ fn cases() -> Vec<Case> {
                     .draw();
                 d.barplot()
                     .height([3, 5, 2])
-                    .names(["a", "b", "c"])
+                    .names_arg(["a", "b", "c"])
                     .las(2)
                     .cex_axis(0.7)
                     .col_axis("red")
@@ -525,14 +525,14 @@ fn cases() -> Vec<Case> {
                 d.par().mfrow([1, 2]).draw();
                 d.barplot()
                     .height([3, 5, 2])
-                    .names(["a", "b", "c"])
+                    .names_arg(["a", "b", "c"])
                     .cex_names(1.5)
                     .axis_lty("solid")
                     .cex_axis(0.7)
                     .draw();
                 d.barplot()
                     .height([3, 5, 2])
-                    .names(["a", "b", "c"])
+                    .names_arg(["a", "b", "c"])
                     .axisnames(false)
                     .horiz(true)
                     .draw();

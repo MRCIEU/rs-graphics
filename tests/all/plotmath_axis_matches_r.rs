@@ -367,7 +367,7 @@ fn plotmath_high_level_titles_match_r() {
         .height([3.0, 5.0, 2.0])
         .with(
             &BarplotOptions::default()
-                .names(abc())
+                .names_arg(abc())
                 .main(math("bold(Bars)"))
                 .xlab(math("group[k]")),
         )

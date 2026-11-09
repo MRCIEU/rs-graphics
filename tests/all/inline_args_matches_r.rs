@@ -162,7 +162,7 @@ fn cases() -> Vec<Case> {
                     .height([3, 1, 2])
                     .lwd(2.5)
                     .axis_lty(1)
-                    .names(["a", "b", "c"])
+                    .names_arg(["a", "b", "c"])
                     .draw();
             },
         },

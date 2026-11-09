@@ -165,7 +165,7 @@ draw a PNG, so it replaces no R code.
 dev.par().mar([7, 4, 2, 1]).draw();
 dev.barplot()
     .height([3, 5, 2])
-    .names(["first group", "second group", "third group"])
+    .names_arg(["first group", "second group", "third group"])
     .label_srt(45)
     .panel_bg("grey92")
     .draw();
@@ -234,7 +234,7 @@ let h = dev
     .draw();
 dev.abline().v(h.mids[2]).lty("dashed").draw(); // R counts from 1
 let heights = [3.0, 5.0, 2.0];
-let mp = dev.barplot().height(heights).names(["A", "B", "C"]).ylim([0, 6]).draw();
+let mp = dev.barplot().height(heights).names_arg(["A", "B", "C"]).ylim([0, 6]).draw();
 let above: Vec<f64> = heights.iter().map(|h| h + 0.3).collect();
 dev.text().x(&mp).y(&above).labels(["3", "5", "2"]).draw();
 dev.mtext().text("Two panels").outer(true).line(0.5).font(2).draw();

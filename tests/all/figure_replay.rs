@@ -117,7 +117,7 @@ fn bars<G: Graphics>(g: &mut G) {
     ];
     g.barplot()
         .height(m)
-        .names(["a", "b", "c"])
+        .names_arg(["a", "b", "c"])
         .legend_text(["r1", "r2", "r3"])
         .density([10, 20, 30])
         .main("Bars")
@@ -348,7 +348,7 @@ fn recording_checks_arguments_like_the_device() {
         Figure::new()
             .barplot()
             .height([1.0, 2.0])
-            .names(["a", "b", "c"])
+            .names_arg(["a", "b", "c"])
             .draw();
     });
     assert!(

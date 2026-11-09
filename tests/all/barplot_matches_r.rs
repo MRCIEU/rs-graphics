@@ -58,7 +58,7 @@ fn cases() -> Vec<Case> {
             r: r#"barplot(c(23, 41, 12, -5), names.arg = c("A","B","C","D"), main = "Vec", ylab = "v")"#,
             run: |d| {
                 let o = BarplotOptions::default()
-                    .names(names(&["A", "B", "C", "D"]))
+                    .names_arg(names(&["A", "B", "C", "D"]))
                     .main("Vec")
                     .ylab("v");
                 d.barplot().height([23.0, 41.0, 12.0, -5.0]).with(&o).draw();
@@ -69,7 +69,7 @@ fn cases() -> Vec<Case> {
             r: r#"barplot(m, names.arg = c("a","b","c","d"), legend.text = c("r1","r2","r3"))"#,
             run: |d| {
                 let o = BarplotOptions::default()
-                    .names(names(&["a", "b", "c", "d"]))
+                    .names_arg(names(&["a", "b", "c", "d"]))
                     .legend_text(names(&["r1", "r2", "r3"]));
                 d.barplot().height(mat()).with(&o).draw();
             },
@@ -79,7 +79,7 @@ fn cases() -> Vec<Case> {
             r: r#"barplot(m, beside = TRUE, names.arg = c("a","b","c","d"), col = c("red","green","blue"))"#,
             run: |d| {
                 let o = BarplotOptions::default()
-                    .names(names(&["a", "b", "c", "d"]))
+                    .names_arg(names(&["a", "b", "c", "d"]))
                     .beside(true)
                     .col(red_green_blue());
                 d.barplot().height(mat()).with(&o).draw();
@@ -90,7 +90,7 @@ fn cases() -> Vec<Case> {
             r: r#"barplot(m, horiz = TRUE, names.arg = c("a","b","c","d"))"#,
             run: |d| {
                 let o = BarplotOptions::default()
-                    .names(names(&["a", "b", "c", "d"]))
+                    .names_arg(names(&["a", "b", "c", "d"]))
                     .horiz(true);
                 d.barplot().height(mat()).with(&o).draw();
             },

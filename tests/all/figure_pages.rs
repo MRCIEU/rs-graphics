@@ -22,7 +22,10 @@ fn whole_plot<G: Graphics>(g: &mut G) {
     g.plot().x(x).main("one").draw();
     g.hist().x(x).draw();
     g.boxplot().x(x).draw();
-    g.barplot().height([3, 5, 2]).names(["a", "b", "c"]).draw();
+    g.barplot()
+        .height([3, 5, 2])
+        .names_arg(["a", "b", "c"])
+        .draw();
     g.mtext().text("Page one").outer(true).line(0.5).draw();
     g.plot().x(x).y(x).main("five").draw();
     g.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();

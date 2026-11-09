@@ -94,7 +94,7 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
         ("barplot(1:3, names.arg = c('a', 'b'))", "barplot", |g| {
             g.barplot()
                 .height([1, 2, 3])
-                .names(["a", "b"])
+                .names_arg(["a", "b"])
                 .try_draw()
                 .map(drop)
         }),

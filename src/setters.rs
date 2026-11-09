@@ -1357,9 +1357,9 @@ mod tests {
 
         let a = Label::from("A");
         let bars = BarplotOptions::default()
-            .names("A")
+            .names_arg("A")
             .legend_text(String::from("A"));
-        assert_eq!(bars.names, Some(vec![Some(a.clone())]));
+        assert_eq!(bars.names_arg, Some(vec![Some(a.clone())]));
         assert_eq!(bars.legend_text, Some(vec![Some(a.clone())]));
         let names = vec!["A".to_string(), "B".to_string()];
         let boxes = BoxplotOptions::default().names(&names);
@@ -1370,8 +1370,8 @@ mod tests {
         let pie = PieOptions::default().labels(Label::math("x^2"));
         assert_eq!(pie.labels, Some(vec![Some(Label::math("x^2"))]));
         // Every label list may hold R's `NA`.
-        let bars = BarplotOptions::default().names([Some("a"), None]);
-        assert_eq!(bars.names, Some(vec![Some(Label::from("a")), None]));
+        let bars = BarplotOptions::default().names_arg([Some("a"), None]);
+        assert_eq!(bars.names_arg, Some(vec![Some(Label::from("a")), None]));
         // Axis labels may hold R's `NA`.
         let axis = AxisOptions::default().labels("A");
         assert_eq!(axis.labels, Some(vec![Some(a.clone())]));
@@ -1421,9 +1421,9 @@ mod tests {
         assert_eq!(plot.main, Some(Label::math("x^2")));
         assert!(!plot.axes);
 
-        let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
+        let bars = BarplotOptions::default().names_arg(["a", "b"]).col("grey");
         assert_eq!(
-            bars.names,
+            bars.names_arg,
             Some(vec![Some(Label::from("a")), Some(Label::from("b"))])
         );
         assert_eq!(bars.col, vec![ColorSpec::try_from("grey").unwrap()]);

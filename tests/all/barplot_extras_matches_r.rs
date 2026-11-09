@@ -70,7 +70,7 @@ fn cases() -> Vec<Case> {
                 d.barplot()
                     .height([3.0, 1.0, 2.0, 4.0])
                     .offset([1.0, 5.0, 2.0])
-                    .names(["a", "b", "c", "d"])
+                    .names_arg(["a", "b", "c", "d"])
                     .draw();
             },
         },
@@ -139,7 +139,7 @@ fn cases() -> Vec<Case> {
                     .space([1.0])
                     .col("white")
                     .main("hidden")
-                    .names(["x", "y", "z"])
+                    .names_arg(["x", "y", "z"])
                     .draw();
             },
         },

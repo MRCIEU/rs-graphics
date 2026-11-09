@@ -249,7 +249,7 @@ fn cases() -> Vec<Case> {
             r: "barplot(c(3, 40, 700, 12), names.arg = c('a', 'b', 'c', 'd'), log = 'y')",
             draw: |d| {
                 let o = BarplotOptions::default()
-                    .names(["a", "b", "c", "d"].map(Label::from).to_vec())
+                    .names_arg(["a", "b", "c", "d"].map(Label::from).to_vec())
                     .ylog(true);
                 d.barplot().height([3.0, 40.0, 700.0, 12.0]).with(&o).draw();
             },

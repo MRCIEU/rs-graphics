@@ -121,7 +121,7 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `height` | `.height()` | The bar heights: a vector, one bar per value, or a matrix given as its columns (see `BarHeights`). |
 | `width` | `.width()` | Bar widths, recycled. |
 | `space` | `.space()` | Space before each bar, as a fraction of the mean bar width: one value, or `[within group, between groups]` for a `beside` matrix. |
-| `names.arg` | `.names()` | Labels under the bars, or beside them if `horiz`. |
+| `names.arg` | `.names_arg()` | Labels under the bars, or beside them if `horiz`. |
 | `legend.text` | `.legend_text()` | Legend labels, one per row of a matrix or per bar of a vector, filled with `col`. |
 | `beside` | `.beside()` | Matrix only: draws the bars side by side instead of stacked. |
 | `horiz` | `.horiz()` | Draws horizontal bars. |

@@ -196,7 +196,7 @@ fn draw_hist<B: Backend>(dev: &mut Device<B>) {
 fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
     let heights = vec![23.0, 41.0, 12.0, 35.0, 28.0];
     let opts = BarplotOptions::default()
-        .names(["A", "B", "C", "D", "E"])
+        .names_arg(["A", "B", "C", "D", "E"])
         .main("barplot()")
         .ylab("value");
     dev.barplot().height(&heights).with(&opts).draw();
@@ -213,7 +213,7 @@ fn barplot_sample_columns() -> Vec<Vec<f64>> {
 
 fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions {
     BarplotOptions::default()
-        .names(["Q1", "Q2", "Q3", "Q4"])
+        .names_arg(["Q1", "Q2", "Q3", "Q4"])
         .legend_text(["x", "y", "z"])
         .beside(beside)
         .main(main)
