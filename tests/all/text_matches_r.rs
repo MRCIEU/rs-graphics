@@ -58,19 +58,16 @@ fn text_placement_matches_r() {
         dev.plot_new();
         dev.plot_window().xlim([0, 10]).ylim([0, 11]).draw();
         for (i, &(label, h, v, srt, cex, font)) in CASES.iter().enumerate() {
-            let text = dev
-                .text()
+            // `v` `None`: R's one-value `adj`, the vertical `NA`.
+            dev.text()
                 .x(5)
                 .y((i + 1) as f64)
                 .labels(label)
-                .adj(h)
+                .adj([Some(h), v])
                 .srt(srt)
                 .cex(cex)
-                .font(font);
-            match v {
-                Some(v) => text.vadj(v).draw(),
-                None => text.draw(),
-            }
+                .font(font)
+                .draw();
         }
     });
     let (ours, r) = (pdf::parse(&ours), pdf::parse(&r_pdf));

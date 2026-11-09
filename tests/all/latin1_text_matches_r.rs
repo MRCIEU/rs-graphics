@@ -52,8 +52,7 @@ fn latin1_text_matches_r() {
                     .x([5.0])
                     .y([(3 * i + j + 1) as f64])
                     .labels([label])
-                    .adj(*adj)
-                    .vadj(0.0)
+                    .adj([*adj, 0.0])
                     .font(1 + (i % 2) as i32)
                     .draw();
             }

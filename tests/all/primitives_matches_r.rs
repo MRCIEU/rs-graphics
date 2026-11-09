@@ -14,10 +14,11 @@
 //! `plot.window(asp = )`, `plot()`'s axes taking their style from
 //! `par()`, and the high-level plots' `par()`-based defaults (borders,
 //! boxplot lines and outliers, `ann`), `par(pch)` as a character, named
-//! palettes, integer codes given as ranges, unequal-width `hist()`
-//! densities and missing pie labels. Every painted path and text item is
-//! compared in order (see `common::pdf::assert_same`). Skipped if
-//! `Rscript` isn't available.
+//! palettes, integer codes given as ranges, `text()`'s and `legend()`'s
+//! `adj` (one value, two, `NA`s, unset), unequal-width `hist()` densities
+//! and missing pie labels. Every painted path and text item is compared in
+//! order (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
+//! available.
 
 use crate::common;
 use crate::common::{pdf, r};
@@ -225,7 +226,7 @@ fn cases() -> Vec<Case> {
                     .labels(["edge"])
                     .with(&edge)
                     .draw();
-                let rot = TextOptions::default().adj(0.0).vadj(1.0).srt(45.0);
+                let rot = TextOptions::default().adj([0.0, 1.0]).srt(45.0);
                 d.text().x([3.0]).y([3.0]).labels(["rot"]).with(&rot).draw();
                 d.par().adj(1.0).draw();
                 d.text().x([5.0]).y([7.0]).labels(["right"]).draw();
@@ -408,6 +409,66 @@ fn cases() -> Vec<Case> {
                 d.points().x([1.5, 2.5]).y([2.5, 1.5]).draw();
                 d.par().pch(17).draw();
                 d.points().x(2).y(2).draw();
+            },
+        },
+        Case {
+            // `adj` as one setter: unset is par(adj) with the vertical NA;
+            // an NA horizontal value centres even under par(adj = 0); a
+            // one-value adj leaves the vertical NA; a legend's unset adj is
+            // c(0, 0.5) and its NA values centre as text()'s do.
+            name: "adj_one_two_na",
+            r: "par(adj = 0); plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                text(5, 9, 'unset Mg')\n\
+                text(5, 8, 'NA, 0 Mg', adj = c(NA, 0))\n\
+                text(5, 7, 'NA, NA Mg', adj = c(NA_real_, NA_real_))\n\
+                text(5, 6, 'one 1 Mg', adj = 1)\n\
+                text(5, 5, 'two 1 1 Mg', adj = c(1, 1))\n\
+                text(5, 4, 'two 0.2 NA', adj = c(0.2, NA))\n\
+                legend('bottomleft', c('Mg', 'a'), pch = 1)\n\
+                legend('bottomright', c('Mg', 'a'), pch = 1, adj = c(NA, 1))\n\
+                legend('topleft', c('Mg', 'a'), pch = 1, adj = c(0.5, NA))",
+            draw: |d| {
+                d.par().adj(0).draw();
+                d.plot_new();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
+                d.text().x(5).y(9).labels("unset Mg").draw();
+                d.text()
+                    .x(5)
+                    .y(8)
+                    .labels("NA, 0 Mg")
+                    .adj([None, Some(0)])
+                    .draw();
+                d.text()
+                    .x(5)
+                    .y(7)
+                    .labels("NA, NA Mg")
+                    .adj([None::<f64>, None])
+                    .draw();
+                d.text().x(5).y(6).labels("one 1 Mg").adj(1).draw();
+                d.text().x(5).y(5).labels("two 1 1 Mg").adj([1, 1]).draw();
+                d.text()
+                    .x(5)
+                    .y(4)
+                    .labels("two 0.2 NA")
+                    .adj([Some(0.2), None])
+                    .draw();
+                d.legend()
+                    .pos("bottomleft")
+                    .labels(["Mg", "a"])
+                    .pch(1)
+                    .draw();
+                d.legend()
+                    .pos("bottomright")
+                    .labels(["Mg", "a"])
+                    .pch(1)
+                    .adj([None, Some(1)])
+                    .draw();
+                d.legend()
+                    .pos("topleft")
+                    .labels(["Mg", "a"])
+                    .pch(1)
+                    .adj([Some(0.5), None])
+                    .draw();
             },
         },
         Case {

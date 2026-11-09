@@ -16,7 +16,7 @@ use std::f64::consts::PI;
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::device::{
-    Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
+    Adj, Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
 };
 use crate::error::Error;
 use crate::font::FontFace;
@@ -249,7 +249,7 @@ impl<B: Backend> Device<B> {
                 // `text(1.1 * P$x, 1.1 * P$y, labels[i], xpd = TRUE, adj =
                 // ifelse(P$x < 0, 1, 0))`.
                 let at = TextOptions {
-                    adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
+                    adj: Some(Adj::from(if px < 0.0 { 1.0 } else { 0.0 })),
                     xpd: Some(Xpd::Figure),
                     srt: opts.srt,
                     cex: opts.cex.into_iter().map(Some).collect(),

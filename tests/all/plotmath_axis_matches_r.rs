@@ -256,8 +256,7 @@ fn plotmath_title_mtext_text_legend_match_r() {
         .labels(&[Label::math("alpha %+-% beta")])
         .with(
             &TextOptions::default()
-                .adj(0.0)
-                .vadj(1.0)
+                .adj([0.0, 1.0])
                 .srt(30.0)
                 .col(vec![black])
                 .cex(vec![Some(1.5)])

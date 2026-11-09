@@ -55,7 +55,7 @@ use crate::plotmath::Label;
 use crate::recycle::{nth_na, pick_na, rep_or};
 
 use super::hatch::ShapeStyle;
-use super::{Device, Xpd};
+use super::{Adj, Device, Xpd};
 
 /// Where to put a legend: a keyword, a point or two corners.
 ///
@@ -356,13 +356,12 @@ crate::setters::options! {
         /// error of the call (R's "'text.width' must be numeric, >= 0, or a
         /// scalar NA"). R's `text.width`.
         pub text_width: Vec<Option<f64>> => na_values f64,
-        /// Horizontal adjustment of the labels. `None`: 0 (left). R's
-        /// `adj[1]`.
-        pub adj: Option<f64> => number f64,
-        /// Vertical adjustment of the labels. Default 0.5; `None` (R's `NA`)
-        /// centres each label's ink, as R's one-value `adj = x` does. R's
-        /// `adj[2]`.
-        pub vadj: Option<Option<f64>> => na f64,
+        /// Justification of the labels on their points, horizontal and
+        /// vertical ([`Adj`]): one number (horizontal; vertical `None`), two,
+        /// or two `Option`s (`None`: R's `NA`: centred horizontally, each
+        /// label's ink centred vertically). Unset: `[0, 0.5]` (left-justified,
+        /// the point half a capital's height above the baseline).
+        pub adj: Option<Adj> => option Adj,
         /// Whether to draw each point in the middle of its line. `None`: R's
         /// default, `true` when the keys have both lines and points.
         pub merge: Option<bool> => option bool,
@@ -860,8 +859,12 @@ impl<B: Backend> Device<B> {
                 title_font,
             );
         }
-        let adj = opts.adj.unwrap_or(0.0);
-        let vadj = opts.vadj.unwrap_or(Some(0.5));
+        // R's default `adj = c(0, 0.5)`.
+        let adj = opts.adj.unwrap_or(Adj {
+            x: Some(0.0),
+            y: Some(0.5),
+        });
+        let (adj, vadj) = (adj.hadj(), adj.vadj());
         let mut text_x = Vec::with_capacity(n);
         let mut text_y = Vec::with_capacity(n);
         for i in 0..n {

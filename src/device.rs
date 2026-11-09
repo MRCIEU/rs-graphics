@@ -70,8 +70,8 @@ pub(crate) use mtext::check_mtext;
 pub use open::{DeviceBuilder, Units};
 pub(crate) use primitives::check_text;
 pub use primitives::{
-    ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
-    SegmentsOptions, TextOptions, XyOptions,
+    Adj, AdjElement, ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions,
+    RectOptions, SegmentsOptions, TextOptions, XyOptions,
 };
 
 /// A side of the plot, figure or page.

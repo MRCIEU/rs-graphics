@@ -24,7 +24,7 @@
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::device::{
-    AxisOptions, Device, PlotWindowOptions, RectOptions, TextOptions, TitleOptions,
+    Adj, AxisOptions, Device, PlotWindowOptions, RectOptions, TextOptions, TitleOptions,
 };
 use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
@@ -899,8 +899,8 @@ impl<B: Backend> Device<B> {
         };
         if !labels.is_empty() {
             let at = TextOptions {
-                adj: Some(0.5),
-                vadj: Some(-0.5),
+                // `text(mids, y, labels, adj = c(0.5, -0.5))`.
+                adj: Some(Adj::from((0.5, -0.5))),
                 ..TextOptions::default()
             };
             let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();

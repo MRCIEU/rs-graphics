@@ -607,13 +607,14 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// plotmath expressions (`Label::math("alpha^2")`); without them, the
     /// labels are the indices `"1"`, `"2"`, .... The other arguments are in
     /// [`TextOptions`]. `x` and `y` are recycled to the longer, and the labels
-    /// over the points (extra labels are ignored). Horizontally, `adj` sets
-    /// which part of a label is at its point (0 its left end, 0.5 its centre, 1
-    /// its right end); vertically see [`TextOptions::vadj`]; labels are rotated
-    /// by `srt`, else [`par(srt)`]. A label with newlines (`"one\ntwo"`) is
-    /// drawn line by line, [`par(lheight)`] line heights apart, as all text
-    /// is. A label at a non-finite position (a missing value, or a value <=
-    /// 0 on a log axis) is skipped.
+    /// over the points (extra labels are ignored). `adj`
+    /// ([`Adj`](crate::device::Adj)) sets which part of a label is at its
+    /// point: horizontally 0 its left end, 0.5 its centre, 1 its right end;
+    /// vertically its baseline or, by default, its ink centred. Labels are
+    /// rotated by `srt`, else [`par(srt)`]. A label with newlines
+    /// (`"one\ntwo"`) is drawn line by line, [`par(lheight)`] line heights
+    /// apart, as all text is. A label at a non-finite position (a missing
+    /// value, or a value <= 0 on a log axis) is skipped.
     ///
     /// This is R's `text()`.
     ///

@@ -31,7 +31,7 @@
 pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
 pub use crate::device::{
-    AblineOptions, ArrowsOptions, AxisLabels, AxisOptions, BoxOptions, BoxWhich, Device,
+    AblineOptions, Adj, ArrowsOptions, AxisLabels, AxisOptions, BoxOptions, BoxWhich, Device,
     DeviceBuilder, LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextOptions,
     PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, StrUnits, TextOptions,
     TitleOptions, Units, XyOptions,

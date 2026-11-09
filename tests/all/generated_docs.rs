@@ -412,8 +412,6 @@ fn r_names(s: &Setter, allowed: &BTreeSet<String>) -> Vec<String> {
 /// setter) -> how R writes it. Checked to name existing setters.
 const SPECIAL: &[(&str, &str, &str)] = &[
     ("barplot()", "legend_pos", "`args.legend` (`x`, `y`)"),
-    ("text()", "vadj", "`adj` (second value)"),
-    ("legend()", "vadj", "`adj` (second value)"),
     ("legend()", "pos", "`x`, `y`"),
     ("legend()", "labels", "`legend`"),
     ("par()", "palette", "`palette()` (a function in R)"),

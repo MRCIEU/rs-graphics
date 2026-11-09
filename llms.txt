@@ -721,13 +721,12 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `pars` (use its ele
 | `x` | `.x()` | The x coordinates of the labels, or, without `y`, the y values against their index. |
 | `y` | `.y()` | The y coordinates of the labels; `x` and `y` are recycled to the longer. |
 | `labels` | `.labels()` | The labels: text or plotmath expressions, one or several (see `Labels`); a `None` element (R's `NA`) is skipped. |
-| `adj` | `.adj()` | Horizontal justification: 0 left, 0.5 centred, 1 right. |
-| `pos` | `.pos()` | Puts each label below (1), to the left of (2), above (3) or to the right of (4) its point, `offset` away, recycled per label; overrides `adj`/`vadj`. |
+| `adj` | `.adj()` | Justification of the text on its point, horizontal and vertical (`Adj`): one number (horizontal; vertical `None`), two, or two `Option`s (`None`: R's `NA`, centred). |
+| `pos` | `.pos()` | Puts each label below (1), to the left of (2), above (3) or to the right of (4) its point, `offset` away, recycled per label; overrides `adj`. |
 | `offset` | `.offset()` | Distance of a label from its point when `pos` is given, in character heights (1.2 times the starting point size, times `par(cex)`; R's docs call it a character width). |
 | `cex` | `.cex()` | Text sizes, relative to `par(cex)`, recycled per label. |
 | `col` | `.col()` | Text colours, recycled per label. |
 | `font` | `.font()` | Fonts, recycled per label: R's numbers 1 to 5, names or `FontFace` values. |
-| `adj` (second value) | `.vadj()` | Vertical justification. |
 | `srt` | `.srt()` | Rotation in degrees, anticlockwise. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
 
@@ -833,7 +832,7 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `yjust` | `.yjust()` | Vertical justification of the box relative to its `y` position. |
 | `x.intersp` | `.x_intersp()` | Space between each key and its label, in character widths (a column is as wide as its widest). |
 | `y.intersp` | `.y_intersp()` | Space between rows, in character heights, recycled over the rows. |
-| `adj` | `.adj()` | Horizontal adjustment of the labels. |
+| `adj` | `.adj()` | Justification of the labels on their points, horizontal and vertical (`Adj`): one number (horizontal; vertical `None`), two, or two `Option`s (`None`: R's `NA`: centred horizontally, each label's ink centred vertically). |
 | `text.width` | `.text_width()` | Width of the label text, in x *user* units: one width for every column, or one per column; `None` (R's `NA`) makes each column as wide as its own widest label. |
 | `text.col` | `.text_col()` | Colours of the labels. |
 | `text.font` | `.text_font()` | Fonts of the labels (also for measuring them). |
@@ -851,7 +850,6 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `seg.len` | `.seg_len()` | Length of each key's line, in character widths. |
 | `x`, `y` | `.pos()` | Where the legend goes: a keyword such as `"topright"`, a point `[x, y]` for its top-left corner, or two corners `[[xa, xb], [ya, yb]]` (tuples work too; see `LegendPos`). |
 | `legend` | `.labels()` | The keys' labels: text or plotmath expressions, one or several (see `Labels`); a `None` element (R's `NA`) keeps its key but has no text and takes no room. |
-| `adj` (second value) | `.vadj()` | Vertical adjustment of the labels. |
 
 R's arguments not available: `trace`.
 

@@ -48,8 +48,7 @@ fn cases() -> Vec<Case> {
                     .x(0.2)
                     .y(0.8)
                     .labels("one\ntwo\nthree")
-                    .adj(0)
-                    .vadj(1)
+                    .adj([0, 1])
                     .draw();
                 d.text()
                     .x(0.8)

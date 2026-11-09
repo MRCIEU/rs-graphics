@@ -1278,12 +1278,18 @@ mod tests {
         assert_eq!(a.lend, Some(crate::backend::LineEnd::Butt));
         // A bare `None` resets a number.
         assert!(AxisOptions::default().line(2).line(None).line.is_none());
-        // Where R has an `NA` (`par(tck)`, legend `vadj`), `None` is it.
+        // Where R has an `NA` (`par(tck)`, legend `adj`), `None` is it.
         let p = ParOptions::default().tck(0.02);
         assert_eq!(p.tck, Some(Some(0.02)));
         assert_eq!(p.tck(None).tck, Some(None));
-        let l = crate::device::LegendOptions::default().vadj(None);
-        assert_eq!(l.vadj, Some(None));
+        let l = crate::device::LegendOptions::default().adj([Some(0.5), None]);
+        assert_eq!(
+            l.adj,
+            Some(crate::device::Adj {
+                x: Some(0.5),
+                y: None
+            })
+        );
         assert_eq!(ParOptions::default().tck(f64::NAN).tck, Some(None));
         assert_eq!(ParOptions::default().cex(Some(1.5)).cex, Some(1.5));
         // A failed conversion inside the `Option` is kept for `try_draw()`.
@@ -1567,6 +1573,61 @@ mod tests {
             .unwrap();
         assert_eq!(e.message(), "'ncol' must be a count, not -1");
         assert!(XyOptions::default().lty("dashed").deferred_error.is_none());
+    }
+
+    #[test]
+    fn adj_takes_one_value_two_or_two_options() {
+        use crate::device::{Adj, LegendOptions, TextOptions};
+
+        let adj = |a: Adj| TextOptions::default().adj(a).adj;
+        assert_eq!(TextOptions::default().adj, None);
+        // One value: R's one-value `adj`, the vertical `NA`.
+        let one = Adj {
+            x: Some(1.0),
+            y: None,
+        };
+        assert_eq!(TextOptions::default().adj(1).adj, Some(one));
+        assert_eq!(TextOptions::default().adj(1.0_f32).adj, Some(one));
+        assert_eq!(
+            adj([0, 1].into()),
+            Some(Adj {
+                x: Some(0.0),
+                y: Some(1.0)
+            })
+        );
+        assert_eq!(
+            adj((0, 0.5).into()),
+            Some(Adj {
+                x: Some(0.0),
+                y: Some(0.5)
+            })
+        );
+        assert_eq!(
+            LegendOptions::default().adj([None, Some(1)]).adj,
+            Some(Adj {
+                x: None,
+                y: Some(1.0)
+            })
+        );
+        // An old `NaN` is `NA`.
+        assert_eq!(
+            Adj::from([f64::NAN, 0.2]),
+            Adj {
+                x: None,
+                y: Some(0.2)
+            }
+        );
+        // `NA`, or a value that isn't finite, centres.
+        let na = Adj {
+            x: None,
+            y: Some(f64::INFINITY),
+        };
+        assert_eq!((na.hadj(), na.vadj()), (0.5, None));
+        let set = Adj {
+            x: Some(0.2),
+            y: Some(0.7),
+        };
+        assert_eq!((set.hadj(), set.vadj()), (0.2, Some(0.7)));
     }
 
     #[test]
