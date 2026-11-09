@@ -8,7 +8,7 @@
 
 //! Cross-checks `mtext()` placement (every side, inner and outer margins,
 //! `line`, `at`, `adj`, `padj`, `cex`, `font`, and inline `las` 0..=3, plus
-//! `par(las)` without it) against
+//! `par(las)` without it; `side` and `outer` recycled per label) against
 //! a real R `pdf()` device's uncompressed output, inside a 2x2 `mfrow` page
 //! with outer margins (so the 0.83 multi-panel `cex` applies): every text
 //! item (see `common::pdf::assert_same`), except its clip (R clips
@@ -110,6 +110,14 @@ fn mtext_placement_matches_r() {
         "mtext(c('n1', 'n2', 'n3'), side = 3, line = 1, at = c(2, NA, 8), \
          adj = c(NA, 0, 1), padj = c(1, NA, 0))\n",
     );
+    // `side` and `outer` recycled per label too; `outer = NA` is `FALSE`.
+    script.push_str(
+        "mtext(c('v1', 'v2', 'v3', 'v4'), side = 1:4, line = 0.5, \
+         outer = c(FALSE, TRUE, NA, TRUE))\n",
+    );
+    // Either can be the longest argument, giving one label per element.
+    script.push_str("mtext('s', side = c(1, 3), line = 2)\n");
+    script.push_str("mtext('o', side = 4, line = 1, outer = c(FALSE, TRUE))\n");
     let r_pdf = r::run_r("mtext", page, "", &[("all", &script)])
         .pdfs
         .remove(0);
@@ -152,10 +160,23 @@ fn mtext_placement_matches_r() {
             .adj([None, Some(0.0), Some(1.0)])
             .padj([Some(1.0), None, Some(0.0)])
             .draw();
+        dev.mtext()
+            .text(["v1", "v2", "v3", "v4"])
+            .side([1, 2, 3, 4])
+            .line(0.5)
+            .outer([Some(false), Some(true), None, Some(true)])
+            .draw();
+        dev.mtext().text("s").side([1, 3]).line(2).draw();
+        dev.mtext()
+            .text("o")
+            .side(4)
+            .line(1)
+            .outer([false, true])
+            .draw();
     });
 
     let (ours, r) = (pdf::parse(&ours), pdf::parse(&r_pdf));
-    assert_eq!(r.pages[0].texts.len(), cases.len() + 4);
+    assert_eq!(r.pages[0].texts.len(), cases.len() + 12);
     // R clips `mtext()` to the device even for inner margins (its `C_mtext`
     // tests `outer` on the SEXP); we clip it to the figure.
     let how = pdf::Compare {

@@ -148,8 +148,8 @@ fn pie<G: Graphics>(g: &mut G) {
         .draw();
 }
 
-/// `plot_new()`, a log window, outer `mtext()`, and `par(new = TRUE)` for
-/// an overlay.
+/// `plot_new()`, a log window, outer `mtext()` (also with `side` and
+/// `outer` per label), and `par(new = TRUE)` for an overlay.
 fn layered<G: Graphics>(g: &mut G) {
     g.par().oma([0.0, 0.0, 2.0, 0.0]).draw();
     g.plot_new();
@@ -164,6 +164,11 @@ fn layered<G: Graphics>(g: &mut G) {
         .draw();
     g.axis().side(1).draw();
     g.mtext().text("outer title").side(3).outer(true).draw();
+    g.mtext()
+        .text(["below", "outer right"])
+        .side([1, 4])
+        .outer([false, true])
+        .draw();
     g.par().new(true).draw();
     g.plot()
         .x([0.0, 1.0])

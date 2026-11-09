@@ -44,11 +44,11 @@ crate::setters::options! {
         /// out (R writes it with a `nan` coordinate, an invalid PDF: R bug
         /// not copied).
         pub line: Vec<Option<f64>> => na_values f64,
-        /// Draws in the outer margins ([`par(oma)`]) rather than the figure's.
-        /// Default `false`.
+        /// Draws in the outer margins ([`par(oma)`]) rather than the figure's,
+        /// recycled per label. Empty or `None` (R's `NA`): `false`.
         ///
         /// [`par(oma)`]: crate::par::Par::oma
-        pub outer: bool => value bool,
+        pub outer: Vec<Option<bool>> => na_values bool,
         /// Position along the side, recycled per label: a user coordinate
         /// for inner margins, or a fraction (0 to 1) of the inner region for
         /// outer ones. Empty or `None` (R's `NA`): from `adj` (text parallel
@@ -137,14 +137,16 @@ impl<B: Backend> Device<B> {
     pub(crate) fn mtext_impl(
         &mut self,
         texts: &[Option<Label>],
-        side: Side,
+        sides: &[Side],
         opts: &MtextOptions,
     ) -> Result<(), Error> {
-        check_mtext(texts)?;
+        check_mtext(texts, sides)?;
         // `C_mtext`: everything recycled over the longest argument.
         let n = [
             texts.len(),
+            sides.len(),
             opts.line.len(),
+            opts.outer.len(),
             opts.at.len(),
             opts.adj.len(),
             opts.padj.len(),
@@ -164,7 +166,8 @@ impl<B: Backend> Device<B> {
             };
             let one = One {
                 line,
-                outer: opts.outer,
+                // `outer == NA => outer <- 0`.
+                outer: nth(&opts.outer, i).flatten().unwrap_or(false),
                 at: pick(&opts.at, i),
                 adj: pick(&opts.adj, i),
                 padj: pick(&opts.padj, i),
@@ -177,7 +180,7 @@ impl<B: Backend> Device<B> {
             };
             // An `NA` (`None`) text is skipped, as `C_mtext`.
             if let Some(text) = &texts[i % texts.len()] {
-                self.mtext_one(text.clone(), side, &one);
+                self.mtext_one(text.clone(), sides[i % sides.len()], &one);
             }
         }
         Ok(())
@@ -263,9 +266,12 @@ impl<B: Backend> Device<B> {
 }
 
 /// R's check of `mtext()`'s `text`: at least one.
-pub(crate) fn check_mtext(texts: &[Option<Label>]) -> Result<(), Error> {
+pub(crate) fn check_mtext(texts: &[Option<Label>], sides: &[Side]) -> Result<(), Error> {
     if texts.is_empty() {
         return Err(Error::invalid("zero-length 'text' specified"));
+    }
+    if sides.is_empty() {
+        return Err(Error::invalid("zero-length 'side' specified"));
     }
     Ok(())
 }

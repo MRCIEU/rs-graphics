@@ -73,7 +73,7 @@ use crate::layout::{LayoutRespect, LayoutSize};
 use crate::numbers::{Groups, Num, Numbers, Pair};
 use crate::par::ParOptions;
 use crate::plotmath::{Label, Labels};
-use crate::setters::IntoArg;
+use crate::setters::{IntoArg, Values};
 
 pub(crate) mod sealed {
     pub trait Sealed {}
@@ -775,8 +775,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`text`](MtextCall::text) is required: text, or a plotmath expression
     /// (`Label::math(...)`) aligned on its bounding box by `adj`/`padj`.
     /// [`side`](MtextCall::side) defaults to 3, the top. The other arguments
-    /// (the margin line, `at`, `outer`, ...) are in [`MtextOptions`]; the text
-    /// and those arguments are recycled over the longest. Text is rotated
+    /// (the margin line, `at`, `outer`, ...) are in [`MtextOptions`]; the
+    /// text, `side` and those arguments are recycled over the longest, so
+    /// one call can write on several sides. Text is rotated
     /// according to `las` (else [`par(las)`]), and a `None` text (a missing
     /// value) is skipped.
     ///
@@ -794,7 +795,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `text` is missing or empty, or `side` isn't 1 to 4.
+    /// `text` is missing or empty, or `side` is empty or isn't 1 to 4.
     ///
     /// [`par(las)`]: crate::par::Par::las
     fn mtext(&mut self) -> MtextCall<'_, Self> {
@@ -1004,7 +1005,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     fn emit_mtext(
         &mut self,
         text: Vec<Option<Label>>,
-        side: Side,
+        side: Vec<Side>,
         opts: MtextOptions,
     ) -> Result<(), Error>;
     #[doc(hidden)]
@@ -1130,10 +1131,10 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_mtext(
         &mut self,
         text: Vec<Option<Label>>,
-        side: Side,
+        side: Vec<Side>,
         opts: MtextOptions,
     ) -> Result<(), Error> {
-        self.run(|d| d.mtext_impl(&text, side, &opts))
+        self.run(|d| d.mtext_impl(&text, &side, &opts))
     }
     fn emit_title(&mut self, opts: TitleOptions) -> Result<(), Error> {
         self.run(|d| {
@@ -1707,12 +1708,15 @@ call!(
         /// [`Labels`]), recycled with the other arguments; a `None` element
         /// (R's `NA`) is skipped. Required.
         text: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
-        /// The margin to write in: a [`Side`], or its number (1 below, 2
-        /// left, 3 above, 4 right); another number is an error of the call.
-        /// Default: 3, the top.
-        side: Side = (fallible impl IntoArg<Side> => IntoArg::into_arg),
+        /// The margin to write in, recycled per label: a [`Side`], or its
+        /// number (1 below, 2 left, 3 above, 4 right); another number is an
+        /// error of the call, and so is an empty list. Default: 3, the top.
+        side: Vec<Side> = (fallible impl Values<Side> => Values::into_values),
     },
-    |t, o| { t.emit_mtext(required(text, "text")?, side.unwrap_or(Side::Top), o) }
+    |t, o| {
+        let side = side.unwrap_or_else(|| vec![Side::Top]);
+        t.emit_mtext(required(text, "text")?, side, o)
+    }
 );
 call!(
     /// A [`title()`](Graphics::title) call being built: it adds titles.

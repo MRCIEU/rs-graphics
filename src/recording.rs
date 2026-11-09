@@ -227,7 +227,7 @@ enum Call {
     Axis(Side, AxisOptions),
     Abline(AblineOptions),
     Legend(LegendPos, Vec<Option<Label>>, LegendOptions),
-    Mtext(Vec<Option<Label>>, Side, MtextOptions),
+    Mtext(Vec<Option<Label>>, Vec<Side>, MtextOptions),
     Title(TitleOptions),
 }
 
@@ -411,10 +411,10 @@ impl Graphics for Figure {
     fn emit_mtext(
         &mut self,
         text: Vec<Option<Label>>,
-        side: Side,
+        side: Vec<Side>,
         opts: MtextOptions,
     ) -> Result<(), Error> {
-        crate::device::check_mtext(&text)?;
+        crate::device::check_mtext(&text, &side)?;
         self.calls.push(Call::Mtext(text, side, opts));
         Ok(())
     }
@@ -548,7 +548,7 @@ impl<B: Backend> Device<B> {
                 Call::Legend(pos, labels, o) => d
                     .emit_legend(*pos, labels.clone(), o.clone())
                     .map(|l| out.legends.push(l)),
-                Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), *side, o.clone()),
+                Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), side.clone(), o.clone()),
                 Call::Title(o) => d.emit_title(o.clone()),
             };
             r.map_err(|e| e.in_call(call.r_name()))?;

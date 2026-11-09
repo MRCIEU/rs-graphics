@@ -63,6 +63,9 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
         ("mtext(character(0))", "mtext", |g| {
             g.mtext().text([""; 0]).try_draw()
         }),
+        ("mtext('a', side = integer(0))", "mtext", |g| {
+            g.mtext().text("a").side([0i32; 0]).try_draw()
+        }),
         ("points(1, 1, lmitre = 0.5)", "points", |g| {
             g.points().x(1).y(1).lmitre(0.5).try_draw()
         }),

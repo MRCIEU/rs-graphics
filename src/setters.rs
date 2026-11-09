@@ -232,10 +232,11 @@ impl<const N: usize> OptionArray<Option<[f64; N]>> for Option<[f64; N]> {
     }
 }
 
-/// One value or several: colours and `text()`'s `pos` (recycled per
-/// element, as R does), and `layout()`'s `widths` and `heights`.
+/// One value or several: colours, `text()`'s `pos` and `mtext()`'s `side`
+/// (recycled per element, as R does), and `layout()`'s `widths` and
+/// `heights`.
 ///
-/// Takes a single value (a colour or a `pos` code) or a `Vec`, array or
+/// Takes a single value (a colour, a `pos` code or a side) or a `Vec`, array or
 /// slice of them, by value or by reference: `"red"`, `["red", "blue"]`,
 /// `[1, 2]`, ... Colours take anything that converts to a [`ColorSpec`]
 /// (one palette index as an `i32`; a `None` element is R's `NA`, nothing
@@ -307,6 +308,7 @@ macro_rules! single_values {
 
 single_values!(ColorSpec: ColorSpec, Color, &str, String, &String, i32);
 single_values!(i32: i32);
+single_values!(crate::device::Side: crate::device::Side, i32);
 
 /// One value or several for a recycled style vector whose elements may be
 /// missing (`None`, R's `NA`).
@@ -487,6 +489,7 @@ mod na_numbers {
 }
 na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
 na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
+na_values!(bool: IntoArg::<bool>::into_arg; bool);
 
 /// Plotting symbols for a `pch` setter: numbers, characters or strings.
 ///

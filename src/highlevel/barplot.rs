@@ -25,8 +25,9 @@
 //! `r-source/src/library/graphics/R/barplot.R`.
 //!
 //! **R bugs not copied:** with `orderH`, R reorders the colours of each
-//! stack's segments but not `density`/`angle`, so the shading moves to
-//! other rows; here it stays with its row, as the colour does. For the
+//! stack's segments but not `density`/`angle`/`border`, so the shading
+//! and borders move to other rows; here they stay with their row, as the
+//! colour does. For the
 //! legend, R reverses `density`/`angle` before recycling them over the
 //! labels; here they are recycled first, as the colours are. And for
 //! stacked bars R works out the default value axis limits with `offset`
@@ -69,10 +70,11 @@ crate::setters::options! {
         /// matrix. Empty: `"grey"` for a vector, `gray.colors(nrow)` for a
         /// matrix.
         pub col: Vec<ColorSpec> => values ColorSpec,
-        /// Colour of the bar borders. `None`: [`par(fg)`].
+        /// Colours of the bar borders, recycled as `col` is. Empty:
+        /// [`par(fg)`]. A `None` element (R's `NA`): that bar has no border.
         ///
         /// [`par(fg)`]: crate::par::Par::fg
-        pub border: Option<ColorSpec> => option_value ColorSpec,
+        pub border: Vec<ColorSpec> => values ColorSpec,
         /// Shading lines per inch in the bars, recycled as `col` is; the
         /// lines take the bar's `col`. `None` or a negative value fills the
         /// bar instead, 0 leaves it empty (see [`RectOptions::density`]).
@@ -261,7 +263,7 @@ impl Default for BarplotOptions {
             extra: Default::default(),
             names: None,
             col: Vec::new(),
-            border: None,
+            border: Vec::new(),
             density: Vec::new(),
             angle: Vec::new(),
             width: Vec::new(),
@@ -768,8 +770,12 @@ impl<B: Backend> Device<B> {
 
         // One `rect()` call for all bars beside each other, one per stack
         // otherwise, as R (which matters for the order shading lines and
-        // borders are drawn in); `col`, `density` and `angle` per bar.
-        let border = vec![opts.border.unwrap_or(ColorSpec::Color(self.par.fg))];
+        // borders are drawn in); `col`, `border`, `density` and `angle` per bar.
+        let border = if opts.border.is_empty() {
+            vec![ColorSpec::Color(self.par.fg)]
+        } else {
+            opts.border.clone()
+        };
         let mut start = 0;
         while start < bars.len() {
             let end = if beside {
@@ -799,7 +805,7 @@ impl<B: Backend> Device<B> {
             }
             let style = RectOptions {
                 col: group.iter().map(|b| colors[b.3 % colors.len()]).collect(),
-                border: border.clone(),
+                border: per_bar(&border, group),
                 density: per_bar(&opts.density, group),
                 angle: per_bar(&opts.angle, group),
                 ..RectOptions::default()
