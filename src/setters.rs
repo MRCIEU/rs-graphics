@@ -1351,7 +1351,7 @@ mod tests {
 
     #[test]
     fn label_setters_take_one_label_or_several() {
-        use crate::device::AxisOptions;
+        use crate::device::{AxisLabels, AxisOptions};
         use crate::highlevel::{BarplotOptions, BoxplotOptions, PieOptions};
         use crate::plotmath::Label;
 
@@ -1374,14 +1374,24 @@ mod tests {
         assert_eq!(bars.names_arg, Some(vec![Some(Label::from("a")), None]));
         // Axis labels may hold R's `NA`.
         let axis = AxisOptions::default().labels("A");
-        assert_eq!(axis.labels, Some(vec![Some(a.clone())]));
+        assert_eq!(axis.labels, AxisLabels::Text(vec![Some(a.clone())]));
         let axis = AxisOptions::default().labels([Some("A"), None]);
-        assert_eq!(axis.labels, Some(vec![Some(a), None]));
+        assert_eq!(axis.labels, AxisLabels::Text(vec![Some(a), None]));
+        // And R's `TRUE`/`FALSE`.
+        assert_eq!(AxisOptions::default().labels, AxisLabels::Values);
+        assert_eq!(
+            AxisOptions::default().labels(false).labels,
+            AxisLabels::None
+        );
+        assert_eq!(
+            AxisOptions::default().labels(true).labels,
+            AxisLabels::Values
+        );
     }
 
     #[test]
     fn setters_set_the_fields() {
-        use crate::device::{AblineOptions, AxisOptions, TextOptions, XyOptions};
+        use crate::device::{AblineOptions, AxisLabels, AxisOptions, TextOptions, XyOptions};
         use crate::highlevel::{BarplotOptions, PlotOptions};
         use crate::plotmath::Label;
 
@@ -1406,7 +1416,7 @@ mod tests {
         assert_eq!(axis.at, Some(vec![1.0, 2.0]));
         assert_eq!(
             axis.labels,
-            Some(vec![Some(Label::from("a")), Some(Label::from("b"))])
+            AxisLabels::Text(vec![Some(Label::from("a")), Some(Label::from("b"))])
         );
         assert_eq!(axis.las, Some(1));
 

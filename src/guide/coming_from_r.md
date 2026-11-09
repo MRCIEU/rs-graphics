@@ -43,7 +43,6 @@ dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 | `box()`, `type =` (Rust keywords) | `dev.box_()`, `.type_()` |
 | `orderH`, `axTicks()` | `.order_h()`, `dev.ax_ticks()` |
 | `log = "xy"` | `.xlog(true).ylog(true)` |
-| `labels = FALSE` (in `axis()`) | `.draw_labels(false)` |
 
 # Values
 

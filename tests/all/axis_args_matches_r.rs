@@ -215,7 +215,7 @@ fn cases() -> Vec<Case> {
                 d.axis().side(1).with(&o).draw();
                 let o = AxisOptions::default()
                     .lty(LineType::try_from(2).unwrap())
-                    .draw_labels(false);
+                    .labels(false);
                 d.axis().side(2).with(&o).draw();
                 let o = AxisOptions::default()
                     .tick(false)
@@ -460,7 +460,7 @@ fn axis_returns_tick_positions_like_r() {
             g.axis().side(3).at([12, 5, -3]).draw(),
             g.axis().side(4).at(Vec::<f64>::new()).draw(),
             g.axis().side(1).xaxt("n").draw(),
-            g.axis().side(2).draw_labels(false).tick(false).draw(),
+            g.axis().side(2).labels(false).tick(false).draw(),
         ];
         g.plot_new();
         g.plot_window()

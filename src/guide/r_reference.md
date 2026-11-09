@@ -457,7 +457,7 @@ R's arguments not available: `vfont`.
 |---|---|---|
 | `side` | `.side()` | The side to draw on: a `Side`, or its number (1 below, 2 left, 3 above, 4 right); another number is an error of the call. |
 | `at` | `.at()` | Tick positions, in user coordinates (data units, also on a log axis). |
-| `labels` | `.labels()` | Labels for the ticks in `at` (requires `at`, as many; otherwise an error of the call): text or plotmath expressions (`Some("a".into())`, `Some(Label::math("10^5"))`). |
+| `labels` | `.labels()` | The tick labels (`AxisLabels`): `true` (the default), the tick positions formatted like R's `formatReal()`; `false`, none; or one label per tick in `at` (which they require, as many; otherwise an error of the call), text or plotmath expressions (`"a"`, `Label::math("10^5")`). |
 | `tick` | `.tick()` | Whether to draw the axis line and tick marks. |
 | `line` | `.line()` | Distance of the axis line from the plot region (inner region for `outer`), in margin lines; the labels sit `mgp[1]` lines beyond it. |
 | `pos` | `.pos()` | Where to draw the axis line, as a user coordinate on the other axis; overrides `line`. |
@@ -471,7 +471,6 @@ R's arguments not available: `vfont`.
 | `hadj` | `.hadj()` | Justification of every label along its reading direction. |
 | `padj` | `.padj()` | Justification across each label, recycled over the ticks in increasing order of `at`. |
 | `gap.axis` | `.gap_axis()` | Minimum gap between labels, in "m" widths (labels parallel to the axis) or "M" heights (perpendicular); a label closer than that to the previous one is dropped. |
-| `labels = FALSE` | `.draw_labels()` | Whether to draw the tick labels. |
 | `cex.axis` | `.cex_axis()` | Size of the labels. |
 | `col.axis` | `.col_axis()` | Colour of the labels. |
 | `las` | `.las()` | Orientation of the labels. |

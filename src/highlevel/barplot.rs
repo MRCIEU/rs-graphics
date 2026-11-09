@@ -42,7 +42,8 @@
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec, gray_colors};
 use crate::device::{
-    AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions, TitleOptions,
+    AxisLabels, AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions,
+    TitleOptions,
 };
 use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
@@ -835,7 +836,7 @@ impl<B: Backend> Device<B> {
             let lty = opts.axis_lty.filter(|&l| l != LineType::BLANK);
             let names = AxisOptions {
                 at: Some(at),
-                labels: Some(names.clone()),
+                labels: AxisLabels::Text(names.clone()),
                 tick: lty.is_some(),
                 lty,
                 cex_axis: opts.cex_names,

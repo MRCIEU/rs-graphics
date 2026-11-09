@@ -27,13 +27,107 @@ use crate::font::FontFace;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::AxisType;
-use crate::plotmath::Label;
+use crate::plotmath::{Expression, Label, LabelElement, Labels};
 use crate::recycle::nth;
 
 use super::{Device, Side, Xpd, default_padj, format_axis_labels, las_perpendicular, las_rotation};
 
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
+
+/// What `axis()` writes at its ticks: their positions (the default),
+/// nothing, or given labels.
+///
+/// Setters take `true` ([`Values`](AxisLabels::Values)), `false`
+/// ([`None`](AxisLabels::None)), or one label or several, as
+/// [`Labels`] takes them (`None` elements included).
+///
+/// This is R's `axis(labels = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot().x([1, 2, 3]).y([3, 1, 2]).axes(false).draw();
+/// dev.axis().side(1).labels(false).draw();
+/// dev.axis().side(2).at([1, 2, 3]).labels(["a", "b", "c"]).draw();
+/// dev.axis().side(3).at([1, 2]).labels([Some("left"), None]).draw();
+/// ```
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum AxisLabels {
+    /// The tick positions, formatted like R's `formatReal()` (R's
+    /// `labels = TRUE`, the default).
+    #[default]
+    Values,
+    /// No labels; the ticks are drawn (R's `labels = FALSE`).
+    None,
+    /// These labels, one per tick in `at` (R's character or expression
+    /// `labels`). A `None` element (a character `NA`) draws the tick but
+    /// not its label, and doesn't count for `gap_axis`.
+    Text(Vec<Option<Label>>),
+}
+
+impl From<bool> for AxisLabels {
+    /// `true`: [`AxisLabels::Values`]; `false`: [`AxisLabels::None`].
+    fn from(b: bool) -> Self {
+        if b {
+            AxisLabels::Values
+        } else {
+            AxisLabels::None
+        }
+    }
+}
+
+/// `From` for each kind of value [`Labels`] takes.
+macro_rules! axis_labels_from {
+    ($($t:ty),*) => {
+        $(
+            impl From<$t> for AxisLabels {
+                /// These labels.
+                fn from(v: $t) -> Self {
+                    AxisLabels::Text(v.into_labels())
+                }
+            }
+        )*
+    };
+}
+axis_labels_from!(&str, &&str, String, &String, Label, Expression);
+
+impl<L: Clone + LabelElement> From<&[L]> for AxisLabels {
+    /// These labels.
+    fn from(v: &[L]) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement, const N: usize> From<[L; N]> for AxisLabels {
+    /// These labels.
+    fn from(v: [L; N]) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement, const N: usize> From<&[L; N]> for AxisLabels {
+    /// These labels.
+    fn from(v: &[L; N]) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement> From<Vec<L>> for AxisLabels {
+    /// These labels.
+    fn from(v: Vec<L>) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement> From<&Vec<L>> for AxisLabels {
+    /// These labels.
+    fn from(v: &Vec<L>) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
 
 crate::setters::options! {
     /// The arguments of R's `axis()` other than `side`, plus the inline
@@ -46,16 +140,13 @@ crate::setters::options! {
         /// axis). `None`: the default ticks from `xaxp` or `yaxp` (the axis's
         /// direction; else `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
         pub at: Option<Vec<f64>> => option_numbers f64,
-        /// Labels for the ticks in `at` (requires `at`, as many; otherwise an
-        /// error of the call): text or plotmath
-        /// expressions (`Some("a".into())`, `Some(Label::math("10^5"))`).
-        /// `None`: `at` formatted like R's `formatReal()`. An inner `None` (a
-        /// character `NA`) draws the tick but not its label, and doesn't count
-        /// for `gap_axis`.
-        pub labels: Option<Vec<Option<Label>>> => labels Label,
-        /// Whether to draw the tick labels. Default `true`. `false` is R's
-        /// `labels = FALSE`.
-        pub draw_labels: bool => value bool,
+        /// The tick labels ([`AxisLabels`]): `true` (the default), the tick
+        /// positions formatted like R's `formatReal()`; `false`, none; or one
+        /// label per tick in `at` (which they require, as many; otherwise an
+        /// error of the call), text or plotmath expressions (`"a"`,
+        /// `Label::math("10^5")`). A `None` element (a character `NA`) draws
+        /// the tick but not its label, and doesn't count for `gap_axis`.
+        pub labels: AxisLabels => value AxisLabels,
         /// Whether to draw the axis line and tick marks. Default `true`.
         pub tick: bool => value bool,
         /// Distance of the axis line from the plot region (inner region for
@@ -195,8 +286,7 @@ impl Default for AxisOptions {
         AxisOptions {
             deferred_error: None,
             at: None,
-            labels: None,
-            draw_labels: true,
+            labels: AxisLabels::Values,
             tick: true,
             line: None,
             pos: None,
@@ -287,17 +377,14 @@ impl<B: Backend> Device<B> {
             Some(axp) => self.ticks_from_axp(side, axp),
             None => self.ax_ticks(side),
         });
-        let labels = if opts.draw_labels {
-            match &opts.labels {
-                None => format_axis_labels(&at)
-                    .into_iter()
-                    .map(|l| Some(Label::Text(l)))
-                    .collect(),
-                // `check_axis` has made sure `at` is given, and as long.
-                Some(l) => l.clone(),
-            }
-        } else {
-            Vec::new()
+        let labels = match &opts.labels {
+            AxisLabels::Values => format_axis_labels(&at)
+                .into_iter()
+                .map(|l| Some(Label::Text(l)))
+                .collect(),
+            AxisLabels::None => Vec::new(),
+            // `check_axis` has made sure `at` is given, and as long.
+            AxisLabels::Text(l) => l.clone(),
         };
         // `xaxt`/`yaxt = "n"`: nothing drawn (checked after the argument
         // errors above, as in R).
@@ -433,7 +520,7 @@ impl<B: Backend> Device<B> {
             self.pop_clip();
         }
 
-        if !opts.draw_labels {
+        if opts.labels == AxisLabels::None {
             return used;
         }
         let font = opts.font.unwrap_or(self.par.font_axis);
@@ -520,7 +607,7 @@ impl<B: Backend> Device<B> {
 
 /// R's checks of `axis()`'s `labels`: given only with `at`, and as many.
 pub(crate) fn check_axis(opts: &AxisOptions) -> Result<(), Error> {
-    if let (true, Some(labels)) = (opts.draw_labels, &opts.labels) {
+    if let AxisLabels::Text(labels) = &opts.labels {
         match &opts.at {
             None => return Err(Error::invalid("'labels' is supplied and not 'at'")),
             Some(at) if at.len() != labels.len() => {

@@ -23,8 +23,8 @@
 use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
 use crate::device::{
-    AxisOptions, BoxOptions, Device, PlotWindowOptions, PolygonOptions, SegmentsOptions,
-    TitleOptions, XyOptions,
+    AxisLabels, AxisOptions, BoxOptions, Device, PlotWindowOptions, PolygonOptions,
+    SegmentsOptions, TitleOptions, XyOptions,
 };
 use crate::error::Error;
 use crate::lty::LineType;
@@ -794,7 +794,7 @@ impl<B: Backend> Device<B> {
                     .unwrap_or_else(|| (1..=n).map(|i| Some(Label::from(i.to_string()))).collect());
                 let names = AxisOptions {
                     at: Some(at.clone()),
-                    labels: Some(labels),
+                    labels: AxisLabels::Text(labels),
                     ..pars.clone()
                 };
                 let names = crate::extra::rotated_axis(&opts.extra, names);

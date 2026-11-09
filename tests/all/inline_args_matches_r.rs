@@ -256,7 +256,7 @@ fn cases() -> Vec<Case> {
                 d.par().usr([0, 20, -5, 5]).draw();
                 d.points().x([5]).y([0]).draw();
                 d.axis().side(1).draw();
-                d.axis().side(2).draw_labels(false).draw();
+                d.axis().side(2).labels(false).draw();
                 d.abline().h([0]).draw();
             },
         },
