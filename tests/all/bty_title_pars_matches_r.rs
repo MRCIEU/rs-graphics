@@ -11,7 +11,8 @@
 //! parameters (`cex.main`/`col.main`/`font.main` and the `sub` and `lab`
 //! ones) of `plot()`, `title()`, `hist()`, `barplot()`, `boxplot()`
 //! (which, as R's `bxp()`, passes only the `cex` and `col` ones) and
-//! `pie()` against a real R `pdf()` device's uncompressed output. Compares
+//! `pie()`, and `plot()`'s `ann` (inline and from `par(ann)`), against a
+//! real R `pdf()` device's uncompressed output. Compares
 //! every painted path and text item in order (see
 //! `common::pdf::assert_same`). Skipped if `Rscript` isn't available.
 
@@ -398,6 +399,34 @@ fn cases() -> Vec<Case> {
                     .type_("b")
                     .xlab("i")
                     .draw();
+            },
+        },
+        Case {
+            // `ann = FALSE` drops the titles; unset, `par(ann)` decides, and
+            // an inline `ann = TRUE` overrides `par(ann = FALSE)`.
+            name: "plot_ann",
+            r: "par(mfrow = c(1, 3))\n\
+                plot(x, y, main = 'M', sub = 'S', xlab = 'X', ylab = 'Y', ann = FALSE)\n\
+                par(ann = FALSE)\n\
+                plot(x, y, main = 'M', sub = 'S', xlab = 'X', ylab = 'Y')\n\
+                plot(x, y, main = 'M', sub = 'S', xlab = 'X', ylab = 'Y', ann = TRUE)",
+            ours: |d| {
+                d.par().mfrow([1, 3]).draw();
+                let titled = |d: &mut Device<AnyBackend>, ann: Option<bool>| {
+                    d.plot()
+                        .x(X)
+                        .y(Y)
+                        .main("M")
+                        .sub("S")
+                        .xlab("X")
+                        .ylab("Y")
+                        .ann(ann)
+                        .draw();
+                };
+                titled(d, Some(false));
+                d.par().ann(false).draw();
+                titled(d, None);
+                titled(d, Some(true));
             },
         },
         Case {

@@ -424,7 +424,6 @@ const SPECIAL: &[(&str, &str, &str)] = &[
 
 /// What to use instead of an R argument that isn't available.
 const INSTEAD: &[(&str, &str, &str)] = &[
-    ("plot()", "ann", "`dev.par().ann(false)`"),
     ("hist()", "probability", "`.freq(false)`"),
     ("hist()", "nclass", "`.breaks(n)`"),
     ("boxplot()", "plot", "`boxplot_stats()`"),

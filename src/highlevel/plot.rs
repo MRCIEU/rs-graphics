@@ -12,13 +12,10 @@
 //!
 //! Only numeric x/y plots are supported: the vast majority of R's
 //! `plot.default` is dispatch logic and argument munging for other input
-//! types, which is out of scope here. Not supported: `lim2`, and `ann`
-//! (set [`par(ann)`] instead).
+//! types, which is out of scope here. Not supported: `lim2`.
 //!
 //! This is R's `plot(x, y, ...)`, ported from `plot.default` in
 //! `r-source/src/library/graphics/R/plot.R`.
-//!
-//! [`par(ann)`]: crate::par::Par::ann
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
@@ -219,6 +216,11 @@ crate::setters::options! {
         ///
         /// [`par(font.lab)`]: crate::par::Par::font_lab
         pub font_lab: Option<FontFace> => option FontFace,
+        /// Whether to draw the titles (`main`, `sub`, `xlab`, `ylab`).
+        /// `None`: [`par(ann)`]; overrides it for this call only.
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
+        pub ann: Option<bool> => option bool,
         /// Whether to draw the axes and the box around the plot. Default
         /// `true`.
         pub axes: bool => value bool,
@@ -367,6 +369,7 @@ impl Default for PlotOptions {
             cex_lab: None,
             col_lab: None,
             font_lab: None,
+            ann: None,
             axes: true,
             bty: None,
             xaxt: None,
@@ -495,7 +498,8 @@ impl<B: Backend> Device<B> {
             })?;
         }
 
-        if self.par.ann {
+        // `if (ann) localTitle(...)`, `ann = par("ann")` by default.
+        if opts.ann.unwrap_or(self.par.ann) {
             self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),

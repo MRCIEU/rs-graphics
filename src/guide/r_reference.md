@@ -15,6 +15,7 @@
 | `sub` | `.sub()` | Subtitle. |
 | `xlab` | `.xlab()` | x axis label. |
 | `ylab` | `.ylab()` | y axis label. |
+| `ann` | `.ann()` | Whether to draw the titles (`main`, `sub`, `xlab`, `ylab`). |
 | `axes` | `.axes()` | Whether to draw the axes and the box around the plot. |
 | `frame.plot` | `.frame_plot()` | Whether to draw the box around the plot region (shaped by `bty`). |
 | `panel.first` | `.panel_first()` | Low-level calls (a `Figure`) drawn after the window is set and before the points, e.g. grid lines; added with `Device::add_figure`, so its `par()` changes don't last. |
@@ -60,7 +61,7 @@
 | *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
 | *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
-R's arguments not available: `lim2`, `ann` (use `dev.par().ann(false)`), `xgap.axis`, `ygap.axis`.
+R's arguments not available: `lim2`, `xgap.axis`, `ygap.axis`.
 
 ### `hist()`
 
