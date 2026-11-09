@@ -268,7 +268,8 @@ translated from, and when. Programs that use rs-graphics should carry the
 same section in their notices.
 
 The crate embeds Adobe's Helvetica and Symbol AFM metrics (`assets/afm/`, under
-the notice in `assets/afm/MustRead.html`) and the Liberation Sans fonts
-(`assets/fonts/`, SIL OFL 1.1). Their notices, and those of the
+the notice in `assets/afm/MustRead.html`), the Liberation Sans fonts
+(`assets/fonts/`, SIL OFL 1.1) and, among R's named palettes, ColorBrewer's
+colour schemes (Apache 2.0). Their notices, and those of the
 third-party crates compiled in, are in [NOTICE](NOTICE). Programs that
 use rs-graphics embed these too, so their own notices should include them.

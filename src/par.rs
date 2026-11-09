@@ -542,10 +542,12 @@ par_options! {
         pub col_sub: Color => option Color,
 
         /// Colours that colour numbers (`col = 2`) index, from 1, on this
-        /// device only: each device has its own palette. Default
-        /// [`DEFAULT_PALETTE`]. R's `palette()`, which R keeps for the whole
-        /// session (a device opened later uses it too).
-        pub palette: Vec<Color> => option Vec<Color>,
+        /// device only: each device has its own palette. Set it to one of R's
+        /// named sets (`"Okabe-Ito"`, `"R3"`, ...) or to two or more colours
+        /// of your own (see [`PaletteColors`](crate::setters::PaletteColors)).
+        /// Default [`DEFAULT_PALETTE`]. R's `palette()`, which R keeps for the
+        /// whole session (a device opened later uses it too).
+        pub palette: Vec<Color> => palette Vec<Color>,
 
         /// Line width; 1 is 1/96 inch, as in R. Default 1.
         pub lwd: f64 => number f64,

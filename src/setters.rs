@@ -603,6 +603,132 @@ fn string_pch<S: AsRef<str>>(strings: &[Option<S>], legend: bool) -> Vec<Option<
     }
 }
 
+/// A palette: a palette's name, or two or more colours, as R's
+/// `palette()` takes.
+///
+/// One string is the name of one of R's colour sets, ignoring case,
+/// spaces and punctuation, or a unique start of one: `"R3"`, `"R4"` (the
+/// default, also `"default"`), `"ggplot2"`, `"Okabe-Ito"`, `"Accent"`,
+/// `"Dark 2"`, `"Paired"`, `"Pastel 1"`, `"Pastel 2"`, `"Set 1"`, `"Set 2"`,
+/// `"Set 3"`, `"Tableau 10"`, `"Classic Tableau"`, `"Polychrome 36"` and
+/// `"Alphabet"` (R's `palette.pals()`). Two or more colours (an array,
+/// `Vec` or slice of [`Color`]s or colour strings, by value or by
+/// reference) make a palette of their own. No colours leave the palette
+/// as it is.
+///
+/// This is R's `palette(value)`.
+///
+/// # Errors
+///
+/// One string that names no set ("unknown palette (need >= 2 colors)",
+/// as R; also for one colour), or starts several (an error naming them;
+/// R fails there with an internal error), more than 1024 colours ("maximum
+/// number of colors is 1024"), or a string that isn't a colour ("invalid
+/// color name '..'").
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::PaletteColors;
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("okabe".into_palette().unwrap().unwrap().len(), 9);
+/// let own = ["black", "#E69F00", "navy"].into_palette().unwrap().unwrap();
+/// assert_eq!(own[1], Color::rgb(0xE6, 0x9F, 0x00));
+/// assert!("red".into_palette().is_err());
+/// # let mut dev = Device::null().open().unwrap();
+/// dev.par().palette("Okabe-Ito").draw();
+/// ```
+pub trait PaletteColors {
+    /// The palette's colours; `None` for no colours (unchanged).
+    ///
+    /// # Errors
+    ///
+    /// As the trait's doc says.
+    fn into_palette(self) -> Result<Option<Vec<Color>>, Error>;
+}
+
+/// An element a [`PaletteColors`] value is made of: a [`Color`] or a
+/// string.
+///
+/// Sealed: implemented only in this crate.
+pub trait PaletteElement: palette_sealed::Sealed {
+    /// The element as a palette name, if it is a string.
+    #[doc(hidden)]
+    fn as_name(&self) -> Option<&str>;
+    /// The element as a colour.
+    #[doc(hidden)]
+    fn to_color(&self) -> Result<Color, Error>;
+}
+
+mod palette_sealed {
+    pub trait Sealed {}
+}
+
+impl palette_sealed::Sealed for Color {}
+impl PaletteElement for Color {
+    fn as_name(&self) -> Option<&str> {
+        None
+    }
+    fn to_color(&self) -> Result<Color, Error> {
+        Ok(*self)
+    }
+}
+
+macro_rules! palette_strings {
+    ($($t:ty),*) => {
+        $(
+            impl palette_sealed::Sealed for $t {}
+            impl PaletteElement for $t {
+                fn as_name(&self) -> Option<&str> {
+                    Some(self.as_ref())
+                }
+                fn to_color(&self) -> Result<Color, Error> {
+                    Color::try_from(AsRef::<str>::as_ref(self))
+                }
+            }
+        )*
+    };
+}
+palette_strings!(&str, String, &String);
+
+/// R's `palette()` for `items`: see [`PaletteColors`].
+fn palette_of<E: PaletteElement>(items: &[E]) -> Result<Option<Vec<Color>>, Error> {
+    match items {
+        [] => Ok(None),
+        [one] => match one.as_name() {
+            Some(name) => crate::color::named_palette(name).map(Some),
+            None => Err(Error::invalid("unknown palette (need >= 2 colors)")),
+        },
+        _ if items.len() > 1024 => Err(Error::invalid("maximum number of colors is 1024")),
+        _ => items
+            .iter()
+            .map(PaletteElement::to_color)
+            .collect::<Result<_, _>>()
+            .map(Some),
+    }
+}
+
+macro_rules! palette_shape {
+    ($([$($g:tt)*] $ty:ty => |$v:ident| $items:expr;)*) => {
+        $(
+            impl<$($g)*> PaletteColors for $ty {
+                fn into_palette(self) -> Result<Option<Vec<Color>>, Error> {
+                    let $v = self;
+                    palette_of($items)
+                }
+            }
+        )*
+    };
+}
+palette_shape! {
+    [E: PaletteElement] E => |v| std::slice::from_ref(&v);
+    [E: PaletteElement, const N: usize] [E; N] => |v| &v;
+    [E: PaletteElement] Vec<E> => |v| &v;
+    [E: PaletteElement] &[E] => |v| v;
+    [E: PaletteElement, const N: usize] &[E; N] => |v| v;
+    [E: PaletteElement] &Vec<E> => |v| v;
+}
+
 /// One `pch` code for a `par()` parameter, checked as R's `par()` does:
 /// no value leaves it unchanged (`Ok(None)`), more than one is the wrong
 /// length, and `NA` (or `""`) is invalid.
@@ -707,10 +833,13 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// `NA`-able number, from a number or `None` for `NA`), `count`
 /// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
 /// [`Pch`]), `legend_pch` (the same, read as `legend()` does) and
-/// `one_pch` (`Option<i32>` from one [`Pch`] value, for [`par(pch)`]).
+/// `one_pch` (`Option<i32>` from one [`Pch`] value, for [`par(pch)`]) and
+/// `palette` (`Option<Vec<Color>>` from [`PaletteColors`], for
+/// [`par(palette)`]).
 ///
 /// [`par(plt)`]: crate::par::Par::plt
 /// [`par(pch)`]: crate::par::Par::pch
+/// [`par(palette)`]: crate::par::Par::palette
 macro_rules! options {
     (
         $(#[$sattr:meta])*
@@ -866,6 +995,19 @@ macro_rules! options {
         #[doc = "Takes numbers, characters or strings; `None` is R's `NA` (see [`Pch`](crate::setters::Pch))."]
         pub fn $field(mut self, values: impl $crate::setters::Pch) -> Self {
             self$(.$p)?.$field = values.into_pch();
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident palette $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes a palette's name, or two or more colours (see [`PaletteColors`](crate::setters::PaletteColors))."]
+        pub fn $field(mut self, value: impl $crate::setters::PaletteColors) -> Self {
+            match value.into_palette() {
+                Ok(Some(v)) => self$(.$p)?.$field = Some(v),
+                Ok(None) => {}
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
@@ -1358,6 +1500,26 @@ mod tests {
             .unwrap();
         assert_eq!(e.message(), "'ncol' must be a count, not -1");
         assert!(XyOptions::default().lty("dashed").deferred_error.is_none());
+    }
+
+    #[test]
+    fn palettes_take_a_name_or_two_or_more_colours() {
+        use crate::color::Color;
+        let (red, blue) = (Color::rgb(255, 0, 0), Color::rgb(0, 0, 255));
+        assert_eq!([red, blue].into_palette().unwrap(), Some(vec![red, blue]));
+        assert_eq!(
+            vec!["red", "blue"].into_palette().unwrap(),
+            Some(vec![red, blue])
+        );
+        assert_eq!(Vec::<Color>::new().into_palette().unwrap(), None);
+        // One colour is not a palette, as R's "need >= 2 colors".
+        let e = red.into_palette().unwrap_err();
+        assert_eq!(e.message(), "unknown palette (need >= 2 colors)");
+        assert!(["red"].into_palette().is_err());
+        let p = crate::par::ParOptions::default().palette(["red", "blue"]);
+        assert_eq!(p.palette, Some(vec![red, blue]));
+        let p = crate::par::ParOptions::default().palette("red");
+        assert!(p.palette.is_none() && p.deferred_error.is_some());
     }
 
     #[test]

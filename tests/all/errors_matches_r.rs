@@ -79,6 +79,15 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
             g.par().pch(None::<i32>).try_draw()
         }),
         ("par(pch = '')", "par", |g| g.par().pch("").try_draw()),
+        ("palette('red')", "par", |g| {
+            g.par().palette("red").try_draw()
+        }),
+        ("palette(c('red', 'nonsense'))", "par", |g| {
+            g.par().palette(["red", "nonsense"]).try_draw()
+        }),
+        ("palette(rep('red', 1025))", "par", |g| {
+            g.par().palette(vec!["red"; 1025]).try_draw()
+        }),
         ("par(usr = c(0, 0, 0, 1))", "par", |g| {
             g.par().usr([0, 0, 0, 1]).try_draw()
         }),

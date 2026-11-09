@@ -332,6 +332,41 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            // Named palettes (exact, a partial name, "default") and one of
+            // our own, read by colour numbers. R's palette is session-wide,
+            // so the R code ends with the default again.
+            name: "palette_names_and_colours",
+            r: "palette('Okabe-Ito'); plot(1:9, col = 1:9, pch = 19, xlab = '', ylab = '')\n\
+                palette('tab'); points(1:9, 9:1, col = 1:9, pch = 15)\n\
+                palette(c('navy', '#E69F00', 'transparent')); points(1:3, c(5, 5, 5), col = 1:3, pch = 17)\n\
+                palette('default'); points(5, 2, col = 2, pch = 19)",
+            draw: |d| {
+                d.par().palette("Okabe-Ito").draw();
+                d.plot()
+                    .x(1..=9)
+                    .y(1..=9)
+                    .col([1, 2, 3, 4, 5, 6, 7, 8, 9])
+                    .pch(19)
+                    .draw();
+                d.par().palette("tab").draw();
+                d.points()
+                    .x(1..=9)
+                    .y([9, 8, 7, 6, 5, 4, 3, 2, 1])
+                    .col([1, 2, 3, 4, 5, 6, 7, 8, 9])
+                    .pch(15)
+                    .draw();
+                d.par().palette(["navy", "#E69F00", "transparent"]).draw();
+                d.points()
+                    .x([1, 2, 3])
+                    .y([5, 5, 5])
+                    .col([1, 2, 3])
+                    .pch(17)
+                    .draw();
+                d.par().palette("default").draw();
+                d.points().x(5).y(2).col(2).pch(19).draw();
+            },
+        },
+        Case {
             // par(pch) as a character: a string's first character, drawn as
             // itself by points() and plot(); a number again afterwards.
             name: "par_pch_character",

@@ -18,6 +18,9 @@
 
 use crate::named_colors::NAMED_COLORS;
 
+mod palettes;
+pub(crate) use palettes::named_palette;
+
 /// An RGBA colour with 8 bits per channel.
 ///
 /// This is the same representation R uses internally (a packed
