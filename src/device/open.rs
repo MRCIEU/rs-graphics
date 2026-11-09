@@ -76,11 +76,12 @@ crate::setters::options! {
         pub res: Option<f64> => number f64,
         /// Compresses the output: a PDF's page contents (`None`: `true`), or
         /// a whole SVG document, gzipped as a `.svgz` file (`None`: `false`).
-        /// Ignored for PNG, which is always compressed.
+        /// Ignored for PNG, which is always compressed. R's `pdf()` has it;
+        /// compressing an SVG is not in R.
         pub compress: Option<bool> => option bool,
-        /// Threads drawing a PNG, PNG only. `None`: one per CPU core. `1`
-        /// draws on the calling thread. The output is the same for any
-        /// number above 1.
+        /// **Not in R.** Threads drawing a PNG, PNG only. `None`: one per
+        /// CPU core. `1` draws on the calling thread. The output is the same
+        /// for any number above 1.
         pub threads: Option<usize> => count usize,
         /// Puts all pages in one file, PDF only. `false` writes a file per
         /// page, named with the page number in `file` (as `"Rplot%03d.pdf"`;

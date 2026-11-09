@@ -194,30 +194,6 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | `show.names` | `.show_names()` | Labels the boxes with `names`. |
 | `log = "x"` | `.xlog()` | Makes the x axis logarithmic: the position axis, or the value axis when `horizontal`. |
 | `log = "y"` | `.ylog()` | Makes the y axis logarithmic: the value axis, or the position axis when `horizontal`. |
-| `pars = list(boxwex = )` | `.boxwex()` | Box widths, in units of the position axis (of its natural log on a log axis). |
-| `pars = list(staplewex = )` | `.staplewex()` | Staple width as a fraction of the box width. |
-| `pars = list(outwex = )` | `.outwex()` | Width of the outlier lines (see `outlty`) as a fraction of the box width. |
-| `pars = list(boxlty = )` | `.boxlty()` | Line type of the box outline. |
-| `pars = list(boxlwd = )` | `.boxlwd()` | Line width of the box outline. |
-| `pars = list(boxcol = )` | `.boxcol()` | Colour of the box outline. |
-| `pars = list(medlty = )` | `.medlty()` | Line type of the median. |
-| `pars = list(medlwd = )` | `.medlwd()` | Line width of the median. |
-| `pars = list(medpch = )` | `.medpch()` | Symbol drawn at the median. |
-| `pars = list(medcex = )` | `.medcex()` | Size of the median symbol. |
-| `pars = list(medcol = )` | `.medcol()` | Colour of the median line and symbol. |
-| `pars = list(medbg = )` | `.medbg()` | Fill of the median symbol. |
-| `pars = list(whisklty = )` | `.whisklty()` | Line type of the whiskers. |
-| `pars = list(whisklwd = )` | `.whisklwd()` | Line width of the whiskers. |
-| `pars = list(whiskcol = )` | `.whiskcol()` | Colour of the whiskers. |
-| `pars = list(staplelty = )` | `.staplelty()` | Line type of the staples. |
-| `pars = list(staplelwd = )` | `.staplelwd()` | Line width of the staples. |
-| `pars = list(staplecol = )` | `.staplecol()` | Colour of the staples. |
-| `pars = list(outlty = )` | `.outlty()` | Line type of a short line across each outlier (`outwex` wide). |
-| `pars = list(outlwd = )` | `.outlwd()` | Line width of the outlier lines and symbols. |
-| `pars = list(outpch = )` | `.outpch()` | Outlier symbol. |
-| `pars = list(outcex = )` | `.outcex()` | Size of the outlier symbols. |
-| `pars = list(outcol = )` | `.outcol()` | Colour of the outlier lines and symbols. |
-| `pars = list(outbg = )` | `.outbg()` | Fill of the outlier symbols. |
 | `xlim` | `.xlim()` | Limits of the position axis. |
 | `ylim` | `.ylim()` | Limits of the value axis, also when `horizontal` (as in R). |
 | `main` | `.main()` | Main title, text or a plotmath expression, as for `plot()`. |
@@ -231,11 +207,35 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | `cex.lab` | `.cex_lab()` | Size of the axis labels `xlab` and `ylab`, relative to `par(cex)`. |
 | `col.lab` | `.col_lab()` | Colour of `xlab` and `ylab`. |
 | `axes` | `.axes()` | Draws the axes and the box around the plot, also with `add` (as in R). |
+| `boxwex` | `.boxwex()` | Box widths, in units of the position axis (of its natural log on a log axis). |
+| `staplewex` | `.staplewex()` | Staple width as a fraction of the box width. |
+| `outwex` | `.outwex()` | Width of the outlier lines (see `outlty`) as a fraction of the box width. |
 | `lty` | `.lty()` | Default line type of the box, median and staples, and of the whiskers. |
 | `lwd` | `.lwd()` | Default line width of every part (the median: 3 times it). |
 | `pch` | `.pch()` | Default outlier symbol. |
 | `cex` | `.cex()` | Default size of the median and outlier symbols. |
 | `bg` | `.bg()` | Default fill of the median and outlier symbols (21 to 25). |
+| `boxlty` | `.boxlty()` | Line type of the box outline. |
+| `boxlwd` | `.boxlwd()` | Line width of the box outline. |
+| `boxcol` | `.boxcol()` | Colour of the box outline. |
+| `medlty` | `.medlty()` | Line type of the median. |
+| `medlwd` | `.medlwd()` | Line width of the median. |
+| `medpch` | `.medpch()` | Symbol drawn at the median. |
+| `medcex` | `.medcex()` | Size of the median symbol. |
+| `medcol` | `.medcol()` | Colour of the median line and symbol. |
+| `medbg` | `.medbg()` | Fill of the median symbol. |
+| `whisklty` | `.whisklty()` | Line type of the whiskers. |
+| `whisklwd` | `.whisklwd()` | Line width of the whiskers. |
+| `whiskcol` | `.whiskcol()` | Colour of the whiskers. |
+| `staplelty` | `.staplelty()` | Line type of the staples. |
+| `staplelwd` | `.staplelwd()` | Line width of the staples. |
+| `staplecol` | `.staplecol()` | Colour of the staples. |
+| `outlty` | `.outlty()` | Line type of a short line across each outlier (`outwex` wide). |
+| `outlwd` | `.outlwd()` | Line width of the outlier lines and symbols. |
+| `outpch` | `.outpch()` | Outlier symbol. |
+| `outcex` | `.outcex()` | Size of the outlier symbols. |
+| `outcol` | `.outcol()` | Colour of the outlier lines and symbols. |
+| `outbg` | `.outbg()` | Fill of the outlier symbols. |
 | `las` | `.las()` | Orientation of the axis labels: 0 parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical. |
 | `cex.axis` | `.cex_axis()` | Size of the axis labels. |
 | `col.axis` | `.col_axis()` | Colour of the axis labels. |
@@ -247,7 +247,7 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
 | *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
-R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, `panel.first`, `panel.last`.
+R's arguments not available: `plot` (use `boxplot_stats()`), `pars` (use its elements' own setters, as `.boxwex()` and `.medcol()`), `z`, `notch.frac`, `panel.first`, `panel.last`.
 
 ### `pie()`
 
@@ -726,7 +726,7 @@ R's arguments not available: `vfont`.
 | `compress` | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
 | (none) | `.units()` | Units of `width` and `height`. |
 | (none) | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
-| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
+| *not in R* | `.threads()` | Threads drawing a PNG, PNG only. |
 
 R's arguments not available: `family`, `title`, `fonts`, `version`, `paper`, `encoding`, `fg`, `pagecentre`, `colormodel`, `useDingbats`, `useKerning`, `fillOddEven`, `timestamp`, `producer`, `author`.
 
@@ -745,7 +745,7 @@ R's arguments not available: `family`, `title`, `fonts`, `version`, `paper`, `en
 | (none) | `.units()` | Units of `width` and `height`. |
 | (none) | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
 | (none) | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
-| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
+| *not in R* | `.threads()` | Threads drawing a PNG, PNG only. |
 
 R's arguments not available: `family`, `antialias`, `symbolfamily`.
 
@@ -763,7 +763,7 @@ R's arguments not available: `family`, `antialias`, `symbolfamily`.
 | `bg` | `.bg()` | Page background, and the starting `par(bg)`; a colour that draws nothing (`ColorSpec::None`, `"transparent"`) is transparent. |
 | `res` | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
 | (none) | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
-| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
+| *not in R* | `.threads()` | Threads drawing a PNG, PNG only. |
 | (none) | `.onefile()` | Puts all pages in one file, PDF only. |
 
 R's arguments not available: `type`, `antialias`.
