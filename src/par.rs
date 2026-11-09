@@ -541,8 +541,10 @@ par_options! {
         /// Colour of the subtitle. Default black. R's `col.sub`.
         pub col_sub: Color => option Color,
 
-        /// Colours that colour numbers (`col = 2`) index, from 1. Default
-        /// [`DEFAULT_PALETTE`]. R's `palette()`.
+        /// Colours that colour numbers (`col = 2`) index, from 1, on this
+        /// device only: each device has its own palette. Default
+        /// [`DEFAULT_PALETTE`]. R's `palette()`, which R keeps for the whole
+        /// session (a device opened later uses it too).
         pub palette: Vec<Color> => option Vec<Color>,
 
         /// Line width; 1 is 1/96 inch, as in R. Default 1.

@@ -962,7 +962,7 @@ R's arguments not available: `trace`.
 | `yaxt` | `.yaxt()` | As `xaxt`, for y axes (sides 2 and 4). |
 | `ylbias` | `.ylbias()` | How far text parallel to its side is moved out from its margin line: `1 - ylbias` lines on sides 1 and 4, `ylbias` on sides 2 and 3 (divided by `mex`). |
 | `ylog` | `.ylog()` | As `xlog`, for the y axis. |
-| `palette()` (a function in R) | `.palette()` | Colours that colour numbers (`col = 2`) index, from 1. |
+| `palette()` (a function in R) | `.palette()` | Colours that colour numbers (`col = 2`) index, from 1, on this device only: each device has its own palette. |
 
 R's arguments not available: `ask`, `crt`, `err`, `family`, `mkh`, `smo`.
 
