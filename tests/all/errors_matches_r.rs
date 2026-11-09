@@ -184,6 +184,15 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
                 d.par().xaxp([1, 100, 0]).try_draw()
             },
         ),
+        // `axis()` checks both directions' inline values, whichever side.
+        (
+            "plot(1:100, log = 'y'); axis(1, yaxp = c(1, 100, 7))",
+            "axis",
+            |d| {
+                d.plot().x(1..=100).ylog(true).draw();
+                d.axis().side(1).yaxp([1, 100, 7]).try_draw().map(|_| ())
+            },
+        ),
     ]
 }
 
@@ -348,19 +357,26 @@ fn plotmath_delimiters_are_checked_when_parsed() {
     assert!(message("bgroup(lfloor, x, rfloor)").contains("group is incomplete"));
 }
 
-/// On a log axis, an `axp` code that `CreateAtVector()` can't use is
-/// `axis()`'s error (R: "INVALID xaxp[3]"), not a panic.
+/// On a log axis, an inline `xaxp` code above 4 is the graphical-parameter
+/// error, and code 4, which `CreateAtVector()` can't use, is `axis()`'s
+/// (R: "INVALID {xy}axp[3]", unformatted; ours names the axis); not
+/// panics.
 #[test]
 fn log_axis_with_an_invalid_axp_code_is_an_error() {
     let mut dev = device();
     dev.plot().x(1..=100).xlog(true).axes(false).draw();
-    let e = dev.axis().side(1).axp([1, 100, 7]).try_draw().unwrap_err();
+    let e = dev.axis().side(1).xaxp([1, 100, 7]).try_draw().unwrap_err();
     assert_eq!(
         e.to_string(),
-        "axis(): log - axis(), 'at' creation: INVALID xaxp[3] = 7"
+        "axis(): invalid value specified for graphical parameter \"xaxp\""
     );
-    assert!(dev.axis().side(1).axp([1, 100, 3]).try_draw().is_ok());
-    assert!(dev.axis().side(1).axp([1, 100, -4]).try_draw().is_ok());
+    let e = dev.axis().side(1).xaxp([1, 100, 4]).try_draw().unwrap_err();
+    assert_eq!(
+        e.to_string(),
+        "axis(): log - axis(), 'at' creation: INVALID xaxp[3] = 4"
+    );
+    assert!(dev.axis().side(1).xaxp([1, 100, 3]).try_draw().is_ok());
+    assert!(dev.axis().side(1).xaxp([1, 100, -4]).try_draw().is_ok());
 }
 
 /// A setter's value that doesn't convert is returned by `try_draw()`, also

@@ -699,7 +699,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
     /// `side` is missing or not 1 to 4, `labels` is given without `at` or
-    /// their lengths differ, or a log axis's `axp` code isn't 1, 2 or 3.
+    /// their lengths differ; on a log axis, if the code (third value) of the
+    /// `xaxp`/`yaxp` it uses isn't 1, 2 or 3; and if a given `xaxp` or
+    /// `yaxp` for a log direction has a code of 0 or above 4, whichever the
+    /// side.
     fn axis(&mut self) -> AxisCall<'_, Self> {
         AxisCall::start(self)
     }

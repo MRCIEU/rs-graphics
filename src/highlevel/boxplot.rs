@@ -771,8 +771,8 @@ impl<B: Backend> Device<B> {
         // then the title, then the frame.
         let (name_side, value_side) = if opts.horizontal { (2, 1) } else { (1, 2) };
         if opts.axes {
-            // `bxp()` passes only these of its `pars` to the axes, with
-            // `xaxt`/`xaxp` reaching the x axis and `yaxt`/`yaxp` the y axis.
+            // `bxp()` passes only these of its `pars` to the axes; `axis()`
+            // uses `xaxt`/`xaxp` on the x axis and `yaxt`/`yaxp` on the y axis.
             let inline = InlineAxis {
                 las: opts.las,
                 cex_axis: opts.cex_axis,
@@ -780,17 +780,12 @@ impl<B: Backend> Device<B> {
                 gap_axis: opts.gap_axis,
                 ..InlineAxis::default()
             };
-            let side_pars = |side: i32| {
-                let (axt, axp) = if side == 1 {
-                    (opts.xaxt, opts.xaxp)
-                } else {
-                    (opts.yaxt, opts.yaxp)
-                };
-                AxisOptions {
-                    axt,
-                    axp,
-                    ..AxisOptions::default()
-                }
+            let pars = AxisOptions {
+                xaxt: opts.xaxt,
+                yaxt: opts.yaxt,
+                xaxp: opts.xaxp,
+                yaxp: opts.yaxp,
+                ..AxisOptions::default()
             };
             if opts.show_names.unwrap_or(n > 1) {
                 let labels = opts
@@ -800,12 +795,12 @@ impl<B: Backend> Device<B> {
                 let names = AxisOptions {
                     at: Some(at.clone()),
                     labels: Some(labels),
-                    ..side_pars(name_side)
+                    ..pars.clone()
                 };
                 let names = crate::extra::rotated_axis(&opts.extra, names);
                 self.axis_impl(name_side, &inline.apply(names))?;
             }
-            self.axis_impl(value_side, &inline.apply(side_pars(value_side)))?;
+            self.axis_impl(value_side, &inline.apply(pars))?;
         }
 
         if opts.ann.unwrap_or(!opts.add) {

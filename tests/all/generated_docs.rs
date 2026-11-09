@@ -417,8 +417,6 @@ const SPECIAL: &[(&str, &str, &str)] = &[
     ("legend()", "pos", "`x`, `y`"),
     ("legend()", "labels", "`legend`"),
     ("axis()", "draw_labels", "`labels = FALSE`"),
-    ("axis()", "axp", "`xaxp`, `yaxp`"),
-    ("axis()", "axt", "`xaxt`, `yaxt`"),
     ("par()", "palette", "`palette()` (a function in R)"),
 ];
 

@@ -43,8 +43,8 @@ crate::setters::options! {
     #[derive(Clone, Debug)]
     pub struct AxisOptions => [AxisCall] {
         /// Tick positions, in user coordinates (data units, also on a log
-        /// axis). `None`: the default ticks from `axp` (else
-        /// `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
+        /// axis). `None`: the default ticks from `xaxp` or `yaxp` (the axis's
+        /// direction; else `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
         pub at: Option<Vec<f64>> => option_numbers f64,
         /// Labels for the ticks in `at` (requires `at`, as many; otherwise an
         /// error of the call): text or plotmath
@@ -122,25 +122,31 @@ crate::setters::options! {
         ///
         /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
-        /// Range and number of the default ticks, used when `at` is `None`.
-        /// `None`: [`par(xaxp)`] (sides 1, 3) or [`par(yaxp)`] (sides 2, 4);
-        /// overrides it for this call only.
+        /// Range and number of the default ticks of an x axis (sides 1, 3),
+        /// used when `at` is `None`; a y axis ignores it, as in R. `None`:
+        /// [`par(xaxp)`]; overrides it for this call only.
         ///
         /// [`par(xaxp)`]: crate::par::Par::xaxp
+        pub xaxp: Option<[f64; 3]> => array [f64; 3],
+        /// As `xaxp`, for a y axis (sides 2, 4). `None`: [`par(yaxp)`].
+        ///
         /// [`par(yaxp)`]: crate::par::Par::yaxp
-        pub axp: Option<[f64; 3]> => array [f64; 3],
+        pub yaxp: Option<[f64; 3]> => array [f64; 3],
         /// Margin lines for the axis title, labels and line (only the labels
         /// and line are used here). `None`: [`par(mgp)`]; overrides it for this
         /// call only.
         ///
         /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
-        /// Whether to draw the axis at all: `AxisType::None` draws nothing.
-        /// `None`: [`par(xaxt)`] (sides 1, 3) or [`par(yaxt)`] (sides 2, 4).
+        /// Whether to draw an x axis (sides 1, 3) at all: `AxisType::None`
+        /// draws nothing; a y axis ignores it, as in R. `None`: [`par(xaxt)`].
         ///
         /// [`par(xaxt)`]: crate::par::Par::xaxt
+        pub xaxt: Option<AxisType> => option AxisType,
+        /// As `xaxt`, for a y axis (sides 2, 4). `None`: [`par(yaxt)`].
+        ///
         /// [`par(yaxt)`]: crate::par::Par::yaxt
-        pub axt: Option<AxisType> => option AxisType,
+        pub yaxt: Option<AxisType> => option AxisType,
         /// Tick length as a fraction of the plot region (of its height for an
         /// x axis if above 0.5, else of its smaller side); positive points
         /// inwards. Overrides `tcl`. `None`: [`par(tck)`], which is `NA` by
@@ -207,9 +213,11 @@ impl Default for AxisOptions {
             cex_axis: None,
             col_axis: None,
             las: None,
-            axp: None,
+            xaxp: None,
+            yaxp: None,
             mgp: None,
-            axt: None,
+            xaxt: None,
+            yaxt: None,
             tck: None,
             tcl: None,
             xpd: None,
@@ -230,8 +238,21 @@ impl<B: Backend> Device<B> {
     ) -> Result<Vec<f64>, Error> {
         check_axis(opts)?;
         let side = side.into_arg()?;
+        // R checks both inline `xaxp` and `yaxp` against their log scales,
+        // whichever the side.
+        if let (Some(axp), true) = (opts.xaxp, self.xlog) {
+            crate::device::check_log_axp("xaxp", axp)?;
+        }
+        if let (Some(axp), true) = (opts.yaxp, self.ylog) {
+            crate::device::check_log_axp("yaxp", axp)?;
+        }
+        let axp = if side.is_horizontal() {
+            opts.xaxp
+        } else {
+            opts.yaxp
+        };
         if opts.at.is_none() {
-            self.check_axis_axp(side, opts.axp)?;
+            self.check_axis_axp(side, axp)?;
         }
         let mut dev = self.line_pars(opts.lend, None, None)?;
         Ok(dev.axis_draw(side, opts))
@@ -261,7 +282,8 @@ impl<B: Backend> Device<B> {
             lineoff = 0.0;
         }
 
-        let at = opts.at.clone().unwrap_or_else(|| match opts.axp {
+        let axp = if x_axis { opts.xaxp } else { opts.yaxp };
+        let at = opts.at.clone().unwrap_or_else(|| match axp {
             Some(axp) => self.ticks_from_axp(side, axp),
             None => self.ax_ticks(side),
         });
@@ -279,8 +301,12 @@ impl<B: Backend> Device<B> {
         };
         // `xaxt`/`yaxt = "n"`: nothing drawn (checked after the argument
         // errors above, as in R).
-        let axt = if x_axis { self.par.xaxt } else { self.par.yaxt };
-        if opts.axt.unwrap_or(axt) == AxisType::None {
+        let axt = if x_axis {
+            opts.xaxt.unwrap_or(self.par.xaxt)
+        } else {
+            opts.yaxt.unwrap_or(self.par.yaxt)
+        };
+        if axt == AxisType::None {
             return Vec::new();
         }
         // R's return value: `at` sorted, `NA`s last.

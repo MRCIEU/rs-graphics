@@ -265,7 +265,7 @@ impl From<Expression> for Label {
 /// [`mtext()`](crate::graphics::Graphics::mtext) (recycled with its other
 /// arguments), the labels of [`legend()`](crate::graphics::Graphics::legend)
 /// (one per key), [`axis()`](crate::graphics::Graphics::axis)'s `labels`,
-/// `barplot()`'s `names` and `legend_text`, `boxplot()`'s `names` and
+/// `barplot()`'s `names_arg` and `legend_text`, `boxplot()`'s `names` and
 /// `pie()`'s `labels`. As in R, one label is a list of one (`.names("A")`).
 ///
 /// A `None` element is R's `NA`: no text there. `text()` and `mtext()`

@@ -472,12 +472,14 @@ R's arguments not available: `vfont`.
 | `padj` | `.padj()` | Justification across each label, recycled over the ticks in increasing order of `at`. |
 | `gap.axis` | `.gap_axis()` | Minimum gap between labels, in "m" widths (labels parallel to the axis) or "M" heights (perpendicular); a label closer than that to the previous one is dropped. |
 | `labels = FALSE` | `.draw_labels()` | Whether to draw the tick labels. |
-| `xaxp`, `yaxp` | `.axp()` | Range and number of the default ticks, used when `at` is `None`. |
-| `xaxt`, `yaxt` | `.axt()` | Whether to draw the axis at all: `AxisType::None` draws nothing. |
 | `cex.axis` | `.cex_axis()` | Size of the labels. |
 | `col.axis` | `.col_axis()` | Colour of the labels. |
 | `las` | `.las()` | Orientation of the labels. |
+| `xaxp` | `.xaxp()` | Range and number of the default ticks of an x axis (sides 1, 3), used when `at` is `None`; a y axis ignores it, as in R. |
+| `yaxp` | `.yaxp()` | As `xaxp`, for a y axis (sides 2, 4). |
 | `mgp` | `.mgp()` | Margin lines for the axis title, labels and line (only the labels and line are used here). |
+| `xaxt` | `.xaxt()` | Whether to draw an x axis (sides 1, 3) at all: `AxisType::None` draws nothing; a y axis ignores it, as in R. |
+| `yaxt` | `.yaxt()` | As `xaxt`, for a y axis (sides 2, 4). |
 | `tck` | `.tck()` | Tick length as a fraction of the plot region (of its height for an x axis if above 0.5, else of its smaller side); positive points inwards. |
 | `tcl` | `.tcl()` | Tick length in margin lines; negative points outwards. |
 | `xpd` | `.xpd()` | How far ticks and labels may reach along the axis: the plot region, figure region or device, as for `par(xpd)`. |

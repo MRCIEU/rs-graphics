@@ -1491,7 +1491,7 @@ mod tests {
             (p.type_, p.xaxt),
             (Some(PlotType::Histogram), Some(AxisType::None))
         );
-        assert_eq!(AxisOptions::default().axt("n").axt, Some(AxisType::None));
+        assert_eq!(AxisOptions::default().xaxt("n").xaxt, Some(AxisType::None));
         assert_eq!(LegendOptions::default().bty("n").bty, Some(Bty::N));
         assert_eq!(
             BarplotOptions::default().order_h("decr").order_h,

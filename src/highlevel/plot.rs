@@ -476,10 +476,13 @@ impl<B: Backend> Device<B> {
                 xpd: opts.xpd,
                 ..InlineAxis::default()
             };
-            for (side, axt, axp) in [(1, opts.xaxt, opts.xaxp), (2, opts.yaxt, opts.yaxp)] {
+            // `localAxis(side, ...)`: both axes get all four.
+            for side in [1, 2] {
                 let mut o = AxisOptions {
-                    axt,
-                    axp,
+                    xaxt: opts.xaxt,
+                    yaxt: opts.yaxt,
+                    xaxp: opts.xaxp,
+                    yaxp: opts.yaxp,
                     ..AxisOptions::default()
                 };
                 if side == 1 {

@@ -229,16 +229,24 @@ fn cases() -> Vec<Case> {
         Case {
             name: "axt",
             r_par: "par(xaxt = 'n')",
-            r: "axis(1); axis(3, xaxt = 's'); axis(2, yaxt = 'n'); axis(4)",
+            // Each side reads its own direction's setting and ignores the
+            // other's, as in R.
+            r: "axis(1); axis(3, xaxt = 's', yaxt = 'n'); axis(2, yaxt = 'n', xaxt = 's'); \
+                axis(4, xaxt = 'n')",
             xlim: (0.0, 10.0),
             setup: |p| p.xaxt(AxisType::None),
             draw: |d| {
                 d.axis().side(1).draw();
-                let o = AxisOptions::default().axt(AxisType::Standard);
+                let o = AxisOptions::default()
+                    .xaxt(AxisType::Standard)
+                    .yaxt(AxisType::None);
                 d.axis().side(3).with(&o).draw();
-                let o = AxisOptions::default().axt(AxisType::None);
+                let o = AxisOptions::default()
+                    .yaxt(AxisType::None)
+                    .xaxt(AxisType::Standard);
                 d.axis().side(2).with(&o).draw();
-                d.axis().side(4).draw();
+                let o = AxisOptions::default().xaxt(AxisType::None);
+                d.axis().side(4).with(&o).draw();
             },
         },
         Case {
@@ -451,7 +459,7 @@ fn axis_returns_tick_positions_like_r() {
                 .draw(),
             g.axis().side(3).at([12, 5, -3]).draw(),
             g.axis().side(4).at(Vec::<f64>::new()).draw(),
-            g.axis().side(1).axt("n").draw(),
+            g.axis().side(1).xaxt("n").draw(),
             g.axis().side(2).draw_labels(false).tick(false).draw(),
         ];
         g.plot_new();

@@ -9,9 +9,10 @@
 //! Cross-checks `par(xaxp/yaxp)` against R: the values `plot.window()`
 //! sets (linear, log with each tick-rule code, reversed, tiny ranges,
 //! `par(lab)`), and the ticks `axis()` draws when they are changed
-//! afterwards, overridden inline, or passed to `plot()` (every painted path
-//! and text item in order vs. an uncompressed R `pdf()`, see
-//! `common::pdf::assert_same`). Skipped if `Rscript` isn't available.
+//! afterwards, overridden inline (each side by its own direction's value),
+//! or passed to `plot()` (every painted path and text item in order vs. an
+//! uncompressed R `pdf()`, see `common::pdf::assert_same`). Skipped if
+//! `Rscript` isn't available.
 
 use crate::common;
 use crate::common::{pdf, r};
@@ -109,7 +110,8 @@ fn cases() -> Vec<Case> {
             name: "par_after_window",
             r: "plot.new(); plot.window(c(0, 10), c(1, 1000), log = 'y')\n\
                 par(xaxp = c(0, 10, 2), yaxp = c(1, 1000, 2))\n\
-                axis(1); axis(2); axis(3, xaxp = c(2, 8, 3)); axis(4, yaxp = c(1, 100, 3))",
+                axis(1); axis(2); axis(3, xaxp = c(2, 8, 3), yaxp = c(1, 10, 1))\n\
+                axis(4, yaxp = c(1, 100, 3), xaxp = c(0, 4, 4))",
             draw: |d| {
                 d.plot_new();
                 d.plot_window()
@@ -121,9 +123,14 @@ fn cases() -> Vec<Case> {
                 d.par().yaxp([1.0, 1000.0, 2.0]).draw();
                 d.axis().side(1).draw();
                 d.axis().side(2).draw();
-                let o = AxisOptions::default().axp([2.0, 8.0, 3.0]);
+                // Each side uses its own direction's value, as in R.
+                let o = AxisOptions::default()
+                    .xaxp([2.0, 8.0, 3.0])
+                    .yaxp([1.0, 10.0, 1.0]);
                 d.axis().side(3).with(&o).draw();
-                let o = AxisOptions::default().axp([1.0, 100.0, 3.0]);
+                let o = AxisOptions::default()
+                    .yaxp([1.0, 100.0, 3.0])
+                    .xaxp([0.0, 4.0, 4.0]);
                 d.axis().side(4).with(&o).draw();
             },
         },
