@@ -558,8 +558,12 @@ par_options! {
         /// Mitre limit for mitred joins. Default 10.
         pub lmitre: f64 => number f64,
 
-        /// Default plotting symbol. Default 1 (open circle).
-        pub pch: i32 => option i32,
+        /// Default plotting symbol: a symbol code (0 to 25), or a character
+        /// drawn as itself (a string's first character). Default 1 (open
+        /// circle). A character is stored as [`Pch`](crate::setters::Pch)
+        /// stores it. More than one value, or `None` (R's `NA`) or `""`, is
+        /// an error of the call, as in R.
+        pub pch: i32 => one_pch i32,
 
         /// Base text size, in big points. Default 12. Its value when the
         /// device is created is the device's starting size

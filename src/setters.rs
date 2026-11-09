@@ -603,6 +603,22 @@ fn string_pch<S: AsRef<str>>(strings: &[Option<S>], legend: bool) -> Vec<Option<
     }
 }
 
+/// One `pch` code for a `par()` parameter, checked as R's `par()` does:
+/// no value leaves it unchanged (`Ok(None)`), more than one is the wrong
+/// length, and `NA` (or `""`) is invalid.
+pub(crate) fn one_pch(codes: Vec<Option<i32>>, name: &str) -> Result<Option<i32>, Error> {
+    match codes.as_slice() {
+        [] => Ok(None),
+        [Some(code)] => Ok(Some(*code)),
+        [None] => Err(Error::invalid(format!(
+            "invalid value specified for graphical parameter \"{name}\""
+        ))),
+        _ => Err(Error::invalid(format!(
+            "graphical parameter \"{name}\" has the wrong length"
+        ))),
+    }
+}
+
 /// `Pch` for one shape of value: `$items` turns it into `Option` elements.
 macro_rules! pch_shape {
     ($([$($g:tt)*] $ty:ty => |$v:ident| $items:expr;)*) => {
@@ -690,9 +706,11 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// truncated), `na` (`Option<Option<f64>>`, R's
 /// `NA`-able number, from a number or `None` for `NA`), `count`
 /// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
-/// [`Pch`]) and `legend_pch` (the same, read as `legend()` does).
+/// [`Pch`]), `legend_pch` (the same, read as `legend()` does) and
+/// `one_pch` (`Option<i32>` from one [`Pch`] value, for [`par(pch)`]).
 ///
 /// [`par(plt)`]: crate::par::Par::plt
+/// [`par(pch)`]: crate::par::Par::pch
 macro_rules! options {
     (
         $(#[$sattr:meta])*
@@ -848,6 +866,19 @@ macro_rules! options {
         #[doc = "Takes numbers, characters or strings; `None` is R's `NA` (see [`Pch`](crate::setters::Pch))."]
         pub fn $field(mut self, values: impl $crate::setters::Pch) -> Self {
             self$(.$p)?.$field = values.into_pch();
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident one_pch $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number, character or string (see [`Pch`](crate::setters::Pch))."]
+        pub fn $field(mut self, value: impl $crate::setters::Pch) -> Self {
+            match $crate::setters::one_pch(value.into_pch(), stringify!($field)) {
+                Ok(Some(v)) => self$(.$p)?.$field = Some(v),
+                Ok(None) => {}
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
@@ -1327,5 +1358,20 @@ mod tests {
             .unwrap();
         assert_eq!(e.message(), "'ncol' must be a count, not -1");
         assert!(XyOptions::default().lty("dashed").deferred_error.is_none());
+    }
+
+    #[test]
+    fn par_pch_takes_one_number_character_or_string() {
+        use crate::par::ParOptions;
+        let p = |v: ParOptions| (v.pch, v.deferred_error.is_some());
+        assert_eq!(p(ParOptions::default().pch(17)), (Some(17), false));
+        assert_eq!(p(ParOptions::default().pch('+')), (Some(43), false));
+        assert_eq!(p(ParOptions::default().pch("ab")), (Some(97), false));
+        assert_eq!(p(ParOptions::default().pch('\u{e9}')), (Some(-233), false));
+        // No value leaves it unchanged, as R's `par(pch = character(0))`.
+        assert_eq!(p(ParOptions::default().pch([0i32; 0])), (None, false));
+        // R's errors: tested against R in `tests/all/errors_matches_r.rs`.
+        assert_eq!(p(ParOptions::default().pch([1, 2])), (None, true));
+        assert_eq!(p(ParOptions::default().pch(None::<i32>)), (None, true));
     }
 }

@@ -947,7 +947,7 @@ R's arguments not available: `trace`.
 | `oma` | `.oma()` | Outer margins, in lines. |
 | `omd` | `.omd()` | Inner region (the device less the outer margins) as fractions of the device, `[x0, x1, y0, y1]`. |
 | `omi` | `.omi()` | Outer margins in inches, instead of lines. |
-| `pch` | `.pch()` | Default plotting symbol. |
+| `pch` | `.pch()` | Default plotting symbol: a symbol code (0 to 25), or a character drawn as itself (a string's first character). |
 | `pin` | `.pin()` | Plot region size in inches, `[width, height]`, centred in the figure, instead of the figure less `mar`. |
 | `plt` | `.plt()` | Plot region as fractions of the figure region, `[x0, x1, y0, y1]`, instead of the figure less `mar`. |
 | `ps` | `.ps()` | Base text size, in big points. |

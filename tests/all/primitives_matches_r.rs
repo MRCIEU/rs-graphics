@@ -13,8 +13,8 @@
 //! vectorised and default `text()` labels, `box(which = )` and
 //! `plot.window(asp = )`, `plot()`'s axes taking their style from
 //! `par()`, and the high-level plots' `par()`-based defaults (borders,
-//! boxplot lines and outliers, `ann`), unequal-width `hist()` densities
-//! and missing pie labels. Every painted path and text item is compared
+//! boxplot lines and outliers, `ann`), `par(pch)` as a character,
+//! unequal-width `hist()` densities and missing pie labels. Every painted path and text item is compared
 //! in order (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
 //! available.
 
@@ -329,6 +329,22 @@ fn cases() -> Vec<Case> {
                 d.par().fg(blue).draw();
                 d.par().col(blue).draw();
                 d.boxplot().x(&[vec![1.0, 2.0, 3.0, 4.0, 5.0, 12.0]]).draw();
+            },
+        },
+        Case {
+            // par(pch) as a character: a string's first character, drawn as
+            // itself by points() and plot(); a number again afterwards.
+            name: "par_pch_character",
+            r: "par(pch = '+'); plot(1:3, c(2, 1, 3), xlab = '', ylab = '')\n\
+                par(pch = 'ab'); points(c(1.5, 2.5), c(2.5, 1.5))\n\
+                par(pch = 17); points(2, 2)",
+            draw: |d| {
+                d.par().pch('+').draw();
+                d.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
+                d.par().pch("ab").draw();
+                d.points().x([1.5, 2.5]).y([2.5, 1.5]).draw();
+                d.par().pch(17).draw();
+                d.points().x(2).y(2).draw();
             },
         },
         Case {

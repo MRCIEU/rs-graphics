@@ -72,6 +72,13 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
         ("par(lmitre = 0.5)", "par", |g| {
             g.par().lmitre(0.5).try_draw()
         }),
+        ("par(pch = c(1, 2))", "par", |g| {
+            g.par().pch([1, 2]).try_draw()
+        }),
+        ("par(pch = NA)", "par", |g| {
+            g.par().pch(None::<i32>).try_draw()
+        }),
+        ("par(pch = '')", "par", |g| g.par().pch("").try_draw()),
         ("par(usr = c(0, 0, 0, 1))", "par", |g| {
             g.par().usr([0, 0, 0, 1]).try_draw()
         }),
