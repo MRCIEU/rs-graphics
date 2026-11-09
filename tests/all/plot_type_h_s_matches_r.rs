@@ -75,7 +75,7 @@ const CASES: [Case; 6] = [
         name: "h_log",
         r: "plot(x, ylog, type = 'h', log = 'y', axes = FALSE, ann = FALSE)",
         ours: |dev| {
-            let opts = plot(PlotType::Histogram).ylog(true);
+            let opts = plot(PlotType::Histogram).log("y");
             dev.plot().x(X).y(Y_LOG).with(&opts).draw();
         },
     },
@@ -97,7 +97,7 @@ const CASES: [Case; 6] = [
         name: "S_log_x",
         r: "plot(x, y, type = 'S', log = 'x', lwd = 2, axes = FALSE, ann = FALSE)",
         ours: |dev| {
-            let opts = plot(PlotType::StepsVerticalFirst).xlog(true);
+            let opts = plot(PlotType::StepsVerticalFirst).log("x");
             dev.plot().x(X).y(Y).with(&opts).lwd(2.0).draw();
         },
     },
@@ -108,7 +108,7 @@ const CASES: [Case; 6] = [
             points(x, ylog, type = 'h', col = c('red', 'grey'))\n\
             lines(x, ylog, type = 'S', lwd = 2)",
         ours: |dev| {
-            let opts = plot(PlotType::None).ylog(true);
+            let opts = plot(PlotType::None).log("y");
             dev.plot().x(X).y(Y_LOG).with(&opts).draw();
             dev.lines()
                 .x(X)

@@ -82,11 +82,7 @@ fn axp_values_match_r() {
         dev.plot_window()
             .xlim((xlim.0, xlim.1))
             .ylim((ylim.0, ylim.1))
-            .with(
-                &PlotWindowOptions::default()
-                    .xlog(log.contains('x'))
-                    .ylog(log.contains('y')),
-            )
+            .with(&PlotWindowOptions::default().log(*log))
             .draw();
         let p = dev.current_par();
         let ours: Vec<f64> = p.xaxp.iter().chain(&p.yaxp).copied().collect();
@@ -117,7 +113,7 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim([0.0, 10.0])
                     .ylim([1.0, 1000.0])
-                    .with(&PlotWindowOptions::default().ylog(true))
+                    .with(&PlotWindowOptions::default().log("y"))
                     .draw();
                 d.par().xaxp([0.0, 10.0, 2.0]).draw();
                 d.par().yaxp([1.0, 1000.0, 2.0]).draw();

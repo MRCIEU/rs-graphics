@@ -81,8 +81,7 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
         .type_(PlotType::Both)
         .pch(19)
         .col(4)
-        .xlog(true)
-        .ylog(true)
+        .log("xy")
         .main("plot(): log = \"xy\"")
         .xlab("x")
         .ylab("2 * x^1.5");
@@ -131,8 +130,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
 
     let opts = PlotOptions::default()
         .pch(19)
-        .xlog(true)
-        .ylog(true)
+        .log("xy")
         .main("abline() on log axes")
         .xlab("x")
         .ylab("y");

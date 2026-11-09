@@ -419,7 +419,7 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim([1.0, 100.0])
                     .ylim([1.0, 10.0])
-                    .xlog(true)
+                    .log("x")
                     .draw();
                 d.arrows()
                     .x0([0.0, 10.0, -5.0])
@@ -494,11 +494,7 @@ fn cases() -> Vec<Case> {
                      col = c('red', 'blue', 'green', 'orange', 'purple', 'black'))",
             draw: |d| {
                 d.plot_new();
-                d.plot_window()
-                    .xlim([1, 100])
-                    .ylim([0, 10])
-                    .xlog(true)
-                    .draw();
+                d.plot_window().xlim([1, 100]).ylim([0, 10]).log("x").draw();
                 d.text()
                     .x([f64::NAN, 10.0, 0.0, 50.0, -1.0, 20.0])
                     .y([2.0, 3.0, 4.0, 5.0, 6.0, f64::NAN])
@@ -526,7 +522,7 @@ fn cases() -> Vec<Case> {
                     .ytop([2.0])
                     .draw();
                 // Ignored on a log axis, as in R.
-                let log = asp.xlog(true);
+                let log = asp.log("x");
                 d.plot_window()
                     .xlim([1.0, 100.0])
                     .ylim([0.0, 2.0])

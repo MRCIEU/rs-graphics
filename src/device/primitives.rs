@@ -28,7 +28,7 @@ use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
 use crate::lty::LineType;
-use crate::par::{AxisStyle, Bty};
+use crate::par::{AxisStyle, Bty, Log};
 use crate::plotmath::Label;
 use crate::recycle::{pick, pick_na, recycled_len};
 
@@ -486,10 +486,14 @@ crate::setters::options! {
     /// Arguments of `plot.window()` besides the limits.
     #[derive(Clone, Debug, Default)]
     pub struct PlotWindowOptions => [PlotWindowCall] {
-        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic. Default `false`. R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Aspect ratio: one x unit is `asp` y units long on the page.
         /// Ignored on log axes, as in R. `None`: no constraint.
         pub asp: Option<f64> => number f64,
@@ -542,8 +546,8 @@ impl<B: Backend> Device<B> {
 
     fn plot_window_draw(&mut self, xlim: (f64, f64), ylim: (f64, f64), opts: &PlotWindowOptions) {
         let asp = opts.asp.filter(|a| a.is_finite() && *a > 0.0);
-        let (Some(asp), false, false) = (asp, opts.xlog, opts.ylog) else {
-            self.set_window(xlim, ylim, opts.xlog, opts.ylog);
+        let (Some(asp), false, false) = (asp, opts.log.x, opts.log.y) else {
+            self.set_window(xlim, ylim, opts.log.x, opts.log.y);
             return;
         };
         let (pin1, pin2) = (self.plt.width(), self.plt.height());

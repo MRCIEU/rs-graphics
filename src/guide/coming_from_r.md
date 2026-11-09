@@ -42,7 +42,6 @@ dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 | a dot in a name: `cex.main`, `plot.window()` | an underscore: `.cex_main()`, `dev.plot_window()` |
 | `box()`, `type =` (Rust keywords) | `dev.box_()`, `.type_()` |
 | `orderH`, `axTicks()` | `.order_h()`, `dev.ax_ticks()` |
-| `log = "xy"` | `.xlog(true).ylog(true)` |
 
 # Values
 
@@ -112,6 +111,11 @@ dev.par().mfrow([1, 2]).mar([4, 4, 2, 1]).las(1).draw();
   `dev.par().mar(mar).draw();`.
 - Graphical parameters given to a function (`plot(x, cex.axis = 0.8)`)
   are setters of that call, and last for that call only, as in R.
+- Log axes, as in R: a log plot is `plot(x, log = "xy")`, i.e.
+  `.log("xy")` on `plot()` (or `hist()`, `barplot()`, `boxplot()`,
+  `plot_window()`), which works out the limits on that scale.
+  `par(xlog = TRUE)` is `dev.par().xlog(true)`: it only flips the
+  current plot's state (and leaves `usr` as it is); `dev.xlog()` reads it.
 - `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))` is
   `dev.layout().mat(&[[1, 1], [2, 3]]).draw()`: matrices are written as
   rows.

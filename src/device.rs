@@ -899,8 +899,8 @@ impl<B: Backend> Device<B> {
 
     /// Returns whether the x axis is logarithmic.
     ///
-    /// Set by the last `plot_window()` or `par(xlog = )`; `plot_new()` resets
-    /// it.
+    /// Set by the last plot's `log` (`.log("x")` on `plot()`, `hist()`,
+    /// ..., `plot_window()`) or by `dev.par().xlog()`; `plot_new()` resets it.
     ///
     /// This is R's [`par("xlog")`].
     ///
@@ -909,7 +909,7 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.plot().x([1, 10, 100]).xlog(true).draw();
+    /// dev.plot().x([1, 10, 100]).log("x").draw();
     /// assert!(dev.xlog());
     /// ```
     ///
@@ -927,7 +927,7 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.plot().x([1, 10, 100]).ylog(true).draw();
+    /// dev.plot().x([1, 10, 100]).log("y").draw();
     /// assert!(dev.ylog());
     /// ```
     ///
@@ -2615,10 +2615,7 @@ mod tests {
         let mut dev = Device::memory("pdf").width(7.0).height(5.0).open().unwrap();
         dev.plot_new_impl().unwrap();
         assert!(!dev.xlog() && !dev.ylog());
-        let log_x = PlotWindowOptions {
-            xlog: true,
-            ..PlotWindowOptions::default()
-        };
+        let log_x = PlotWindowOptions::default().log("x");
         dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x);
         assert!(dev.xlog() && !dev.ylog());
         for (x, y) in [(1.0, -2.0), (31.6, 0.25), (1000.0, 3.0)] {

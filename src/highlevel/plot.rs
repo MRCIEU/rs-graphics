@@ -23,7 +23,7 @@ use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOpt
 use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
-use crate::par::{AxisStyle, AxisType, Bty, Xpd};
+use crate::par::{AxisStyle, AxisType, Bty, Log, Xpd};
 use crate::plotmath::Label;
 use crate::recording::Figure;
 
@@ -154,10 +154,14 @@ crate::setters::options! {
         /// y axis limits. `None`: the range of the finite data, as for
         /// `xlim`.
         pub ylim: Option<(f64, f64)> => pair f64,
-        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic. Default `false`. R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Main title: text (`"Weight"`) or a plotmath expression
         /// (`Label::math("x^2")`), drawn by `title()`. `None`: none.
         pub main: Option<Label> => option Label,
@@ -354,8 +358,7 @@ impl Default for PlotOptions {
             cex: Vec::new(),
             xlim: None,
             ylim: None,
-            xlog: false,
-            ylog: false,
+            log: Log::default(),
             main: None,
             sub: None,
             xlab: None,
@@ -419,15 +422,14 @@ impl<B: Backend> Device<B> {
                 data_range(v)
             }
         };
-        let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.xlog));
-        let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
+        let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.log.x));
+        let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.log.y));
 
         self.plot_new_impl()?;
         // `localWindow(xlim, ylim, log, asp, ...)`.
         let window = PlotWindowOptions {
             deferred_error: None,
-            xlog: opts.xlog,
-            ylog: opts.ylog,
+            log: opts.log,
             asp: opts.asp,
             xaxs: opts.xaxs,
             yaxs: opts.yaxs,

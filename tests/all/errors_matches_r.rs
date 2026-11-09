@@ -41,6 +41,30 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
                 .try_draw()
                 .map(drop)
         }),
+        // `log`'s check is `plot.window()`'s, whichever call it came from.
+        ("plot(1:10, log = 'z')", "plot.window", |g| {
+            g.plot().x(1..=10).log("z").try_draw()
+        }),
+        ("hist(c(1, 2, 2), log = 'X')", "plot.window", |g| {
+            g.hist().x([1, 2, 2]).log("X").try_draw().map(drop)
+        }),
+        ("barplot(1:3, log = 'yxq')", "plot.window", |g| {
+            g.barplot().height(1..=3).log("yxq").try_draw().map(drop)
+        }),
+        ("boxplot(1:3, log = ' ')", "plot.window", |g| {
+            g.boxplot().x(1..=3).log(" ").try_draw().map(drop)
+        }),
+        (
+            "plot.window(c(1, 10), c(1, 10), log = 'xyz')",
+            "plot.window",
+            |g| {
+                g.plot_window()
+                    .xlim([1, 10])
+                    .ylim([1, 10])
+                    .log("xyz")
+                    .try_draw()
+            },
+        ),
         ("abline(a = 1)", "abline", |g| g.abline().a(1).try_draw()),
         ("abline(a = NA, b = 1)", "abline", |g| {
             g.abline().a(f64::NAN).b(1).try_draw()
@@ -101,13 +125,13 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
         ("barplot(1:3, log = 'y', density = 10)", "barplot", |g| {
             g.barplot()
                 .height([1, 2, 3])
-                .ylog(true)
+                .log("y")
                 .density(10)
                 .try_draw()
                 .map(drop)
         }),
         ("barplot(c(1, -1), log = 'y')", "barplot", |g| {
-            g.barplot().height([1, -1]).ylog(true).try_draw().map(drop)
+            g.barplot().height([1, -1]).log("y").try_draw().map(drop)
         }),
         ("hist(1:10, breaks = c(2, 5))", "hist", |g| {
             g.hist().x(1..=10).breaks([2, 5]).try_draw().map(drop)
@@ -172,7 +196,7 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
             "plot(1:100, log = 'x'); par(xaxp = c(1, 100, 7))",
             "par",
             |d| {
-                d.plot().x(1..=100).xlog(true).draw();
+                d.plot().x(1..=100).log("x").draw();
                 d.par().xaxp([1, 100, 7]).try_draw()
             },
         ),
@@ -180,7 +204,7 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
             "plot(1:100, log = 'x'); par(xaxp = c(1, 100, 0))",
             "par",
             |d| {
-                d.plot().x(1..=100).xlog(true).draw();
+                d.plot().x(1..=100).log("x").draw();
                 d.par().xaxp([1, 100, 0]).try_draw()
             },
         ),
@@ -189,7 +213,7 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
             "plot(1:100, log = 'y'); axis(1, yaxp = c(1, 100, 7))",
             "axis",
             |d| {
-                d.plot().x(1..=100).ylog(true).draw();
+                d.plot().x(1..=100).log("y").draw();
                 d.axis().side(1).yaxp([1, 100, 7]).try_draw().map(|_| ())
             },
         ),
@@ -364,7 +388,7 @@ fn plotmath_delimiters_are_checked_when_parsed() {
 #[test]
 fn log_axis_with_an_invalid_axp_code_is_an_error() {
     let mut dev = device();
-    dev.plot().x(1..=100).xlog(true).axes(false).draw();
+    dev.plot().x(1..=100).log("x").axes(false).draw();
     let e = dev.axis().side(1).xaxp([1, 100, 7]).try_draw().unwrap_err();
     assert_eq!(
         e.to_string(),

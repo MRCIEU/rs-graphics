@@ -252,7 +252,7 @@ fn legend_return_value_on_log_axes_matches_r() {
     );
 
     let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
-    let opts = PlotOptions::default().xlog(true).ylog(true);
+    let opts = PlotOptions::default().log("xy");
     dev.plot()
         .x([1.0, 1000.0])
         .y([2.0, 500.0])

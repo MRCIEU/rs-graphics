@@ -341,6 +341,85 @@ impl AxisType {
 
 crate::error::from_r_string!(AxisType, "axis type", "\"s\" or \"n\"");
 
+/// Which axes of a new plot are logarithmic: the x axis, the y axis, both
+/// or neither (the default).
+///
+/// The plotting calls ([`plot()`](crate::graphics::Graphics::plot),
+/// [`hist()`](crate::graphics::Graphics::hist),
+/// [`barplot()`](crate::graphics::Graphics::barplot),
+/// [`boxplot()`](crate::graphics::Graphics::boxplot) and
+/// [`plot_window()`](crate::graphics::Graphics::plot_window)) take it as
+/// `.log("x")`, `.log("y")` or `.log("xy")`; they work out the limits on
+/// that scale and set `dev.par()`'s `xlog`/`ylog` for the plot.
+///
+/// From a string (`"xy".parse::<Log>()` or `TryFrom<&str>`): each
+/// character is `x` or `y`, in any order and repeated or not (`"yx"`,
+/// `"xxy"`); `""` is neither axis. Any other character is an error naming
+/// the first one, as in R (`invalid "log=z" specification`, from
+/// `plot.window()`).
+///
+/// This is R's `plot(log = )`, `plot.window(log = )`, ...
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// dev.plot().x([1, 10, 100]).y([1, 2, 3]).log("x").draw();
+/// assert!(dev.xlog() && !dev.ylog());
+/// assert_eq!("yx".parse::<Log>().unwrap(), Log { x: true, y: true });
+/// assert!("xz".parse::<Log>().is_err());
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Log {
+    /// The x axis is logarithmic (R's `"x"` in `log`).
+    pub x: bool,
+    /// The y axis is logarithmic (R's `"y"` in `log`).
+    pub y: bool,
+}
+
+impl TryFrom<&str> for Log {
+    type Error = crate::error::Error;
+
+    /// R's check in `plot.window()`: each character is `x` or `y`.
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let mut log = Log::default();
+        for c in s.chars() {
+            match c {
+                'x' => log.x = true,
+                'y' => log.y = true,
+                _ => {
+                    return Err(crate::error::Error::invalid(format!(
+                        "invalid \"log={c}\" specification"
+                    ))
+                    .in_call("plot.window"));
+                }
+            }
+        }
+        Ok(log)
+    }
+}
+
+impl TryFrom<String> for Log {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Log::try_from(s.as_str())
+    }
+}
+
+impl TryFrom<&String> for Log {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: &String) -> Result<Self, Self::Error> {
+        Log::try_from(s.as_str())
+    }
+}
+
+crate::error::from_str_via_try_from!(Log);
+
 // `Par` and `ParOptions` from one list of `Par`'s fields: `ParOptions`
 // holds every field as an `Option` (`None`: unchanged), with its `apply`
 // and setters (on `ParOptions` and `ParCall`), each documented with the
@@ -415,10 +494,13 @@ macro_rules! par_options {
                 /// Makes the x axis logarithmic, or linear again: from now on, x
                 /// values are mapped through `log10` first. As in R, `usr` stays
                 /// as it is, so set it too. The next `plot_new()` resets it.
-                /// Unset: unchanged.
+                /// Unset: unchanged. This is the current plot's state; to draw a
+                /// log plot, give `.log("x")` to `plot()` (or `hist()`,
+                /// `barplot()`, `boxplot()`, `plot_window()`), which works out the
+                /// limits on that scale and sets it (see [`Log`]).
                 pub xlog: Option<bool> => option bool,
-                /// As [`xlog`](ParOptions::xlog), for the y axis. Unset:
-                /// unchanged.
+                /// As [`xlog`](ParOptions::xlog), for the y axis (`.log("y")` on
+                /// the plotting calls). Unset: unchanged.
                 pub ylog: Option<bool> => option bool,
             }
         }
@@ -809,6 +891,22 @@ impl ParOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn log_takes_r_strings() {
+        let log = |s: &str| Log::try_from(s);
+        assert_eq!(log("").unwrap(), Log::default());
+        assert_eq!(log("x").unwrap(), Log { x: true, y: false });
+        assert_eq!(log("y").unwrap(), Log { x: false, y: true });
+        for both in ["xy", "yx", "xxy", "yxy"] {
+            assert_eq!(log(both).unwrap(), Log { x: true, y: true }, "{both}");
+        }
+        // The first bad character, as R's `plot.window()` reports it.
+        let e = log("xzq").unwrap_err();
+        assert_eq!(e.call(), "plot.window");
+        assert_eq!(e.message(), "invalid \"log=z\" specification");
+        assert!(Log::try_from(String::from("Y")).is_err());
+    }
 
     #[test]
     fn sides_from_array_is_bottom_left_top_right() {

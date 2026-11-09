@@ -11,6 +11,7 @@
 | `type` | `.type_()` | What to draw: points, lines, both, steps, ... |
 | `xlim` | `.xlim()` | x axis limits. |
 | `ylim` | `.ylim()` | y axis limits. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `main` | `.main()` | Main title: text (`"Weight"`) or a plotmath expression (`Label::math("x^2")`), drawn by `title()`. |
 | `sub` | `.sub()` | Subtitle. |
 | `xlab` | `.xlab()` | x axis label. |
@@ -21,8 +22,6 @@
 | `panel.first` | `.panel_first()` | Low-level calls (a `Figure`) drawn after the window is set and before the points, e.g. grid lines; added with `Device::add_figure`, so its `par()` changes don't last. |
 | `panel.last` | `.panel_last()` | As `panel_first`, but drawn after the points and before the axes. |
 | `asp` | `.asp()` | Aspect ratio: one x unit is `asp` y units long (1 for equal scales); ignored on log axes. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `pch` | `.pch()` | Plotting symbols, recycled over the points: R's symbol codes, characters or strings (a string's first character). |
 | `col` | `.col()` | Colours, recycled over the points. |
 | `bg` | `.bg()` | Fill of symbols 21-25, recycled over the points. |
@@ -88,10 +87,9 @@ R's arguments not available: `lim2`, `xgap.axis`, `ygap.axis`.
 | `plot` | `.plot()` | Whether to draw: `false` only returns the bins. |
 | `labels` | `.labels()` | Labels above the bars: `HistLabels::Values` writes each bar's count (or, with densities, its density to 3 decimals), `Text` the given labels. |
 | `lty` | `.lty()` | Line types of the bar borders, recycled over the bars. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `add` | `.add()` | Draws the bars on the current plot, without a new plot, window, title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`, `xlim`, `ylim`, `ann` and `panel_bg` are ignored). |
 | `ann` | `.ann()` | Whether to draw the titles. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `cex.main` | `.cex_main()` | Size of the main title, relative to `par(cex)`. |
 | `col.main` | `.col_main()` | Colour of the main title. |
 | `font.main` | `.font_main()` | Font of the main title (a `FontFace`). |
@@ -136,6 +134,7 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `xlim` | `.xlim()` | Limits of the x axis. |
 | `ylim` | `.ylim()` | Limits of the y axis. |
 | `xpd` | `.xpd()` | Clipping of the bars, names and legend; the setter also takes `false`/`true`. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `axes` | `.axes()` | Draws the value axis. |
 | `axisnames` | `.axisnames()` | Draws the names. |
 | `cex.axis` | `.cex_axis()` | Size of the axis labels. |
@@ -148,8 +147,6 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `args.legend` | `.args_legend()` | Legend options (e.g. `bty`, `inset`, `ncol`, `cex`, `title`, `fill`); every setting made here overrides barplot's choice (`fill` from `col`, `xjust = yjust = 1`, otherwise `legend()`'s defaults). |
 | `orderH` | `.order_h()` | Stacked bars only: order of the segments within each stack; each segment keeps its row's colour. |
 | `args.legend` (`x`, `y`) | `.legend_pos()` | Position of the legend, e.g. `"topleft"` or `(x, y)`. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `cex.main` | `.cex_main()` | Size of the main title, relative to `par(cex)`. |
 | `col.main` | `.col_main()` | Colour of the main title. |
 | `font.main` | `.font_main()` | Font of the main title. |
@@ -187,14 +184,13 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | `names` | `.names()` | Group labels on the name axis (side 1, or 2 if `horizontal`). |
 | `border` | `.border()` | Colours of the box outlines, median, whiskers, staples and outliers, recycled over the boxes. |
 | `col` | `.col()` | Box fill colours, recycled over the boxes. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `ann` | `.ann()` | Whether to draw the titles. |
 | `horizontal` | `.horizontal()` | Draws horizontal boxes: group names on side 2, values on side 1. |
 | `add` | `.add()` | Draws on the current plot instead of starting a new one. |
 | `at` | `.at()` | Box positions on the name axis, one per group. |
 | `frame.plot` | `.frame_plot()` | Draws the box around the plot region. |
 | `show.names` | `.show_names()` | Labels the boxes with `names`. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic: the position axis, or the value axis when `horizontal`. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic: the value axis, or the position axis when `horizontal`. |
 | `xlim` | `.xlim()` | Limits of the position axis. |
 | `ylim` | `.ylim()` | Limits of the value axis, also when `horizontal` (as in R). |
 | `main` | `.main()` | Main title, text or a plotmath expression, as for `plot()`. |
@@ -283,9 +279,8 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `pars` (use its ele
 |---|---|---|
 | `xlim` | `.xlim()` | The x range shown, `[from, to]` in data units (also on a log axis); decreasing for a reversed axis. |
 | `ylim` | `.ylim()` | The y range shown; as `xlim`. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `asp` | `.asp()` | Aspect ratio: one x unit is `asp` y units long on the page. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `xaxs` | `.xaxs()` | How the x range is extended: `"r"` adds 4% at each end, `"i"` nothing. |
 | `yaxs` | `.yaxs()` | As `xaxs`, for the y axis. |
 | `lab` | `.lab()` | Approximate numbers of x and y ticks (and label length) for the default ticks this window sets. |
@@ -664,7 +659,7 @@ R's arguments not available: `trace`.
 | `yaxs` | `.yaxs()` | Range style of the y axis, as `xaxs`. |
 | `yaxt` | `.yaxt()` | As `xaxt`, for y axes (sides 2 and 4). |
 | `ylbias` | `.ylbias()` | How far text parallel to its side is moved out from its margin line: `1 - ylbias` lines on sides 1 and 4, `ylbias` on sides 2 and 3 (divided by `mex`). |
-| `ylog` | `.ylog()` | As `xlog`, for the y axis. |
+| `ylog` | `.ylog()` | As `xlog`, for the y axis (`.log("y")` on the plotting calls). |
 | `palette()` (a function in R) | `.palette()` | Colours that colour numbers (`col = 2`) index, from 1, on this device only: each device has its own palette. |
 
 R's arguments not available: `ask`, `crt`, `err`, `family`, `mkh`, `smo`.

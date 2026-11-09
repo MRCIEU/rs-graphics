@@ -466,7 +466,7 @@ fn axis_returns_tick_positions_like_r() {
         g.plot_window()
             .xlim([1, 1000])
             .ylim([1, 10])
-            .xlog(true)
+            .log("x")
             .draw();
         out.push(g.axis().side(1).draw());
         out.push(g.axis().side(3).at([100, 5, 2000]).draw());

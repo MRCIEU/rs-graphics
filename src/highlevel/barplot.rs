@@ -14,7 +14,7 @@
 //! [`BarHeights`]) drawn either stacked or `beside`, vertical or
 //! `horiz`ontal, with `width`/`space`, a per-series colour vector (default
 //! `gray.colors(nrow)`), `names.arg`, `legend.text` (and `args.legend`),
-//! `xlim`/`ylim`, log axes (`xlog`/`ylog`), `offset`, `orderH`, `add`,
+//! `xlim`/`ylim`, log axes (`log`), `offset`, `orderH`, `add`,
 //! `axisnames`, `cex.names`, `axis.lty`, shading lines (`density`/
 //! `angle`) and R's inline axis parameters (`las`, `cex.axis`, ...).
 //!
@@ -49,7 +49,7 @@ use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
-use crate::par::{AxisStyle, Xpd};
+use crate::par::{AxisStyle, Log, Xpd};
 use crate::plotmath::Label;
 use crate::recycle::rep_len;
 
@@ -115,14 +115,17 @@ crate::setters::options! {
         pub xlim: Option<(f64, f64)> => pair f64,
         /// Limits of the y axis. `None`: from the bars.
         pub ylim: Option<(f64, f64)> => pair f64,
-        /// Makes the x axis logarithmic. Default `false`. On a log value
-        /// axis the bars start at the first value of `ylim` (or `xlim` if
-        /// `horiz`) when given, else at 0.9 times the smallest height, as
-        /// in R. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic. Default `false`. See `xlog`. R's
-        /// `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        /// On a log value axis the bars start at the first value of `ylim`
+        /// (or `xlim` if `horiz`) when given, else at 0.9 times the smallest
+        /// height, as in R.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Shifts the bars along the value axis, recycled over the bars of a
         /// vector, the rows of a `beside` matrix, or the columns (stacks) of
         /// a stacked one. Empty: 0.
@@ -276,8 +279,7 @@ impl Default for BarplotOptions {
             args_legend: LegendOptions::default(),
             xlim: None,
             ylim: None,
-            xlog: false,
-            ylog: false,
+            log: Log::default(),
             offset: Vec::new(),
             order_h: OrderH::None,
             add: false,
@@ -557,14 +559,14 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
         offset[k % offset.len()]
     };
 
-    if (opts.xlog || opts.ylog) && !opts.density.is_empty() {
+    if (opts.log.x || opts.log.y) && !opts.density.is_empty() {
         return Err(Error::invalid(
             "Cannot use shading lines in bars when log scale is used",
         ));
     }
 
     // --- log scale in the data direction: where bars start ---
-    let log_dat = (opts.xlog && horiz) || (opts.ylog && !horiz);
+    let log_dat = (opts.log.x && horiz) || (opts.log.y && !horiz);
     let rectbase = if log_dat {
         let min_h = columns
             .iter()
@@ -585,8 +587,8 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
             ));
         }
         for (log, lim, name) in [
-            (opts.xlog, opts.xlim, "xlim"),
-            (opts.ylog, opts.ylim, "ylim"),
+            (opts.log.x, opts.xlim, "xlim"),
+            (opts.log.y, opts.ylim, "ylim"),
         ] {
             if let (true, Some(l)) = (log, lim) {
                 if l.0.min(l.1) <= 0.0 {
@@ -595,8 +597,8 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
             }
         }
         match (horiz, opts.ylim, opts.xlim) {
-            (false, Some(l), _) if opts.ylog => l.0,
-            (true, _, Some(l)) if opts.xlog => l.0,
+            (false, Some(l), _) if opts.log.y => l.0,
+            (true, _, Some(l)) if opts.log.x => l.0,
             _ => 0.9 * min_h,
         }
     } else {
@@ -757,8 +759,7 @@ impl<B: Backend> Device<B> {
         if !opts.add {
             self.plot_new_impl()?;
             let window = PlotWindowOptions {
-                xlog: opts.xlog,
-                ylog: opts.ylog,
+                log: opts.log,
                 ..PlotWindowOptions::default()
             };
             self.plot_window_impl(xlim, ylim, &window);

@@ -29,7 +29,7 @@ use crate::device::{
 use crate::error::Error;
 use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
-use crate::par::AxisType;
+use crate::par::{AxisType, Log};
 use crate::plotmath::Label;
 use crate::recycle::nth;
 
@@ -219,12 +219,16 @@ crate::setters::options! {
         /// Draws the outliers and includes them in the default value range.
         /// Default `true`.
         pub outline: bool => value bool,
-        /// Makes the x axis logarithmic: the position axis, or the value axis
-        /// when `horizontal`. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic: the value axis, or the position axis
-        /// when `horizontal`. Default `false`. R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        /// The x axis is the position axis, or the value axis when
+        /// `horizontal`.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Limits of the position axis. `None`: `range(at) + c(-0.5, 0.5)`.
         pub xlim: Option<(f64, f64)> => pair f64,
         /// Limits of the value axis, also when `horizontal` (as in R).
@@ -435,8 +439,7 @@ impl Default for BoxplotOptions {
             width: None,
             add: false,
             outline: true,
-            xlog: false,
-            ylog: false,
+            log: Log::default(),
             xlim: None,
             ylim: None,
             main: None,
@@ -564,8 +567,7 @@ impl<B: Backend> Device<B> {
             });
             self.plot_new_impl()?;
             let window = PlotWindowOptions {
-                xlog: opts.xlog,
-                ylog: opts.ylog,
+                log: opts.log,
                 ..PlotWindowOptions::default()
             };
             if opts.horizontal {

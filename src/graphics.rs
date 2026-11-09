@@ -380,8 +380,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// - `xlim`/`ylim` are in data units, also on a log axis, and may be
     ///   decreasing (a reversed axis).
-    /// - `xlog`/`ylog` make that axis log10. [`Device::usr`] is then in log10
-    ///   units on that axis.
+    /// - `log` (`"x"`, `"y"` or `"xy"`) makes that axis log10, setting
+    ///   `dev.par()`'s `xlog`/`ylog`. [`Device::usr`] is then in log10 units
+    ///   on that axis.
     /// - `asp` (linear axes only): first widens whichever range is needed so
     ///   that one x unit is `asp` y units long on the page, centred on the given
     ///   limits.
@@ -395,7 +396,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///   from the new range and [`par(lab)`]. Later calls to `axis()` without
     ///   `at` read them; changing [`par(lab)`] afterwards doesn't change them.
     ///
-    /// This is R's `plot.window()`; its `log = "x"` is `.xlog(true)`.
+    /// This is R's `plot.window()`.
     ///
     /// # Examples
     ///
@@ -403,7 +404,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
-    /// dev.plot_window().xlim([1, 1000]).ylim([0, 1]).xlog(true).draw();
+    /// dev.plot_window().xlim([1, 1000]).ylim([0, 1]).log("x").draw();
     /// dev.axis().side(1).draw();
     /// ```
     ///

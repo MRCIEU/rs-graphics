@@ -156,7 +156,7 @@ fn layered<G: Graphics>(g: &mut G) {
     g.plot_window()
         .xlim([1.0, 1000.0])
         .ylim([0.0, 1.0])
-        .xlog(true)
+        .log("x")
         .draw();
     g.points()
         .x([1.0, 10.0, 100.0, 1000.0])
@@ -487,10 +487,10 @@ fn barplot_shading_on_a_log_axis_panics() {
         let r = std::panic::catch_unwind(|| {
             if figure {
                 let mut fig = Figure::new();
-                fig.barplot().height([1, 2]).ylog(true).density(10).draw();
+                fig.barplot().height([1, 2]).log("y").density(10).draw();
             } else {
                 let mut dev = Device::memory("pdf").width(5).height(5).open().unwrap();
-                dev.barplot().height([1, 2]).ylog(true).density(10).draw();
+                dev.barplot().height([1, 2]).log("y").density(10).draw();
             }
         });
         let msg = r.unwrap_err();

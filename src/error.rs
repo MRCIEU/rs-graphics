@@ -300,7 +300,7 @@ mod string_route_tests {
     use crate::font::FontFace;
     use crate::highlevel::{HistBreaks, OrderH, PlotType};
     use crate::lty::LineType;
-    use crate::par::{AxisStyle, AxisType, Bty, Pty};
+    use crate::par::{AxisStyle, AxisType, Bty, Log, Pty};
     use std::fmt::Debug;
     use std::str::FromStr;
 
@@ -337,5 +337,6 @@ mod string_route_tests {
         same::<LegendKeyword>("topr", "to");
         same::<LegendPos>("topleft", "middle");
         same::<Units>("cm", "pt");
+        same::<Log>("yx", "z");
     }
 }

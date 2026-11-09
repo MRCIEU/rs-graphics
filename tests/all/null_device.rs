@@ -18,7 +18,7 @@ fn measure<B: Backend>(dev: &mut Device<B>) -> String {
     dev.plot()
         .x([1, 10, 100])
         .y([3, 1, 2])
-        .xlog(true)
+        .log("x")
         .main("Main")
         .draw();
     let legend = dev

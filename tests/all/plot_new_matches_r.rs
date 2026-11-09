@@ -66,7 +66,7 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim([1.0, 1000.0])
                     .ylim([1.0, 1000.0])
-                    .with(&PlotWindowOptions::default().xlog(true).ylog(true))
+                    .with(&PlotWindowOptions::default().log("xy"))
                     .draw();
                 axes(d, &[1, 2]);
                 d.par().new(true).draw();

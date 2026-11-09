@@ -46,6 +46,6 @@ pub use crate::highlevel::{
 };
 pub use crate::layout::{LayoutRespect, LayoutSize};
 pub use crate::lty::LineType;
-pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};
+pub use crate::par::{AxisStyle, AxisType, Bty, Log, Par, ParOptions, Pty, Sides, Xpd};
 pub use crate::plotmath::{Expression, Label};
 pub use crate::recording::{Figure, FigureResult};

@@ -30,6 +30,7 @@ use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::Num;
+use crate::par::Log;
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
@@ -543,12 +544,16 @@ crate::setters::options! {
         pub ann: bool => value bool,
         /// Whether to draw the axes. Default `true`.
         pub axes: bool => value bool,
-        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic. Default `false`. As in R, the range
-        /// still starts from 0, which R "corrects" to about 1e-307 (with a
-        /// warning). R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        /// On a log y axis the range still starts from 0, which R "corrects"
+        /// to about 1e-307 (with a warning), as here.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Draws the bars on the current plot, without a new plot, window,
         /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`,
         /// `xlim`, `ylim`, `ann` and `panel_bg` are ignored). Default `false`.
@@ -628,8 +633,7 @@ impl Default for HistOptions {
             font_lab: None,
             ann: true,
             axes: true,
-            xlog: false,
-            ylog: false,
+            log: Log::default(),
             add: false,
             las: None,
             cex_axis: None,
@@ -790,8 +794,7 @@ impl<B: Backend> Device<B> {
         if !opts.add {
             self.plot_new_impl()?;
             let window = PlotWindowOptions {
-                xlog: opts.xlog,
-                ylog: opts.ylog,
+                log: opts.log,
                 ..PlotWindowOptions::default()
             };
             // `xlim = range(breaks)`, `ylim = range(y, 0)` unless given.
