@@ -22,7 +22,8 @@ come with a table of old and new calls.
 | `dev.axis().side(1).draw_labels(false)` | `dev.axis().side(1).labels(false)` (R's `labels = FALSE`) |
 | `dev.plot()...xlog(true).ylog(true)` | `dev.plot()...log("xy")` (also `hist()`, `barplot()`, `boxplot()`, `plot_window()`) |
 | `dev.text()...adj(0).vadj(1)` | `dev.text()...adj([0, 1])` (also `legend()`) |
-| `.vadj(v)` without `.adj()` | `let a = dev.current_par().adj;` then `.adj([a, v])` (R's `c(par("adj"), v)`; `[None, Some(v)]` would centre horizontally, R's `c(NA, v)`) |
+| text `.vadj(v)` without `.adj()` | `let a = dev.current_par().adj;` then `.adj([a, v])` (R's `c(par("adj"), v)`; `[None, Some(v)]` would centre horizontally, R's `c(NA, v)`) |
+| legend `.vadj(v)` without `.adj()` | `.adj([0.0, v])` (the default horizontal 0) |
 
 - `axis()` uses `xaxp`/`xaxt` on an x axis and `yaxp`/`yaxt` on a y axis
   and ignores the other direction's, as R does; a given `xaxp` or `yaxp`

@@ -329,6 +329,12 @@ crate::setters::options! {
 /// floats: `(0, 0.5)`), or two `Option`s of numbers (`[None, Some(1)]`,
 /// R's `c(NA, 1)`). A `NaN` is taken as `None`.
 ///
+/// A horizontal `None` centres, as R's `NA` does; it doesn't mean the
+/// default. To change only the vertical value, give the horizontal
+/// default too: for `text()`, `let a = dev.current_par().adj;` then
+/// `.adj([a, v])` (R's `c(par("adj"), v)`); for `legend()`,
+/// `.adj([0.0, v])`.
+///
 /// This is R's `adj` of `text()` and `legend()`.
 ///
 /// # Examples
@@ -340,6 +346,9 @@ crate::setters::options! {
 /// dev.text().x(5).y(5).labels("left edge on the point").adj(0).draw();
 /// dev.text().x(5).y(2).labels("above the point").adj([0.5, -0.5]).draw();
 /// dev.text().x(5).y(8).labels("centred, baseline on it").adj([None, Some(0)]).draw();
+/// // The baseline on the point, keeping `par(adj)` across.
+/// let a = dev.current_par().adj;
+/// dev.text().x(5).y(4).labels("baseline on it").adj([a, 0.0]).draw();
 /// assert_eq!(Adj::from(1), Adj { x: Some(1.0), y: None });
 /// assert_eq!(Adj::from((0, 0.5)), Adj { x: Some(0.0), y: Some(0.5) });
 /// ```
@@ -435,7 +444,9 @@ crate::setters::options! {
         /// `Option`s (`None`: R's `NA`, centred). For text with newlines the
         /// vertical value places the block of lines (`None`: 0.5), each
         /// line's baseline as for one line. Unset: [`par(adj)`] horizontally,
-        /// the ink centred vertically.
+        /// the ink centred vertically. To change only the vertical value,
+        /// pass [`par(adj)`] too: `let a = dev.current_par().adj;` then
+        /// `.adj([a, v])` (a horizontal `None` would centre).
         ///
         /// [`par(adj)`]: crate::par::Par::adj
         pub adj: Option<Adj> => option Adj,

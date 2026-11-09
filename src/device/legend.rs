@@ -360,7 +360,9 @@ crate::setters::options! {
         /// vertical ([`Adj`]): one number (horizontal; vertical `None`), two,
         /// or two `Option`s (`None`: R's `NA`: centred horizontally, each
         /// label's ink centred vertically). Unset: `[0, 0.5]` (left-justified,
-        /// the point half a capital's height above the baseline).
+        /// the point half a capital's height above the baseline). To change
+        /// only the vertical value, keep the 0: `.adj([0.0, v])` (a horizontal
+        /// `None` would centre the labels).
         pub adj: Option<Adj> => option Adj,
         /// Whether to draw each point in the middle of its line. `None`: R's
         /// default, `true` when the keys have both lines and points.
