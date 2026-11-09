@@ -13,10 +13,11 @@
 //! vectorised and default `text()` labels, `box(which = )` and
 //! `plot.window(asp = )`, `plot()`'s axes taking their style from
 //! `par()`, and the high-level plots' `par()`-based defaults (borders,
-//! boxplot lines and outliers, `ann`), `par(pch)` as a character,
-//! unequal-width `hist()` densities and missing pie labels. Every painted path and text item is compared
-//! in order (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
-//! available.
+//! boxplot lines and outliers, `ann`), `par(pch)` as a character, named
+//! palettes, integer codes given as ranges, unequal-width `hist()`
+//! densities and missing pie labels. Every painted path and text item is
+//! compared in order (see `common::pdf::assert_same`). Skipped if
+//! `Rscript` isn't available.
 
 use crate::common;
 use crate::common::{pdf, r};
@@ -329,6 +330,33 @@ fn cases() -> Vec<Case> {
                 d.par().fg(blue).draw();
                 d.par().col(blue).draw();
                 d.boxplot().x(&[vec![1.0, 2.0, 3.0, 4.0, 5.0, 12.0]]).draw();
+            },
+        },
+        Case {
+            // Integer codes as ranges, as R's `1:n`: colours, symbols, line
+            // types, fonts, `text()` positions and `mtext()` sides.
+            name: "integer_code_ranges",
+            r: "plot(1:6, col = 1:6, pch = 15:20, xlab = '', ylab = '')\n\
+                segments(1:6, 2, 1:6, 5, lty = 1:6, col = 1:6)\n\
+                text(rep(3, 4), 4, 'a', pos = 1:4, font = 1:4)\n\
+                mtext('s', side = 1:4)",
+            draw: |d| {
+                d.plot().x(1..=6).y(1..=6).col(1..=6).pch(15..=20).draw();
+                d.segments()
+                    .x0(1..=6)
+                    .y0(2)
+                    .y1(5)
+                    .lty(1..=6)
+                    .col(1..=6)
+                    .draw();
+                d.text()
+                    .x([3, 3, 3, 3])
+                    .y(4)
+                    .labels("a")
+                    .pos(1..=4)
+                    .font(1..=4)
+                    .draw();
+                d.mtext().text("s").side(1..=4).draw();
             },
         },
         Case {

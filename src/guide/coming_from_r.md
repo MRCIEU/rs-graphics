@@ -50,7 +50,7 @@ dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 | R | Rust |
 |---|---|
 | `c(1, 2, 3)` | `[1, 2, 3]` or `&v` (a `Vec`, array or slice) |
-| `1:10` | `1..=10` |
+| `1:10` | `1..=10`, for data and for codes too: `col = 1:3` is `.col(1..=3)`, `pch = 15:18` is `.pch(15..=18)` |
 | `TRUE`, `FALSE` | `true`, `false` |
 | `NA` in a setting: `pch = c(19, NA)`, `mtext(at = c(1, NA))` | `None`: `.pch([Some(19), None])`, `.at([Some(1.0), None])` |
 | `NA` in data or coordinates: `x = c(1, NA, 3)` | `f64::NAN`: that value is skipped, as in R |

@@ -238,7 +238,8 @@ impl<const N: usize> OptionArray<Option<[f64; N]>> for Option<[f64; N]> {
 ///
 /// Takes a single value (a colour, a `pos` code or a side) or a `Vec`, array or
 /// slice of them, by value or by reference: `"red"`, `["red", "blue"]`,
-/// `[1, 2]`, ... Colours take anything that converts to a [`ColorSpec`]
+/// `[1, 2]`, ..., or a range of integer codes (`1..=9`, R's `1:9`: palette
+/// colours 1 to 9). Colours take anything that converts to a [`ColorSpec`]
 /// (one palette index as an `i32`; a `None` element is R's `NA`, nothing
 /// drawn). Settings whose other elements may be `NA` take [`NaValues`],
 /// numeric data [`Numbers`](crate::numbers::Numbers), and `pch` [`Pch`].
@@ -293,6 +294,24 @@ impl<T, U: IntoArg<T> + Clone> Values<T> for &Vec<U> {
     }
 }
 
+impl<T> Values<T> for std::ops::Range<i32>
+where
+    i32: IntoArg<T>,
+{
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.map(IntoArg::into_arg).collect()
+    }
+}
+
+impl<T> Values<T> for std::ops::RangeInclusive<i32>
+where
+    i32: IntoArg<T>,
+{
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.map(IntoArg::into_arg).collect()
+    }
+}
+
 /// `impl Values<$t> for $single` (one value) for each listed type.
 macro_rules! single_values {
     ($t:ty: $($single:ty),*) => {
@@ -317,7 +336,8 @@ single_values!(crate::device::Side: crate::device::Side, i32);
 /// of either, by value or by reference: `19`, `[1, 2]`,
 /// `[Some(19), None]`, `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`,
 /// ... Numeric settings take any number type ([`Num`](crate::numbers::Num))
-/// and integer ranges (`1..=3`). Rust arrays hold one element type, so
+/// and integer ranges (`1..=3`), and line types and fonts ranges of their
+/// codes (`1..=6`, R's `lty = 1:6`). Rust arrays hold one element type, so
 /// once one element is `None` the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
@@ -491,12 +511,32 @@ na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &Str
 na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
 na_values!(bool: IntoArg::<bool>::into_arg; bool);
 
+/// `NaValues<$t>` for ranges of integer codes (`1..=6`, R's `1:6`), each
+/// converted as one `i32` is.
+macro_rules! code_ranges {
+    ($($t:ty),*) => {
+        $(
+            impl NaValues<$t> for std::ops::Range<i32> {
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    self.map(|v| IntoArg::<$t>::into_arg(v).map(Some)).collect()
+                }
+            }
+            impl NaValues<$t> for std::ops::RangeInclusive<i32> {
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    self.map(|v| IntoArg::<$t>::into_arg(v).map(Some)).collect()
+                }
+            }
+        )*
+    };
+}
+code_ranges!(LineType, FontFace);
+
 /// Plotting symbols for a `pch` setter: numbers, characters or strings.
 ///
-/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
-/// `['a', 'b']`) or strings (`"a"`, `["a", "b"]`), by value or by
-/// reference; `None` elements are R's `NA`, no symbol (`[Some(19), None]`,
-/// `[Some("x"), None]`). Numbers are R's symbol codes 0 to 25 (see
+/// One or several numbers (`19`, `[1, 2]`, `&pch`, or a range such as
+/// `0..=25`, R's `0:25`), characters (`'a'`, `['a', 'b']`) or strings
+/// (`"a"`, `["a", "b"]`), by value or by reference; `None` elements are
+/// R's `NA`, no symbol (`[Some(19), None]`, `[Some("x"), None]`). Numbers are R's symbol codes 0 to 25 (see
 /// [`charts::pch`](crate::charts::pch)). A character is drawn as itself:
 /// ASCII ones are their character codes, other characters are stored as
 /// minus their Unicode code point (R's negative `pch`), so `'é'` is `-233`.
@@ -776,6 +816,23 @@ pch_shape! {
     [E: PchElement + Clone] &Vec<E> => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
     [E: PchElement] &Vec<Option<E>> => |v| v;
 }
+
+/// Ranges of symbol codes (`0..=25`, R's `pch = 0:25`).
+macro_rules! pch_ranges {
+    ($($r:ty),*) => {
+        $(
+            impl Pch for $r {
+                fn into_pch(self) -> Vec<Option<i32>> {
+                    self.map(Some).collect()
+                }
+                fn into_legend_pch(self) -> Vec<Option<i32>> {
+                    self.into_pch()
+                }
+            }
+        )*
+    };
+}
+pch_ranges!(std::ops::Range<i32>, std::ops::RangeInclusive<i32>);
 
 /// A character's `pch` code, as R's `GEstring_to_pch()` in a UTF-8 locale:
 /// its ASCII code, or minus its Unicode code point for any other character
@@ -1500,6 +1557,35 @@ mod tests {
             .unwrap();
         assert_eq!(e.message(), "'ncol' must be a count, not -1");
         assert!(XyOptions::default().lty("dashed").deferred_error.is_none());
+    }
+
+    #[test]
+    fn integer_code_settings_take_ranges() {
+        use crate::color::ColorSpec;
+        use crate::device::Side;
+        // Each range is the array of its codes, as R's `1:n`.
+        let col: Vec<ColorSpec> = (1..=9).into_values().unwrap();
+        assert_eq!(col, [1, 2, 3, 4, 5, 6, 7, 8, 9].into_values().unwrap());
+        let col: Vec<ColorSpec> = (1..4).into_values().unwrap();
+        assert_eq!(col, [1, 2, 3].into_values().unwrap());
+        assert_eq!(
+            (0..=25).into_pch(),
+            (0..26).collect::<Vec<i32>>().into_pch()
+        );
+        assert_eq!((15..18).into_legend_pch(), [15, 16, 17].into_legend_pch());
+        let lty: Vec<Option<LineType>> = (1..=6).into_na_values().unwrap();
+        assert_eq!(lty, [1, 2, 3, 4, 5, 6].into_na_values().unwrap());
+        let font: Vec<Option<FontFace>> = (1..5).into_na_values().unwrap();
+        assert_eq!(font, [1, 2, 3, 4].into_na_values().unwrap());
+        let side: Vec<Side> = (1..=4).into_values().unwrap();
+        assert_eq!(side, [1, 2, 3, 4].into_values().unwrap());
+        let pos: Vec<i32> = (1..=4).into_values().unwrap();
+        assert_eq!(pos, [1, 2, 3, 4]);
+        // A code that doesn't convert is the same error as in an array.
+        let e = Values::<Side>::into_values(1..=5).unwrap_err();
+        assert_eq!(e.message(), "invalid axis number 5");
+        let e = NaValues::<FontFace>::into_na_values(1..=6).unwrap_err();
+        assert!(e.message().starts_with("invalid font 6"), "{e}");
     }
 
     #[test]
