@@ -51,7 +51,8 @@ come with a table of old and new calls.
   `DeviceBuilder::threads` and SVG compression are marked **Not in R.**;
   the R reference lists boxplot's style setters (`.boxwex()`,
   `.medcol()`, ...) as R arguments, which R takes through `...`; NOTICE
-  credits the ColorBrewer palettes.
+  credits the ColorBrewer palettes; the README is shorter, with one
+  explanation of each point and the same examples.
 
 ### Added
 

@@ -53,24 +53,8 @@ fn block_11() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// README.md, the block at line 68.
-fn block_68() -> Result<(), Box<dyn std::error::Error>> {
-    let mut dev = Device::null().open()?;
-    let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
-    let fig = Figure::new();
-    let response = [1.8, 3.1, 3.9];
-    match dev.plot().x(&x).y(&y).try_draw() {
-        Ok(()) => {}
-        Err(e) if e.kind() == ErrorKind::DoesNotFit => {
-            eprintln!("{e}: use a bigger page or fewer panels");
-        }
-        Err(e) => return Err(e.into()),
-    }
-    Ok(())
-}
-
-/// README.md, the block at line 82.
-fn block_82() -> Result<(), Box<dyn std::error::Error>> {
+/// README.md, the block at line 62.
+fn block_62() -> Result<(), Box<dyn std::error::Error>> {
     let mut dev = Device::null().open()?;
     let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
     let fig = Figure::new();
@@ -96,8 +80,8 @@ fn block_82() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// README.md, the block at line 117.
-fn block_117() -> Result<(), Box<dyn std::error::Error>> {
+/// README.md, the block at line 93.
+fn block_93() -> Result<(), Box<dyn std::error::Error>> {
     let mut dev = Device::null().open()?;
     let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
     let fig = Figure::new();
@@ -124,8 +108,8 @@ fn block_117() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// README.md, the block at line 147.
-fn block_147() -> Result<(), Box<dyn std::error::Error>> {
+/// README.md, the block at line 119.
+fn block_119() -> Result<(), Box<dyn std::error::Error>> {
     let mut dev = Device::null().open()?;
     let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
     let fig = Figure::new();
@@ -136,8 +120,8 @@ fn block_147() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// README.md, the block at line 159.
-fn block_159() -> Result<(), Box<dyn std::error::Error>> {
+/// README.md, the block at line 131.
+fn block_131() -> Result<(), Box<dyn std::error::Error>> {
     let mut dev = Device::null().open()?;
     let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
     let fig = Figure::new();
@@ -171,26 +155,8 @@ fn block_159() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// README.md, the block at line 190.
-fn block_190() -> Result<(), Box<dyn std::error::Error>> {
-    let mut dev = Device::null().open()?;
-    let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
-    let fig = Figure::new();
-    let response = [1.8, 3.1, 3.9];
-    for format in ["pdf", "png"] {
-        let mut dev = Device::format(format, format!("fit.{format}"))
-            .width(7.0)
-            .height(5.0)
-            .res(300.0) // PNG only
-            .open()?;
-        dev.add_figure(&fig);
-        dev.close()?;
-    }
-    Ok(())
-}
-
-/// README.md, the block at line 204.
-fn block_204() -> Result<(), Box<dyn std::error::Error>> {
+/// README.md, the block at line 162.
+fn block_162() -> Result<(), Box<dyn std::error::Error>> {
     let mut dev = Device::null().open()?;
     let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
     let fig = Figure::new();
@@ -217,8 +183,8 @@ fn block_204() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// README.md, the block at line 232.
-fn block_232() -> Result<(), Box<dyn std::error::Error>> {
+/// README.md, the block at line 190.
+fn block_190() -> Result<(), Box<dyn std::error::Error>> {
     let mut dev = Device::null().open()?;
     let (x, y) = ([1.0, 2.0, 3.0], [2.0, 4.0, 3.0]);
     let fig = Figure::new();
