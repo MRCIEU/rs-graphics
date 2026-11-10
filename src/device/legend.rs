@@ -67,6 +67,19 @@ use super::{Adj, Device, Xpd};
 /// | `legend("topright", ...)` | `"topright"` (or `LegendKeyword::TopRight`) | [`Keyword`](LegendPos::Keyword) |
 /// | `legend(5, 20, ...)` | `[5, 20]` or `(5, 20.5)` | [`Xy`](LegendPos::Xy) |
 /// | `legend(c(5, 15), c(10, 20), ...)` | `[[5, 15], [10, 20]]` or `((5, 15), (10, 20.5))` | [`Corners`](LegendPos::Corners) |
+///
+/// This is R's `legend(x, y)`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot().x([0, 10]).y([0, 20]).draw();
+/// dev.legend().pos("topright").labels("a").pch(1).draw();
+/// dev.legend().pos([5, 20]).labels("b").pch(2).draw();
+/// assert_eq!(LegendPos::try_from("topr").unwrap(), LegendPos::Keyword(LegendKeyword::TopRight));
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LegendPos {
     /// A single point `(x, y)` in user coordinates; anchored by
@@ -290,7 +303,6 @@ crate::setters::options! {
         /// [`par(lwd)`]; `None`: no line on that key (its point, if any, uses
         /// [`par(lwd)`]).
         ///
-        /// [`par(lwd)`]: crate::par::Par::lwd
         /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
         /// Fill colours of box keys; giving any draws boxes. Empty: no fill,

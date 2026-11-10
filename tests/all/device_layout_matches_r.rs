@@ -12,8 +12,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::device::Device;
 use rs_graphics::prelude::*;
 
@@ -26,7 +24,7 @@ fn r_par_values(width: f64, height: f64, ps: f64, xlim: (f64, f64), ylim: (f64, 
          invisible(dev.off())",
         xlim.0, xlim.1, ylim.0, ylim.1
     );
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .arg("-e")
         .arg(&script)
         .output()

@@ -257,8 +257,8 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// Ends of the axis line and ticks (`"round"`, `"butt"`,
-        /// `"square"`). `None`: [`par(lend)`].
+        /// Ends of the axis line and ticks (`"round"`, `"butt"`, `"square"` or
+        /// R's codes 0 to 2). `None`: [`par(lend)`].
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,

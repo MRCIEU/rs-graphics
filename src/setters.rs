@@ -236,8 +236,9 @@ impl<const N: usize> OptionArray<Option<[f64; N]>> for Option<[f64; N]> {
 /// (recycled per element, as R does), and `layout()`'s `widths` and
 /// `heights`.
 ///
-/// Takes a single value (a colour, a `pos` code or a side) or a `Vec`, array or
-/// slice of them, by value or by reference: `"red"`, `["red", "blue"]`,
+/// Takes a single value (a colour, a `pos` code or a side; layout sizes
+/// only as an array or `Vec`) or a `Vec`, array or slice of them, by value
+/// or by reference: `"red"`, `["red", "blue"]`,
 /// `[1, 2]`, ..., or a range of integer codes (`1..=9`, R's `1:9`: palette
 /// colours 1 to 9). Colours take anything that converts to a [`ColorSpec`]
 /// (one palette index as an `i32`; a `None` element is R's `NA`, nothing

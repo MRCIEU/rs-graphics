@@ -88,7 +88,7 @@ Opening creates the file, so a bad path fails before anything is drawn. `Device:
 
 ### Several panels
 
-Each high-level call (`plot`, `hist`, `barplot`, `boxplot`, `pie`) starts the next panel, unless given `.add(true)`, and returns what R's function returns.
+Each high-level call (`plot`, `hist`, `barplot`, `boxplot`, `pie`) starts the next panel (`hist`, `barplot` and `boxplot` draw on the current one with `.add(true)`), and returns what R's function returns.
 
 ```rust
 // R: pdf("panels.pdf", 8, 4); par(mfrow = c(1, 2), oma = c(0, 0, 2, 0))

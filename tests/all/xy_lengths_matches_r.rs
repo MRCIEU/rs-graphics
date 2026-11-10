@@ -13,8 +13,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::prelude::*;
 
 /// The calls, generic over the target so a device and a `Figure` run the
@@ -70,7 +68,7 @@ fn unequal_xy_lengths_fail_like_r() {
             })
             .collect::<String>()
     );
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .args(["--vanilla", "-e", &script])
         .output()
         .expect("run Rscript");

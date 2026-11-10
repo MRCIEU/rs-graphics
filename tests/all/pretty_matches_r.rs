@@ -20,8 +20,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::prelude::*;
 
 fn r_xaxp(lo: f64, up: f64, ndiv: i32) -> (f64, f64, i32) {
@@ -32,7 +30,7 @@ fn r_xaxp(lo: f64, up: f64, ndiv: i32) -> (f64, f64, i32) {
          cat(sprintf('%.17g %.17g %d', xaxp[1], xaxp[2], as.integer(xaxp[3]))); \
          invisible(dev.off())"
     );
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .arg("-e")
         .arg(&script)
         .output()

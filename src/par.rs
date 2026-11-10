@@ -8,7 +8,7 @@
 
 //! The graphical parameters ([`Par`]), the changes one `par()` call makes
 //! ([`ParOptions`]), and their value types ([`Sides`], [`AxisStyle`],
-//! [`Pty`], [`Bty`], [`Xpd`], [`AxisType`]).
+//! [`Pty`], [`Bty`], [`Xpd`], [`AxisType`], [`Log`]).
 //!
 //! [`Par`] holds the subset of R's graphics parameters this crate
 //! implements, with R's exact default values (cross-checked against
@@ -196,7 +196,8 @@ crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 ///
 /// From a string (`"l".parse::<Bty>()` or `TryFrom<&str>`): R's first
 /// character, `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"`
-/// (letters in either case). Anything else is an error.
+/// (letters in either case, except `"n"`, lower case only, as R). Anything
+/// else is an error.
 ///
 /// This is R's [`par(bty)`].
 ///
@@ -244,7 +245,8 @@ impl Bty {
             'c' | 'C' | '[' => Some(Bty::C),
             'u' | 'U' => Some(Bty::U),
             ']' => Some(Bty::Bracket),
-            'n' | 'N' => Some(Bty::N),
+            // Lower case only, as R's `par()`.
+            'n' => Some(Bty::N),
             _ => None,
         }
     }
@@ -489,8 +491,8 @@ macro_rules! par_options {
                 /// tick settings (`xaxp`/`yaxp`) are worked out again from them.
                 /// Applied after the other fields and `xlog`/`ylog` in the same
                 /// call, so a `usr` given with them is in their units, uses a new
-                /// `lab`, and replaces an `xaxp`/`yaxp` given there. A value
-                /// `NaN`, `x0 == x1` or `y0 == y1` is an error of the call (R's
+                /// `lab`, and replaces an `xaxp`/`yaxp` given there. A value that
+                /// isn't finite, `x0 == x1` or `y0 == y1` is an error of the call (R's
                 /// "invalid value specified for graphical parameter \"usr\"").
                 /// Unset: unchanged.
                 ///
@@ -648,7 +650,7 @@ impl ParOptions {
             finite("yaxp", &axp[..2])?;
         }
         if let Some([x0, x1, y0, y1]) = self.usr {
-            if [x0, x1, y0, y1].iter().any(|v| v.is_nan()) || x0 == x1 || y0 == y1 {
+            if [x0, x1, y0, y1].iter().any(|v| !v.is_finite()) || x0 == x1 || y0 == y1 {
                 return Err(par_error("usr"));
             }
         }
@@ -662,8 +664,8 @@ par_options! {
     /// The graphical parameters: margins, colours, fonts, line styles, axis
     /// styles and the rest of what `par()` sets.
     ///
-    /// A device starts with the `Par` it was made with (usually
-    /// `Par::default()`, R's defaults); change it with
+    /// A device starts with R's defaults (`Par::default()`), with `ps` and
+    /// `bg` from its builder; change it with
     /// [`par()`](crate::graphics::Graphics::par) and read it with
     /// [`Device::current_par`](crate::device::Device::current_par). Field names
     /// match R's where practical (`cex_main` is R's `cex.main`).
@@ -757,9 +759,11 @@ par_options! {
         pub lwd: f64 => number f64,
         /// Line type. Default solid.
         pub lty: LineType => option LineType,
-        /// Line end style. Default round.
+        /// Line end style: `"round"`, `"butt"`, `"square"` or R's codes 0 to
+        /// 2 ([`LineEnd`]). Default round.
         pub lend: LineEnd => option LineEnd,
-        /// Line join style. Default round.
+        /// Line join style: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to
+        /// 2 ([`LineJoin`]). Default round.
         pub ljoin: LineJoin => option LineJoin,
         /// Mitre limit for mitred joins. Default 10.
         pub lmitre: f64 => number f64,
@@ -1022,6 +1026,14 @@ impl ParOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bty_n_is_lower_case_only() {
+        // R's `par(bty = "N")` is an error; the other letters take either case.
+        assert!("N".parse::<Bty>().is_err());
+        assert_eq!("n".parse::<Bty>().unwrap(), Bty::N);
+        assert_eq!("O".parse::<Bty>().unwrap(), Bty::O);
+    }
 
     #[test]
     fn log_takes_r_strings() {

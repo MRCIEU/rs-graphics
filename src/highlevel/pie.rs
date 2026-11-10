@@ -108,7 +108,8 @@ crate::setters::options! {
         /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
         /// Approximate number of polygon edges for a full circle (each slice
-        /// gets at least 2); not finite is R's error. `None`: 200.
+        /// gets at least 2); not finite, or a slice's share beyond R's longest
+        /// vector (2^52), is R's error. `None`: 200.
         pub edges: Option<f64> => number f64,
         /// Whether slices go clockwise. Default `false` (counterclockwise).
         pub clockwise: bool => value bool,
@@ -282,6 +283,16 @@ pub(crate) fn check_pie(x: &[f64], opts: &PieOptions) -> Result<(), Error> {
     // R's `seq.int(.., length.out = n)` with a non-finite `edges`.
     if opts.edges.is_some_and(|e| !e.is_finite()) {
         return Err(Error::invalid("'length.out' must be a finite number"));
+    }
+    // A slice's `floor(edges * dx)` beyond R's longest vector
+    // (`R_XLEN_T_MAX`, 2^52).
+    let total: f64 = x.iter().sum();
+    let widest = x.iter().fold(0.0_f64, |m, &v| m.max(v)) / total;
+    if opts
+        .edges
+        .is_some_and(|e| (e * widest).floor() > 4_503_599_627_370_496.0)
+    {
+        return Err(Error::invalid("result would be too long a vector"));
     }
     Ok(())
 }

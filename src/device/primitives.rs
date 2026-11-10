@@ -74,18 +74,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -126,13 +126,13 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -173,18 +173,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -220,18 +220,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -280,18 +280,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -586,18 +586,18 @@ crate::setters::options! {
         ///
         /// [`par(bty)`]: crate::par::Par::bty
         pub bty: Option<Bty> => option Bty,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,

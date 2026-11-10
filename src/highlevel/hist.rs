@@ -18,6 +18,11 @@
 //! `warn.unused`; R's `probability` and `nclass` are `.freq(false)` and
 //! `.breaks(n)`.
 //!
+//! R bugs not copied: with a count of breaks and no finite data, R's
+//! message is `character(0)` (its `gettextf()` formats an empty result);
+//! the message here is the one R meant, `hist.default: pretty() error,
+//! breaks=`.
+//!
 //! This is R's `hist(x, ...)`, ported from `hist.default`/`plot.histogram`
 //! in `r-source/src/library/graphics/R/hist.R`.
 
@@ -57,7 +62,9 @@ fn var(x: &[f64]) -> f64 {
 }
 
 /// R's `quantile(x, p, type = 7)` of sorted `x`; `NaN` of nothing (R's
-/// `NA`, which makes `nclass.FD()` fail: "invalid number of 'breaks'").
+/// `NA`). With no data the `"FD"` rule then gives one class, which ends in
+/// [`pretty_breaks`]'s error (R's `nclass.FD()` fails earlier, with
+/// "missing value where TRUE/FALSE needed").
 fn quantile7(sorted: &[f64], p: f64) -> f64 {
     let n = sorted.len();
     if n == 0 {
@@ -559,8 +566,8 @@ crate::setters::options! {
         #[doc(alias = "xlog", alias = "ylog")]
         pub log: Log => value Log,
         /// Draws the bars on the current plot, without a new plot, window,
-        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`,
-        /// `xlim`, `ylim`, `ann` and `panel_bg` are ignored). Default `false`.
+        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `log`, `xlim`,
+        /// `ylim`, `ann` and `panel_bg` are ignored, as in R). Default `false`.
         pub add: bool => value bool,
         /// Orientation of the axis labels: 0 parallel to the axis, 1
         /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
@@ -688,9 +695,6 @@ pub struct HistResult {
     pub equidist: bool,
 }
 
-/// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
-/// mid-points. Needs no device, so a recorded figure can return the same
-/// result as [`Graphics::hist`](crate::graphics::Graphics::hist).
 /// `plot.histogram()`'s window: `xlim = range(breaks)`, `ylim = range(y,
 /// 0)` unless given, checked as `plot.window()` does
 /// ([`check_window_limits`]). `heights` are the bars (counts or
@@ -731,6 +735,9 @@ fn pretty_breaks(data: &[f64], nclass: i32) -> Result<Vec<f64>, Error> {
     Ok(pretty_r(lo, hi, nclass, 1))
 }
 
+/// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
+/// mid-points. Needs no device, so a recorded figure can return the same
+/// result as [`Graphics::hist`](crate::graphics::Graphics::hist).
 pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> Result<HistResult, Error> {
     let data: Vec<f64> = x.iter().copied().filter(|v| v.is_finite()).collect();
     let n = data.len();
@@ -822,11 +829,10 @@ impl<B: Backend> Device<B> {
             equidist,
         } = result;
         let nb = breaks.len();
-        let (xlim, ylim) = hist_window(&breaks, &heights, opts)?;
-
-        // `plot.histogram()`: window, title, axes (unless `add`), then the
-        // bars.
+        // `plot.histogram()`: window, title, axes (unless `add`, which
+        // checks no limits, as R), then the bars.
         if !opts.add {
+            let (xlim, ylim) = hist_window(&breaks, &heights, opts)?;
             self.plot_new_impl()?;
             let window = PlotWindowOptions {
                 log: opts.log,

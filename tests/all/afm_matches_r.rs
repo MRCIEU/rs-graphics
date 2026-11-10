@@ -13,8 +13,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::prelude::*;
 
 fn r_strwidth(s: &str, pointsize: f64, cex: f64, font: i32) -> f64 {
@@ -23,7 +21,7 @@ fn r_strwidth(s: &str, pointsize: f64, cex: f64, font: i32) -> f64 {
          cat(strwidth('{s}', units = 'in', cex = {cex}, font = {font})); \
          invisible(dev.off())"
     );
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .arg("-e")
         .arg(&script)
         .output()

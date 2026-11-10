@@ -13,6 +13,16 @@ pub mod r;
 
 use std::process::Command;
 
+/// `Rscript`, with R's messages untranslated (`LANGUAGE=en`), so that
+/// tests comparing them don't depend on the locale (R's British English
+/// translation writes "colour" where R's own message, and ours, says
+/// "color"). Every test that runs R starts it through this.
+pub fn rscript() -> Command {
+    let mut c = Command::new("Rscript");
+    c.env("LANGUAGE", "en");
+    c
+}
+
 /// Whether `Rscript` is on `PATH`, so the R cross-checks can run. When it
 /// isn't, the test is skipped (prints a note and returns `false`), unless
 /// `RS_GRAPHICS_REQUIRE_R` is set, as in CI: then it fails, so a missing R

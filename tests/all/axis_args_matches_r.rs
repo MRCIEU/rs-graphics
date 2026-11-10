@@ -17,8 +17,6 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use std::process::Command;
-
 use rs_graphics::color::{Color, ColorSpec};
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::lty::LineType;
@@ -430,7 +428,7 @@ fn axis_returns_tick_positions_like_r() {
     if !common::r_available() {
         return;
     }
-    let r = Command::new("Rscript")
+    let r = common::rscript()
         .args([
             "--vanilla",
             "-e",

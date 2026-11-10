@@ -6,7 +6,7 @@ follow [Semantic Versioning](https://semver.org/): below 1.0, a minor
 version may break the API. Breaking changes are marked **Breaking** and
 come with a table of old and new calls.
 
-## [Unreleased]
+## [0.6.0] - 2026-11-10
 
 ### Changed
 
@@ -48,7 +48,8 @@ come with a table of old and new calls.
 - `par()` keeps `xlog`/`ylog` (R's own `par()` names); they only flip the
   current plot's state, and their docs point to `.log()`.
 - Docs: the palette is per device (R's `palette()` is session-wide);
-  `DeviceBuilder::threads` and SVG compression are marked **Not in R.**;
+  `DeviceBuilder::threads` is marked **Not in R.**, and SVG compression
+  noted as not in R;
   the R reference lists boxplot's style setters (`.boxwex()`,
   `.medcol()`, ...) as R arguments, which R takes through `...`; NOTICE
   credits the ColorBrewer palettes; the README is shorter, with one
@@ -73,6 +74,14 @@ come with a table of old and new calls.
 
 ### Fixed
 
+- `par(usr = )` with an infinite value is R's `invalid value specified for
+  graphical parameter "usr"` (before, a panic at the next axis);
+  `par(bty = "N")` is an error, as in R (the other letters still take
+  either case);
+  `hist(add = TRUE)` no longer checks `xlim`/`ylim` on a device (it
+  draws no window, as R; a `Figure` already didn't); `pie()` with an
+  `edges` too large for R's longest vector is R's `result would be too
+  long a vector` (before, a panic).
 - `mtext()` recycles `side` and `outer` over the labels, and `barplot()`
   recycles `border` over the bars, as R does.
 - Five more of R's argument errors, with R's messages: `axis()` with no
@@ -514,7 +523,7 @@ Initial release: a port of R's base graphics, aiming for visual and numerical fi
 - R's `pretty()` and `GEPretty()` tick algorithms, R's log-axis ticks, and `Device::text_metrics` (R's `strwidth()`/`strheight()`).
 - Licensed GPL-3.0-or-later. NOTICE lists R's copyright holders and the ported R sources.
 
-[Unreleased]: https://github.com/MRCIEU/rs-graphics/compare/v0.5.0...HEAD
+[0.6.0]: https://github.com/MRCIEU/rs-graphics/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MRCIEU/rs-graphics/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MRCIEU/rs-graphics/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MRCIEU/rs-graphics/compare/v0.2.0-pre...v0.3.0

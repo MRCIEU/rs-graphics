@@ -13,8 +13,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::Error;
 use rs_graphics::prelude::*;
 
@@ -266,6 +264,9 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
                     .try_draw()
             },
         ),
+        ("pie(c(1, 1), edges = 1e300)", "pie", |g| {
+            g.pie().x([1, 1]).edges(1e300).try_draw()
+        }),
         ("abline(a = 1)", "abline", |g| g.abline().a(1).try_draw()),
         ("abline(a = NA, b = 1)", "abline", |g| {
             g.abline().a(f64::NAN).b(1).try_draw()
@@ -384,6 +385,9 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
         ("par(mfrow = c(-1, 2))", "par", |d| {
             d.par().mfrow([-1, 2]).try_draw()
         }),
+        ("par(usr = c(0, Inf, 0, 1))", "par", |d| {
+            d.par().usr([0.0, f64::INFINITY, 0.0, 1.0]).try_draw()
+        }),
         ("par(mfg = c(0, 1))", "par", |d| {
             d.par().mfg([0, 1]).try_draw()
         }),
@@ -469,7 +473,7 @@ fn r_messages(code: &[&str]) -> Vec<String> {
     for c in code {
         script.push_str(&format!("e({{ {c} }})\n"));
     }
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .args(["--vanilla", "-e", &script])
         .output()
         .expect("run Rscript");
@@ -717,4 +721,28 @@ fn negative_bg_fails_when_opening() {
     assert_eq!(e.kind(), ErrorKind::InvalidArgument);
     assert_eq!(e.call(), "png");
     assert!(!path.exists());
+}
+
+/// `hist(add = TRUE)` draws no window, so it checks no limits, on a device
+/// and in a `Figure` alike, as R's `hist(1:3, add = TRUE, xlim = c(NaN, 1))`.
+#[test]
+fn hist_add_checks_no_limits() {
+    let mut dev = device();
+    assert!(
+        dev.hist()
+            .x([1, 2, 3])
+            .add(true)
+            .xlim((f64::NAN, 1.0))
+            .try_draw()
+            .is_ok()
+    );
+    let mut fig = Figure::new();
+    assert!(
+        fig.hist()
+            .x([1, 2, 3])
+            .add(true)
+            .xlim((f64::NAN, 1.0))
+            .try_draw()
+            .is_ok()
+    );
 }

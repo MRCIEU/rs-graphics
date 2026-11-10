@@ -36,9 +36,10 @@ pub(crate) const MAX_LAYOUT_CELLS: usize = 500;
 /// A column width or row height in a layout: relative to the other
 /// relative sizes, or absolute in centimetres.
 ///
-/// Numbers convert to relative sizes, so `[2, 1]` works where sizes are
-/// taken (the layout builder's [`widths`](crate::device::LayoutCall::widths)
-/// and [`heights`](crate::device::LayoutCall::heights)). Absolute sizes
+/// `f64` and `i32` numbers convert to relative sizes, so `[2, 1]` works
+/// where sizes are taken (the layout builder's
+/// [`widths`](crate::device::LayoutCall::widths) and
+/// [`heights`](crate::device::LayoutCall::heights)). Absolute sizes
 /// are R's `lcm(x)`.
 ///
 /// # Examples

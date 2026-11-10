@@ -15,8 +15,8 @@ usage, see [README.md](README.md).
   0..1 user coordinates), user/device coordinate transforms, log
   axes (R's default log ticks from `GLPretty()`/`CreateAtVector()`, `at`/
   `pos`/`abline(h=, v=)` in data units, `abline(a, b)` straight on the
-  page or curved with `AblineOptions::untf`, and `xlog`/`ylog` for `plot()`,
-  `hist()`, `barplot()` and `boxplot()`), `par(lab=)`, `par(xaxp=/yaxp=)` (set by
+  page or curved with `AblineOptions::untf`, and `log` for `plot()`,
+  `hist()`, `barplot()`, `boxplot()` and `plot_window()`), `par(lab=)`, `par(xaxp=/yaxp=)` (set by
   `plot_window()` as R's `GAxisPars()`, read by `axis()` via
   `CreateAtVector()`, overridable inline), and R's `xpd` clip regions
   (`par::Xpd`: the plot region, the figure region or the whole device,

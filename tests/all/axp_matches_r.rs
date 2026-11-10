@@ -17,8 +17,6 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use std::process::Command;
-
 
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::highlevel::PlotOptions;
@@ -31,7 +29,7 @@ const PAGE_H: f64 = 6.0;
 fn rscript(name: &str, script: &str) -> String {
     let path = std::env::temp_dir().join(format!("rs_graphics_axp_{name}.R"));
     std::fs::write(&path, script).unwrap();
-    let out = Command::new("Rscript").arg(&path).output().expect("run Rscript");
+    let out = common::rscript().arg(&path).output().expect("run Rscript");
     assert!(
         out.status.success(),
         "Rscript failed: {}",

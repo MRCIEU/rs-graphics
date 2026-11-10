@@ -103,7 +103,10 @@ pub struct BoxStats {
 /// 0` (or an infinite range) there are no outliers and the whiskers reach
 /// the extremes. `n` counts the non-`NaN` values (infinities included),
 /// and the notch is `median -/+ 1.58 * IQR / sqrt(n)`. With no finite
-/// values, the statistics are `NaN` (see [`BoxStats`]).
+/// values, the statistics are `NaN` (see [`BoxStats`]). A negative `coef`,
+/// R's error in `boxplot.stats()`, is taken as 0 here (this function
+/// returns no `Result`); [`Graphics::boxplot`](crate::graphics::Graphics::boxplot)
+/// checks its `range`.
 ///
 /// This is R's `boxplot.stats(x, coef)`.
 ///

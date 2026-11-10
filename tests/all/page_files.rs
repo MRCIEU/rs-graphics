@@ -19,7 +19,6 @@
 use crate::common;
 
 use std::path::PathBuf;
-use std::process::Command;
 
 use rs_graphics::prelude::*;
 
@@ -220,10 +219,7 @@ fn pdf_files_and_pages_match_r() {
         );
         let path = std::env::temp_dir().join(format!("rs_graphics_page_files_{onefile}.R"));
         std::fs::write(&path, script).unwrap();
-        let out = Command::new("Rscript")
-            .arg(&path)
-            .output()
-            .expect("run Rscript");
+        let out = common::rscript().arg(&path).output().expect("run Rscript");
         assert!(
             out.status.success(),
             "{}",
@@ -293,10 +289,7 @@ fn page_numbers_are_formatted_as_rs_sprintf() {
     }
     let path = std::env::temp_dir().join("rs_graphics_page_files.R");
     std::fs::write(&path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&path)
-        .output()
-        .expect("run Rscript");
+    let out = common::rscript().arg(&path).output().expect("run Rscript");
     assert!(
         out.status.success(),
         "{}",

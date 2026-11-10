@@ -50,7 +50,9 @@ use crate::numbers::Num;
 ///
 /// From a string (`"butt".parse::<LineEnd>()` or `TryFrom<&str>`): `"round"`,
 /// `"butt"` or `"square"`, or their codes as strings, `"0"` to `"2"` (R takes
-/// the codes only as numbers). Anything else is an error.
+/// the codes only as numbers). Anything else is an error. From a number
+/// (`TryFrom<i32>`, so setters take `.lend(1)`): R's codes, `0` round, `1`
+/// butt, `2` square, higher codes recycled as R does.
 ///
 /// This is R's [`par(lend)`].
 ///
@@ -133,7 +135,9 @@ fn line_code(code: i32, n: i32) -> Option<i32> {
 ///
 /// From a string (`"mitre".parse::<LineJoin>()` or `TryFrom<&str>`): `"round"`,
 /// `"mitre"` or `"bevel"`, or their codes as strings, `"0"` to `"2"` (R takes
-/// the codes only as numbers). Anything else is an error.
+/// the codes only as numbers). Anything else is an error. From a number
+/// (`TryFrom<i32>`, so setters take `.ljoin(1)`): R's codes, `0` round, `1`
+/// mitre, `2` bevel, higher codes recycled as R does.
 ///
 /// This is R's [`par(ljoin)`].
 ///

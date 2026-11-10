@@ -270,8 +270,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing, or with R's errors for invalid `breaks` (for example edges that
     /// don't span the data; no finite data at all is "invalid number of
-    /// 'breaks'"), or, as `plot.window()`'s error, if a given `xlim`/`ylim`
-    /// isn't finite ("need finite 'xlim' values").
+    /// 'breaks'" with the default rule, and the `pretty()` error with the
+    /// others or a count), or, as `plot.window()`'s error, if a given
+    /// `xlim`/`ylim` isn't finite ("need finite 'xlim' values"; not checked
+    /// with `add`).
     fn hist(&mut self) -> HistCall<'_, Self> {
         HistCall::start(self)
     }
@@ -376,7 +378,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing or empty or has a negative or non-finite value ("'x' values must be
-    /// positive").
+    /// positive"), or `edges` isn't finite ("'length.out' must be a finite
+    /// number") or is too large for one slice ("result would be too long a
+    /// vector"), with R's messages.
     fn pie(&mut self) -> PieCall<'_, Self> {
         PieCall::start(self)
     }
@@ -401,9 +405,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// - Each range is then extended: with [`par(xaxs)`]/[`par(yaxs)`] `"r"`
     ///   (the default) by 4% at each end; with `"i"` the limits are used as given. A
     ///   zero-width range is widened, to -1..1 around 0, otherwise by 40% of the
-    ///   value either side. Non-finite limits are replaced by huge finite ones;
-    ///   on a log axis, a limit <= 0 gives a lower end of about 1e-307 (R warns
-    ///   there; this doesn't).
+    ///   value either side. On a log axis, a limit <= 0 gives a lower end of
+    ///   about 1e-307 (R warns there; this doesn't).
     /// - Sets [`par(xaxp)`]/[`par(yaxp)`] (the default tick range and count)
     ///   from the new range and [`par(lab)`]. Later calls to `axis()` without
     ///   `at` read them; changing [`par(lab)`] afterwards doesn't change them.
@@ -720,9 +723,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `side` is missing or not 1 to 4, no value of a given `at` is finite
     /// ("no locations are finite"), `labels` is given without `at` or
     /// their lengths differ; on a log axis, if the code (third value) of the
-    /// `xaxp`/`yaxp` it uses isn't 1, 2 or 3; and if a given `xaxp` or
-    /// `yaxp` for a log direction has a code of 0 or above 4, whichever the
-    /// side.
+    /// `xaxp`/`yaxp` it uses isn't 1, 2 or 3 (a negative value is a count
+    /// and allowed); and if a given `xaxp` or `yaxp` for a log direction has
+    /// a code of 0 or above 4, whichever the side.
     fn axis(&mut self) -> AxisCall<'_, Self> {
         AxisCall::start(self)
     }
@@ -899,11 +902,13 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `mar`, `mai`, `oma`, `omi`, `plt` or `pin` negative or not finite;
     /// `omd` outside 0 to 1; `mgp` or `srt` not finite; `las` outside 0 to
     /// 3; `ps` negative or not finite; `lab` (see [`lab`](ParCall::lab));
-    /// `xaxp`/`yaxp` with a non-finite limit, or a third value that isn't 1
-    /// to 4 on a log axis (R's `logAxpCheck`) or a positive count on a
-    /// linear one; `usr` with a `NaN` or `x0 == x1` or `y0 == y1`; `lmitre`
-    /// below 1; `mfrow`/`mfcol`/`mfg`, `fig` and `fin` (see their setters);
-    /// an unknown string for `pty`, `bty`, `xaxs`, `xaxt`, `lend`, `ljoin`,
+    /// `xaxp`/`yaxp` with a non-finite limit, or a third value of 0 or above
+    /// 4 (truncated) on a log axis (R's `logAxpCheck`) or a positive count
+    /// on a linear one; a negative palette number for a colour ("numerical
+    /// color values must be >= 0, found -1"); `usr` with a value that isn't
+    /// finite, or `x0 == x1` or `y0 == y1`; `lmitre` below 1;
+    /// `mfrow`/`mfcol`/`mfg`, `fig` and `fin` (see their setters); an
+    /// unknown string for `pty`, `bty`, `xaxs`, `xaxt`, `lend`, `ljoin`,
     /// `lty`, `pch`, a colour or a palette (their own messages).
     fn par(&mut self) -> ParCall<'_, Self> {
         ParCall::start(self)

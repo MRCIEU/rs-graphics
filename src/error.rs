@@ -138,8 +138,9 @@ impl Error {
     }
 
     /// Returns the name of the R function that raised the error, such as
-    /// `"plot.new"` or `"hist"`; empty for an error from a string
-    /// conversion.
+    /// `"plot.new"` or `"hist"`; usually empty for an error from a string
+    /// conversion (a [`Log`](crate::par::Log)'s names `plot.window`, as R's
+    /// does).
     pub fn call(&self) -> &str {
         self.call
     }

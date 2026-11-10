@@ -17,8 +17,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::HistBreaks;
@@ -38,7 +36,7 @@ fn r_hist(data: &[f64], breaks: &str) -> (Vec<f64>, Vec<f64>) {
              paste(h$counts, collapse=','), '\\n')",
         values.join(",")
     );
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .arg("-e")
         .arg(&script)
         .output()
@@ -172,7 +170,7 @@ fn r_values(data: &[f64], expr: &str) -> Vec<f64> {
         "x <- c({}); v <- {expr}; cat(sprintf('%.17g', as.numeric(v)), '\\n')",
         values.join(",")
     );
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .args(["-e", &script])
         .output()
         .expect("failed to run Rscript");

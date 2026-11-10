@@ -159,8 +159,9 @@ replaces draws (see [`extra`](crate::extra)):
   `boxplot()`: a background for the plot region only. In R:
   `panel.first = rect(<par("usr")>, col = "grey92", border = NA)`.
 
-One device setter is not in R either: `.threads()` sets how many threads
-draw a PNG, so it replaces no R code.
+Two device options are not in R either, so they replace no R code:
+`.threads()` sets how many threads draw a PNG, and `.compress(true)` on
+an SVG device writes a gzipped `.svgz`.
 
 ```
 # use rs_graphics::prelude::*;

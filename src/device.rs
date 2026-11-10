@@ -79,6 +79,19 @@ pub(crate) use primitives::{check_arrows, check_text, check_window_limits};
 /// Setters also take R's side numbers (`TryFrom<i32>`): `1` bottom, `2`
 /// left, `3` top, `4` right (`.side(1)` is `.side(Side::Bottom)`); any
 /// other number is an error of the call ("invalid axis number").
+///
+/// This is R's `side` of `axis()` and `mtext()`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot().x([1, 2]).y([1, 2]).axes(false).draw();
+/// dev.axis().side(Side::Left).draw();
+/// dev.mtext().text("note").side(4).draw();
+/// assert_eq!(Side::try_from(1).unwrap(), Side::Bottom);
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     /// Side 1, below the plot.
@@ -225,8 +238,7 @@ pub struct Device<B: Backend> {
 /// device, or recorded in a [`Figure`](crate::recording::Figure).
 /// Without `.draw()`, nothing happens (the compiler warns).
 ///
-/// See [`Graphics::layout`] for an
-/// example.
+/// See [`Graphics::layout`] for the arguments and an example.
 #[must_use = "nothing is changed until `.draw()`"]
 pub struct LayoutCall<'a, G: Graphics> {
     target: &'a mut G,
