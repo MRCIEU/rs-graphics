@@ -1174,12 +1174,13 @@ macro_rules! options {
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident int_array $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes an array of any numbers; fractions are truncated, as R's `as.integer()`."]
+        #[doc = "Takes an array of any numbers, read as R's `as.integer()`: fractions are truncated, and `NaN` or a value beyond R's integer range is R's `NA` (an error in `par()`)."]
         pub fn $field<U: $crate::numbers::Num, const N: usize>(mut self, values: [U; N]) -> Self
         where
             [i32; N]: Into<$t>,
         {
-            let values: [i32; N] = values.map(|v| $crate::numbers::Num::to_f64(v) as i32);
+            let values: [i32; N] =
+                values.map(|v| $crate::numbers::as_integer($crate::numbers::Num::to_f64(v)));
             self$(.$p)?.$field = Some(values.into());
             self
         }

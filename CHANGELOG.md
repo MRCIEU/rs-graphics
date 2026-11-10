@@ -60,6 +60,17 @@ come with a table of old and new calls.
 
 - `mtext()` recycles `side` and `outer` over the labels, and `barplot()`
   recycles `border` over the bars, as R does.
+- Three crashes found by a pre-release review: `par(mfrow)`/`mfcol`/`mfg`
+  with a value beyond R's integer range (`1e300`) overflowed a figure
+  count (a panic in debug builds) instead of R's `invalid value specified
+  for graphical parameter "mfrow"`; `par(lab)` wasn't checked, so
+  `lab = c(0, 0, 7)` or a negative or `NaN` value panicked inside the
+  next `plot()` (now R's `par()` error: the first two values at least 1,
+  the third at least 0; `par()`'s integer settings read `NaN` and values
+  beyond R's integer range as R's `NA`); on a PNG device a glyph larger
+  than the whole page (`cex = 1e6`) tried to allocate its full pixel
+  bounds and aborted the process (now filled as a clipped path; beyond
+  tiny-skia's coordinate range nothing is drawn).
 
 
 ## [0.5.0] - 2026-10-31

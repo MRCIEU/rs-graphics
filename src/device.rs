@@ -2553,6 +2553,28 @@ pub(crate) fn check_lmitre(lmitre: Option<f64>) -> Result<(), Error> {
     }
 }
 
+/// R's check of [`par(lab)`](crate::par::Par::lab): the first two values
+/// positive integers and the third non-negative, none R's `NA`
+/// (`as.integer()` of `NaN` or a value beyond its range). Without it
+/// `GEPretty()` would be asked for 0 intervals, which is an internal panic.
+pub(crate) fn check_lab(lab: Option<[i32; 3]>) -> Result<(), Error> {
+    match lab {
+        Some([nx, ny, len])
+            if nx == crate::numbers::NA_INTEGER
+                || ny == crate::numbers::NA_INTEGER
+                || len == crate::numbers::NA_INTEGER
+                || nx <= 0
+                || ny <= 0
+                || len < 0 =>
+        {
+            Err(Error::invalid(
+                "invalid value specified for graphical parameter \"lab\"",
+            ))
+        }
+        _ => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::format_axis_labels;

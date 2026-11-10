@@ -1809,17 +1809,11 @@ pub(crate) enum ParGrid {
 }
 
 /// A pair of grid counts (`mfrow`, `mfcol`, `mfg`) as R's `as.integer()`
-/// reads them: fractions truncated. A negative or non-finite value becomes
-/// 0, which R's checks reject ("invalid value specified for graphical
-/// parameter").
+/// reads them: fractions truncated. A negative value, or one R's integer
+/// can't hold (`NaN`, beyond `i32::MAX`: R's `NA`), becomes 0, which R's
+/// checks reject ("invalid value specified for graphical parameter").
 fn grid_pair(p: impl Pair) -> (usize, usize) {
-    let count = |v: f64| {
-        if v.is_finite() && v >= 0.0 {
-            v as usize
-        } else {
-            0
-        }
-    };
+    let count = |v: f64| crate::numbers::as_integer(v).max(0) as usize;
     let (a, b) = p.into_pair();
     (count(a), count(b))
 }
@@ -1856,7 +1850,7 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `nrow` or
-    /// `ncol` is below 1 (or not finite).
+    /// `ncol` is below 1, not finite, or beyond R's integer range.
     ///
     /// [`par(cex)`]: crate::par::Par::cex
     pub fn mfrow(mut self, mfrow: impl Pair) -> Self {
@@ -1883,7 +1877,7 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `nrow` or
-    /// `ncol` is below 1 (or not finite).
+    /// `ncol` is below 1, not finite, or beyond R's integer range.
     pub fn mfcol(mut self, mfcol: impl Pair) -> Self {
         let (nrow, ncol) = grid_pair(mfcol);
         self.page.grid = Some(ParGrid::Cols(nrow, ncol));
@@ -1915,7 +1909,8 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `row`/`col` are below 1 or outside the current arrangement.
+    /// `row`/`col` are below 1 (or not R's integers), or outside the current
+    /// arrangement.
     pub fn mfg(mut self, mfg: impl Pair) -> Self {
         self.page.mfg = Some(grid_pair(mfg));
         self

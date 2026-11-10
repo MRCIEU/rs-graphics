@@ -519,7 +519,8 @@ macro_rules! par_options {
         }
 
         impl ParOptions {
-            /// R's checks of `usr`, made when the call is drawn or recorded.
+            /// R's checks of `usr`, `lmitre` and `lab`, made when the call is
+            /// drawn or recorded.
             pub(crate) fn check(&self) -> Result<(), $crate::error::Error> {
                 if let Some([x0, x1, y0, y1]) = self.usr {
                     let ok = ![x0, x1, y0, y1].iter().any(|v| v.is_nan()) && x0 != x1 && y0 != y1;
@@ -530,6 +531,7 @@ macro_rules! par_options {
                     }
                 }
                 $crate::device::check_lmitre(self.lmitre)?;
+                $crate::device::check_lab(self.lab)?;
                 Ok(())
             }
         }
@@ -717,7 +719,8 @@ par_options! {
         pub mgp: [f64; 3] => array [f64; 3],
         /// Approximate number of tick intervals on the x and y axes for
         /// default ticks; the third value (label length) is unused, as in R.
-        /// Default `c(5, 5, 7)`.
+        /// Default `c(5, 5, 7)`. The first two must be at least 1 and the
+        /// third at least 0, else `par()` is R's error.
         pub lab: [i32; 3] => int_array [i32; 3],
         /// First and last default x tick and the number of intervals between
         /// them. On a log axis the first two are powers of ten and the third

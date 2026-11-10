@@ -38,6 +38,21 @@ mod sealed {
     pub trait Sealed {}
 }
 
+/// R's `as.integer()` of one number: the fraction truncated; `NaN` or a
+/// value outside R's integer range (`|v| > i32::MAX`) is R's `NA_integer_`,
+/// which is `i32::MIN` in R too. Checks of integer settings
+/// ([`par(lab)`](crate::par::Par::lab), `mfrow`) reject it as R's do.
+pub(crate) const NA_INTEGER: i32 = i32::MIN;
+
+/// See [`NA_INTEGER`].
+pub(crate) fn as_integer(v: f64) -> i32 {
+    if v.is_nan() || v.abs() > i32::MAX as f64 {
+        NA_INTEGER
+    } else {
+        v as i32
+    }
+}
+
 /// A number type that converts to `f64`: `f64`, `f32` and the integer
 /// types.
 ///

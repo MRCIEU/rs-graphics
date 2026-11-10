@@ -192,6 +192,29 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
         ("par(mfg = c(1, 3))", "par", |d| {
             d.par().mfg([1, 3]).try_draw()
         }),
+        // Beyond R's integer range: `as.integer()` gives `NA` (a warning),
+        // which `par()` rejects. Our count would overflow instead.
+        ("par(mfrow = c(1e300, 2))", "par", |d| {
+            d.par().mfrow([1e300, 2.0]).try_draw()
+        }),
+        ("par(mfg = c(1e300, 1))", "par", |d| {
+            d.par().mfg([1e300, 1.0]).try_draw()
+        }),
+        ("par(lab = c(0, 5, 7))", "par", |d| {
+            d.par().lab([0, 5, 7]).try_draw()
+        }),
+        ("par(lab = c(5, 0.5, 7))", "par", |d| {
+            d.par().lab([5.0, 0.5, 7.0]).try_draw()
+        }),
+        ("par(lab = c(5, 5, -1))", "par", |d| {
+            d.par().lab([5, 5, -1]).try_draw()
+        }),
+        ("par(lab = c(5, 5, NA))", "par", |d| {
+            d.par().lab([5.0, 5.0, f64::NAN]).try_draw()
+        }),
+        ("par(lab = c(1e300, 5, 7))", "par", |d| {
+            d.par().lab([1e300, 5.0, 7.0]).try_draw()
+        }),
         (
             "plot(1:100, log = 'x'); par(xaxp = c(1, 100, 7))",
             "par",
