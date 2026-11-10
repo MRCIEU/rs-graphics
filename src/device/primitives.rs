@@ -635,16 +635,37 @@ crate::setters::options! {
     }
 }
 
+/// R's check in `plot.window()` (`C_plotwindow`): both limits finite,
+/// `xlim` first ("need finite 'xlim' values", then `'ylim'`). The error is
+/// `plot.window`'s whichever call made the window (`plot()`, `hist()`,
+/// `barplot()`, `boxplot()`), as in R; the high-level calls' pure limit
+/// helpers run it too, so a `Figure` fails when recording.
+pub(crate) fn check_window_limits(xlim: (f64, f64), ylim: (f64, f64)) -> Result<(), Error> {
+    for (name, (lo, hi)) in [("xlim", xlim), ("ylim", ylim)] {
+        if !(lo.is_finite() && hi.is_finite()) {
+            return Err(
+                Error::invalid(format!("need finite '{name}' values")).in_call("plot.window")
+            );
+        }
+    }
+    Ok(())
+}
+
 impl<B: Backend> Device<B> {
     /// Draws R's `plot.window()`; the public entry is
     /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window), whose docs
     /// describe it.
+    ///
+    /// # Errors
+    ///
+    /// R's, if a limit isn't finite ([`check_window_limits`]).
     pub(crate) fn plot_window_impl(
         &mut self,
         xlim: (f64, f64),
         ylim: (f64, f64),
         opts: &PlotWindowOptions,
-    ) {
+    ) -> Result<(), Error> {
+        check_window_limits(xlim, ylim)?;
         // R's inline `xaxs`/`yaxs`/`lab` hold for this call only; the
         // `xaxp`/`yaxp` it sets stay.
         let mut dev = self.par_scope(|now, saved| {
@@ -662,6 +683,7 @@ impl<B: Backend> Device<B> {
             dev.par.lab = lab;
         }
         dev.plot_window_draw(xlim, ylim, opts);
+        Ok(())
     }
 
     fn plot_window_draw(&mut self, xlim: (f64, f64), ylim: (f64, f64), opts: &PlotWindowOptions) {

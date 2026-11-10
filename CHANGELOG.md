@@ -60,6 +60,16 @@ come with a table of old and new calls.
 
 - `mtext()` recycles `side` and `outer` over the labels, and `barplot()`
   recycles `border` over the bars, as R does.
+- `plot.window()` rejects non-finite limits with R's `need finite 'xlim'
+  values` (then `'ylim'`), whichever call made the window: `plot()` of
+  no data or all-`NaN` data (R's `range()` is `(Inf, -Inf)`), or with a
+  `NaN`/`Inf` `xlim`/`ylim`; `hist()`, `barplot()` and `boxplot()` with
+  such limits, `barplot()` of no finite height or with `space = NaN`,
+  `boxplot()` of no finite data. `hist()` of no finite data is R's
+  `invalid number of 'breaks'` (Sturges) or, with a count of breaks, an
+  error where R's own message is the quirk `character(0)` (ours:
+  `hist.default: pretty() error, breaks=`); with `"FD"` it no longer
+  panics. Before, these drew an empty `(0, 1)` window.
 - `par()` checks its values as R's `par()` does (`par-common.c`), each
   with R's `invalid value specified for graphical parameter "<name>"`:
   `adj` in 0 to 1; `cex` (and `cex.axis`/`cex.lab`/`cex.main`/`cex.sub`),

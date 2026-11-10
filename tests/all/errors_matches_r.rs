@@ -30,6 +30,94 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
             g.text().x(1).y(1).labels("a").pos(5).try_draw()
         }),
         ("pie(c(1, -1))", "pie", |g| g.pie().x([1, -1]).try_draw()),
+        // `plot.window()`'s finite limits, from the data's range or the
+        // given limits, whichever call made the window.
+        ("plot(numeric(0))", "plot.window", |g| {
+            g.plot().x([0.0; 0]).try_draw()
+        }),
+        ("plot(c(NA_real_, NA_real_))", "plot.window", |g| {
+            g.plot().x([f64::NAN, f64::NAN]).try_draw()
+        }),
+        ("plot(1:2, xlim = c(NA, 1))", "plot.window", |g| {
+            g.plot().x([1, 2]).xlim([f64::NAN, 1.0]).try_draw()
+        }),
+        ("plot(1:2, ylim = c(0, Inf))", "plot.window", |g| {
+            g.plot().x([1, 2]).ylim([0.0, f64::INFINITY]).try_draw()
+        }),
+        ("plot.window(c(NA, 1), c(0, 1))", "plot.window", |g| {
+            g.plot_window()
+                .xlim([f64::NAN, 1.0])
+                .ylim([0, 1])
+                .try_draw()
+        }),
+        ("plot.window(c(0, 1), c(0, NA))", "plot.window", |g| {
+            g.plot_window()
+                .xlim([0, 1])
+                .ylim([0.0, f64::NAN])
+                .try_draw()
+        }),
+        ("hist(numeric(0))", "hist", |g| {
+            g.hist().x([0.0; 0]).try_draw().map(drop)
+        }),
+        ("hist(c(NA_real_, NA_real_))", "hist", |g| {
+            g.hist().x([f64::NAN, f64::NAN]).try_draw().map(drop)
+        }),
+        ("hist(1:3, ylim = c(0, NA))", "plot.window", |g| {
+            g.hist()
+                .x([1, 2, 3])
+                .ylim([0.0, f64::NAN])
+                .try_draw()
+                .map(drop)
+        }),
+        ("barplot(c(NA_real_, NA_real_))", "plot.window", |g| {
+            g.barplot()
+                .height([f64::NAN, f64::NAN])
+                .try_draw()
+                .map(drop)
+        }),
+        ("barplot(c(1, Inf))", "plot.window", |g| {
+            g.barplot()
+                .height([1.0, f64::INFINITY])
+                .try_draw()
+                .map(drop)
+        }),
+        ("barplot(1:2, space = NA)", "plot.window", |g| {
+            g.barplot()
+                .height([1, 2])
+                .space(f64::NAN)
+                .try_draw()
+                .map(drop)
+        }),
+        (
+            "barplot(c(1, 2), horiz = TRUE, xlim = c(0, NA))",
+            "plot.window",
+            |g| {
+                g.barplot()
+                    .height([1, 2])
+                    .horiz(true)
+                    .xlim([0.0, f64::NAN])
+                    .try_draw()
+                    .map(drop)
+            },
+        ),
+        ("boxplot(numeric(0))", "plot.window", |g| {
+            g.boxplot().x([0.0; 0]).try_draw().map(drop)
+        }),
+        ("boxplot(c(NA_real_, NA_real_))", "plot.window", |g| {
+            g.boxplot().x([f64::NAN, f64::NAN]).try_draw().map(drop)
+        }),
+        (
+            "boxplot(1:3, horizontal = TRUE, ylim = c(NA, 1))",
+            "plot.window",
+            |g| {
+                g.boxplot()
+                    .x([1, 2, 3])
+                    .horizontal(true)
+                    .ylim([f64::NAN, 1.0])
+                    .try_draw()
+                    .map(drop)
+            },
+        ),
         // `par()`'s value checks (R's `par-common.c` and `par.c`).
         ("par(adj = 1.5)", "par", |g| g.par().adj(1.5).try_draw()),
         ("par(adj = NA)", "par", |g| g.par().adj(f64::NAN).try_draw()),

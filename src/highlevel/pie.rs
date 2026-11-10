@@ -173,7 +173,7 @@ impl<B: Backend> Device<B> {
             asp: Some(1.0),
             ..PlotWindowOptions::default()
         };
-        self.plot_window_impl(xlim, ylim, &window);
+        self.plot_window_impl(xlim, ylim, &window)?;
 
         let twopi = if opts.clockwise { -2.0 * PI } else { 2.0 * PI };
         let init = opts

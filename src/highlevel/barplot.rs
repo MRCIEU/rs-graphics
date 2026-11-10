@@ -43,7 +43,7 @@ use crate::backend::Backend;
 use crate::color::{Color, ColorSpec, gray_colors};
 use crate::device::{
     AxisLabels, AxisOptions, Device, LegendOptions, LegendPos, PlotWindowOptions, RectOptions,
-    TitleOptions,
+    TitleOptions, check_window_limits,
 };
 use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
@@ -675,6 +675,11 @@ pub(crate) fn bar_layout(heights: &BarHeights, opts: &BarplotOptions) -> Result<
     } else {
         (opts.xlim.unwrap_or(cat_lim), opts.ylim.unwrap_or(val_lim))
     };
+    // `plot.window()`'s check, unless `add` (no window): no finite height
+    // or a `NaN` `space` gives R's "need finite 'ylim'/'xlim' values".
+    if !opts.add {
+        check_window_limits(xlim, ylim)?;
+    }
 
     let names_at = opts
         .names_arg
@@ -762,7 +767,7 @@ impl<B: Backend> Device<B> {
                 log: opts.log,
                 ..PlotWindowOptions::default()
             };
-            self.plot_window_impl(xlim, ylim, &window);
+            self.plot_window_impl(xlim, ylim, &window)?;
         }
         crate::extra::panel_bg(self, &opts.extra)?;
 

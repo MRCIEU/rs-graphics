@@ -44,11 +44,15 @@ pub use pie::PieOptions;
 pub(crate) use pie::check_pie;
 pub use plot::{PlotOptions, PlotType};
 
+/// A window's limits, `(xlim, ylim)`, in `plot.window()`'s order.
+pub(crate) type Window = ((f64, f64), (f64, f64));
+
 /// Compute the finite min/max of a data slice, matching R's `range(x[is.finite(x)])`
-/// idiom used throughout the plotting defaults. Falls back to `(0.0, 1.0)` for
-/// empty/all-non-finite input. A single repeated value gives the degenerate
-/// `(v, v)`, as R's `range()` does; `Graphics::plot_window` (`GScale()`) widens
-/// it, so no padding is done here.
+/// idiom used throughout the plotting defaults. No finite value gives
+/// `(Inf, -Inf)`, as R's `range()` does (with a warning there), which
+/// `plot.window()` then rejects ("need finite 'xlim' values"). A single
+/// repeated value gives the degenerate `(v, v)`, as R's `range()` does;
+/// `Graphics::plot_window` (`GScale()`) widens it, so no padding is done here.
 pub(crate) fn data_range(xs: &[f64]) -> (f64, f64) {
     let mut lo = f64::INFINITY;
     let mut hi = f64::NEG_INFINITY;
@@ -58,7 +62,7 @@ pub(crate) fn data_range(xs: &[f64]) -> (f64, f64) {
             hi = hi.max(v);
         }
     }
-    if lo > hi { (0.0, 1.0) } else { (lo, hi) }
+    (lo, hi)
 }
 
 /// R's inline axis parameters that a high-level plot passes through its

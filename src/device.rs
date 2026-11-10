@@ -68,11 +68,11 @@ pub use legend::{LegendKeyword, LegendLayout, LegendOptions, LegendPos};
 pub use mtext::MtextOptions;
 pub(crate) use mtext::check_mtext;
 pub use open::{DeviceBuilder, Units};
-pub(crate) use primitives::check_text;
 pub use primitives::{
     Adj, AdjElement, ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions,
     RectOptions, SegmentsOptions, TextOptions, XyOptions,
 };
+pub(crate) use primitives::{check_text, check_window_limits};
 
 /// A side of the plot, figure or page.
 ///
@@ -2655,7 +2655,8 @@ mod tests {
         dev.plot_new_impl().unwrap();
         assert!(!dev.xlog() && !dev.ylog());
         let log_x = PlotWindowOptions::default().log("x");
-        dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x);
+        dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x)
+            .unwrap();
         assert!(dev.xlog() && !dev.ylog());
         for (x, y) in [(1.0, -2.0), (31.6, 0.25), (1000.0, 3.0)] {
             let (x2, y2) = dev.inches_to_data(dev.data_to_inches(x, y));

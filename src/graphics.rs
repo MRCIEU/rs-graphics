@@ -234,7 +234,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing (`argument "x" is missing, with no default`) or `x` and `y` have
-    /// different lengths ("'x' and 'y' lengths differ"), with R's messages.
+    /// different lengths ("'x' and 'y' lengths differ"), with R's messages;
+    /// and, as `plot.window()`'s error, if a limit isn't finite: a given
+    /// `xlim`/`ylim` with a `NaN` or infinity, or no finite data to take
+    /// the range of ("need finite 'xlim' values", then `'ylim'`).
     fn plot(&mut self) -> PlotCall<'_, Self> {
         PlotCall::start(self)
     }
@@ -266,7 +269,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing, or with R's errors for invalid `breaks` (for example edges that
-    /// don't span the data).
+    /// don't span the data; no finite data at all is "invalid number of
+    /// 'breaks'"), or, as `plot.window()`'s error, if a given `xlim`/`ylim`
+    /// isn't finite ("need finite 'xlim' values").
     fn hist(&mut self) -> HistCall<'_, Self> {
         HistCall::start(self)
     }
@@ -301,8 +306,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `height`
     /// is missing or empty, or a matrix's columns are empty or of different
     /// lengths; if `names_arg` has neither one name per bar nor (for `beside`) one
-    /// per column; and, with a log value axis, if any `height + offset`, or a
-    /// given limit of a log axis, is <= 0.
+    /// per column; with a log value axis, if any `height + offset`, or a
+    /// given limit of a log axis, is <= 0; and, as `plot.window()`'s error, if
+    /// a limit isn't finite: a given `xlim`/`ylim` with a `NaN` or infinity,
+    /// no finite height, or a `NaN` `space` ("need finite 'ylim' values";
+    /// `'xlim'` for the category axis, or when `horiz`).
     fn barplot(&mut self) -> BarplotCall<'_, Self> {
         BarplotCall::start(self)
     }
@@ -337,7 +345,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing or has no groups, or `at` or `width` doesn't have one value per
-    /// group (or a width isn't positive).
+    /// group (or a width isn't positive); and, as `plot.window()`'s error, if
+    /// a limit isn't finite: a given `xlim`/`ylim` with a `NaN` or infinity,
+    /// or no finite value in any group ("need finite 'ylim' values"; the
+    /// names swap when `horizontal`, as R's `bxp()` passes them).
     fn boxplot(&mut self) -> BoxplotCall<'_, Self> {
         BoxplotCall::start(self)
     }
@@ -411,7 +422,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `xlim` or
-    /// `ylim` is missing (R's message).
+    /// `ylim` is missing, or has a `NaN` or infinity ("need finite 'xlim'
+    /// values", then `'ylim'`), with R's messages.
     ///
     /// [`par(xaxs)`]: crate::par::Par::xaxs
     /// [`par(yaxs)`]: crate::par::Par::yaxs
@@ -1069,10 +1081,7 @@ impl<B: Backend> Graphics for Device<B> {
         ylim: (f64, f64),
         opts: PlotWindowOptions,
     ) -> Result<(), Error> {
-        self.run(|d| {
-            d.plot_window_impl(xlim, ylim, &opts);
-            Ok(())
-        })
+        self.run(|d| d.plot_window_impl(xlim, ylim, &opts))
     }
     fn emit_points(&mut self, x: &[f64], y: &[f64], opts: XyOptions) -> Result<(), Error> {
         self.run(|d| d.points_impl(x, y, &opts))
@@ -1365,6 +1374,7 @@ call!(
     },
     |t, o| {
         let (x, y, index) = xy_coords(x, y, false)?;
+        crate::highlevel::plot::plot_window_limits(&x, &y, &o)?;
         let mut o = o;
         if index && o.xlab.is_none() {
             o.xlab = Some("Index".into());
@@ -1451,7 +1461,11 @@ call!(
     /// See [`Graphics::plot_window`] for the arguments and an example.
     PlotWindowCall("plot.window"), PlotWindowOptions => (),
     args { xlim: (f64, f64) = (manual), ylim: (f64, f64) = (manual) },
-    |t, o| { t.emit_plot_window(required(xlim, "xlim")?, required(ylim, "ylim")?, o) }
+    |t, o| {
+        let (xlim, ylim) = (required(xlim, "xlim")?, required(ylim, "ylim")?);
+        crate::device::check_window_limits(xlim, ylim)?;
+        t.emit_plot_window(xlim, ylim, o)
+    }
 );
 
 impl<G: Graphics> PlotWindowCall<'_, G> {

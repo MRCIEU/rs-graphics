@@ -19,7 +19,10 @@
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
-use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions};
+use crate::device::{
+    AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions,
+    check_window_limits,
+};
 use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
@@ -27,7 +30,7 @@ use crate::par::{AxisStyle, AxisType, Bty, Log, Xpd};
 use crate::plotmath::Label;
 use crate::recording::Figure;
 
-use super::{InlineAxis, data_range};
+use super::{InlineAxis, Window, data_range};
 
 /// What a plot draws for its points: points, lines, both, vertical lines,
 /// stair steps or nothing.
@@ -402,6 +405,30 @@ impl Default for PlotOptions {
     }
 }
 
+/// `plot()`'s window limits: `xlim`/`ylim`, else the data's range (on a log
+/// axis of the positive values only: R's `xy.coords()` makes the others
+/// `NA`, which `points()`/`lines()` then skip), checked as `plot.window()`
+/// does ([`check_window_limits`]), so no data or all-`NaN` data is R's
+/// "need finite 'xlim' values".
+pub(crate) fn plot_window_limits(
+    x: &[f64],
+    y: &[f64],
+    opts: &PlotOptions,
+) -> Result<Window, Error> {
+    let range = |v: &[f64], log: bool| {
+        if log {
+            let positive: Vec<f64> = v.iter().copied().filter(|&a| a > 0.0).collect();
+            data_range(&positive)
+        } else {
+            data_range(v)
+        }
+    };
+    let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.log.x));
+    let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.log.y));
+    check_window_limits(xlim, ylim)?;
+    Ok((xlim, ylim))
+}
+
 impl<B: Backend> Device<B> {
     /// Draws R's `plot()`; the public entry is
     /// [`Graphics::plot`](crate::graphics::Graphics::plot), whose docs
@@ -412,18 +439,7 @@ impl<B: Backend> Device<B> {
         y: &[f64],
         opts: &PlotOptions,
     ) -> Result<(), Error> {
-        // On a log axis, values <= 0 are dropped (R's `xy.coords()` makes
-        // them `NA`); `points()`/`lines()` then skip them.
-        let range = |v: &[f64], log: bool| {
-            if log {
-                let positive: Vec<f64> = v.iter().copied().filter(|&a| a > 0.0).collect();
-                data_range(&positive)
-            } else {
-                data_range(v)
-            }
-        };
-        let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.log.x));
-        let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.log.y));
+        let (xlim, ylim) = plot_window_limits(x, y, opts)?;
 
         self.plot_new_impl()?;
         // `localWindow(xlim, ylim, log, asp, ...)`.
@@ -435,7 +451,7 @@ impl<B: Backend> Device<B> {
             yaxs: opts.yaxs,
             lab: opts.lab,
         };
-        self.plot_window_impl(xlim, ylim, &window);
+        self.plot_window_impl(xlim, ylim, &window)?;
         crate::extra::panel_bg(self, &opts.extra)?;
         if let Some(panel) = &opts.panel_first {
             self.try_add_figure(panel)?;

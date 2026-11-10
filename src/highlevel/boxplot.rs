@@ -24,7 +24,7 @@ use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
 use crate::device::{
     AxisLabels, AxisOptions, BoxOptions, Device, PlotWindowOptions, PolygonOptions,
-    SegmentsOptions, TitleOptions, XyOptions,
+    SegmentsOptions, TitleOptions, XyOptions, check_window_limits,
 };
 use crate::error::Error;
 use crate::lty::LineType;
@@ -33,7 +33,7 @@ use crate::par::{AxisType, Log};
 use crate::plotmath::Label;
 use crate::recycle::nth;
 
-use super::InlineAxis;
+use super::{InlineAxis, Window};
 
 /// Tukey's five-number summary (`fivenum()` in R's `stats` package):
 /// `[min, lower hinge, median, upper hinge, max]`. This is *not* the same
@@ -525,6 +525,51 @@ pub(crate) fn boxplot_all_stats(
         .collect())
 }
 
+/// `bxp()`'s window, in `plot.window()`'s order (swapped when
+/// `horizontal`, as `bxp()` calls it): the value limits are `ylim`, else
+/// the range of the finite statistics drawn (the five, the outliers if
+/// `outline`, the notches if `notch`); the position limits `xlim`, else
+/// `range(at) + c(-0.5, 0.5)`. Checked as `plot.window()` does unless
+/// `add` ([`check_window_limits`]): no finite statistic (no data, or all
+/// `NaN`) is R's "need finite 'ylim' values".
+pub(crate) fn boxplot_window(
+    stats: &[BoxStats],
+    at: &[f64],
+    opts: &BoxplotOptions,
+) -> Result<Window, Error> {
+    let ylim = opts.ylim.unwrap_or_else(|| {
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for s in stats {
+            let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
+            let out = if opts.outline { &s.outliers[..] } else { &[] };
+            let conf = if opts.notch { s.conf.to_vec() } else { vec![] };
+            for &v in five.iter().chain(out).chain(&conf) {
+                if v.is_finite() {
+                    lo = lo.min(v);
+                    hi = hi.max(v);
+                }
+            }
+        }
+        (lo, hi)
+    });
+    let xlim = opts.xlim.unwrap_or_else(|| {
+        let finite = at.iter().copied().filter(|v| v.is_finite());
+        let lo = finite.clone().fold(f64::INFINITY, f64::min);
+        let hi = finite.fold(f64::NEG_INFINITY, f64::max);
+        (lo - 0.5, hi + 0.5)
+    });
+    let window = if opts.horizontal {
+        (ylim, xlim)
+    } else {
+        (xlim, ylim)
+    };
+    if !opts.add {
+        check_window_limits(window.0, window.1)?;
+    }
+    Ok(window)
+}
+
 impl<B: Backend> Device<B> {
     /// Draws R's `boxplot()`; the public entry is
     /// [`Graphics::boxplot`](crate::graphics::Graphics::boxplot), whose docs
@@ -541,40 +586,15 @@ impl<B: Backend> Device<B> {
             .clone()
             .unwrap_or_else(|| (1..=n).map(|i| i as f64).collect());
 
-        let ylim = opts.ylim.unwrap_or_else(|| {
-            let mut lo = f64::INFINITY;
-            let mut hi = f64::NEG_INFINITY;
-            for s in &stats {
-                let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
-                let out = if opts.outline { &s.outliers[..] } else { &[] };
-                let conf = if opts.notch { s.conf.to_vec() } else { vec![] };
-                for &v in five.iter().chain(out).chain(&conf) {
-                    if v.is_finite() {
-                        lo = lo.min(v);
-                        hi = hi.max(v);
-                    }
-                }
-            }
-            if lo <= hi { (lo, hi) } else { (0.0, 1.0) }
-        });
+        let (xlim, ylim) = boxplot_window(&stats, &at, opts)?;
 
         if !opts.add {
-            let xlim = opts.xlim.unwrap_or_else(|| {
-                let finite = at.iter().copied().filter(|v| v.is_finite());
-                let lo = finite.clone().fold(f64::INFINITY, f64::min);
-                let hi = finite.fold(f64::NEG_INFINITY, f64::max);
-                (lo - 0.5, hi + 0.5)
-            });
             self.plot_new_impl()?;
             let window = PlotWindowOptions {
                 log: opts.log,
                 ..PlotWindowOptions::default()
             };
-            if opts.horizontal {
-                self.plot_window_impl(ylim, xlim, &window);
-            } else {
-                self.plot_window_impl(xlim, ylim, &window);
-            }
+            self.plot_window_impl(xlim, ylim, &window)?;
         }
         crate::extra::panel_bg(self, &opts.extra)?;
         // Whether the position axis is logarithmic (from the device, as R's

@@ -107,8 +107,8 @@ use crate::device::{
 use crate::error::Error;
 use crate::graphics::{Graphics, ParPage};
 use crate::highlevel::barplot::bar_layout;
-use crate::highlevel::boxplot::boxplot_all_stats;
-use crate::highlevel::hist::hist_bins;
+use crate::highlevel::boxplot::{boxplot_all_stats, boxplot_window};
+use crate::highlevel::hist::{hist_bins, hist_heights, hist_window};
 use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions,
@@ -283,6 +283,9 @@ impl Graphics for Figure {
     }
     fn emit_hist(&mut self, x: &[f64], opts: HistOptions) -> Result<HistResult, Error> {
         let result = hist_bins(x, &opts)?;
+        if opts.plot.unwrap_or(true) && !opts.add {
+            hist_window(&result.breaks, &hist_heights(&result, &opts), &opts)?;
+        }
         self.calls.push(Call::Hist(x.to_vec(), opts));
         Ok(result)
     }
@@ -301,6 +304,12 @@ impl Graphics for Figure {
         opts: BoxplotOptions,
     ) -> Result<Vec<BoxStats>, Error> {
         let stats = boxplot_all_stats(groups, &opts)?;
+        let n = groups.len();
+        let at: Vec<f64> = opts
+            .at
+            .clone()
+            .unwrap_or_else(|| (1..=n).map(|i| i as f64).collect());
+        boxplot_window(&stats, &at, &opts)?;
         self.calls
             .push(Call::Boxplot(groups.to_vec(), Box::new(opts)));
         Ok(stats)
