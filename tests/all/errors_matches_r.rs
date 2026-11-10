@@ -30,6 +30,54 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
             g.text().x(1).y(1).labels("a").pos(5).try_draw()
         }),
         ("pie(c(1, -1))", "pie", |g| g.pie().x([1, -1]).try_draw()),
+        ("axis(1, at = c(NA, Inf))", "axis", |g| {
+            g.axis()
+                .side(1)
+                .at([f64::NAN, f64::INFINITY])
+                .try_draw()
+                .map(drop)
+        }),
+        ("arrows(1, 1, 2, 2, length = -1)", "arrows", |g| {
+            g.arrows().x0(1).y0(1).x1(2).y1(2).length(-1).try_draw()
+        }),
+        ("arrows(1, 1, 2, 2, length = NA)", "arrows", |g| {
+            g.arrows()
+                .x0(1)
+                .y0(1)
+                .x1(2)
+                .y1(2)
+                .length(f64::NAN)
+                .try_draw()
+        }),
+        ("arrows(1, 1, 2, 2, angle = Inf)", "arrows", |g| {
+            g.arrows()
+                .x0(1)
+                .y0(1)
+                .x1(2)
+                .y1(2)
+                .angle(f64::INFINITY)
+                .try_draw()
+        }),
+        ("arrows(1, 1, 2, 2, code = 4)", "arrows", |g| {
+            g.arrows().x0(1).y0(1).x1(2).y1(2).code(4).try_draw()
+        }),
+        ("legend('top', c('a', 'b'), ncol = 0)", "legend", |g| {
+            g.legend()
+                .pos("top")
+                .labels(["a", "b"])
+                .ncol(0)
+                .try_draw()
+                .map(drop)
+        }),
+        ("boxplot(1:5, range = -0.5)", "boxplot", |g| {
+            g.boxplot().x(1..=5).range(-0.5).try_draw().map(drop)
+        }),
+        ("text(1, 1, 'a', srt = NA)", "text", |g| {
+            g.text().x(1).y(1).labels("a").srt(f64::NAN).try_draw()
+        }),
+        ("text(1, 1, 'a', srt = Inf)", "text", |g| {
+            g.text().x(1).y(1).labels("a").srt(f64::INFINITY).try_draw()
+        }),
         // `plot.window()`'s finite limits, from the data's range or the
         // given limits, whichever call made the window.
         ("plot(numeric(0))", "plot.window", |g| {

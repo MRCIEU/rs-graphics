@@ -143,13 +143,15 @@ crate::setters::options! {
     /// Arguments of `arrows()`.
     #[derive(Clone, Debug, Default)]
     pub struct ArrowsOptions => [ArrowsCall] {
-        /// Length of the edges of each head, in inches. `None`: 0.25.
+        /// Length of the edges of each head, in inches; negative or not
+        /// finite is R's error. `None`: 0.25.
         pub length: Option<f64> => number f64,
         /// Angle between the shaft and each edge of the head, in degrees (90
-        /// gives flat caps, as for error bars). `None`: 30.
+        /// gives flat caps, as for error bars); not finite is R's error.
+        /// `None`: 30.
         pub angle: Option<f64> => number f64,
-        /// Where the heads go: at the start (1), the end (2) or both ends
-        /// (3). `None`: 2.
+        /// Where the heads go: none (0), at the start (1), the end (2) or
+        /// both ends (3); above 3 is R's error. `None`: 2.
         pub code: Option<u8> => option u8,
         /// Arrow colours, recycled per arrow. Empty: [`par(fg)`], as in R.
         ///
@@ -450,8 +452,8 @@ crate::setters::options! {
         ///
         /// [`par(adj)`]: crate::par::Par::adj
         pub adj: Option<Adj> => option Adj,
-        /// Rotation in degrees, anticlockwise. `None`: [`par(srt)`] (0 by
-        /// default).
+        /// Rotation in degrees, anticlockwise; not finite is R's error.
+        /// `None`: [`par(srt)`] (0 by default).
         ///
         /// [`par(srt)`]: crate::par::Par::srt
         pub srt: Option<f64> => number f64,
@@ -1213,6 +1215,25 @@ impl<B: Backend> Device<B> {
 pub(crate) fn check_text(opts: &TextOptions) -> Result<(), Error> {
     if !opts.pos.iter().all(|p| (1..=4).contains(p)) {
         return Err(Error::invalid("invalid 'pos' value"));
+    }
+    // An inline `srt` goes through R's `par()` checks (`par-common.c`).
+    if opts.srt.is_some_and(|s| !s.is_finite()) {
+        return Err(crate::device::par_error("srt"));
+    }
+    Ok(())
+}
+
+/// R's checks of `arrows()`'s head (`C_arrows`): `length` finite and
+/// non-negative, `angle` finite, `code` 0 to 3.
+pub(crate) fn check_arrows(opts: &ArrowsOptions) -> Result<(), Error> {
+    if opts.length.is_some_and(|l| !l.is_finite() || l < 0.0) {
+        return Err(Error::invalid("invalid arrow head length"));
+    }
+    if opts.angle.is_some_and(|a| !a.is_finite()) {
+        return Err(Error::invalid("invalid arrow head angle"));
+    }
+    if opts.code.is_some_and(|c| c > 3) {
+        return Err(Error::invalid("invalid arrow head specification"));
     }
     Ok(())
 }

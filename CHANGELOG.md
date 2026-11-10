@@ -60,6 +60,13 @@ come with a table of old and new calls.
 
 - `mtext()` recycles `side` and `outer` over the labels, and `barplot()`
   recycles `border` over the bars, as R does.
+- Five more of R's argument errors, with R's messages: `axis()` with no
+  finite `at` ("no locations are finite"); `arrows()` with a negative or
+  non-finite `length` ("invalid arrow head length"), a non-finite `angle`
+  ("invalid arrow head angle") or a `code` above 3 ("invalid arrow head
+  specification"); `legend(ncol = 0)` (R's "invalid 'times' argument");
+  `boxplot()` with a negative `range` ("'coef' must not be negative");
+  `text()` with a non-finite `srt` (R's `par(srt)` error).
 - `plot.window()` rejects non-finite limits with R's `need finite 'xlim'
   values` (then `'ylim'`), whichever call made the window: `plot()` of
   no data or all-`NaN` data (R's `range()` is `(Inf, -Inf)`), or with a

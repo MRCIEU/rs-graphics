@@ -344,8 +344,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
-    /// missing or has no groups, or `at` or `width` doesn't have one value per
-    /// group (or a width isn't positive); and, as `plot.window()`'s error, if
+    /// missing or has no groups, `at` or `width` doesn't have one value per
+    /// group (or a width isn't positive), or `range` is negative ("'coef'
+    /// must not be negative"); and, as `plot.window()`'s error, if
     /// a limit isn't finite: a given `xlim`/`ylim` with a `NaN` or infinity,
     /// or no finite value in any group ("need finite 'ylim' values"; the
     /// names swap when `horizontal`, as R's `bxp()` passes them).
@@ -545,7 +546,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x0` or
-    /// `y0` is missing (R's message).
+    /// `y0` is missing, `length` is negative or not finite ("invalid arrow
+    /// head length"), `angle` isn't finite ("invalid arrow head angle"), or
+    /// `code` is above 3 ("invalid arrow head specification"), with R's
+    /// messages.
     fn arrows(&mut self) -> ArrowsCall<'_, Self> {
         ArrowsCall::start(self)
     }
@@ -642,7 +646,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
-    /// missing (R's message) or a `pos` isn't 1 to 4 ("invalid 'pos' value").
+    /// missing (R's message), a `pos` isn't 1 to 4 ("invalid 'pos' value"),
+    /// or `srt` isn't finite (R's [`par(srt)`](crate::par::Par::srt) error).
     ///
     /// [`par(lheight)`]: crate::par::Par::lheight
     /// [`par(srt)`]: crate::par::Par::srt
@@ -712,7 +717,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `side` is missing or not 1 to 4, `labels` is given without `at` or
+    /// `side` is missing or not 1 to 4, no value of a given `at` is finite
+    /// ("no locations are finite"), `labels` is given without `at` or
     /// their lengths differ; on a log axis, if the code (third value) of the
     /// `xaxp`/`yaxp` it uses isn't 1, 2 or 3; and if a given `xaxp` or
     /// `yaxp` for a log direction has a code of 0 or above 4, whichever the
@@ -782,7 +788,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `pos`
     /// or `labels` is missing, `pos` is a string that isn't one of the nine
     /// keywords (or a unique prefix of one), there are no labels ("'legend' is of length
-    /// 0"), or a `text_width` is negative or has `NaN` among several values.
+    /// 0"), `ncol` is 0 (R's "invalid 'times' argument"), or a `text_width`
+    /// is negative or has `NaN` among several values.
     fn legend(&mut self) -> LegendCall<'_, Self> {
         LegendCall::start(self)
     }
@@ -1574,6 +1581,7 @@ call!(
     },
     |t, o| {
         let [x0, y0, x1, y1] = segment_ends(x0, y0, x1, y1)?;
+        crate::device::check_arrows(&o)?;
         t.emit_arrows(&x0, &y0, &x1, &y1, o)
     }
 );

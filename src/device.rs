@@ -72,7 +72,7 @@ pub use primitives::{
     Adj, AdjElement, ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions,
     RectOptions, SegmentsOptions, TextOptions, XyOptions,
 };
-pub(crate) use primitives::{check_text, check_window_limits};
+pub(crate) use primitives::{check_arrows, check_text, check_window_limits};
 
 /// A side of the plot, figure or page.
 ///

@@ -355,9 +355,9 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `pars` (use its ele
 | `y0` | `.y0()` | The y coordinates of the starts. |
 | `x1` | `.x1()` | The x coordinates of the ends. |
 | `y1` | `.y1()` | The y coordinates of the ends. |
-| `length` | `.length()` | Length of the edges of each head, in inches. |
-| `angle` | `.angle()` | Angle between the shaft and each edge of the head, in degrees (90 gives flat caps, as for error bars). |
-| `code` | `.code()` | Where the heads go: at the start (1), the end (2) or both ends (3). |
+| `length` | `.length()` | Length of the edges of each head, in inches; negative or not finite is R's error. |
+| `angle` | `.angle()` | Angle between the shaft and each edge of the head, in degrees (90 gives flat caps, as for error bars); not finite is R's error. |
+| `code` | `.code()` | Where the heads go: none (0), at the start (1), the end (2) or both ends (3); above 3 is R's error. |
 | `col` | `.col()` | Arrow colours, recycled per arrow. |
 | `lty` | `.lty()` | Line types, recycled per arrow. |
 | `lwd` | `.lwd()` | Line widths, recycled per arrow. |
@@ -422,7 +422,7 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `pars` (use its ele
 | `cex` | `.cex()` | Text sizes, relative to `par(cex)`, recycled per label. |
 | `col` | `.col()` | Text colours, recycled per label. |
 | `font` | `.font()` | Fonts, recycled per label: R's numbers 1 to 5, names or `FontFace` values. |
-| `srt` | `.srt()` | Rotation in degrees, anticlockwise. |
+| `srt` | `.srt()` | Rotation in degrees, anticlockwise; not finite is R's error. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
 
 R's arguments not available: `vfont`.
@@ -450,7 +450,7 @@ R's arguments not available: `vfont`.
 | R | Rust | |
 |---|---|---|
 | `side` | `.side()` | The side to draw on: a `Side`, or its number (1 below, 2 left, 3 above, 4 right); another number is an error of the call. |
-| `at` | `.at()` | Tick positions, in user coordinates (data units, also on a log axis). |
+| `at` | `.at()` | Tick positions, in user coordinates (data units, also on a log axis); a `NaN` is skipped, but none finite is R's error. |
 | `labels` | `.labels()` | The tick labels (`AxisLabels`): `true` (the default), the tick positions formatted like R's `formatReal()`; `false`, none; or one label per tick in `at` (which they require, as many; otherwise an error of the call), text or plotmath expressions (`"a"`, `Label::math("10^5")`). |
 | `tick` | `.tick()` | Whether to draw the axis line and tick marks. |
 | `line` | `.line()` | Distance of the axis line from the plot region (inner region for `outer`), in margin lines; the labels sit `mgp[1]` lines beyond it. |
@@ -533,7 +533,7 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `text.font` | `.text_font()` | Fonts of the labels (also for measuring them). |
 | `merge` | `.merge()` | Whether to draw each point in the middle of its line. |
 | `plot` | `.plot()` | Whether to draw: `false` works out the layout (returned as usual) but draws nothing. |
-| `ncol` | `.ncol()` | Number of columns. |
+| `ncol` | `.ncol()` | Number of columns; 0 is R's error. |
 | `horiz` | `.horiz()` | Whether to lay the entries out in one row. |
 | `title` | `.title()` | Text or a plotmath expression above the entries. |
 | `inset` | `.inset()` | Inset from the plot region's edges for keyword positions, as fractions of the plot region, `[x, y]` or one number for both. |

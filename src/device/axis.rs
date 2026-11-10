@@ -137,8 +137,9 @@ crate::setters::options! {
     #[derive(Clone, Debug)]
     pub struct AxisOptions => [AxisCall] {
         /// Tick positions, in user coordinates (data units, also on a log
-        /// axis). `None`: the default ticks from `xaxp` or `yaxp` (the axis's
-        /// direction; else `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
+        /// axis); a `NaN` is skipped, but none finite is R's error. `None`:
+        /// the default ticks from `xaxp` or `yaxp` (the axis's direction;
+        /// else `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
         pub at: Option<Vec<f64>> => option_numbers f64,
         /// The tick labels ([`AxisLabels`]): `true` (the default), the tick
         /// positions formatted like R's `formatReal()`; `false`, none; or one
@@ -605,8 +606,15 @@ impl<B: Backend> Device<B> {
     }
 }
 
-/// R's checks of `axis()`'s `labels`: given only with `at`, and as many.
+/// R's checks of `axis()`'s `at` and `labels`: a given `at` has a finite
+/// position (`C_axis`: "no locations are finite"), `labels` only with
+/// `at`, and as many.
 pub(crate) fn check_axis(opts: &AxisOptions) -> Result<(), Error> {
+    if let Some(at) = &opts.at {
+        if !at.is_empty() && !at.iter().any(|v| v.is_finite()) {
+            return Err(Error::invalid("no locations are finite"));
+        }
+    }
     if let AxisLabels::Text(labels) = &opts.labels {
         match &opts.at {
             None => return Err(Error::invalid("'labels' is supplied and not 'at'")),

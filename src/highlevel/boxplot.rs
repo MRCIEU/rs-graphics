@@ -204,7 +204,7 @@ crate::setters::options! {
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// How far the whiskers reach: to the most extreme point within
         /// `range` times the box length (IQR); points beyond are outliers.
-        /// `None`: 1.5.
+        /// Negative is R's error. `None`: 1.5.
         pub range: Option<f64> => number f64,
         /// Box positions on the name axis, one per group. `None`: `1, 2,
         /// ..., n`.
@@ -518,6 +518,10 @@ pub(crate) fn boxplot_all_stats(
     }
     if (opts.width.as_ref()).is_some_and(|w| w.len() != n || w.iter().any(|&v| v.is_nan() || v <= 0.0)) {
         return Err(Error::invalid("invalid boxplot widths"));
+    }
+    // `boxplot.stats()`'s check of `coef`.
+    if opts.range.is_some_and(|r| r < 0.0) {
+        return Err(Error::invalid("'coef' must not be negative"));
     }
     Ok(groups
         .iter()

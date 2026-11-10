@@ -367,7 +367,7 @@ crate::setters::options! {
         /// Whether to draw each point in the middle of its line. `None`: R's
         /// default, `true` when the keys have both lines and points.
         pub merge: Option<bool> => option bool,
-        /// Number of columns. `None`: 1.
+        /// Number of columns; 0 is R's error. `None`: 1.
         pub ncol: Option<usize> => count usize,
         /// Whether to lay the entries out in one row. Default `false`.
         pub horiz: bool => value bool,
@@ -426,6 +426,10 @@ crate::setters::options! {
 pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Result<(), Error> {
     if labels.is_empty() {
         return Err(Error::invalid("'legend' is of length 0"));
+    }
+    // R's `rep(.., ncol)` fails on 0 (the `count` setter rejects negatives).
+    if opts.ncol == Some(0) {
+        return Err(Error::invalid("invalid 'times' argument"));
     }
     let tw: Vec<Option<f64>> = (0..opts.text_width.len())
         .map(|i| nth_na(&opts.text_width, i).flatten())
