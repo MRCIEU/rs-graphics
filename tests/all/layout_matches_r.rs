@@ -112,7 +112,7 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5, 2), 'wide'); bp(c(4, 1), 'left'); bp(c(2, 6, 1), 'right')",
             run: |d| {
                 d.layout()
-                    .mat(&[[1, 1], [2, 3]])
+                    .mat([[1, 1], [2, 3]])
                     .heights([LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
                     .draw();
                 bp(d, &[3.0, 5.0, 2.0], "wide");
@@ -126,7 +126,7 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5), 'narrow'); bp(c(4, 1, 6), 'wide')",
             run: |d| {
                 d.layout()
-                    .mat(&[[1, 2]])
+                    .mat([[1, 2]])
                     .widths([LayoutSize::Cm(4.0), LayoutSize::Relative(1.0)])
                     .draw();
                 bp(d, &[3.0, 5.0], "narrow");
@@ -139,7 +139,7 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5), 'a'); bp(c(4, 1, 6), 'b'); bp(c(2, 2, 7), 'c')",
             run: |d| {
                 d.layout()
-                    .mat(&[[1, 2], [3, 3]])
+                    .mat([[1, 2], [3, 3]])
                     .widths([LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
                     .heights([LayoutSize::Cm(5.0), LayoutSize::Relative(1.0)])
                     .draw();
@@ -153,7 +153,7 @@ fn cases() -> Vec<Case> {
             r: "layout(matrix(1:4, 2, byrow = TRUE), respect = TRUE)\n\
                 for (k in 1:4) bp(c(k, 2), paste('r', k))",
             run: |d| {
-                d.layout().mat(&[[1, 2], [3, 4]]).respect(true).draw();
+                d.layout().mat([[1, 2], [3, 4]]).respect(true).draw();
                 for k in 1..=4 {
                     bp(d, &[k as f64, 2.0], &format!("r {k}"));
                 }
@@ -165,7 +165,7 @@ fn cases() -> Vec<Case> {
                 bp(c(3, 5), 'sq'); bp(c(4, 1, 6), 'free')",
             run: |d| {
                 d.layout()
-                    .mat(&[[1, 2]])
+                    .mat([[1, 2]])
                     .widths([LayoutSize::Relative(1.0), LayoutSize::Relative(2.0)])
                     .respect(&[[true, false]])
                     .draw();
@@ -233,9 +233,9 @@ fn svg_device() -> Device<AnyBackend> {
 #[test]
 fn layout_returns_the_number_of_figures() {
     let mut d = svg_device();
-    assert_eq!(d.layout().mat(&[[1, 1], [2, 3]]).draw(), 3);
-    assert_eq!(d.layout().mat(&[[1.7, 2.2]]).draw(), 2);
-    assert_eq!(d.layout().mat(&[[1, 0], [2, 2]]).draw(), 2);
+    assert_eq!(d.layout().mat([[1, 1], [2, 3]]).draw(), 3);
+    assert_eq!(d.layout().mat([[1.7, 2.2]]).draw(), 2);
+    assert_eq!(d.layout().mat([[1, 0], [2, 2]]).draw(), 2);
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn layout_without_mat_panics() {
 #[test]
 #[should_panic(expected = "layout matrix must contain at least one reference")]
 fn layout_skipping_a_figure_panics_like_r() {
-    svg_device().layout().mat(&[[1, 3]]).draw();
+    svg_device().layout().mat([[1, 3]]).draw();
 }
 
 #[test]
@@ -255,7 +255,7 @@ fn layout_skipping_a_figure_panics_like_r() {
 fn layout_respect_of_another_shape_panics_like_r() {
     svg_device()
         .layout()
-        .mat(&[[1, 2]])
+        .mat([[1, 2]])
         .respect(&[[true], [false]])
         .draw();
 }
@@ -263,7 +263,7 @@ fn layout_respect_of_another_shape_panics_like_r() {
 #[test]
 #[should_panic(expected = "layout matrix values must be non-negative numbers")]
 fn layout_with_a_negative_value_panics() {
-    svg_device().layout().mat(&[[-1, 1]]).draw();
+    svg_device().layout().mat([[-1, 1]]).draw();
 }
 
 /// `respect` takes R's two forms: a logical or a grid of cells.

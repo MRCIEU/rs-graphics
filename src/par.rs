@@ -431,6 +431,10 @@ crate::error::from_str_via_try_from!(Log);
 macro_rules! par_options {
     (@wrap [] $e:expr) => { $e };
     (@wrap [Some] $e:expr) => { Some($e) };
+    // A `color` field holds a `ColorSpec`, resolved against the palette
+    // (and `bg`) as they are when the call runs, as R's `par()` does.
+    (@value $par:ident color $e:expr) => { $par.resolve_par_color($e) };
+    (@value $par:ident $kind:ident $e:expr) => { $e };
     (
         $(#[$sattr:meta])*
         pub struct Par {
@@ -512,7 +516,8 @@ macro_rules! par_options {
             pub(crate) fn apply(&self, par: &mut Par) {
                 $(
                     if let Some(v) = &self.$field {
-                        par.$field = par_options!(@wrap [$($some)?] v.clone());
+                        par.$field = par_options!(@wrap [$($some)?]
+                            par_options!(@value par $kind v.clone()));
                     }
                 )*
                 self.apply_units(par);
@@ -532,7 +537,8 @@ macro_rules! par_options {
 impl ParOptions {
     /// R's checks of a `par()` call's values (`par.c` and `par-common.c`),
     /// each failing with R's `invalid value specified for graphical
-    /// parameter "<name>"`: `adj` in 0 to 1; `cex` (and `cex.axis`,
+    /// parameter "<name>"` (a negative palette number for a colour: R's
+    /// "numerical color values must be >= 0"): `adj` in 0 to 1; `cex` (and `cex.axis`,
     /// `cex.lab`, `cex.main`, `cex.sub`), `lwd`, `mex` and `lheight`
     /// positive and finite; `mar`, `mai`, `oma`, `omi`, `plt` and `pin`
     /// non-negative and finite; `omd` in 0 to 1; `mgp` and `srt` finite;
@@ -613,6 +619,23 @@ impl ParOptions {
         if let Some(las) = self.las {
             if !(0..=3).contains(&las) {
                 return Err(par_error("las"));
+            }
+        }
+        for c in [
+            self.col,
+            self.bg,
+            self.fg,
+            self.col_axis,
+            self.col_lab,
+            self.col_main,
+            self.col_sub,
+        ] {
+            if let Some(ColorSpec::Index(i)) = c {
+                if i < 0 {
+                    return Err(Error::invalid(format!(
+                        "numerical color values must be >= 0, found {i}"
+                    )));
+                }
             }
         }
         if let Some(ps) = self.ps {
@@ -702,25 +725,25 @@ par_options! {
         pub yaxs: AxisStyle => option AxisStyle,
 
         /// Default colour of points, lines, `abline()` and `box()`. Default
-        /// black.
-        pub col: Color => option Color,
+        /// black. A negative palette number is R's error.
+        pub col: Color => color ColorSpec,
         /// Background colour: of new pages, of the default `legend()` box
         /// fill, and of colour number 0. Default: the device's background
         /// (white; transparent for PDF), or the `bg` it was opened with.
-        pub bg: Color => option Color,
+        pub bg: Color => color ColorSpec,
         /// Default colour of axes, segments, arrows and rectangle/polygon
         /// borders. Default black. Unlike R's, setting it doesn't set `col`
         /// too: set both for the same effect.
-        pub fg: Color => option Color,
+        pub fg: Color => color ColorSpec,
         /// Colour of axis tick labels. Default black. R's `col.axis`.
-        pub col_axis: Color => option Color,
+        pub col_axis: Color => color ColorSpec,
         /// Colour of the axis titles (`xlab`/`ylab`). Default black. R's
         /// `col.lab`.
-        pub col_lab: Color => option Color,
+        pub col_lab: Color => color ColorSpec,
         /// Colour of the main title. Default black. R's `col.main`.
-        pub col_main: Color => option Color,
+        pub col_main: Color => color ColorSpec,
         /// Colour of the subtitle. Default black. R's `col.sub`.
-        pub col_sub: Color => option Color,
+        pub col_sub: Color => color ColorSpec,
 
         /// Colours that colour numbers (`col = 2`) index, from 1, on this
         /// device only: each device has its own palette. Set it to one of R's
@@ -947,6 +970,14 @@ impl Par {
             ColorSpec::Index(0) => Some(self.bg).filter(|c| c.a > 0),
             _ => spec.resolve(&self.palette),
         }
+    }
+
+    /// The colour a `par()` colour setting stores (R's `RGBpar3(value, 0,
+    /// bg)`): a palette number through the current palette (0: `bg`), `NA`
+    /// as transparent. A negative number is rejected before this
+    /// ([`ParOptions::check_values`]).
+    pub(crate) fn resolve_par_color(&self, spec: ColorSpec) -> Color {
+        self.resolve_color(spec).unwrap_or(Color::TRANSPARENT)
     }
 }
 

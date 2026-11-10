@@ -30,6 +30,18 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
             g.text().x(1).y(1).labels("a").pos(5).try_draw()
         }),
         ("pie(c(1, -1))", "pie", |g| g.pie().x([1, -1]).try_draw()),
+        ("par(col = -1)", "par", |g| g.par().col(-1).try_draw()),
+        ("par(col.axis = -2)", "par", |g| {
+            g.par().col_axis(-2).try_draw()
+        }),
+        ("par(lend = -1)", "par", |g| g.par().lend(-1).try_draw()),
+        ("par(ljoin = -1)", "par", |g| g.par().ljoin(-1).try_draw()),
+        ("pie(1:2, edges = NA)", "pie", |g| {
+            g.pie().x([1, 2]).edges(f64::NAN).try_draw()
+        }),
+        ("pie(1:2, edges = Inf)", "pie", |g| {
+            g.pie().x([1, 2]).edges(f64::INFINITY).try_draw()
+        }),
         ("axis(1, at = c(NA, Inf))", "axis", |g| {
             g.axis()
                 .side(1)

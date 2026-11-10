@@ -886,7 +886,9 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// from an array of any numbers), `option_array` (`Option<Option<[f64;
 /// N]>>`, for [`par(plt)`], from an array of any numbers or an `Option`,
 /// [`OptionArray`]), `int_array` (an integer array from any numbers,
-/// truncated), `na` (`Option<Option<f64>>`, R's
+/// truncated), `color` (`Option<ColorSpec>` for a `par()` colour, from a
+/// string, [`Color`](crate::color::Color), palette number or `Option`,
+/// resolved when the call runs), `na` (`Option<Option<f64>>`, R's
 /// `NA`-able number, from a number or `None` for `NA`), `count`
 /// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
 /// [`Pch`]), `legend_pch` (the same, read as `legend()` does) and
@@ -962,6 +964,18 @@ macro_rules! options {
         pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
             match value.into_arg() {
                 Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident color $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes a colour name or `#RRGGBB[AA]` string, a [`Color`](crate::color::Color), a palette number (0: the background colour, as R's `par(bg)`) or an `Option` of one (`None`: R's `NA`, transparent); a number is looked up in the palette when the call runs, as R's `par()` stores the colour."]
+        pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
+            match value.into_arg() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
                 Err(e) => self$(.$p)?.defer(e),
             }
             self
@@ -1537,7 +1551,7 @@ mod tests {
         use crate::par::Bty;
         let par = ParOptions::default().bty("l").col_main("red");
         assert_eq!(par.bty, Some(Bty::L));
-        assert_eq!(par.col_main, Some(Color::rgb(255, 0, 0)));
+        assert_eq!(par.col_main, Some(ColorSpec::Color(Color::rgb(255, 0, 0))));
         assert_eq!(BoxOptions::default().bty("]").bty, Some(Bty::Bracket));
         assert_eq!(PlotOptions::default().bty("[").bty, Some(Bty::C));
         assert_eq!(Bty::parse("7"), Some(Bty::Seven));

@@ -254,7 +254,7 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `pars` (use its ele
 |---|---|---|
 | `x` | `.x()` | The slice sizes. |
 | `labels` | `.labels()` | Slice labels (text or plotmath expressions). |
-| `edges` | `.edges()` | Approximate number of polygon edges for a full circle. |
+| `edges` | `.edges()` | Approximate number of polygon edges for a full circle (each slice gets at least 2); not finite is R's error. |
 | `radius` | `.radius()` | Pie radius in user units, where the plot region's shorter side spans `[-1, 1]` before the usual 4% axis extension. |
 | `clockwise` | `.clockwise()` | Whether slices go clockwise. |
 | `init.angle` | `.init_angle()` | Starting angle in degrees. |

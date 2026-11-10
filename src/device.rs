@@ -255,9 +255,10 @@ impl<'a, G: Graphics> LayoutCall<'a, G> {
     /// appear; `0` marks an empty cell, and a number in several cells
     /// makes that figure span them. Fractions are truncated, as R does.
     /// Required.
-    pub fn mat<R: AsRef<[T]>, T: crate::numbers::Num>(mut self, mat: &[R]) -> Self {
+    pub fn mat<R: AsRef<[T]>, T: crate::numbers::Num>(mut self, mat: impl AsRef<[R]>) -> Self {
         self.mat = Some(
-            mat.iter()
+            mat.as_ref()
+                .iter()
                 .map(|row| row.as_ref().iter().map(|v| v.to_f64()).collect())
                 .collect(),
         );

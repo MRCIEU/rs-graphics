@@ -24,7 +24,21 @@ come with a table of old and new calls.
 | `dev.text()...adj(0).vadj(1)` | `dev.text()...adj([0, 1])` (also `legend()`) |
 | text `.vadj(v)` without `.adj()` | `let a = dev.current_par().adj;` then `.adj([a, v])` (R's `c(par("adj"), v)`; `[None, Some(v)]` would centre horizontally, R's `c(NA, v)`) |
 | legend `.vadj(v)` without `.adj()` | `.adj([0.0, v])` (the default horizontal 0) |
+| `dev.par().col(None::<&str>)` (left `col` unchanged) | leave the setter out; `None` is now R's `NA`, a transparent colour (also `bg`, `fg`, `col.axis`, `col.lab`, `col.main`, `col.sub`) |
+| `dev.pie()...edges(200)` with a `usize` | any number: `.edges(200)` still compiles |
 
+- `par()`'s colours (`col`, `bg`, `fg`, `col.axis`, `col.lab`, `col.main`,
+  `col.sub`) take any colour R's `par()` does: a name or `#RRGGBB[AA]`
+  string, a `Color`, a palette number (`.col(2)`; 0 is the background
+  colour, a negative number R's "numerical color values must be >= 0"
+  error) or `None` (R's `NA`, transparent), looked up in the palette when
+  the call runs, as R stores it. `par(lend)`/`par(ljoin)` (and the inline
+  setters) take R's integer codes (`0` round, `1` butt/mitre, `2`
+  square/bevel, above 2 recycled as R does; negative is R's "invalid line
+  end"/"invalid line join"). `pie()`'s `edges` is any number (floored per
+  slice, at least 2 edges; not finite is R's "'length.out' must be a
+  finite number"). `layout()`'s `mat` takes its rows by value
+  (`[[1, 2], [3, 4]]`) or by reference, as the other data setters.
 - `axis()` uses `xaxp`/`xaxt` on an x axis and `yaxp`/`yaxt` on a y axis
   and ignores the other direction's, as R does; a given `xaxp` or `yaxp`
   is checked against its log scale whichever the side (R's `invalid value

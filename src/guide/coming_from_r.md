@@ -117,7 +117,7 @@ dev.par().mfrow([1, 2]).mar([4, 4, 2, 1]).las(1).draw();
   `par(xlog = TRUE)` is `dev.par().xlog(true)`: it only flips the
   current plot's state (and leaves `usr` as it is); `dev.xlog()` reads it.
 - `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))` is
-  `dev.layout().mat(&[[1, 1], [2, 3]]).draw()`: matrices are written as
+  `dev.layout().mat([[1, 1], [2, 3]]).draw()`: matrices are written as
   rows.
 
 # Recorded plots

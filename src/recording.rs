@@ -315,7 +315,7 @@ impl Graphics for Figure {
         Ok(stats)
     }
     fn emit_pie(&mut self, x: &[f64], opts: PieOptions) -> Result<(), Error> {
-        crate::highlevel::check_pie(x)?;
+        crate::highlevel::check_pie(x, &opts)?;
         self.calls.push(Call::Pie(x.to_vec(), opts));
         Ok(())
     }

@@ -48,7 +48,7 @@ pub(crate) const MAX_LAYOUT_CELLS: usize = 500;
 /// ```
 /// # use rs_graphics::prelude::*;
 /// # let mut dev = Device::null().open().unwrap();
-/// dev.layout().mat(&[[1, 2]]).widths([LayoutSize::Cm(4.0), 1.into()]).draw();
+/// dev.layout().mat([[1, 2]]).widths([LayoutSize::Cm(4.0), 1.into()]).draw();
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LayoutSize {
@@ -96,8 +96,8 @@ impl LayoutSize {
 /// ```
 /// # use rs_graphics::prelude::*;
 /// # let mut dev = Device::null().open().unwrap();
-/// dev.layout().mat(&[[1, 2]]).respect(true).draw();
-/// dev.layout().mat(&[[1, 2]]).respect(&[[true, false]]).draw();
+/// dev.layout().mat([[1, 2]]).respect(true).draw();
+/// dev.layout().mat([[1, 2]]).respect(&[[true, false]]).draw();
 /// assert_eq!(LayoutRespect::from(false), LayoutRespect::No);
 /// ```
 #[derive(Clone, Debug, Default, PartialEq)]

@@ -61,6 +61,7 @@ mod multipage_matches_r;
 mod na_values_matches_r;
 mod page_background;
 mod page_files;
+mod par_colours_matches_r;
 mod par_new_matches_r;
 mod par_page_layout;
 mod pch_matches_r;

@@ -303,10 +303,10 @@ fn layout_fig_and_backends_take_integers() {
         };
         let mut dev = builder.compress(false).open().unwrap();
         if ints {
-            dev.layout().mat(&[[1, 2]]).widths([2, 1]).draw();
+            dev.layout().mat([[1, 2]]).widths([2, 1]).draw();
         } else {
             dev.layout()
-                .mat(&[[1.0, 2.0]])
+                .mat([[1.0, 2.0]])
                 .widths([LayoutSize::Relative(2.0), LayoutSize::Relative(1.0)])
                 .draw();
         }

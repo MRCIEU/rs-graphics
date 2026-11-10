@@ -932,7 +932,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// let n = dev.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
+    /// let n = dev.layout().mat([[1, 1], [2, 3]]).heights([2, 1]).draw();
     /// assert_eq!(n, 3);
     /// dev.plot().x([1, 2, 3]).draw(); // top
     /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left

@@ -146,7 +146,7 @@ key("layout_key.0", "center")"#,
             draw: |d| {
                 let rel = LayoutSize::Relative;
                 d.layout()
-                    .mat(&[[1, 2, 3]])
+                    .mat([[1, 2, 3]])
                     .widths([rel(2.0), rel(2.0), rel(1.0)])
                     .draw();
                 let mut a = Figure::new();
