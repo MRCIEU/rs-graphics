@@ -8,8 +8,6 @@
 
 //! Running R and our device for the `*_matches_r` tests.
 
-use std::process::Command;
-
 use rs_graphics::prelude::*;
 
 /// `v` as R code: `c(1, 2.5, 3)`.
@@ -61,7 +59,7 @@ pub fn run_r_args(tag: &str, prelude: &str, cases: &[(&str, (f64, f64), &str, &s
     }
     let script_path = dir.join(format!("rs_graphics_{tag}.R"));
     std::fs::write(&script_path, script).unwrap();
-    let out = Command::new("Rscript")
+    let out = super::rscript()
         .arg(&script_path)
         .output()
         .expect("run Rscript");

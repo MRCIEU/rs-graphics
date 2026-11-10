@@ -8,7 +8,7 @@
 
 //! The graphical parameters ([`Par`]), the changes one `par()` call makes
 //! ([`ParOptions`]), and their value types ([`Sides`], [`AxisStyle`],
-//! [`Pty`], [`Bty`], [`Xpd`], [`AxisType`]).
+//! [`Pty`], [`Bty`], [`Xpd`], [`AxisType`], [`Log`]).
 //!
 //! [`Par`] holds the subset of R's graphics parameters this crate
 //! implements, with R's exact default values (cross-checked against
@@ -24,6 +24,7 @@
 //! [`par(cex)`]: crate::par::Par::cex
 
 use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
 
@@ -195,7 +196,8 @@ crate::error::from_r_string!(Pty, "pty", "\"m\" or \"s\"");
 ///
 /// From a string (`"l".parse::<Bty>()` or `TryFrom<&str>`): R's first
 /// character, `"o"`, `"l"`, `"7"`, `"c"` or `"["`, `"u"`, `"]"`, `"n"`
-/// (letters in either case). Anything else is an error.
+/// (letters in either case, except `"n"`, lower case only, as R). Anything
+/// else is an error.
 ///
 /// This is R's [`par(bty)`].
 ///
@@ -243,7 +245,8 @@ impl Bty {
             'c' | 'C' | '[' => Some(Bty::C),
             'u' | 'U' => Some(Bty::U),
             ']' => Some(Bty::Bracket),
-            'n' | 'N' => Some(Bty::N),
+            // Lower case only, as R's `par()`.
+            'n' => Some(Bty::N),
             _ => None,
         }
     }
@@ -341,6 +344,85 @@ impl AxisType {
 
 crate::error::from_r_string!(AxisType, "axis type", "\"s\" or \"n\"");
 
+/// Which axes of a new plot are logarithmic: the x axis, the y axis, both
+/// or neither (the default).
+///
+/// The plotting calls ([`plot()`](crate::graphics::Graphics::plot),
+/// [`hist()`](crate::graphics::Graphics::hist),
+/// [`barplot()`](crate::graphics::Graphics::barplot),
+/// [`boxplot()`](crate::graphics::Graphics::boxplot) and
+/// [`plot_window()`](crate::graphics::Graphics::plot_window)) take it as
+/// `.log("x")`, `.log("y")` or `.log("xy")`; they work out the limits on
+/// that scale and set `dev.par()`'s `xlog`/`ylog` for the plot.
+///
+/// From a string (`"xy".parse::<Log>()` or `TryFrom<&str>`): each
+/// character is `x` or `y`, in any order and repeated or not (`"yx"`,
+/// `"xxy"`); `""` is neither axis. Any other character is an error naming
+/// the first one, as in R (`invalid "log=z" specification`, from
+/// `plot.window()`).
+///
+/// This is R's `plot(log = )`, `plot.window(log = )`, ...
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// dev.plot().x([1, 10, 100]).y([1, 2, 3]).log("x").draw();
+/// assert!(dev.xlog() && !dev.ylog());
+/// assert_eq!("yx".parse::<Log>().unwrap(), Log { x: true, y: true });
+/// assert!("xz".parse::<Log>().is_err());
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Log {
+    /// The x axis is logarithmic (R's `"x"` in `log`).
+    pub x: bool,
+    /// The y axis is logarithmic (R's `"y"` in `log`).
+    pub y: bool,
+}
+
+impl TryFrom<&str> for Log {
+    type Error = crate::error::Error;
+
+    /// R's check in `plot.window()`: each character is `x` or `y`.
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let mut log = Log::default();
+        for c in s.chars() {
+            match c {
+                'x' => log.x = true,
+                'y' => log.y = true,
+                _ => {
+                    return Err(crate::error::Error::invalid(format!(
+                        "invalid \"log={c}\" specification"
+                    ))
+                    .in_call("plot.window"));
+                }
+            }
+        }
+        Ok(log)
+    }
+}
+
+impl TryFrom<String> for Log {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Log::try_from(s.as_str())
+    }
+}
+
+impl TryFrom<&String> for Log {
+    type Error = crate::error::Error;
+
+    /// As `TryFrom<&str>`.
+    fn try_from(s: &String) -> Result<Self, Self::Error> {
+        Log::try_from(s.as_str())
+    }
+}
+
+crate::error::from_str_via_try_from!(Log);
+
 // `Par` and `ParOptions` from one list of `Par`'s fields: `ParOptions`
 // holds every field as an `Option` (`None`: unchanged), with its `apply`
 // and setters (on `ParOptions` and `ParCall`), each documented with the
@@ -351,6 +433,10 @@ crate::error::from_r_string!(AxisType, "axis type", "\"s\" or \"n\"");
 macro_rules! par_options {
     (@wrap [] $e:expr) => { $e };
     (@wrap [Some] $e:expr) => { Some($e) };
+    // A `color` field holds a `ColorSpec`, resolved against the palette
+    // (and `bg`) as they are when the call runs, as R's `par()` does.
+    (@value $par:ident color $e:expr) => { $par.resolve_par_color($e) };
+    (@value $par:ident $kind:ident $e:expr) => { $e };
     (
         $(#[$sattr:meta])*
         pub struct Par {
@@ -405,8 +491,8 @@ macro_rules! par_options {
                 /// tick settings (`xaxp`/`yaxp`) are worked out again from them.
                 /// Applied after the other fields and `xlog`/`ylog` in the same
                 /// call, so a `usr` given with them is in their units, uses a new
-                /// `lab`, and replaces an `xaxp`/`yaxp` given there. A value
-                /// `NaN`, `x0 == x1` or `y0 == y1` is an error of the call (R's
+                /// `lab`, and replaces an `xaxp`/`yaxp` given there. A value that
+                /// isn't finite, `x0 == x1` or `y0 == y1` is an error of the call (R's
                 /// "invalid value specified for graphical parameter \"usr\"").
                 /// Unset: unchanged.
                 ///
@@ -415,10 +501,13 @@ macro_rules! par_options {
                 /// Makes the x axis logarithmic, or linear again: from now on, x
                 /// values are mapped through `log10` first. As in R, `usr` stays
                 /// as it is, so set it too. The next `plot_new()` resets it.
-                /// Unset: unchanged.
+                /// Unset: unchanged. This is the current plot's state; to draw a
+                /// log plot, give `.log("x")` to `plot()` (or `hist()`,
+                /// `barplot()`, `boxplot()`, `plot_window()`), which works out the
+                /// limits on that scale and sets it (see [`Log`]).
                 pub xlog: Option<bool> => option bool,
-                /// As [`xlog`](ParOptions::xlog), for the y axis. Unset:
-                /// unchanged.
+                /// As [`xlog`](ParOptions::xlog), for the y axis (`.log("y")` on
+                /// the plotting calls). Unset: unchanged.
                 pub ylog: Option<bool> => option bool,
             }
         }
@@ -429,7 +518,8 @@ macro_rules! par_options {
             pub(crate) fn apply(&self, par: &mut Par) {
                 $(
                     if let Some(v) = &self.$field {
-                        par.$field = par_options!(@wrap [$($some)?] v.clone());
+                        par.$field = par_options!(@wrap [$($some)?]
+                            par_options!(@value par $kind v.clone()));
                     }
                 )*
                 self.apply_units(par);
@@ -437,29 +527,145 @@ macro_rules! par_options {
         }
 
         impl ParOptions {
-            /// R's checks of `usr`, made when the call is drawn or recorded.
+            /// R's checks of the values, made when the call is drawn or
+            /// recorded: [`check_values`](ParOptions::check_values).
             pub(crate) fn check(&self) -> Result<(), $crate::error::Error> {
-                if let Some([x0, x1, y0, y1]) = self.usr {
-                    let ok = ![x0, x1, y0, y1].iter().any(|v| v.is_nan()) && x0 != x1 && y0 != y1;
-                    if !ok {
-                        return Err($crate::error::Error::invalid(
-                            "invalid value specified for graphical parameter \"usr\"",
-                        ));
-                    }
-                }
-                $crate::device::check_lmitre(self.lmitre)?;
-                Ok(())
+                self.check_values()
             }
         }
     };
+}
+
+impl ParOptions {
+    /// R's checks of a `par()` call's values (`par.c` and `par-common.c`),
+    /// each failing with R's `invalid value specified for graphical
+    /// parameter "<name>"` (a negative palette number for a colour: R's
+    /// "numerical color values must be >= 0"): `adj` in 0 to 1; `cex` (and `cex.axis`,
+    /// `cex.lab`, `cex.main`, `cex.sub`), `lwd`, `mex` and `lheight`
+    /// positive and finite; `mar`, `mai`, `oma`, `omi`, `plt` and `pin`
+    /// non-negative and finite; `omd` in 0 to 1; `mgp` and `srt` finite;
+    /// `las` 0 to 3; `ps` non-negative and finite; `xaxp`/`yaxp`'s first
+    /// two values finite (the third is checked against the axis's log
+    /// scale when the call runs); `usr` finite with `x0 != x1` and `y0 !=
+    /// y1`; `lmitre` at least 1; `lab` (see
+    /// [`check_lab`](crate::device::check_lab)). `xaxp`/`yaxp`'s third
+    /// value, `fig`, `fin`, `mfrow`/`mfcol`/`mfg` and `pch` are checked
+    /// elsewhere.
+    pub(crate) fn check_values(&self) -> Result<(), Error> {
+        use crate::device::par_error;
+        let pos = |name: &str, v: Option<f64>| match v {
+            Some(x) if !x.is_finite() || x <= 0.0 => Err(par_error(name)),
+            _ => Ok(()),
+        };
+        let finite = |name: &str, v: &[f64]| {
+            if v.iter().any(|x| !x.is_finite()) {
+                Err(par_error(name))
+            } else {
+                Ok(())
+            }
+        };
+        let nonneg = |name: &str, v: &[f64]| {
+            if v.iter().any(|x| !x.is_finite() || *x < 0.0) {
+                Err(par_error(name))
+            } else {
+                Ok(())
+            }
+        };
+        let unit = |name: &str, v: &[f64]| {
+            if v.iter().any(|x| !x.is_finite() || *x < 0.0 || *x > 1.0) {
+                Err(par_error(name))
+            } else {
+                Ok(())
+            }
+        };
+        let sides = |s: &Sides<f64>| [s.bottom, s.left, s.top, s.right];
+
+        if let Some(adj) = self.adj {
+            unit("adj", &[adj])?;
+        }
+        pos("cex", self.cex)?;
+        pos("cex.axis", self.cex_axis)?;
+        pos("cex.lab", self.cex_lab)?;
+        pos("cex.main", self.cex_main)?;
+        pos("cex.sub", self.cex_sub)?;
+        pos("lwd", self.lwd)?;
+        pos("mex", self.mex)?;
+        pos("lheight", self.lheight)?;
+        if let Some(m) = &self.mar {
+            nonneg("mar", &sides(m))?;
+        }
+        if let Some(m) = &self.mai {
+            nonneg("mai", &sides(m))?;
+        }
+        if let Some(m) = &self.oma {
+            nonneg("oma", &sides(m))?;
+        }
+        if let Some(m) = &self.omi {
+            nonneg("omi", &sides(m))?;
+        }
+        if let Some(Some(plt)) = self.plt {
+            nonneg("plt", &plt)?;
+        }
+        if let Some(pin) = self.pin {
+            nonneg("pin", &pin)?;
+        }
+        if let Some(omd) = self.omd {
+            unit("omd", &omd)?;
+        }
+        if let Some(mgp) = self.mgp {
+            finite("mgp", &mgp)?;
+        }
+        if let Some(srt) = self.srt {
+            finite("srt", &[srt])?;
+        }
+        if let Some(las) = self.las {
+            if !(0..=3).contains(&las) {
+                return Err(par_error("las"));
+            }
+        }
+        for c in [
+            self.col,
+            self.bg,
+            self.fg,
+            self.col_axis,
+            self.col_lab,
+            self.col_main,
+            self.col_sub,
+        ] {
+            if let Some(ColorSpec::Index(i)) = c {
+                if i < 0 {
+                    return Err(Error::invalid(format!(
+                        "numerical color values must be >= 0, found {i}"
+                    )));
+                }
+            }
+        }
+        if let Some(ps) = self.ps {
+            nonneg("ps", &[ps])?;
+        }
+        if let Some(axp) = self.xaxp {
+            finite("xaxp", &axp[..2])?;
+        }
+        if let Some(axp) = self.yaxp {
+            finite("yaxp", &axp[..2])?;
+        }
+        if let Some([x0, x1, y0, y1]) = self.usr {
+            if [x0, x1, y0, y1].iter().any(|v| !v.is_finite()) || x0 == x1 || y0 == y1 {
+                return Err(par_error("usr"));
+            }
+        }
+        crate::device::check_lmitre(self.lmitre)?;
+        crate::device::check_lab(self.lab)?;
+        Ok(())
+    }
 }
 
 par_options! {
     /// The graphical parameters: margins, colours, fonts, line styles, axis
     /// styles and the rest of what `par()` sets.
     ///
-    /// A device starts with the `Par` it was made with (usually
-    /// `Par::default()`, R's defaults); change it with
+    /// A device starts with R's defaults (`Par::default()`), with `ps` and
+    /// `bg` from its builder; change it with
     /// [`par()`](crate::graphics::Graphics::par) and read it with
     /// [`Device::current_par`](crate::device::Device::current_par). Field names
     /// match R's where practical (`cex_main` is R's `cex.main`).
@@ -521,43 +727,53 @@ par_options! {
         pub yaxs: AxisStyle => option AxisStyle,
 
         /// Default colour of points, lines, `abline()` and `box()`. Default
-        /// black.
-        pub col: Color => option Color,
+        /// black. A negative palette number is R's error.
+        pub col: Color => color ColorSpec,
         /// Background colour: of new pages, of the default `legend()` box
         /// fill, and of colour number 0. Default: the device's background
         /// (white; transparent for PDF), or the `bg` it was opened with.
-        pub bg: Color => option Color,
+        pub bg: Color => color ColorSpec,
         /// Default colour of axes, segments, arrows and rectangle/polygon
         /// borders. Default black. Unlike R's, setting it doesn't set `col`
         /// too: set both for the same effect.
-        pub fg: Color => option Color,
+        pub fg: Color => color ColorSpec,
         /// Colour of axis tick labels. Default black. R's `col.axis`.
-        pub col_axis: Color => option Color,
+        pub col_axis: Color => color ColorSpec,
         /// Colour of the axis titles (`xlab`/`ylab`). Default black. R's
         /// `col.lab`.
-        pub col_lab: Color => option Color,
+        pub col_lab: Color => color ColorSpec,
         /// Colour of the main title. Default black. R's `col.main`.
-        pub col_main: Color => option Color,
+        pub col_main: Color => color ColorSpec,
         /// Colour of the subtitle. Default black. R's `col.sub`.
-        pub col_sub: Color => option Color,
+        pub col_sub: Color => color ColorSpec,
 
-        /// Colours that colour numbers (`col = 2`) index, from 1. Default
-        /// [`DEFAULT_PALETTE`]. R's `palette()`.
-        pub palette: Vec<Color> => option Vec<Color>,
+        /// Colours that colour numbers (`col = 2`) index, from 1, on this
+        /// device only: each device has its own palette. Set it to one of R's
+        /// named sets (`"Okabe-Ito"`, `"R3"`, ...) or to two or more colours
+        /// of your own (see [`PaletteColors`](crate::setters::PaletteColors)).
+        /// Default [`DEFAULT_PALETTE`]. R's `palette()`, which R keeps for the
+        /// whole session (a device opened later uses it too).
+        pub palette: Vec<Color> => palette Vec<Color>,
 
         /// Line width; 1 is 1/96 inch, as in R. Default 1.
         pub lwd: f64 => number f64,
         /// Line type. Default solid.
         pub lty: LineType => option LineType,
-        /// Line end style. Default round.
+        /// Line end style: `"round"`, `"butt"`, `"square"` or R's codes 0 to
+        /// 2 ([`LineEnd`]). Default round.
         pub lend: LineEnd => option LineEnd,
-        /// Line join style. Default round.
+        /// Line join style: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to
+        /// 2 ([`LineJoin`]). Default round.
         pub ljoin: LineJoin => option LineJoin,
         /// Mitre limit for mitred joins. Default 10.
         pub lmitre: f64 => number f64,
 
-        /// Default plotting symbol. Default 1 (open circle).
-        pub pch: i32 => option i32,
+        /// Default plotting symbol: a symbol code (0 to 25), or a character
+        /// drawn as itself (a string's first character). Default 1 (open
+        /// circle). A character is stored as [`Pch`](crate::setters::Pch)
+        /// stores it. More than one value, or `None` (R's `NA`) or `""`, is
+        /// an error of the call, as in R.
+        pub pch: i32 => one_pch i32,
 
         /// Base text size, in big points. Default 12. Its value when the
         /// device is created is the device's starting size
@@ -627,7 +843,8 @@ par_options! {
         pub mgp: [f64; 3] => array [f64; 3],
         /// Approximate number of tick intervals on the x and y axes for
         /// default ticks; the third value (label length) is unused, as in R.
-        /// Default `c(5, 5, 7)`.
+        /// Default `c(5, 5, 7)`. The first two must be at least 1 and the
+        /// third at least 0, else `par()` is R's error.
         pub lab: [i32; 3] => int_array [i32; 3],
         /// First and last default x tick and the number of intervals between
         /// them. On a log axis the first two are powers of ten and the third
@@ -758,6 +975,14 @@ impl Par {
             _ => spec.resolve(&self.palette),
         }
     }
+
+    /// The colour a `par()` colour setting stores (R's `RGBpar3(value, 0,
+    /// bg)`): a palette number through the current palette (0: `bg`), `NA`
+    /// as transparent. A negative number is rejected before this
+    /// ([`ParOptions::check_values`]).
+    pub(crate) fn resolve_par_color(&self, spec: ColorSpec) -> Color {
+        self.resolve_color(spec).unwrap_or(Color::TRANSPARENT)
+    }
 }
 
 impl ParOptions {
@@ -801,6 +1026,30 @@ impl ParOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bty_n_is_lower_case_only() {
+        // R's `par(bty = "N")` is an error; the other letters take either case.
+        assert!("N".parse::<Bty>().is_err());
+        assert_eq!("n".parse::<Bty>().unwrap(), Bty::N);
+        assert_eq!("O".parse::<Bty>().unwrap(), Bty::O);
+    }
+
+    #[test]
+    fn log_takes_r_strings() {
+        let log = |s: &str| Log::try_from(s);
+        assert_eq!(log("").unwrap(), Log::default());
+        assert_eq!(log("x").unwrap(), Log { x: true, y: false });
+        assert_eq!(log("y").unwrap(), Log { x: false, y: true });
+        for both in ["xy", "yx", "xxy", "yxy"] {
+            assert_eq!(log(both).unwrap(), Log { x: true, y: true }, "{both}");
+        }
+        // The first bad character, as R's `plot.window()` reports it.
+        let e = log("xzq").unwrap_err();
+        assert_eq!(e.call(), "plot.window");
+        assert_eq!(e.message(), "invalid \"log=z\" specification");
+        assert!(Log::try_from(String::from("Y")).is_err());
+    }
 
     #[test]
     fn sides_from_array_is_bottom_left_top_right() {

@@ -55,7 +55,7 @@ use crate::plotmath::Label;
 use crate::recycle::{nth_na, pick_na, rep_or};
 
 use super::hatch::ShapeStyle;
-use super::{Device, Xpd};
+use super::{Adj, Device, Xpd};
 
 /// Where to put a legend: a keyword, a point or two corners.
 ///
@@ -67,6 +67,19 @@ use super::{Device, Xpd};
 /// | `legend("topright", ...)` | `"topright"` (or `LegendKeyword::TopRight`) | [`Keyword`](LegendPos::Keyword) |
 /// | `legend(5, 20, ...)` | `[5, 20]` or `(5, 20.5)` | [`Xy`](LegendPos::Xy) |
 /// | `legend(c(5, 15), c(10, 20), ...)` | `[[5, 15], [10, 20]]` or `((5, 15), (10, 20.5))` | [`Corners`](LegendPos::Corners) |
+///
+/// This is R's `legend(x, y)`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot().x([0, 10]).y([0, 20]).draw();
+/// dev.legend().pos("topright").labels("a").pch(1).draw();
+/// dev.legend().pos([5, 20]).labels("b").pch(2).draw();
+/// assert_eq!(LegendPos::try_from("topr").unwrap(), LegendPos::Keyword(LegendKeyword::TopRight));
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LegendPos {
     /// A single point `(x, y)` in user coordinates; anchored by
@@ -291,7 +304,6 @@ crate::setters::options! {
         /// [`par(lwd)`]).
         ///
         /// [`par(lwd)`]: crate::par::Par::lwd
-        /// [`par(lwd)`]: crate::par::Par::lwd
         pub lwd: Vec<Option<f64>> => na_values f64,
         /// Fill colours of box keys; giving any draws boxes. Empty: no fill,
         /// and no boxes unless `density` is given. With shading, the colour of
@@ -356,17 +368,18 @@ crate::setters::options! {
         /// error of the call (R's "'text.width' must be numeric, >= 0, or a
         /// scalar NA"). R's `text.width`.
         pub text_width: Vec<Option<f64>> => na_values f64,
-        /// Horizontal adjustment of the labels. `None`: 0 (left). R's
-        /// `adj[1]`.
-        pub adj: Option<f64> => number f64,
-        /// Vertical adjustment of the labels. Default 0.5; `None` (R's `NA`)
-        /// centres each label's ink, as R's one-value `adj = x` does. R's
-        /// `adj[2]`.
-        pub vadj: Option<Option<f64>> => na f64,
+        /// Justification of the labels on their points, horizontal and
+        /// vertical ([`Adj`]): one number (horizontal; vertical `None`), two,
+        /// or two `Option`s (`None`: R's `NA`: centred horizontally, each
+        /// label's ink centred vertically). Unset: `[0, 0.5]` (left-justified,
+        /// the point half a capital's height above the baseline). To change
+        /// only the vertical value, keep the 0: `.adj([0.0, v])` (a horizontal
+        /// `None` would centre the labels).
+        pub adj: Option<Adj> => option Adj,
         /// Whether to draw each point in the middle of its line. `None`: R's
         /// default, `true` when the keys have both lines and points.
         pub merge: Option<bool> => option bool,
-        /// Number of columns. `None`: 1.
+        /// Number of columns; 0 is R's error. `None`: 1.
         pub ncol: Option<usize> => count usize,
         /// Whether to lay the entries out in one row. Default `false`.
         pub horiz: bool => value bool,
@@ -425,6 +438,10 @@ crate::setters::options! {
 pub(crate) fn check_legend(labels: &[Option<Label>], opts: &LegendOptions) -> Result<(), Error> {
     if labels.is_empty() {
         return Err(Error::invalid("'legend' is of length 0"));
+    }
+    // R's `rep(.., ncol)` fails on 0 (the `count` setter rejects negatives).
+    if opts.ncol == Some(0) {
+        return Err(Error::invalid("invalid 'times' argument"));
     }
     let tw: Vec<Option<f64>> = (0..opts.text_width.len())
         .map(|i| nth_na(&opts.text_width, i).flatten())
@@ -860,8 +877,12 @@ impl<B: Backend> Device<B> {
                 title_font,
             );
         }
-        let adj = opts.adj.unwrap_or(0.0);
-        let vadj = opts.vadj.unwrap_or(Some(0.5));
+        // R's default `adj = c(0, 0.5)`.
+        let adj = opts.adj.unwrap_or(Adj {
+            x: Some(0.0),
+            y: Some(0.5),
+        });
+        let (adj, vadj) = (adj.hadj(), adj.vadj());
         let mut text_x = Vec::with_capacity(n);
         let mut text_y = Vec::with_capacity(n);
         for i in 0..n {

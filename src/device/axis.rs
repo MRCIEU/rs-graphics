@@ -27,13 +27,107 @@ use crate::font::FontFace;
 use crate::geometry::Point;
 use crate::lty::LineType;
 use crate::par::AxisType;
-use crate::plotmath::Label;
+use crate::plotmath::{Expression, Label, LabelElement, Labels};
 use crate::recycle::nth;
 
 use super::{Device, Side, Xpd, default_padj, format_axis_labels, las_perpendicular, las_rotation};
 
 /// `FLT_EPSILON`, which `GetAxisLimits()` widens the axis range by.
 const FLT_EPSILON: f64 = f32::EPSILON as f64;
+
+/// What `axis()` writes at its ticks: their positions (the default),
+/// nothing, or given labels.
+///
+/// Setters take `true` ([`Values`](AxisLabels::Values)), `false`
+/// ([`None`](AxisLabels::None)), or one label or several, as
+/// [`Labels`] takes them (`None` elements included).
+///
+/// This is R's `axis(labels = )`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot().x([1, 2, 3]).y([3, 1, 2]).axes(false).draw();
+/// dev.axis().side(1).labels(false).draw();
+/// dev.axis().side(2).at([1, 2, 3]).labels(["a", "b", "c"]).draw();
+/// dev.axis().side(3).at([1, 2]).labels([Some("left"), None]).draw();
+/// ```
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum AxisLabels {
+    /// The tick positions, formatted like R's `formatReal()` (R's
+    /// `labels = TRUE`, the default).
+    #[default]
+    Values,
+    /// No labels; the ticks are drawn (R's `labels = FALSE`).
+    None,
+    /// These labels, one per tick in `at` (R's character or expression
+    /// `labels`). A `None` element (a character `NA`) draws the tick but
+    /// not its label, and doesn't count for `gap_axis`.
+    Text(Vec<Option<Label>>),
+}
+
+impl From<bool> for AxisLabels {
+    /// `true`: [`AxisLabels::Values`]; `false`: [`AxisLabels::None`].
+    fn from(b: bool) -> Self {
+        if b {
+            AxisLabels::Values
+        } else {
+            AxisLabels::None
+        }
+    }
+}
+
+/// `From` for each kind of value [`Labels`] takes.
+macro_rules! axis_labels_from {
+    ($($t:ty),*) => {
+        $(
+            impl From<$t> for AxisLabels {
+                /// These labels.
+                fn from(v: $t) -> Self {
+                    AxisLabels::Text(v.into_labels())
+                }
+            }
+        )*
+    };
+}
+axis_labels_from!(&str, &&str, String, &String, Label, Expression);
+
+impl<L: Clone + LabelElement> From<&[L]> for AxisLabels {
+    /// These labels.
+    fn from(v: &[L]) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement, const N: usize> From<[L; N]> for AxisLabels {
+    /// These labels.
+    fn from(v: [L; N]) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement, const N: usize> From<&[L; N]> for AxisLabels {
+    /// These labels.
+    fn from(v: &[L; N]) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement> From<Vec<L>> for AxisLabels {
+    /// These labels.
+    fn from(v: Vec<L>) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
+
+impl<L: Clone + LabelElement> From<&Vec<L>> for AxisLabels {
+    /// These labels.
+    fn from(v: &Vec<L>) -> Self {
+        AxisLabels::Text(v.into_labels())
+    }
+}
 
 crate::setters::options! {
     /// The arguments of R's `axis()` other than `side`, plus the inline
@@ -43,19 +137,17 @@ crate::setters::options! {
     #[derive(Clone, Debug)]
     pub struct AxisOptions => [AxisCall] {
         /// Tick positions, in user coordinates (data units, also on a log
-        /// axis). `None`: the default ticks from `axp` (else
-        /// `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
+        /// axis); a `NaN` is skipped, but none finite is R's error. `None`:
+        /// the default ticks from `xaxp` or `yaxp` (the axis's direction;
+        /// else `par(xaxp/yaxp)`), as [`Device::ax_ticks`].
         pub at: Option<Vec<f64>> => option_numbers f64,
-        /// Labels for the ticks in `at` (requires `at`, as many; otherwise an
-        /// error of the call): text or plotmath
-        /// expressions (`Some("a".into())`, `Some(Label::math("10^5"))`).
-        /// `None`: `at` formatted like R's `formatReal()`. An inner `None` (a
-        /// character `NA`) draws the tick but not its label, and doesn't count
-        /// for `gap_axis`.
-        pub labels: Option<Vec<Option<Label>>> => labels Label,
-        /// Whether to draw the tick labels. Default `true`. `false` is R's
-        /// `labels = FALSE`.
-        pub draw_labels: bool => value bool,
+        /// The tick labels ([`AxisLabels`]): `true` (the default), the tick
+        /// positions formatted like R's `formatReal()`; `false`, none; or one
+        /// label per tick in `at` (which they require, as many; otherwise an
+        /// error of the call), text or plotmath expressions (`"a"`,
+        /// `Label::math("10^5")`). A `None` element (a character `NA`) draws
+        /// the tick but not its label, and doesn't count for `gap_axis`.
+        pub labels: AxisLabels => value AxisLabels,
         /// Whether to draw the axis line and tick marks. Default `true`.
         pub tick: bool => value bool,
         /// Distance of the axis line from the plot region (inner region for
@@ -122,25 +214,31 @@ crate::setters::options! {
         ///
         /// [`par(las)`]: crate::par::Par::las
         pub las: Option<i32> => option i32,
-        /// Range and number of the default ticks, used when `at` is `None`.
-        /// `None`: [`par(xaxp)`] (sides 1, 3) or [`par(yaxp)`] (sides 2, 4);
-        /// overrides it for this call only.
+        /// Range and number of the default ticks of an x axis (sides 1, 3),
+        /// used when `at` is `None`; a y axis ignores it, as in R. `None`:
+        /// [`par(xaxp)`]; overrides it for this call only.
         ///
         /// [`par(xaxp)`]: crate::par::Par::xaxp
+        pub xaxp: Option<[f64; 3]> => array [f64; 3],
+        /// As `xaxp`, for a y axis (sides 2, 4). `None`: [`par(yaxp)`].
+        ///
         /// [`par(yaxp)`]: crate::par::Par::yaxp
-        pub axp: Option<[f64; 3]> => array [f64; 3],
+        pub yaxp: Option<[f64; 3]> => array [f64; 3],
         /// Margin lines for the axis title, labels and line (only the labels
         /// and line are used here). `None`: [`par(mgp)`]; overrides it for this
         /// call only.
         ///
         /// [`par(mgp)`]: crate::par::Par::mgp
         pub mgp: Option<[f64; 3]> => array [f64; 3],
-        /// Whether to draw the axis at all: `AxisType::None` draws nothing.
-        /// `None`: [`par(xaxt)`] (sides 1, 3) or [`par(yaxt)`] (sides 2, 4).
+        /// Whether to draw an x axis (sides 1, 3) at all: `AxisType::None`
+        /// draws nothing; a y axis ignores it, as in R. `None`: [`par(xaxt)`].
         ///
         /// [`par(xaxt)`]: crate::par::Par::xaxt
+        pub xaxt: Option<AxisType> => option AxisType,
+        /// As `xaxt`, for a y axis (sides 2, 4). `None`: [`par(yaxt)`].
+        ///
         /// [`par(yaxt)`]: crate::par::Par::yaxt
-        pub axt: Option<AxisType> => option AxisType,
+        pub yaxt: Option<AxisType> => option AxisType,
         /// Tick length as a fraction of the plot region (of its height for an
         /// x axis if above 0.5, else of its smaller side); positive points
         /// inwards. Overrides `tcl`. `None`: [`par(tck)`], which is `NA` by
@@ -159,8 +257,8 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// Ends of the axis line and ticks (`"round"`, `"butt"`,
-        /// `"square"`). `None`: [`par(lend)`].
+        /// Ends of the axis line and ticks (`"round"`, `"butt"`, `"square"` or
+        /// R's codes 0 to 2). `None`: [`par(lend)`].
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
@@ -189,8 +287,7 @@ impl Default for AxisOptions {
         AxisOptions {
             deferred_error: None,
             at: None,
-            labels: None,
-            draw_labels: true,
+            labels: AxisLabels::Values,
             tick: true,
             line: None,
             pos: None,
@@ -207,9 +304,11 @@ impl Default for AxisOptions {
             cex_axis: None,
             col_axis: None,
             las: None,
-            axp: None,
+            xaxp: None,
+            yaxp: None,
             mgp: None,
-            axt: None,
+            xaxt: None,
+            yaxt: None,
             tck: None,
             tcl: None,
             xpd: None,
@@ -230,8 +329,21 @@ impl<B: Backend> Device<B> {
     ) -> Result<Vec<f64>, Error> {
         check_axis(opts)?;
         let side = side.into_arg()?;
+        // R checks both inline `xaxp` and `yaxp` against their log scales,
+        // whichever the side.
+        if let (Some(axp), true) = (opts.xaxp, self.xlog) {
+            crate::device::check_log_axp("xaxp", axp)?;
+        }
+        if let (Some(axp), true) = (opts.yaxp, self.ylog) {
+            crate::device::check_log_axp("yaxp", axp)?;
+        }
+        let axp = if side.is_horizontal() {
+            opts.xaxp
+        } else {
+            opts.yaxp
+        };
         if opts.at.is_none() {
-            self.check_axis_axp(side, opts.axp)?;
+            self.check_axis_axp(side, axp)?;
         }
         let mut dev = self.line_pars(opts.lend, None, None)?;
         Ok(dev.axis_draw(side, opts))
@@ -261,26 +373,28 @@ impl<B: Backend> Device<B> {
             lineoff = 0.0;
         }
 
-        let at = opts.at.clone().unwrap_or_else(|| match opts.axp {
+        let axp = if x_axis { opts.xaxp } else { opts.yaxp };
+        let at = opts.at.clone().unwrap_or_else(|| match axp {
             Some(axp) => self.ticks_from_axp(side, axp),
             None => self.ax_ticks(side),
         });
-        let labels = if opts.draw_labels {
-            match &opts.labels {
-                None => format_axis_labels(&at)
-                    .into_iter()
-                    .map(|l| Some(Label::Text(l)))
-                    .collect(),
-                // `check_axis` has made sure `at` is given, and as long.
-                Some(l) => l.clone(),
-            }
-        } else {
-            Vec::new()
+        let labels = match &opts.labels {
+            AxisLabels::Values => format_axis_labels(&at)
+                .into_iter()
+                .map(|l| Some(Label::Text(l)))
+                .collect(),
+            AxisLabels::None => Vec::new(),
+            // `check_axis` has made sure `at` is given, and as long.
+            AxisLabels::Text(l) => l.clone(),
         };
         // `xaxt`/`yaxt = "n"`: nothing drawn (checked after the argument
         // errors above, as in R).
-        let axt = if x_axis { self.par.xaxt } else { self.par.yaxt };
-        if opts.axt.unwrap_or(axt) == AxisType::None {
+        let axt = if x_axis {
+            opts.xaxt.unwrap_or(self.par.xaxt)
+        } else {
+            opts.yaxt.unwrap_or(self.par.yaxt)
+        };
+        if axt == AxisType::None {
             return Vec::new();
         }
         // R's return value: `at` sorted, `NA`s last.
@@ -407,7 +521,7 @@ impl<B: Backend> Device<B> {
             self.pop_clip();
         }
 
-        if !opts.draw_labels {
+        if opts.labels == AxisLabels::None {
             return used;
         }
         let font = opts.font.unwrap_or(self.par.font_axis);
@@ -492,9 +606,16 @@ impl<B: Backend> Device<B> {
     }
 }
 
-/// R's checks of `axis()`'s `labels`: given only with `at`, and as many.
+/// R's checks of `axis()`'s `at` and `labels`: a given `at` has a finite
+/// position (`C_axis`: "no locations are finite"), `labels` only with
+/// `at`, and as many.
 pub(crate) fn check_axis(opts: &AxisOptions) -> Result<(), Error> {
-    if let (true, Some(labels)) = (opts.draw_labels, &opts.labels) {
+    if let Some(at) = &opts.at {
+        if !at.is_empty() && !at.iter().any(|v| v.is_finite()) {
+            return Err(Error::invalid("no locations are finite"));
+        }
+    }
+    if let AxisLabels::Text(labels) = &opts.labels {
         match &opts.at {
             None => return Err(Error::invalid("'labels' is supplied and not 'at'")),
             Some(at) if at.len() != labels.len() => {

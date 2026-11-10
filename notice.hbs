@@ -5,8 +5,9 @@ General Public License, version 2 or later (one translated file, version 3 or
 later), and closely follows R's source code; R's copyright notices and a
 description of the changes are below.
 
-rs-graphics embeds font metrics and font files, and incorporates third-party
-Rust crates, which are distributed under the following licences:
+rs-graphics embeds font metrics, font files and colour schemes, and
+incorporates third-party Rust crates, which are distributed under the
+following licences:
 
   - Adobe Font Metrics licence (Helvetica and Symbol AFM files)
   - SIL Open Font License 1.1 (Liberation Sans fonts)
@@ -46,8 +47,23 @@ src/library/grDevices/inst/enc/ISOLatin1.enc, and the R functions in
 src/library/graphics/R/ (plot.default, hist, barplot, boxplot, bxp, pie,
 legend, polygon, rect, ...), src/library/grDevices/R/ (boxplot.stats,
 nclass.Sturges, nclass.scott, nclass.FD, gray.colors, xy.coords,
-checkIntFormat), src/library/base/R/pretty.R and
+checkIntFormat, and palette with its colour sets),
+src/library/base/R/pretty.R and
 src/library/stats/R/{fivenum,quantile}.R.
+
+--------------------------------------------------------------------------------
+ColorBrewer colour schemes: the "Accent", "Dark 2", "Paired", "Pastel 1",
+"Pastel 2", "Set 1", "Set 2" and "Set 3" palettes, from R's grDevices package
+(src/color/palettes.rs)
+http://colorbrewer.org/
+--------------------------------------------------------------------------------
+
+Copyright (c) 2002 Cynthia Brewer, Mark Harrower, and The Pennsylvania State
+University.
+
+This product includes color specifications and designs developed by Cynthia
+Brewer (http://colorbrewer.org/). Licensed under the Apache License, Version
+2.0, reproduced below.
 
 --------------------------------------------------------------------------------
 Helvetica and Symbol font metrics (assets/afm/*.afm), from R's grDevices package

@@ -13,9 +13,11 @@
 //! vectorised and default `text()` labels, `box(which = )` and
 //! `plot.window(asp = )`, `plot()`'s axes taking their style from
 //! `par()`, and the high-level plots' `par()`-based defaults (borders,
-//! boxplot lines and outliers, `ann`), unequal-width `hist()` densities
-//! and missing pie labels. Every painted path and text item is compared
-//! in order (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
+//! boxplot lines and outliers, `ann`), `par(pch)` as a character, named
+//! palettes, integer codes given as ranges, `text()`'s and `legend()`'s
+//! `adj` (one value, two, `NA`s, unset), unequal-width `hist()` densities
+//! and missing pie labels. Every painted path and text item is compared in
+//! order (see `common::pdf::assert_same`). Skipped if `Rscript` isn't
 //! available.
 
 use crate::common;
@@ -224,7 +226,7 @@ fn cases() -> Vec<Case> {
                     .labels(["edge"])
                     .with(&edge)
                     .draw();
-                let rot = TextOptions::default().adj(0.0).vadj(1.0).srt(45.0);
+                let rot = TextOptions::default().adj([0.0, 1.0]).srt(45.0);
                 d.text().x([3.0]).y([3.0]).labels(["rot"]).with(&rot).draw();
                 d.par().adj(1.0).draw();
                 d.text().x([5.0]).y([7.0]).labels(["right"]).draw();
@@ -332,6 +334,144 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            // Integer codes as ranges, as R's `1:n`: colours, symbols, line
+            // types, fonts, `text()` positions and `mtext()` sides.
+            name: "integer_code_ranges",
+            r: "plot(1:6, col = 1:6, pch = 15:20, xlab = '', ylab = '')\n\
+                segments(1:6, 2, 1:6, 5, lty = 1:6, col = 1:6)\n\
+                text(rep(3, 4), 4, 'a', pos = 1:4, font = 1:4)\n\
+                mtext('s', side = 1:4)",
+            draw: |d| {
+                d.plot().x(1..=6).y(1..=6).col(1..=6).pch(15..=20).draw();
+                d.segments()
+                    .x0(1..=6)
+                    .y0(2)
+                    .y1(5)
+                    .lty(1..=6)
+                    .col(1..=6)
+                    .draw();
+                d.text()
+                    .x([3, 3, 3, 3])
+                    .y(4)
+                    .labels("a")
+                    .pos(1..=4)
+                    .font(1..=4)
+                    .draw();
+                d.mtext().text("s").side(1..=4).draw();
+            },
+        },
+        Case {
+            // Named palettes (exact, a partial name, "default") and one of
+            // our own, read by colour numbers. R's palette is session-wide,
+            // so the R code ends with the default again.
+            name: "palette_names_and_colours",
+            r: "palette('Okabe-Ito'); plot(1:9, col = 1:9, pch = 19, xlab = '', ylab = '')\n\
+                palette('tab'); points(1:9, 9:1, col = 1:9, pch = 15)\n\
+                palette(c('navy', '#E69F00', 'transparent')); points(1:3, c(5, 5, 5), col = 1:3, pch = 17)\n\
+                palette('default'); points(5, 2, col = 2, pch = 19)",
+            draw: |d| {
+                d.par().palette("Okabe-Ito").draw();
+                d.plot()
+                    .x(1..=9)
+                    .y(1..=9)
+                    .col([1, 2, 3, 4, 5, 6, 7, 8, 9])
+                    .pch(19)
+                    .draw();
+                d.par().palette("tab").draw();
+                d.points()
+                    .x(1..=9)
+                    .y([9, 8, 7, 6, 5, 4, 3, 2, 1])
+                    .col([1, 2, 3, 4, 5, 6, 7, 8, 9])
+                    .pch(15)
+                    .draw();
+                d.par().palette(["navy", "#E69F00", "transparent"]).draw();
+                d.points()
+                    .x([1, 2, 3])
+                    .y([5, 5, 5])
+                    .col([1, 2, 3])
+                    .pch(17)
+                    .draw();
+                d.par().palette("default").draw();
+                d.points().x(5).y(2).col(2).pch(19).draw();
+            },
+        },
+        Case {
+            // par(pch) as a character: a string's first character, drawn as
+            // itself by points() and plot(); a number again afterwards.
+            name: "par_pch_character",
+            r: "par(pch = '+'); plot(1:3, c(2, 1, 3), xlab = '', ylab = '')\n\
+                par(pch = 'ab'); points(c(1.5, 2.5), c(2.5, 1.5))\n\
+                par(pch = 17); points(2, 2)",
+            draw: |d| {
+                d.par().pch('+').draw();
+                d.plot().x([1, 2, 3]).y([2, 1, 3]).draw();
+                d.par().pch("ab").draw();
+                d.points().x([1.5, 2.5]).y([2.5, 1.5]).draw();
+                d.par().pch(17).draw();
+                d.points().x(2).y(2).draw();
+            },
+        },
+        Case {
+            // `adj` as one setter: unset is par(adj) with the vertical NA;
+            // an NA horizontal value centres even under par(adj = 0); a
+            // one-value adj leaves the vertical NA; a legend's unset adj is
+            // c(0, 0.5) and its NA values centre as text()'s do.
+            name: "adj_one_two_na",
+            r: "par(adj = 0); plot.new(); plot.window(c(0, 10), c(0, 10))\n\
+                text(5, 9, 'unset Mg')\n\
+                text(5, 8, 'NA, 0 Mg', adj = c(NA, 0))\n\
+                text(5, 7, 'NA, NA Mg', adj = c(NA_real_, NA_real_))\n\
+                text(5, 6, 'one 1 Mg', adj = 1)\n\
+                text(5, 5, 'two 1 1 Mg', adj = c(1, 1))\n\
+                text(5, 4, 'two 0.2 NA', adj = c(0.2, NA))\n\
+                legend('bottomleft', c('Mg', 'a'), pch = 1)\n\
+                legend('bottomright', c('Mg', 'a'), pch = 1, adj = c(NA, 1))\n\
+                legend('topleft', c('Mg', 'a'), pch = 1, adj = c(0.5, NA))",
+            draw: |d| {
+                d.par().adj(0).draw();
+                d.plot_new();
+                d.plot_window().xlim([0, 10]).ylim([0, 10]).draw();
+                d.text().x(5).y(9).labels("unset Mg").draw();
+                d.text()
+                    .x(5)
+                    .y(8)
+                    .labels("NA, 0 Mg")
+                    .adj([None, Some(0)])
+                    .draw();
+                d.text()
+                    .x(5)
+                    .y(7)
+                    .labels("NA, NA Mg")
+                    .adj([None::<f64>, None])
+                    .draw();
+                d.text().x(5).y(6).labels("one 1 Mg").adj(1).draw();
+                d.text().x(5).y(5).labels("two 1 1 Mg").adj([1, 1]).draw();
+                d.text()
+                    .x(5)
+                    .y(4)
+                    .labels("two 0.2 NA")
+                    .adj([Some(0.2), None])
+                    .draw();
+                d.legend()
+                    .pos("bottomleft")
+                    .labels(["Mg", "a"])
+                    .pch(1)
+                    .draw();
+                d.legend()
+                    .pos("bottomright")
+                    .labels(["Mg", "a"])
+                    .pch(1)
+                    .adj([None, Some(1)])
+                    .draw();
+                d.legend()
+                    .pos("topleft")
+                    .labels(["Mg", "a"])
+                    .pch(1)
+                    .adj([Some(0.5), None])
+                    .draw();
+            },
+        },
+        Case {
             name: "arrows_log",
             r: "plot.new(); plot.window(c(1, 100), c(1, 10), log = 'x')\n\
                 arrows(c(0, 10, -5), 2, c(50, 20, 30), c(5, 8, 9))",
@@ -340,7 +480,7 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim([1.0, 100.0])
                     .ylim([1.0, 10.0])
-                    .xlog(true)
+                    .log("x")
                     .draw();
                 d.arrows()
                     .x0([0.0, 10.0, -5.0])
@@ -415,11 +555,7 @@ fn cases() -> Vec<Case> {
                      col = c('red', 'blue', 'green', 'orange', 'purple', 'black'))",
             draw: |d| {
                 d.plot_new();
-                d.plot_window()
-                    .xlim([1, 100])
-                    .ylim([0, 10])
-                    .xlog(true)
-                    .draw();
+                d.plot_window().xlim([1, 100]).ylim([0, 10]).log("x").draw();
                 d.text()
                     .x([f64::NAN, 10.0, 0.0, 50.0, -1.0, 20.0])
                     .y([2.0, 3.0, 4.0, 5.0, 6.0, f64::NAN])
@@ -447,7 +583,7 @@ fn cases() -> Vec<Case> {
                     .ytop([2.0])
                     .draw();
                 // Ignored on a log axis, as in R.
-                let log = asp.xlog(true);
+                let log = asp.log("x");
                 d.plot_window()
                     .xlim([1.0, 100.0])
                     .ylim([0.0, 2.0])

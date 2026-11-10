@@ -162,7 +162,7 @@ fn cases() -> Vec<Case> {
                     .height([3, 1, 2])
                     .lwd(2.5)
                     .axis_lty(1)
-                    .names(["a", "b", "c"])
+                    .names_arg(["a", "b", "c"])
                     .draw();
             },
         },
@@ -256,7 +256,7 @@ fn cases() -> Vec<Case> {
                 d.par().usr([0, 20, -5, 5]).draw();
                 d.points().x([5]).y([0]).draw();
                 d.axis().side(1).draw();
-                d.axis().side(2).draw_labels(false).draw();
+                d.axis().side(2).labels(false).draw();
                 d.abline().h([0]).draw();
             },
         },
@@ -269,11 +269,7 @@ fn cases() -> Vec<Case> {
                 par(usr = c(0, 3, 0, 1)); points(c(10, 100), c(0.5, 0.5))",
             ours: |d| {
                 d.plot_new();
-                d.plot_window()
-                    .xlim([1, 100])
-                    .ylim([0, 1])
-                    .xlog(true)
-                    .draw();
+                d.plot_window().xlim([1, 100]).ylim([0, 1]).log("x").draw();
                 d.par().usr([0, 3, 0, 1]).draw();
                 d.points().x([10, 100]).y([0.5, 0.5]).draw();
             },
@@ -466,7 +462,7 @@ fn par_usr_on_a_log_axis_sets_log_ticks() {
     dev.plot_window()
         .xlim([1, 100])
         .ylim([0, 1])
-        .xlog(true)
+        .log("x")
         .draw();
     dev.par().usr([0, 3, 0, 1]).draw();
     let got = dev.current_par().xaxp;
@@ -476,7 +472,7 @@ fn par_usr_on_a_log_axis_sets_log_ticks() {
     want.plot_window()
         .xlim([1, 1000])
         .ylim([0, 1])
-        .xlog(true)
+        .log("x")
         .draw();
     assert_eq!(got, want.current_par().xaxp);
     assert_eq!(dev.usr(), [0.0, 3.0, 0.0, 1.0]);

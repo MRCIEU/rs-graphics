@@ -22,10 +22,13 @@ fn whole_plot<G: Graphics>(g: &mut G) {
     g.plot().x(x).main("one").draw();
     g.hist().x(x).draw();
     g.boxplot().x(x).draw();
-    g.barplot().height([3, 5, 2]).names(["a", "b", "c"]).draw();
+    g.barplot()
+        .height([3, 5, 2])
+        .names_arg(["a", "b", "c"])
+        .draw();
     g.mtext().text("Page one").outer(true).line(0.5).draw();
     g.plot().x(x).y(x).main("five").draw();
-    g.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
+    g.layout().mat([[1, 1], [2, 3]]).heights([2, 1]).draw();
     g.plot().x(x).type_("l").draw();
     g.pie().x([1, 2, 3]).draw();
     g.par().mfg([2, 1]).draw();
@@ -87,11 +90,11 @@ fn layout_errors_are_found_when_recording() {
             "invalid value specified for graphical parameter \"fin\"".into()
         )
     );
-    let e = fig.layout().mat(&[[1, 3]]).try_draw().unwrap_err();
+    let e = fig.layout().mat([[1, 3]]).try_draw().unwrap_err();
     assert_eq!(e.call(), "layout");
     assert!(fig.is_empty(), "nothing recorded after an error");
     // `layout()` returns the number of figures in a `Figure` too.
-    assert_eq!(fig.layout().mat(&[[1, 2], [3, 3]]).draw(), 3);
+    assert_eq!(fig.layout().mat([[1, 2], [3, 3]]).draw(), 3);
 }
 
 #[test]
@@ -120,7 +123,7 @@ fn a_whole_plot_cant_go_into_a_panel() {
     assert!(e.message().contains("can't be added into a panel"), "{e}");
     // `layout()` makes a whole plot too.
     let mut fig = Figure::new();
-    fig.layout().mat(&[[1, 2]]).draw();
+    fig.layout().mat([[1, 2]]).draw();
     assert!(dev.try_add_figure_at(1, 1, &fig).is_err());
 }
 

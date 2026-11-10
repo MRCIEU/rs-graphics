@@ -61,24 +61,37 @@ mod plotmath;
 mod primitives;
 pub use abline::AblineOptions;
 pub(crate) use axis::AxisLabelStyle;
-pub use axis::AxisOptions;
+pub use axis::{AxisLabels, AxisOptions};
 pub(crate) use axis::check_axis;
 pub(crate) use legend::check_legend;
 pub use legend::{LegendKeyword, LegendLayout, LegendOptions, LegendPos};
 pub use mtext::MtextOptions;
 pub(crate) use mtext::check_mtext;
 pub use open::{DeviceBuilder, Units};
-pub(crate) use primitives::check_text;
 pub use primitives::{
-    ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions, RectOptions,
-    SegmentsOptions, TextOptions, XyOptions,
+    Adj, AdjElement, ArrowsOptions, BoxOptions, BoxWhich, PlotWindowOptions, PolygonOptions,
+    RectOptions, SegmentsOptions, TextOptions, XyOptions,
 };
+pub(crate) use primitives::{check_arrows, check_text, check_window_limits};
 
 /// A side of the plot, figure or page.
 ///
 /// Setters also take R's side numbers (`TryFrom<i32>`): `1` bottom, `2`
 /// left, `3` top, `4` right (`.side(1)` is `.side(Side::Bottom)`); any
 /// other number is an error of the call ("invalid axis number").
+///
+/// This is R's `side` of `axis()` and `mtext()`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot().x([1, 2]).y([1, 2]).axes(false).draw();
+/// dev.axis().side(Side::Left).draw();
+/// dev.mtext().text("note").side(4).draw();
+/// assert_eq!(Side::try_from(1).unwrap(), Side::Bottom);
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {
     /// Side 1, below the plot.
@@ -225,8 +238,7 @@ pub struct Device<B: Backend> {
 /// device, or recorded in a [`Figure`](crate::recording::Figure).
 /// Without `.draw()`, nothing happens (the compiler warns).
 ///
-/// See [`Graphics::layout`] for an
-/// example.
+/// See [`Graphics::layout`] for the arguments and an example.
 #[must_use = "nothing is changed until `.draw()`"]
 pub struct LayoutCall<'a, G: Graphics> {
     target: &'a mut G,
@@ -255,9 +267,10 @@ impl<'a, G: Graphics> LayoutCall<'a, G> {
     /// appear; `0` marks an empty cell, and a number in several cells
     /// makes that figure span them. Fractions are truncated, as R does.
     /// Required.
-    pub fn mat<R: AsRef<[T]>, T: crate::numbers::Num>(mut self, mat: &[R]) -> Self {
+    pub fn mat<R: AsRef<[T]>, T: crate::numbers::Num>(mut self, mat: impl AsRef<[R]>) -> Self {
         self.mat = Some(
-            mat.iter()
+            mat.as_ref()
+                .iter()
                 .map(|row| row.as_ref().iter().map(|v| v.to_f64()).collect())
                 .collect(),
         );
@@ -899,8 +912,8 @@ impl<B: Backend> Device<B> {
 
     /// Returns whether the x axis is logarithmic.
     ///
-    /// Set by the last `plot_window()` or `par(xlog = )`; `plot_new()` resets
-    /// it.
+    /// Set by the last plot's `log` (`.log("x")` on `plot()`, `hist()`,
+    /// ..., `plot_window()`) or by `dev.par().xlog()`; `plot_new()` resets it.
     ///
     /// This is R's [`par("xlog")`].
     ///
@@ -909,7 +922,7 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.plot().x([1, 10, 100]).xlog(true).draw();
+    /// dev.plot().x([1, 10, 100]).log("x").draw();
     /// assert!(dev.xlog());
     /// ```
     ///
@@ -927,7 +940,7 @@ impl<B: Backend> Device<B> {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// dev.plot().x([1, 10, 100]).ylog(true).draw();
+    /// dev.plot().x([1, 10, 100]).log("y").draw();
     /// assert!(dev.ylog());
     /// ```
     ///
@@ -2543,12 +2556,51 @@ pub(crate) fn check_log_axp(name: &str, axp: [f64; 3]) -> Result<(), Error> {
     Ok(())
 }
 
+/// R's error for a `par()` value it rejects (`par_error()` in `par.c`).
+pub(crate) fn par_error(name: &str) -> Error {
+    Error::invalid(format!(
+        "invalid value specified for graphical parameter \"{name}\""
+    ))
+}
+
+/// R's check of `par(xaxp/yaxp = )` on a linear axis: the count `axp[2]`,
+/// as an integer, is positive (`posIntCheck`; `NaN` is R's `NA`).
+pub(crate) fn check_linear_axp(name: &str, axp: [f64; 3]) -> Result<(), Error> {
+    let n = crate::numbers::as_integer(axp[2]);
+    if n == crate::numbers::NA_INTEGER || n <= 0 {
+        return Err(par_error(name));
+    }
+    Ok(())
+}
+
 /// R's check of `lmitre` (in `par()` or inline): at least 1.
 pub(crate) fn check_lmitre(lmitre: Option<f64>) -> Result<(), Error> {
     match lmitre {
         Some(m) if m.is_nan() || m < 1.0 => Err(Error::invalid(
             "invalid value specified for graphical parameter \"lmitre\"",
         )),
+        _ => Ok(()),
+    }
+}
+
+/// R's check of [`par(lab)`](crate::par::Par::lab): the first two values
+/// positive integers and the third non-negative, none R's `NA`
+/// (`as.integer()` of `NaN` or a value beyond its range). Without it
+/// `GEPretty()` would be asked for 0 intervals, which is an internal panic.
+pub(crate) fn check_lab(lab: Option<[i32; 3]>) -> Result<(), Error> {
+    match lab {
+        Some([nx, ny, len])
+            if nx == crate::numbers::NA_INTEGER
+                || ny == crate::numbers::NA_INTEGER
+                || len == crate::numbers::NA_INTEGER
+                || nx <= 0
+                || ny <= 0
+                || len < 0 =>
+        {
+            Err(Error::invalid(
+                "invalid value specified for graphical parameter \"lab\"",
+            ))
+        }
         _ => Ok(()),
     }
 }
@@ -2615,11 +2667,9 @@ mod tests {
         let mut dev = Device::memory("pdf").width(7.0).height(5.0).open().unwrap();
         dev.plot_new_impl().unwrap();
         assert!(!dev.xlog() && !dev.ylog());
-        let log_x = PlotWindowOptions {
-            xlog: true,
-            ..PlotWindowOptions::default()
-        };
-        dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x);
+        let log_x = PlotWindowOptions::default().log("x");
+        dev.plot_window_impl((1.0, 1000.0), (-2.0, 3.0), &log_x)
+            .unwrap();
         assert!(dev.xlog() && !dev.ylog());
         for (x, y) in [(1.0, -2.0), (31.6, 0.25), (1000.0, 3.0)] {
             let (x2, y2) = dev.inches_to_data(dev.data_to_inches(x, y));

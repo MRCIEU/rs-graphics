@@ -42,15 +42,13 @@ dev.plot().x(&x).y(&y).pch(19).col("red").main("Weight").draw();
 | a dot in a name: `cex.main`, `plot.window()` | an underscore: `.cex_main()`, `dev.plot_window()` |
 | `box()`, `type =` (Rust keywords) | `dev.box_()`, `.type_()` |
 | `orderH`, `axTicks()` | `.order_h()`, `dev.ax_ticks()` |
-| `log = "xy"` | `.xlog(true).ylog(true)` |
-| `labels = FALSE` (in `axis()`) | `.draw_labels(false)` |
 
 # Values
 
 | R | Rust |
 |---|---|
 | `c(1, 2, 3)` | `[1, 2, 3]` or `&v` (a `Vec`, array or slice) |
-| `1:10` | `1..=10` |
+| `1:10` | `1..=10`, for data and for codes too: `col = 1:3` is `.col(1..=3)`, `pch = 15:18` is `.pch(15..=18)` |
 | `TRUE`, `FALSE` | `true`, `false` |
 | `NA` in a setting: `pch = c(19, NA)`, `mtext(at = c(1, NA))` | `None`: `.pch([Some(19), None])`, `.at([Some(1.0), None])` |
 | `NA` in data or coordinates: `x = c(1, NA, 3)` | `f64::NAN`: that value is skipped, as in R |
@@ -113,8 +111,13 @@ dev.par().mfrow([1, 2]).mar([4, 4, 2, 1]).las(1).draw();
   `dev.par().mar(mar).draw();`.
 - Graphical parameters given to a function (`plot(x, cex.axis = 0.8)`)
   are setters of that call, and last for that call only, as in R.
+- Log axes, as in R: a log plot is `plot(x, log = "xy")`, i.e.
+  `.log("xy")` on `plot()` (or `hist()`, `barplot()`, `boxplot()`,
+  `plot_window()`), which works out the limits on that scale.
+  `par(xlog = TRUE)` is `dev.par().xlog(true)`: it only flips the
+  current plot's state (and leaves `usr` as it is); `dev.xlog()` reads it.
 - `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))` is
-  `dev.layout().mat(&[[1, 1], [2, 3]]).draw()`: matrices are written as
+  `dev.layout().mat([[1, 1], [2, 3]]).draw()`: matrices are written as
   rows.
 
 # Recorded plots
@@ -156,13 +159,17 @@ replaces draws (see [`extra`](crate::extra)):
   `boxplot()`: a background for the plot region only. In R:
   `panel.first = rect(<par("usr")>, col = "grey92", border = NA)`.
 
+Two device options are not in R either, so they replace no R code:
+`.threads()` sets how many threads draw a PNG, and `.compress(true)` on
+an SVG device writes a gzipped `.svgz`.
+
 ```
 # use rs_graphics::prelude::*;
 # let mut dev = Device::memory("svg").width(7).height(7).open().unwrap();
 dev.par().mar([7, 4, 2, 1]).draw();
 dev.barplot()
     .height([3, 5, 2])
-    .names(["first group", "second group", "third group"])
+    .names_arg(["first group", "second group", "third group"])
     .label_srt(45)
     .panel_bg("grey92")
     .draw();
@@ -231,7 +238,7 @@ let h = dev
     .draw();
 dev.abline().v(h.mids[2]).lty("dashed").draw(); // R counts from 1
 let heights = [3.0, 5.0, 2.0];
-let mp = dev.barplot().height(heights).names(["A", "B", "C"]).ylim([0, 6]).draw();
+let mp = dev.barplot().height(heights).names_arg(["A", "B", "C"]).ylim([0, 6]).draw();
 let above: Vec<f64> = heights.iter().map(|h| h + 0.3).collect();
 dev.text().x(&mp).y(&above).labels(["3", "5", "2"]).draw();
 dev.mtext().text("Two panels").outer(true).line(0.5).font(2).draw();

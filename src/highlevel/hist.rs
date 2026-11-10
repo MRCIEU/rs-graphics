@@ -18,28 +18,34 @@
 //! `warn.unused`; R's `probability` and `nclass` are `.freq(false)` and
 //! `.breaks(n)`.
 //!
+//! R bugs not copied: with a count of breaks and no finite data, R's
+//! message is `character(0)` (its `gettextf()` formats an empty result);
+//! the message here is the one R meant, `hist.default: pretty() error,
+//! breaks=`.
+//!
 //! This is R's `hist(x, ...)`, ported from `hist.default`/`plot.histogram`
 //! in `r-source/src/library/graphics/R/hist.R`.
 
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::device::{
-    AxisOptions, Device, PlotWindowOptions, RectOptions, TextOptions, TitleOptions,
+    Adj, AxisOptions, Device, PlotWindowOptions, RectOptions, TextOptions, TitleOptions,
+    check_window_limits,
 };
 use crate::error::{Error, from_r_string};
 use crate::font::FontFace;
 use crate::lty::LineType;
 use crate::numbers::Num;
+use crate::par::Log;
 use crate::plotmath::Label;
 use crate::pretty::pretty_r;
 
-use super::{InlineAxis, data_range};
+use super::{InlineAxis, Window, data_range};
 
 /// Sturges' rule (`nclass.Sturges()`): `ceiling(log2(length(x)) + 1)`.
+/// No data gives `-Inf`, which `hist()` rejects ("invalid number of
+/// 'breaks'"), as R.
 fn nclass_sturges(n: usize) -> f64 {
-    if n == 0 {
-        return 1.0;
-    }
     ((n as f64).log2() + 1.0).ceil()
 }
 
@@ -55,9 +61,15 @@ fn var(x: &[f64]) -> f64 {
     x.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>() / (n - 1.0)
 }
 
-/// R's `quantile(x, p, type = 7)` of sorted `x`.
+/// R's `quantile(x, p, type = 7)` of sorted `x`; `NaN` of nothing (R's
+/// `NA`). With no data the `"FD"` rule then gives one class, which ends in
+/// [`pretty_breaks`]'s error (R's `nclass.FD()` fails earlier, with
+/// "missing value where TRUE/FALSE needed").
 fn quantile7(sorted: &[f64], p: f64) -> f64 {
     let n = sorted.len();
+    if n == 0 {
+        return f64::NAN;
+    }
     let index = 1.0 + (n.saturating_sub(1)) as f64 * p;
     let (lo, hi) = (index.floor(), index.ceil());
     let qs = sorted[lo as usize - 1];
@@ -543,15 +555,19 @@ crate::setters::options! {
         pub ann: bool => value bool,
         /// Whether to draw the axes. Default `true`.
         pub axes: bool => value bool,
-        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic. Default `false`. As in R, the range
-        /// still starts from 0, which R "corrects" to about 1e-307 (with a
-        /// warning). R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        /// On a log y axis the range still starts from 0, which R "corrects"
+        /// to about 1e-307 (with a warning), as here.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Draws the bars on the current plot, without a new plot, window,
-        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`,
-        /// `xlim`, `ylim`, `ann` and `panel_bg` are ignored). Default `false`.
+        /// title or axes (so `main`, `xlab`, `ylab`, `axes`, `log`, `xlim`,
+        /// `ylim`, `ann` and `panel_bg` are ignored, as in R). Default `false`.
         pub add: bool => value bool,
         /// Orientation of the axis labels: 0 parallel to the axis, 1
         /// horizontal, 2 perpendicular, 3 vertical. `None`: [`par(las)`].
@@ -628,8 +644,7 @@ impl Default for HistOptions {
             font_lab: None,
             ann: true,
             axes: true,
-            xlog: false,
-            ylog: false,
+            log: Log::default(),
             add: false,
             las: None,
             cex_axis: None,
@@ -680,6 +695,46 @@ pub struct HistResult {
     pub equidist: bool,
 }
 
+/// `plot.histogram()`'s window: `xlim = range(breaks)`, `ylim = range(y,
+/// 0)` unless given, checked as `plot.window()` does
+/// ([`check_window_limits`]). `heights` are the bars (counts or
+/// densities, R's `y`).
+pub(crate) fn hist_window(
+    breaks: &[f64],
+    heights: &[f64],
+    opts: &HistOptions,
+) -> Result<Window, Error> {
+    let ymax = heights.iter().cloned().fold(0.0_f64, f64::max);
+    let xlim = opts.xlim.unwrap_or((breaks[0], breaks[breaks.len() - 1]));
+    let ylim = opts.ylim.unwrap_or((0.0, ymax));
+    check_window_limits(xlim, ylim)?;
+    Ok((xlim, ylim))
+}
+
+/// The bar heights `plot.histogram()` draws: counts if `freq` (R's
+/// `freq = NULL`: when the bins are equally wide), else densities.
+pub(crate) fn hist_heights(result: &HistResult, opts: &HistOptions) -> Vec<f64> {
+    if opts.freq.unwrap_or(result.equidist) {
+        result.counts.clone()
+    } else {
+        result.density.clone()
+    }
+}
+
+/// `pretty(range(x), n = breaks, min.n = 1)` for a count of breaks. With no
+/// finite data `range()` is `(Inf, -Inf)` and `pretty()` gives nothing,
+/// which `hist.default` stops on: its `stop(gettextf("hist.default:
+/// pretty() error, breaks=%s", format(breaks)))` formats the empty
+/// result, so R's message is the quirk `character(0)`; the message here is
+/// the template R meant. Not in the R cross-checks for that reason.
+fn pretty_breaks(data: &[f64], nclass: i32) -> Result<Vec<f64>, Error> {
+    let (lo, hi) = data_range(data);
+    if !(lo.is_finite() && hi.is_finite()) {
+        return Err(Error::invalid("hist.default: pretty() error, breaks="));
+    }
+    Ok(pretty_r(lo, hi, nclass, 1))
+}
+
 /// The bins of `hist(x, plot = FALSE)`: breaks, counts, densities and
 /// mid-points. Needs no device, so a recorded figure can return the same
 /// result as [`Graphics::hist`](crate::graphics::Graphics::hist).
@@ -709,14 +764,10 @@ pub(crate) fn hist_bins(x: &[f64], opts: &HistOptions) -> Result<HistResult, Err
             // R caps it (with a warning) so that pretty() gets an integer;
             // pretty() truncates it.
             let nclass = k.min(1e6) as i32;
-            let (lo, hi) = data_range(&data);
-            (pretty_r(lo, hi, nclass, 1), false)
+            (pretty_breaks(&data, nclass)?, false)
         }
         // Fewer than two edges (none given): Sturges.
-        _ => {
-            let (lo, hi) = data_range(&data);
-            (pretty_r(lo, hi, nclass_sturges(n) as i32, 1), false)
-        }
+        _ => (pretty_breaks(&data, nclass_sturges(n) as i32)?, false),
     };
 
     // R forces `include.lowest` (with a warning) unless edges were given.
@@ -767,37 +818,27 @@ impl<B: Backend> Device<B> {
         if !opts.plot.unwrap_or(true) {
             return hist_bins(x, opts);
         }
+        let result = hist_bins(x, opts)?;
+        let heights = hist_heights(&result, opts);
+        let freq = opts.freq.unwrap_or(result.equidist);
         let HistResult {
             breaks,
             counts,
             density,
             mids,
             equidist,
-        } = hist_bins(x, opts)?;
+        } = result;
         let nb = breaks.len();
-
-        // R's `freq = NULL`: counts if the bins are equally wide.
-        let freq = opts.freq.unwrap_or(equidist);
-        let heights: Vec<f64> = if freq {
-            counts.clone()
-        } else {
-            density.clone()
-        };
-        let ymax = heights.iter().cloned().fold(0.0_f64, f64::max);
-
-        // `plot.histogram()`: window, title, axes (unless `add`), then the
-        // bars.
+        // `plot.histogram()`: window, title, axes (unless `add`, which
+        // checks no limits, as R), then the bars.
         if !opts.add {
+            let (xlim, ylim) = hist_window(&breaks, &heights, opts)?;
             self.plot_new_impl()?;
             let window = PlotWindowOptions {
-                xlog: opts.xlog,
-                ylog: opts.ylog,
+                log: opts.log,
                 ..PlotWindowOptions::default()
             };
-            // `xlim = range(breaks)`, `ylim = range(y, 0)` unless given.
-            let xlim = opts.xlim.unwrap_or((breaks[0], breaks[nb - 1]));
-            let ylim = opts.ylim.unwrap_or((0.0, ymax));
-            self.plot_window_impl(xlim, ylim, &window);
+            self.plot_window_impl(xlim, ylim, &window)?;
             crate::extra::panel_bg(self, &opts.extra)?;
 
             if opts.ann {
@@ -896,8 +937,8 @@ impl<B: Backend> Device<B> {
         };
         if !labels.is_empty() {
             let at = TextOptions {
-                adj: Some(0.5),
-                vadj: Some(-0.5),
+                // `text(mids, y, labels, adj = c(0.5, -0.5))`.
+                adj: Some(Adj::from((0.5, -0.5))),
                 ..TextOptions::default()
             };
             let labels: Vec<Option<Label>> = labels.into_iter().map(Some).collect();
@@ -917,6 +958,44 @@ impl<B: Backend> Device<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// No finite data: Sturges gives `-Inf` breaks (R's "invalid number of
+    /// 'breaks'"); a given count reaches `pretty()` with an empty range,
+    /// where R stops with an empty message (see `pretty_breaks`).
+    #[test]
+    fn no_finite_data_is_an_error() {
+        let message =
+            |opts: HistOptions, x: &[f64]| hist_bins(x, &opts).unwrap_err().message().to_string();
+        assert_eq!(
+            message(HistOptions::default(), &[]),
+            "invalid number of 'breaks'"
+        );
+        assert_eq!(
+            message(HistOptions::default(), &[f64::NAN]),
+            "invalid number of 'breaks'"
+        );
+        for breaks in [
+            HistBreaks::Count(5.0),
+            HistBreaks::Scott,
+            HistBreaks::FreedmanDiaconis,
+        ] {
+            let opts = HistOptions {
+                breaks: Some(breaks),
+                ..HistOptions::default()
+            };
+            assert!(hist_bins(&[], &opts).is_err());
+        }
+        assert_eq!(
+            message(
+                HistOptions {
+                    breaks: Some(HistBreaks::Count(5.0)),
+                    ..HistOptions::default()
+                },
+                &[]
+            ),
+            "hist.default: pretty() error, breaks="
+        );
+    }
 
     /// Values from R 4.6: `sprintf("%.17g", signif(v, 5))` and
     /// `quantile(x, p, type = 7)`, written out in full.

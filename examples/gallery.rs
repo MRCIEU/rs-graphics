@@ -81,8 +81,7 @@ fn draw_log<B: Backend>(dev: &mut Device<B>) {
         .type_(PlotType::Both)
         .pch(19)
         .col(4)
-        .xlog(true)
-        .ylog(true)
+        .log("xy")
         .main("plot(): log = \"xy\"")
         .xlab("x")
         .ylab("2 * x^1.5");
@@ -131,8 +130,7 @@ fn draw_abline_log<B: Backend>(dev: &mut Device<B>) {
 
     let opts = PlotOptions::default()
         .pch(19)
-        .xlog(true)
-        .ylog(true)
+        .log("xy")
         .main("abline() on log axes")
         .xlab("x")
         .ylab("y");
@@ -196,7 +194,7 @@ fn draw_hist<B: Backend>(dev: &mut Device<B>) {
 fn draw_barplot<B: Backend>(dev: &mut Device<B>) {
     let heights = vec![23.0, 41.0, 12.0, 35.0, 28.0];
     let opts = BarplotOptions::default()
-        .names(["A", "B", "C", "D", "E"])
+        .names_arg(["A", "B", "C", "D", "E"])
         .main("barplot()")
         .ylab("value");
     dev.barplot().height(&heights).with(&opts).draw();
@@ -213,7 +211,7 @@ fn barplot_sample_columns() -> Vec<Vec<f64>> {
 
 fn barplot_sample_opts(main: &'static str, beside: bool) -> BarplotOptions {
     BarplotOptions::default()
-        .names(["Q1", "Q2", "Q3", "Q4"])
+        .names_arg(["Q1", "Q2", "Q3", "Q4"])
         .legend_text(["x", "y", "z"])
         .beside(beside)
         .main(main)
@@ -303,7 +301,7 @@ fn draw_pch<B: Backend>(dev: &mut Device<B>) {
 
 /// `layout(matrix(c(1, 1, 2, 3), 2, byrow = TRUE))`: one wide panel above two.
 fn draw_multipanel<B: Backend>(dev: &mut Device<B>) {
-    dev.layout().mat(&[[1, 1], [2, 3]]).draw();
+    dev.layout().mat([[1, 1], [2, 3]]).draw();
     draw_scatter(dev);
     draw_lineplot(dev);
     draw_barplot(dev);

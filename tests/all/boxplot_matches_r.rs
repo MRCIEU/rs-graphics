@@ -14,8 +14,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::highlevel::boxplot::boxplot_stats;
 
 fn r_boxplot_stats(data: &[f64]) -> (Vec<f64>, Vec<f64>) {
@@ -26,7 +24,7 @@ fn r_boxplot_stats(data: &[f64]) -> (Vec<f64>, Vec<f64>) {
              paste(sprintf('%.17g', s$out), collapse=','), '\\n')",
         values.join(",")
     );
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .arg("-e")
         .arg(&script)
         .output()

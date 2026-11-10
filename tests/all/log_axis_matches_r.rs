@@ -22,6 +22,7 @@ use rs_graphics::backend::AnyBackend;
 use rs_graphics::device::{AxisOptions, Device};
 use rs_graphics::graphics::Graphics;
 use rs_graphics::highlevel::PlotOptions;
+use rs_graphics::par::Log;
 
 const PAGE_W: f64 = 7.0;
 const PAGE_H: f64 = 6.0;
@@ -110,8 +111,10 @@ fn r_code(c: &Case) -> String {
 
 fn draw_ours(c: &Case, dev: &mut Device<AnyBackend>) {
     let mut opts = PlotOptions::default()
-        .xlog(c.xlog)
-        .ylog(c.ylog)
+        .log(Log {
+            x: c.xlog,
+            y: c.ylog,
+        })
         .xlab("x")
         .ylab("y");
     if let Some((a, b)) = c.xlim {

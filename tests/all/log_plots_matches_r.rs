@@ -66,7 +66,7 @@ fn cases() -> Vec<Case> {
                 d.plot_window()
                     .xlim([1.0, 100.0])
                     .ylim([1.0, 100.0])
-                    .with(&PlotWindowOptions::default().xlog(true).ylog(true))
+                    .with(&PlotWindowOptions::default().log("xy"))
                     .draw();
                 let nan = f64::NAN;
                 d.segments()
@@ -90,11 +90,7 @@ fn cases() -> Vec<Case> {
                 abline(a = 5, b = 2, untf = TRUE, lty = 2)\n\
                 abline(h = -1); abline(a = -50, b = 3, untf = TRUE, col = 'red')",
             draw: |d| {
-                let opts = PlotOptions::default()
-                    .xlog(true)
-                    .ylog(true)
-                    .xlab("x")
-                    .ylab("y");
+                let opts = PlotOptions::default().log("xy").xlab("x").ylab("y");
                 d.plot().x([1.0, 1000.0]).y([1.0, 1e4]).with(&opts).draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
@@ -164,7 +160,7 @@ fn cases() -> Vec<Case> {
                 abline(1, 2); abline(a = 1, b = 0.01, untf = TRUE)\n\
                 par(xpd = TRUE); abline(h = 5, v = 10, col = 'red')",
             draw: |d| {
-                let opts = PlotOptions::default().xlog(true).xlab("x").ylab("y");
+                let opts = PlotOptions::default().log("x").xlab("x").ylab("y");
                 d.plot().x([1.0, 1000.0]).y([0.0, 10.0]).with(&opts).draw();
                 let black = ColorSpec::Index(1);
                 d.abline()
@@ -206,7 +202,7 @@ fn cases() -> Vec<Case> {
             r: "hist(hx, log = 'x', ylab = 'n')",
             draw: |d| {
                 let o = HistOptions::default()
-                    .xlog(true)
+                    .log("x")
                     .main("Histogram of hx")
                     .xlab("hx")
                     .ylab("n");
@@ -218,7 +214,7 @@ fn cases() -> Vec<Case> {
             r: "suppressWarnings(hist(hx, log = 'y', ylab = 'n'))",
             draw: |d| {
                 let o = HistOptions::default()
-                    .ylog(true)
+                    .log("y")
                     .main("Histogram of hx")
                     .xlab("hx")
                     .ylab("n");
@@ -231,7 +227,7 @@ fn cases() -> Vec<Case> {
                 hist(hx * 1.05, add = TRUE, col = 'pink', border = 'red')",
             draw: |d| {
                 let o = HistOptions::default()
-                    .xlog(true)
+                    .log("x")
                     .main("Histogram of hx")
                     .xlab("hx")
                     .ylab("n");
@@ -249,8 +245,8 @@ fn cases() -> Vec<Case> {
             r: "barplot(c(3, 40, 700, 12), names.arg = c('a', 'b', 'c', 'd'), log = 'y')",
             draw: |d| {
                 let o = BarplotOptions::default()
-                    .names(["a", "b", "c", "d"].map(Label::from).to_vec())
-                    .ylog(true);
+                    .names_arg(["a", "b", "c", "d"].map(Label::from).to_vec())
+                    .log("y");
                 d.barplot().height([3.0, 40.0, 700.0, 12.0]).with(&o).draw();
             },
         },
@@ -260,7 +256,7 @@ fn cases() -> Vec<Case> {
             // used as data), which we deliberately don't copy.
             r: "barplot(cbind(c(2, 5), c(30, 60), c(400, 100)), log = 'y')",
             draw: |d| {
-                let o = BarplotOptions::default().ylog(true);
+                let o = BarplotOptions::default().log("y");
                 d.barplot()
                     .height(&[vec![2.0, 5.0], vec![30.0, 60.0], vec![400.0, 100.0]])
                     .with(&o)
@@ -275,7 +271,7 @@ fn cases() -> Vec<Case> {
                 let o = BarplotOptions::default()
                     .beside(true)
                     .horiz(true)
-                    .xlog(true)
+                    .log("x")
                     .xlim([1.0, 100.0]);
                 d.barplot()
                     .height(&[vec![2.0, 5.0], vec![30.0, 60.0]])
@@ -342,7 +338,7 @@ fn cases() -> Vec<Case> {
                 d.plot().x([0.0, 1.0]).y([0.0, 1.0]).with(&o).draw();
                 d.par().new(true).draw();
                 d.par().lab([2, 12, 7]).draw();
-                let o = PlotOptions::default().xlog(true).ylog(true).axes(false);
+                let o = PlotOptions::default().log("xy").axes(false);
                 d.plot().x([1.0, 1e6]).y([1.0, 50.0]).with(&o).draw();
                 let fg = ColorSpec::Index(1);
                 d.axis()

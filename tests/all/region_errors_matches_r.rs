@@ -14,8 +14,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::prelude::*;
 
 /// One case: R code after `pdf(file, w, h)` that ends in `plot.new()`, and
@@ -104,7 +102,7 @@ fn cases() -> Vec<Case> {
             r: "layout(matrix(1:2, 1), widths = c(lcm(8), lcm(8)))",
             rust: |d| {
                 d.layout()
-                    .mat(&[[1, 2]])
+                    .mat([[1, 2]])
                     .widths([LayoutSize::Cm(8.0), LayoutSize::Cm(8.0)])
                     .draw();
             },
@@ -141,7 +139,7 @@ fn outcome(dev: &mut Device<AnyBackend>) -> String {
 
 /// Runs R code and returns its standard output.
 fn run_r(code: &str) -> String {
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .args(["--vanilla", "-e", code])
         .output()
         .expect("run Rscript");

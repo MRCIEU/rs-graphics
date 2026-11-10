@@ -23,17 +23,17 @@
 use crate::backend::{Backend, LineEnd};
 use crate::color::{Color, ColorSpec};
 use crate::device::{
-    AxisOptions, BoxOptions, Device, PlotWindowOptions, PolygonOptions, SegmentsOptions,
-    TitleOptions, XyOptions,
+    AxisLabels, AxisOptions, BoxOptions, Device, PlotWindowOptions, PolygonOptions,
+    SegmentsOptions, TitleOptions, XyOptions, check_window_limits,
 };
 use crate::error::Error;
 use crate::lty::LineType;
 use crate::numbers::{Num, Numbers};
-use crate::par::AxisType;
+use crate::par::{AxisType, Log};
 use crate::plotmath::Label;
 use crate::recycle::nth;
 
-use super::InlineAxis;
+use super::{InlineAxis, Window};
 
 /// Tukey's five-number summary (`fivenum()` in R's `stats` package):
 /// `[min, lower hinge, median, upper hinge, max]`. This is *not* the same
@@ -103,7 +103,10 @@ pub struct BoxStats {
 /// 0` (or an infinite range) there are no outliers and the whiskers reach
 /// the extremes. `n` counts the non-`NaN` values (infinities included),
 /// and the notch is `median -/+ 1.58 * IQR / sqrt(n)`. With no finite
-/// values, the statistics are `NaN` (see [`BoxStats`]).
+/// values, the statistics are `NaN` (see [`BoxStats`]). A negative `coef`,
+/// R's error in `boxplot.stats()`, is taken as 0 here (this function
+/// returns no `Result`); [`Graphics::boxplot`](crate::graphics::Graphics::boxplot)
+/// checks its `range`.
 ///
 /// This is R's `boxplot.stats(x, coef)`.
 ///
@@ -204,7 +207,7 @@ crate::setters::options! {
         pub border: Vec<ColorSpec> => values ColorSpec,
         /// How far the whiskers reach: to the most extreme point within
         /// `range` times the box length (IQR); points beyond are outliers.
-        /// `None`: 1.5.
+        /// Negative is R's error. `None`: 1.5.
         pub range: Option<f64> => number f64,
         /// Box positions on the name axis, one per group. `None`: `1, 2,
         /// ..., n`.
@@ -219,12 +222,16 @@ crate::setters::options! {
         /// Draws the outliers and includes them in the default value range.
         /// Default `true`.
         pub outline: bool => value bool,
-        /// Makes the x axis logarithmic: the position axis, or the value axis
-        /// when `horizontal`. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic: the value axis, or the position axis
-        /// when `horizontal`. Default `false`. R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        /// The x axis is the position axis, or the value axis when
+        /// `horizontal`.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Limits of the position axis. `None`: `range(at) + c(-0.5, 0.5)`.
         pub xlim: Option<(f64, f64)> => pair f64,
         /// Limits of the value axis, also when `horizontal` (as in R).
@@ -435,8 +442,7 @@ impl Default for BoxplotOptions {
             width: None,
             add: false,
             outline: true,
-            xlog: false,
-            ylog: false,
+            log: Log::default(),
             xlim: None,
             ylim: None,
             main: None,
@@ -516,10 +522,59 @@ pub(crate) fn boxplot_all_stats(
     if (opts.width.as_ref()).is_some_and(|w| w.len() != n || w.iter().any(|&v| v.is_nan() || v <= 0.0)) {
         return Err(Error::invalid("invalid boxplot widths"));
     }
+    // `boxplot.stats()`'s check of `coef`.
+    if opts.range.is_some_and(|r| r < 0.0) {
+        return Err(Error::invalid("'coef' must not be negative"));
+    }
     Ok(groups
         .iter()
         .map(|g| boxplot_stats(g, opts.range.unwrap_or(1.5)))
         .collect())
+}
+
+/// `bxp()`'s window, in `plot.window()`'s order (swapped when
+/// `horizontal`, as `bxp()` calls it): the value limits are `ylim`, else
+/// the range of the finite statistics drawn (the five, the outliers if
+/// `outline`, the notches if `notch`); the position limits `xlim`, else
+/// `range(at) + c(-0.5, 0.5)`. Checked as `plot.window()` does unless
+/// `add` ([`check_window_limits`]): no finite statistic (no data, or all
+/// `NaN`) is R's "need finite 'ylim' values".
+pub(crate) fn boxplot_window(
+    stats: &[BoxStats],
+    at: &[f64],
+    opts: &BoxplotOptions,
+) -> Result<Window, Error> {
+    let ylim = opts.ylim.unwrap_or_else(|| {
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for s in stats {
+            let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
+            let out = if opts.outline { &s.outliers[..] } else { &[] };
+            let conf = if opts.notch { s.conf.to_vec() } else { vec![] };
+            for &v in five.iter().chain(out).chain(&conf) {
+                if v.is_finite() {
+                    lo = lo.min(v);
+                    hi = hi.max(v);
+                }
+            }
+        }
+        (lo, hi)
+    });
+    let xlim = opts.xlim.unwrap_or_else(|| {
+        let finite = at.iter().copied().filter(|v| v.is_finite());
+        let lo = finite.clone().fold(f64::INFINITY, f64::min);
+        let hi = finite.fold(f64::NEG_INFINITY, f64::max);
+        (lo - 0.5, hi + 0.5)
+    });
+    let window = if opts.horizontal {
+        (ylim, xlim)
+    } else {
+        (xlim, ylim)
+    };
+    if !opts.add {
+        check_window_limits(window.0, window.1)?;
+    }
+    Ok(window)
 }
 
 impl<B: Backend> Device<B> {
@@ -538,41 +593,15 @@ impl<B: Backend> Device<B> {
             .clone()
             .unwrap_or_else(|| (1..=n).map(|i| i as f64).collect());
 
-        let ylim = opts.ylim.unwrap_or_else(|| {
-            let mut lo = f64::INFINITY;
-            let mut hi = f64::NEG_INFINITY;
-            for s in &stats {
-                let five = [s.lower_whisker, s.q1, s.median, s.q3, s.upper_whisker];
-                let out = if opts.outline { &s.outliers[..] } else { &[] };
-                let conf = if opts.notch { s.conf.to_vec() } else { vec![] };
-                for &v in five.iter().chain(out).chain(&conf) {
-                    if v.is_finite() {
-                        lo = lo.min(v);
-                        hi = hi.max(v);
-                    }
-                }
-            }
-            if lo <= hi { (lo, hi) } else { (0.0, 1.0) }
-        });
+        let (xlim, ylim) = boxplot_window(&stats, &at, opts)?;
 
         if !opts.add {
-            let xlim = opts.xlim.unwrap_or_else(|| {
-                let finite = at.iter().copied().filter(|v| v.is_finite());
-                let lo = finite.clone().fold(f64::INFINITY, f64::min);
-                let hi = finite.fold(f64::NEG_INFINITY, f64::max);
-                (lo - 0.5, hi + 0.5)
-            });
             self.plot_new_impl()?;
             let window = PlotWindowOptions {
-                xlog: opts.xlog,
-                ylog: opts.ylog,
+                log: opts.log,
                 ..PlotWindowOptions::default()
             };
-            if opts.horizontal {
-                self.plot_window_impl(ylim, xlim, &window);
-            } else {
-                self.plot_window_impl(xlim, ylim, &window);
-            }
+            self.plot_window_impl(xlim, ylim, &window)?;
         }
         crate::extra::panel_bg(self, &opts.extra)?;
         // Whether the position axis is logarithmic (from the device, as R's
@@ -771,8 +800,8 @@ impl<B: Backend> Device<B> {
         // then the title, then the frame.
         let (name_side, value_side) = if opts.horizontal { (2, 1) } else { (1, 2) };
         if opts.axes {
-            // `bxp()` passes only these of its `pars` to the axes, with
-            // `xaxt`/`xaxp` reaching the x axis and `yaxt`/`yaxp` the y axis.
+            // `bxp()` passes only these of its `pars` to the axes; `axis()`
+            // uses `xaxt`/`xaxp` on the x axis and `yaxt`/`yaxp` on the y axis.
             let inline = InlineAxis {
                 las: opts.las,
                 cex_axis: opts.cex_axis,
@@ -780,17 +809,12 @@ impl<B: Backend> Device<B> {
                 gap_axis: opts.gap_axis,
                 ..InlineAxis::default()
             };
-            let side_pars = |side: i32| {
-                let (axt, axp) = if side == 1 {
-                    (opts.xaxt, opts.xaxp)
-                } else {
-                    (opts.yaxt, opts.yaxp)
-                };
-                AxisOptions {
-                    axt,
-                    axp,
-                    ..AxisOptions::default()
-                }
+            let pars = AxisOptions {
+                xaxt: opts.xaxt,
+                yaxt: opts.yaxt,
+                xaxp: opts.xaxp,
+                yaxp: opts.yaxp,
+                ..AxisOptions::default()
             };
             if opts.show_names.unwrap_or(n > 1) {
                 let labels = opts
@@ -799,13 +823,13 @@ impl<B: Backend> Device<B> {
                     .unwrap_or_else(|| (1..=n).map(|i| Some(Label::from(i.to_string()))).collect());
                 let names = AxisOptions {
                     at: Some(at.clone()),
-                    labels: Some(labels),
-                    ..side_pars(name_side)
+                    labels: AxisLabels::Text(labels),
+                    ..pars.clone()
                 };
                 let names = crate::extra::rotated_axis(&opts.extra, names);
                 self.axis_impl(name_side, &inline.apply(names))?;
             }
-            self.axis_impl(value_side, &inline.apply(side_pars(value_side)))?;
+            self.axis_impl(value_side, &inline.apply(pars))?;
         }
 
         if opts.ann.unwrap_or(!opts.add) {

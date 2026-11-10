@@ -50,7 +50,9 @@ use crate::numbers::Num;
 ///
 /// From a string (`"butt".parse::<LineEnd>()` or `TryFrom<&str>`): `"round"`,
 /// `"butt"` or `"square"`, or their codes as strings, `"0"` to `"2"` (R takes
-/// the codes only as numbers). Anything else is an error.
+/// the codes only as numbers). Anything else is an error. From a number
+/// (`TryFrom<i32>`, so setters take `.lend(1)`): R's codes, `0` round, `1`
+/// butt, `2` square, higher codes recycled as R does.
 ///
 /// This is R's [`par(lend)`].
 ///
@@ -88,12 +90,54 @@ impl LineEnd {
 
 crate::error::from_r_string!(LineEnd, "line end", "\"round\", \"butt\" or \"square\"");
 
+impl TryFrom<i32> for LineEnd {
+    type Error = crate::error::Error;
+
+    /// The line end for one of R's `lend` codes: `0` round, `1` butt, `2`
+    /// square; codes above 2 recycle through 1 and 2 as R's `GE_LENDpar()`
+    /// does (`3` is butt, `4` square).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineEnd::try_from(1).unwrap(), LineEnd::Butt);
+    /// assert_eq!(LineEnd::try_from(4).unwrap(), LineEnd::Square);
+    /// assert!(LineEnd::try_from(-1).is_err());
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// If `code` is negative (R: "invalid line end").
+    fn try_from(code: i32) -> Result<Self, Self::Error> {
+        match line_code(code, 2) {
+            Some(0) => Ok(LineEnd::Round),
+            Some(1) => Ok(LineEnd::Butt),
+            Some(_) => Ok(LineEnd::Square),
+            None => Err(crate::error::Error::invalid("invalid line end")),
+        }
+    }
+}
+
+/// R's `GE_LENDpar()`/`GE_LJOINpar()` code rule: `0` stays, a positive
+/// code recycles through `1..=n` (`n` is 2: the names after `"round"`), a
+/// negative one is `None` (an error).
+fn line_code(code: i32, n: i32) -> Option<i32> {
+    match code {
+        0 => Some(0),
+        c if c > 0 => Some((c - 1) % n + 1),
+        _ => None,
+    }
+}
+
 /// How the corners of a line are drawn: round, mitred (pointed) or
 /// bevelled (cut off).
 ///
 /// From a string (`"mitre".parse::<LineJoin>()` or `TryFrom<&str>`): `"round"`,
 /// `"mitre"` or `"bevel"`, or their codes as strings, `"0"` to `"2"` (R takes
-/// the codes only as numbers). Anything else is an error.
+/// the codes only as numbers). Anything else is an error. From a number
+/// (`TryFrom<i32>`, so setters take `.ljoin(1)`): R's codes, `0` round, `1`
+/// mitre, `2` bevel, higher codes recycled as R does.
 ///
 /// This is R's [`par(ljoin)`].
 ///
@@ -130,6 +174,35 @@ impl LineJoin {
 }
 
 crate::error::from_r_string!(LineJoin, "line join", "\"round\", \"mitre\" or \"bevel\"");
+
+impl TryFrom<i32> for LineJoin {
+    type Error = crate::error::Error;
+
+    /// The line join for one of R's `ljoin` codes: `0` round, `1` mitre, `2`
+    /// bevel; codes above 2 recycle through 1 and 2 as R's `GE_LJOINpar()`
+    /// does (`3` is mitre, `4` bevel).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use rs_graphics::prelude::*;
+    /// assert_eq!(LineJoin::try_from(2).unwrap(), LineJoin::Bevel);
+    /// assert_eq!(LineJoin::try_from(3).unwrap(), LineJoin::Mitre);
+    /// assert!(LineJoin::try_from(-1).is_err());
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// If `code` is negative (R: "invalid line join").
+    fn try_from(code: i32) -> Result<Self, Self::Error> {
+        match line_code(code, 2) {
+            Some(0) => Ok(LineJoin::Round),
+            Some(1) => Ok(LineJoin::Mitre),
+            Some(_) => Ok(LineJoin::Bevel),
+            None => Err(crate::error::Error::invalid("invalid line join")),
+        }
+    }
+}
 
 /// Everything a [`Backend`] needs to draw a line: colour, width, line type,
 /// ends, corners and mitre limit.

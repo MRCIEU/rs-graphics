@@ -25,7 +25,7 @@
 //! dev.par().mar([7, 4, 2, 1]).draw();
 //! dev.barplot()
 //!     .height([3, 5, 2])
-//!     .names(["first group", "second group", "third group"])
+//!     .names_arg(["first group", "second group", "third group"])
 //!     .label_srt(45)
 //!     .panel_bg("grey92")
 //!     .draw();

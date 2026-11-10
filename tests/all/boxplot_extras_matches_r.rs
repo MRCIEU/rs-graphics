@@ -158,7 +158,7 @@ fn cases() -> Vec<Case> {
             name: "log_values",
             r: "boxplot(P, log = 'y', main = 'log')",
             ours: |d| {
-                d.boxplot().x(groups(&P)).ylog(true).main("log").draw();
+                d.boxplot().x(groups(&P)).log("y").main("log").draw();
             },
         },
         Case {
@@ -168,7 +168,7 @@ fn cases() -> Vec<Case> {
                 d.boxplot()
                     .x(groups(&P))
                     .horizontal(true)
-                    .ylog(true)
+                    .log("y")
                     .at([1.0, 3.0, 10.0])
                     .draw();
             },

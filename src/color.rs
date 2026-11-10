@@ -7,7 +7,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Colours: RGBA values ([`Color`]), colour arguments ([`ColorSpec`]),
-//! the default palette and grey ramps.
+//! the default palette and grey ramps. R's named palettes are set with
+//! [`par(palette)`].
 //!
 //! A colour argument is a string (`"red"`, `"#FF0000"`, `"#FF000080"`), a
 //! small integer indexing the current palette ([`ColorSpec::Index`]; the
@@ -15,8 +16,13 @@
 //! `NA`: don't draw). [`Color`] converts from the strings R's `col2rgb()`
 //! and graphics functions accept, except numeric strings such as `"2"`
 //! (R's palette indices, which [`ColorSpec`]'s conversion takes).
+//!
+//! [`par(palette)`]: crate::par::Par::palette
 
 use crate::named_colors::NAMED_COLORS;
+
+mod palettes;
+pub(crate) use palettes::named_palette;
 
 /// An RGBA colour with 8 bits per channel.
 ///
@@ -189,7 +195,7 @@ impl Color {
 }
 
 /// The default palette: the eight colours that `col = 1` to `col = 8`
-/// stand for.
+/// stand for, until `dev.par().palette(..)` changes them.
 ///
 /// Palette indices are 1-based: `col = 1` is the first entry (black),
 /// `col = 2` the second, and so on (see [`ColorSpec::Index`]).

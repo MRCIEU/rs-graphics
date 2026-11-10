@@ -412,22 +412,21 @@ fn r_names(s: &Setter, allowed: &BTreeSet<String>) -> Vec<String> {
 /// setter) -> how R writes it. Checked to name existing setters.
 const SPECIAL: &[(&str, &str, &str)] = &[
     ("barplot()", "legend_pos", "`args.legend` (`x`, `y`)"),
-    ("text()", "vadj", "`adj` (second value)"),
-    ("legend()", "vadj", "`adj` (second value)"),
     ("legend()", "pos", "`x`, `y`"),
     ("legend()", "labels", "`legend`"),
-    ("axis()", "draw_labels", "`labels = FALSE`"),
-    ("axis()", "axp", "`xaxp`, `yaxp`"),
-    ("axis()", "axt", "`xaxt`, `yaxt`"),
     ("par()", "palette", "`palette()` (a function in R)"),
 ];
 
 /// What to use instead of an R argument that isn't available.
 const INSTEAD: &[(&str, &str, &str)] = &[
-    ("plot()", "ann", "`dev.par().ann(false)`"),
     ("hist()", "probability", "`.freq(false)`"),
     ("hist()", "nclass", "`.breaks(n)`"),
     ("boxplot()", "plot", "`boxplot_stats()`"),
+    (
+        "boxplot()",
+        "pars",
+        "its elements' own setters, as `.boxwex()` and `.medcol()`",
+    ),
     ("abline()", "coef", "`.a()` and `.b()`"),
     (
         "abline()",
@@ -441,7 +440,8 @@ const DOTS: &[&str] = &[
     "main", "sub", "xlab", "ylab", "xlim", "ylim", "axes", "gap.axis",
 ];
 
-/// `bxp()`'s `pars` list elements.
+/// `bxp()`'s `pars` list elements, which it also takes as arguments, so
+/// `boxplot()` does through `...`.
 const BXP_PARS: &[&str] = &[
     "boxwex",
     "staplewex",
@@ -503,6 +503,11 @@ fn render(sections: &[Section], par_names: &[String]) -> String {
             allowed.extend(DOTS.iter().map(|d| d.to_string()));
         }
         allowed.remove("...");
+        // `boxplot()` passes `...` to `bxp()`, which takes its `pars`
+        // elements as arguments too (`boxplot(x, medcol = "red")`).
+        if sec.formals.iter().any(|f| f == "pars") {
+            allowed.extend(BXP_PARS.iter().map(|p| p.to_string()));
+        }
         // Outside `par()`, the `xlog`/`ylog` setters are R's `log`.
         if sec.title != "par()" {
             allowed.remove("xlog");
@@ -529,9 +534,6 @@ fn render(sections: &[Section], par_names: &[String]) -> String {
                     match s.name.as_str() {
                         "xlog" if has("log") => Some("`log = \"x\"`".into()),
                         "ylog" if has("log") => Some("`log = \"y\"`".into()),
-                        n if has("pars") && BXP_PARS.contains(&n) => {
-                            Some(format!("`pars = list({n} = )`"))
-                        }
                         _ => None,
                     }
                 });

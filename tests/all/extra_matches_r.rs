@@ -147,7 +147,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.barplot()
                     .height([3, 5, 2])
-                    .names(NAMES)
+                    .names_arg(NAMES)
                     .label_srt(45)
                     .panel_bg("grey90")
                     .draw();
@@ -175,8 +175,7 @@ fn cases() -> Vec<Case> {
                 d.plot()
                     .x([1, 10, 100])
                     .y([2, 20, 200])
-                    .xlog(true)
-                    .ylog(true)
+                    .log("xy")
                     .xlab("x")
                     .ylab("y")
                     .panel_bg("lightblue")
@@ -297,7 +296,7 @@ fn scene<G: Graphics>(g: &mut G) {
         .draw();
     g.barplot()
         .height([3, 5, 2])
-        .names(NAMES)
+        .names_arg(NAMES)
         .label_srt(45)
         .panel_bg("grey80")
         .draw();
@@ -324,7 +323,7 @@ fn extras_are_the_same_in_a_figure() {
 #[test]
 fn extras_are_kept_by_with() {
     let opts = BarplotOptions::default()
-        .names(NAMES)
+        .names_arg(NAMES)
         .label_srt(45)
         .panel_bg("grey90");
     let (with, ()) = r::ours(PAGE, |d| {
@@ -333,7 +332,7 @@ fn extras_are_kept_by_with() {
     let (direct, ()) = r::ours(PAGE, |d| {
         d.barplot()
             .height([3, 5, 2])
-            .names(NAMES)
+            .names_arg(NAMES)
             .label_srt(45)
             .panel_bg("grey90")
             .draw();

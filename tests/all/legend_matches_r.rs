@@ -17,8 +17,6 @@
 use crate::common;
 use crate::common::{pdf, r};
 
-use std::process::Command;
-
 use rs_graphics::prelude::*;
 
 struct Case {
@@ -241,7 +239,7 @@ fn legend_return_value_on_log_axes_matches_r() {
                   plot(c(1, 1000), c(2, 500), log = 'xy')\n\
                   l <- legend('topleft', legend = c('a', 'bb'), pch = 1:2, inset = 0.05)\n\
                   cat('log', unlist(l$rect[c('left', 'top', 'w', 'h')]), l$text$x, l$text$y, '\\n')\n";
-    let out = Command::new("Rscript")
+    let out = common::rscript()
         .args(["-e", script])
         .output()
         .expect("run Rscript");
@@ -252,7 +250,7 @@ fn legend_return_value_on_log_axes_matches_r() {
     );
 
     let mut dev = Device::memory("pdf").width(6.0).height(4.0).open().unwrap();
-    let opts = PlotOptions::default().xlog(true).ylog(true);
+    let opts = PlotOptions::default().log("xy");
     dev.plot()
         .x([1.0, 1000.0])
         .y([2.0, 500.0])

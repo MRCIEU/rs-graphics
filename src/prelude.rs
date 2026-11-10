@@ -31,10 +31,10 @@
 pub use crate::backend::{AnyBackend, Backend, Format, LineEnd, LineJoin};
 pub use crate::color::{Color, ColorSpec, gray_colors};
 pub use crate::device::{
-    AblineOptions, ArrowsOptions, AxisOptions, BoxOptions, BoxWhich, Device, DeviceBuilder,
-    LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextOptions, PlotWindowOptions,
-    PolygonOptions, RectOptions, SegmentsOptions, Side, StrUnits, TextOptions, TitleOptions, Units,
-    XyOptions,
+    AblineOptions, Adj, ArrowsOptions, AxisLabels, AxisOptions, BoxOptions, BoxWhich, Device,
+    DeviceBuilder, LegendKeyword, LegendLayout, LegendOptions, LegendPos, MtextOptions,
+    PlotWindowOptions, PolygonOptions, RectOptions, SegmentsOptions, Side, StrUnits, TextOptions,
+    TitleOptions, Units, XyOptions,
 };
 pub use crate::error::ErrorKind;
 pub use crate::font::FontFace;
@@ -46,6 +46,6 @@ pub use crate::highlevel::{
 };
 pub use crate::layout::{LayoutRespect, LayoutSize};
 pub use crate::lty::LineType;
-pub use crate::par::{AxisStyle, AxisType, Bty, Par, ParOptions, Pty, Sides, Xpd};
+pub use crate::par::{AxisStyle, AxisType, Bty, Log, Par, ParOptions, Pty, Sides, Xpd};
 pub use crate::plotmath::{Expression, Label};
 pub use crate::recording::{Figure, FigureResult};

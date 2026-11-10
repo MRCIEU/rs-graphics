@@ -117,7 +117,7 @@ fn bars<G: Graphics>(g: &mut G) {
     ];
     g.barplot()
         .height(m)
-        .names(["a", "b", "c"])
+        .names_arg(["a", "b", "c"])
         .legend_text(["r1", "r2", "r3"])
         .density([10, 20, 30])
         .main("Bars")
@@ -148,15 +148,15 @@ fn pie<G: Graphics>(g: &mut G) {
         .draw();
 }
 
-/// `plot_new()`, a log window, outer `mtext()`, and `par(new = TRUE)` for
-/// an overlay.
+/// `plot_new()`, a log window, outer `mtext()` (also with `side` and
+/// `outer` per label), and `par(new = TRUE)` for an overlay.
 fn layered<G: Graphics>(g: &mut G) {
     g.par().oma([0.0, 0.0, 2.0, 0.0]).draw();
     g.plot_new();
     g.plot_window()
         .xlim([1.0, 1000.0])
         .ylim([0.0, 1.0])
-        .xlog(true)
+        .log("x")
         .draw();
     g.points()
         .x([1.0, 10.0, 100.0, 1000.0])
@@ -164,6 +164,11 @@ fn layered<G: Graphics>(g: &mut G) {
         .draw();
     g.axis().side(1).draw();
     g.mtext().text("outer title").side(3).outer(true).draw();
+    g.mtext()
+        .text(["below", "outer right"])
+        .side([1, 4])
+        .outer([false, true])
+        .draw();
     g.par().new(true).draw();
     g.plot()
         .x([0.0, 1.0])
@@ -343,7 +348,7 @@ fn recording_checks_arguments_like_the_device() {
         Figure::new()
             .barplot()
             .height([1.0, 2.0])
-            .names(["a", "b", "c"])
+            .names_arg(["a", "b", "c"])
             .draw();
     });
     assert!(
@@ -482,10 +487,10 @@ fn barplot_shading_on_a_log_axis_panics() {
         let r = std::panic::catch_unwind(|| {
             if figure {
                 let mut fig = Figure::new();
-                fig.barplot().height([1, 2]).ylog(true).density(10).draw();
+                fig.barplot().height([1, 2]).log("y").density(10).draw();
             } else {
                 let mut dev = Device::memory("pdf").width(5).height(5).open().unwrap();
-                dev.barplot().height([1, 2]).ylog(true).density(10).draw();
+                dev.barplot().height([1, 2]).log("y").density(10).draw();
             }
         });
         let msg = r.unwrap_err();

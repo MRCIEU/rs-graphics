@@ -28,7 +28,7 @@ use crate::font::FontFace;
 use crate::geometry::{Point, Rect};
 use crate::highlevel::PlotType;
 use crate::lty::LineType;
-use crate::par::{AxisStyle, Bty};
+use crate::par::{AxisStyle, Bty, Log};
 use crate::plotmath::Label;
 use crate::recycle::{pick, pick_na, recycled_len};
 
@@ -74,18 +74,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -126,13 +126,13 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -143,13 +143,15 @@ crate::setters::options! {
     /// Arguments of `arrows()`.
     #[derive(Clone, Debug, Default)]
     pub struct ArrowsOptions => [ArrowsCall] {
-        /// Length of the edges of each head, in inches. `None`: 0.25.
+        /// Length of the edges of each head, in inches; negative or not
+        /// finite is R's error. `None`: 0.25.
         pub length: Option<f64> => number f64,
         /// Angle between the shaft and each edge of the head, in degrees (90
-        /// gives flat caps, as for error bars). `None`: 30.
+        /// gives flat caps, as for error bars); not finite is R's error.
+        /// `None`: 30.
         pub angle: Option<f64> => number f64,
-        /// Where the heads go: at the start (1), the end (2) or both ends
-        /// (3). `None`: 2.
+        /// Where the heads go: none (0), at the start (1), the end (2) or
+        /// both ends (3); above 3 is R's error. `None`: 2.
         pub code: Option<u8> => option u8,
         /// Arrow colours, recycled per arrow. Empty: [`par(fg)`], as in R.
         ///
@@ -171,18 +173,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -218,18 +220,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -278,18 +280,18 @@ crate::setters::options! {
         ///
         /// [`par(xpd)`]: crate::par::Par::xpd
         pub xpd: Option<Xpd> => option Xpd,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -314,24 +316,144 @@ crate::setters::options! {
     }
 }
 
+/// How text sits on its point: horizontally (`x`) and vertically (`y`),
+/// each a fraction of the text's size, or `None` (R's `NA`).
+///
+/// `x`: 0 puts the text's left edge on the point, 0.5 its centre, 1 its
+/// right edge; `None` centres it (0.5). `y`: a value puts a text's
+/// baseline `y * height("M")` below the point (0 on the baseline, 1 a
+/// capital's height above), or the point that fraction of an expression's
+/// box height above the box's bottom; `None` centres the text's ink (an
+/// expression's box) on the point. Values outside 0 to 1 are allowed.
+///
+/// Setters take one number (`x`; `y` is `None`, as R's one-value `adj`),
+/// two numbers as an array or a tuple (a tuple can mix integers and
+/// floats: `(0, 0.5)`), or two `Option`s of numbers (`[None, Some(1)]`,
+/// R's `c(NA, 1)`). A `NaN` is taken as `None`.
+///
+/// A horizontal `None` centres, as R's `NA` does; it doesn't mean the
+/// default. To change only the vertical value, give the horizontal
+/// default too: for `text()`, `let a = dev.current_par().adj;` then
+/// `.adj([a, v])` (R's `c(par("adj"), v)`); for `legend()`,
+/// `.adj([0.0, v])`.
+///
+/// This is R's `adj` of `text()` and `legend()`.
+///
+/// # Examples
+///
+/// ```
+/// # use rs_graphics::prelude::*;
+/// # let mut dev = Device::null().open().unwrap();
+/// # dev.plot().x([0, 10]).y([0, 10]).draw();
+/// dev.text().x(5).y(5).labels("left edge on the point").adj(0).draw();
+/// dev.text().x(5).y(2).labels("above the point").adj([0.5, -0.5]).draw();
+/// dev.text().x(5).y(8).labels("centred, baseline on it").adj([None, Some(0)]).draw();
+/// // The baseline on the point, keeping `par(adj)` across.
+/// let a = dev.current_par().adj;
+/// dev.text().x(5).y(4).labels("baseline on it").adj([a, 0.0]).draw();
+/// assert_eq!(Adj::from(1), Adj { x: Some(1.0), y: None });
+/// assert_eq!(Adj::from((0, 0.5)), Adj { x: Some(0.0), y: Some(0.5) });
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+pub struct Adj {
+    /// Horizontal: 0 left, 0.5 centred, 1 right; `None` (R's `NA`): 0.5.
+    /// R's `adj[1]`.
+    pub x: Option<f64>,
+    /// Vertical: the baseline `y * height("M")` below the point; `None`
+    /// (R's `NA`): the ink centred on the point. R's `adj[2]`.
+    pub y: Option<f64>,
+}
+
+impl Adj {
+    /// The horizontal value to draw with: `x`, or 0.5 when it is `NA` or
+    /// not finite (as `GText()`).
+    pub(crate) fn hadj(self) -> f64 {
+        self.x.filter(|x| x.is_finite()).unwrap_or(0.5)
+    }
+
+    /// The vertical value to draw with: `y` if finite, else `None` (the
+    /// ink centred).
+    pub(crate) fn vadj(self) -> Option<f64> {
+        self.y.filter(|y| y.is_finite())
+    }
+}
+
+/// One value of an [`Adj`]: a number, or an `Option` of one (`None`: R's
+/// `NA`).
+pub trait AdjElement: adj_sealed::Sealed {
+    /// The value, `None` for R's `NA` (and for `NaN`).
+    fn into_adj_value(self) -> Option<f64>;
+}
+
+mod adj_sealed {
+    pub trait Sealed {}
+}
+
+impl<N: crate::numbers::Num> adj_sealed::Sealed for Option<N> {}
+impl<N: crate::numbers::Num> AdjElement for Option<N> {
+    fn into_adj_value(self) -> Option<f64> {
+        self.map(crate::numbers::Num::to_f64)
+            .filter(|v| !v.is_nan())
+    }
+}
+
+macro_rules! adj_numbers {
+    ($($t:ty),*) => {
+        $(
+            impl adj_sealed::Sealed for $t {}
+            impl AdjElement for $t {
+                fn into_adj_value(self) -> Option<f64> {
+                    Some(self).into_adj_value()
+                }
+            }
+            impl From<$t> for Adj {
+                /// `x` alone, as R's one-value `adj`; `y` is `None`.
+                fn from(x: $t) -> Self {
+                    Adj { x: x.into_adj_value(), y: None }
+                }
+            }
+        )*
+    };
+}
+adj_numbers!(f64, f32, i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
+
+impl<A: AdjElement, B: AdjElement> From<(A, B)> for Adj {
+    /// `x` and `y`.
+    fn from((x, y): (A, B)) -> Self {
+        Adj {
+            x: x.into_adj_value(),
+            y: y.into_adj_value(),
+        }
+    }
+}
+
+impl<E: AdjElement> From<[E; 2]> for Adj {
+    /// `x` and `y`.
+    fn from([x, y]: [E; 2]) -> Self {
+        Adj {
+            x: x.into_adj_value(),
+            y: y.into_adj_value(),
+        }
+    }
+}
+
 crate::setters::options! {
     /// Arguments of `text()`.
     #[derive(Clone, Debug, Default)]
     pub struct TextOptions => [TextCall] {
-        /// Horizontal justification: 0 left, 0.5 centred, 1 right. `None`:
-        /// [`par(adj)`]. R's `adj[1]`.
+        /// Justification of the text on its point, horizontal and vertical
+        /// ([`Adj`]): one number (horizontal; vertical `None`), two, or two
+        /// `Option`s (`None`: R's `NA`, centred). For text with newlines the
+        /// vertical value places the block of lines (`None`: 0.5), each
+        /// line's baseline as for one line. Unset: [`par(adj)`] horizontally,
+        /// the ink centred vertically. To change only the vertical value,
+        /// pass [`par(adj)`] too: `let a = dev.current_par().adj;` then
+        /// `.adj([a, v])` (a horizontal `None` would centre).
         ///
         /// [`par(adj)`]: crate::par::Par::adj
-        pub adj: Option<f64> => number f64,
-        /// Vertical justification. A finite value puts a text's baseline
-        /// `vadj * height("M")` below the point, or puts the point that
-        /// fraction of an expression's box height above the box's bottom.
-        /// `None` (the default) centres the text's ink, or an expression's
-        /// box, on the point. For text with newlines it places the block of
-        /// lines (`None`: 0.5), each line's baseline as above. R's `adj[2]`.
-        pub vadj: Option<f64> => number f64,
-        /// Rotation in degrees, anticlockwise. `None`: [`par(srt)`] (0 by
-        /// default).
+        pub adj: Option<Adj> => option Adj,
+        /// Rotation in degrees, anticlockwise; not finite is R's error.
+        /// `None`: [`par(srt)`] (0 by default).
         ///
         /// [`par(srt)`]: crate::par::Par::srt
         pub srt: Option<f64> => number f64,
@@ -357,7 +479,7 @@ crate::setters::options! {
         pub xpd: Option<Xpd> => option Xpd,
         /// Puts each label below (1), to the left of (2), above (3) or to
         /// the right of (4) its point, `offset` away, recycled per label;
-        /// overrides `adj`/`vadj`. Empty: not used. Another number is an
+        /// overrides `adj`. Empty: not used. Another number is an
         /// error of the call ("invalid 'pos' value").
         pub pos: Vec<i32> => values i32,
         /// Distance of a label from its point when `pos` is given, in
@@ -464,18 +586,18 @@ crate::setters::options! {
         ///
         /// [`par(bty)`]: crate::par::Par::bty
         pub bty: Option<Bty> => option Bty,
-        /// How line ends are drawn: `"round"`, `"butt"` or `"square"`.
-        /// `None`: [`par(lend)`]; overrides it for this call only.
+        /// How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's
+        /// codes 0 to 2. `None`: [`par(lend)`]; overrides it for this call only.
         ///
         /// [`par(lend)`]: crate::par::Par::lend
         pub lend: Option<LineEnd> => option LineEnd,
-        /// How line corners are joined: `"round"`, `"mitre"` or `"bevel"`.
-        /// `None`: [`par(ljoin)`]; overrides it for this call only.
+        /// How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's
+        /// codes 0 to 2. `None`: [`par(ljoin)`]; overrides it for this call only.
         ///
         /// [`par(ljoin)`]: crate::par::Par::ljoin
         pub ljoin: Option<LineJoin> => option LineJoin,
-        /// Mitre limit of mitred joins (at least 1). `None`: [`par(lmitre)`];
-        /// overrides it for this call only.
+        /// Mitre limit of mitred joins (at least 1; less is an error of the
+        /// call). `None`: [`par(lmitre)`]; overrides it for this call only.
         ///
         /// [`par(lmitre)`]: crate::par::Par::lmitre
         pub lmitre: Option<f64> => number f64,
@@ -486,10 +608,14 @@ crate::setters::options! {
     /// Arguments of `plot.window()` besides the limits.
     #[derive(Clone, Debug, Default)]
     pub struct PlotWindowOptions => [PlotWindowCall] {
-        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic. Default `false`. R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Aspect ratio: one x unit is `asp` y units long on the page.
         /// Ignored on log axes, as in R. `None`: no constraint.
         pub asp: Option<f64> => number f64,
@@ -511,16 +637,37 @@ crate::setters::options! {
     }
 }
 
+/// R's check in `plot.window()` (`C_plotwindow`): both limits finite,
+/// `xlim` first ("need finite 'xlim' values", then `'ylim'`). The error is
+/// `plot.window`'s whichever call made the window (`plot()`, `hist()`,
+/// `barplot()`, `boxplot()`), as in R; the high-level calls' pure limit
+/// helpers run it too, so a `Figure` fails when recording.
+pub(crate) fn check_window_limits(xlim: (f64, f64), ylim: (f64, f64)) -> Result<(), Error> {
+    for (name, (lo, hi)) in [("xlim", xlim), ("ylim", ylim)] {
+        if !(lo.is_finite() && hi.is_finite()) {
+            return Err(
+                Error::invalid(format!("need finite '{name}' values")).in_call("plot.window")
+            );
+        }
+    }
+    Ok(())
+}
+
 impl<B: Backend> Device<B> {
     /// Draws R's `plot.window()`; the public entry is
     /// [`Graphics::plot_window`](crate::graphics::Graphics::plot_window), whose docs
     /// describe it.
+    ///
+    /// # Errors
+    ///
+    /// R's, if a limit isn't finite ([`check_window_limits`]).
     pub(crate) fn plot_window_impl(
         &mut self,
         xlim: (f64, f64),
         ylim: (f64, f64),
         opts: &PlotWindowOptions,
-    ) {
+    ) -> Result<(), Error> {
+        check_window_limits(xlim, ylim)?;
         // R's inline `xaxs`/`yaxs`/`lab` hold for this call only; the
         // `xaxp`/`yaxp` it sets stay.
         let mut dev = self.par_scope(|now, saved| {
@@ -538,12 +685,13 @@ impl<B: Backend> Device<B> {
             dev.par.lab = lab;
         }
         dev.plot_window_draw(xlim, ylim, opts);
+        Ok(())
     }
 
     fn plot_window_draw(&mut self, xlim: (f64, f64), ylim: (f64, f64), opts: &PlotWindowOptions) {
         let asp = opts.asp.filter(|a| a.is_finite() && *a > 0.0);
-        let (Some(asp), false, false) = (asp, opts.xlog, opts.ylog) else {
-            self.set_window(xlim, ylim, opts.xlog, opts.ylog);
+        let (Some(asp), false, false) = (asp, opts.log.x, opts.log.y) else {
+            self.set_window(xlim, ylim, opts.log.x, opts.log.y);
             return;
         };
         let (pin1, pin2) = (self.plt.width(), self.plt.height());
@@ -944,7 +1092,12 @@ impl<B: Backend> Device<B> {
         check_text(opts)?;
         let n = recycled_len(&[x.len(), y.len()]);
         let clip = self.clip_for(opts.xpd);
-        let hadj = opts.adj.unwrap_or(self.par.adj);
+        // `C_text`: no `adj` is `par(adj)` and a vertical `NA`.
+        let adj = opts.adj.unwrap_or(Adj {
+            x: Some(self.par.adj),
+            y: None,
+        });
+        let hadj = adj.hadj();
         // `offset` characters, as `GConvertXUnits(offset, CHARS, INCHES)`
         // before any label's own `cex`: the character height (R's
         // `cra[1]`) times `par(cex)` as of the last layout (see
@@ -975,7 +1128,7 @@ impl<B: Backend> Device<B> {
                 Some(2) => (Point::new(p.x - offset, p.y), 1.0, Some(Y_CHAR_OFFSET)),
                 Some(3) => (Point::new(p.x, p.y + offset), 0.5, Some(0.0)),
                 Some(4) => (Point::new(p.x + offset, p.y), 0.0, Some(Y_CHAR_OFFSET)),
-                _ => (p, hadj, opts.vadj),
+                _ => (p, hadj, adj.vadj()),
             };
             self.draw_label(
                 clip,
@@ -1062,6 +1215,25 @@ impl<B: Backend> Device<B> {
 pub(crate) fn check_text(opts: &TextOptions) -> Result<(), Error> {
     if !opts.pos.iter().all(|p| (1..=4).contains(p)) {
         return Err(Error::invalid("invalid 'pos' value"));
+    }
+    // An inline `srt` goes through R's `par()` checks (`par-common.c`).
+    if opts.srt.is_some_and(|s| !s.is_finite()) {
+        return Err(crate::device::par_error("srt"));
+    }
+    Ok(())
+}
+
+/// R's checks of `arrows()`'s head (`C_arrows`): `length` finite and
+/// non-negative, `angle` finite, `code` 0 to 3.
+pub(crate) fn check_arrows(opts: &ArrowsOptions) -> Result<(), Error> {
+    if opts.length.is_some_and(|l| !l.is_finite() || l < 0.0) {
+        return Err(Error::invalid("invalid arrow head length"));
+    }
+    if opts.angle.is_some_and(|a| !a.is_finite()) {
+        return Err(Error::invalid("invalid arrow head angle"));
+    }
+    if opts.code.is_some_and(|c| c > 3) {
+        return Err(Error::invalid("invalid arrow head specification"));
     }
     Ok(())
 }

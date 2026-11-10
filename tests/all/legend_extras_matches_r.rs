@@ -352,15 +352,13 @@ fn cases() -> Vec<Case> {
                     .pos("topright")
                     .labels(["mmm", "a"])
                     .pch([1, 2])
-                    .adj(0.5)
-                    .vadj(0.2)
+                    .adj([0.5, 0.2])
                     .draw();
                 d.legend()
                     .pos("bottomleft")
                     .labels(["mmm", "g"])
                     .pch([1, 2])
                     .adj(0.3)
-                    .vadj(None)
                     .draw()
             },
         },

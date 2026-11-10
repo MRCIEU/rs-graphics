@@ -1647,24 +1647,41 @@ impl Backend for RasterBackend {
             };
             let bounds = outlined.px_bounds();
 
+            // Local unrotated pixel offset `(lx, ly)` from the glyph run's
+            // pen origin (which sits at `anchor_in`/`(anchor_px_x,
+            // anchor_px_y)`), converted to an inches-space, y-up delta,
+            // rotated the same way every other primitive in this crate is
+            // (CCW about the anchor), then converted back to final pixel
+            // space.
+            let to_page = |lx: f64, ly: f64| {
+                let delta_x_in = lx / dpi;
+                let delta_y_in = -ly / dpi;
+                let rot_x = delta_x_in * cos_t - delta_y_in * sin_t;
+                let rot_y = delta_x_in * sin_t + delta_y_in * cos_t;
+                let final_px_x = anchor_px_x as f64 + rot_x * dpi;
+                let final_px_y = height_px - ((height_px - anchor_px_y as f64) + rot_y * dpi);
+                (final_px_x, final_px_y)
+            };
+
+            // A glyph larger than the whole page (an enormous `cex`) is
+            // filled as a path, which the tiles clip, rather than
+            // rasterized whole: `outlined.draw` allocates its full pixel
+            // bounds, which for `cex = 1e6` is terabytes and aborts.
+            let glyph_px = bounds.width() as f64 * bounds.height() as f64;
+            if glyph_px > self.width_px as f64 * self.height_px as f64 {
+                if let Some(path) = glyph_path(font, glyph_id, scale, to_page) {
+                    self.fill_shape(path, style.color);
+                }
+                continue;
+            }
+
             outlined.draw(|gx, gy, coverage| {
                 if coverage <= 0.0 {
                     return;
                 }
                 let lx = bounds.min.x as i32 + gx as i32;
                 let ly = bounds.min.y as i32 + gy as i32;
-                // Local unrotated pixel offset from the glyph run's pen
-                // origin (which sits at `anchor_in`/`(anchor_px_x,
-                // anchor_px_y)`), converted to an inches-space, y-up
-                // delta, rotated the same way every other primitive in
-                // this crate is (CCW about the anchor), then converted
-                // back to final pixel space.
-                let delta_x_in = lx as f64 / dpi;
-                let delta_y_in = -(ly as f64) / dpi;
-                let rot_x = delta_x_in * cos_t - delta_y_in * sin_t;
-                let rot_y = delta_x_in * sin_t + delta_y_in * cos_t;
-                let final_px_x = anchor_px_x as f64 + rot_x * dpi;
-                let final_px_y = height_px - ((height_px - anchor_px_y as f64) + rot_y * dpi);
+                let (final_px_x, final_px_y) = to_page(lx as f64, ly as f64);
                 samples.push((
                     final_px_x.round() as i32,
                     final_px_y.round() as i32,
@@ -1690,6 +1707,63 @@ impl Backend for RasterBackend {
     }
 }
 
+/// A glyph's outline as a page-pixel path: the font's curves at `scale`
+/// (pixels per em height, y down from the pen origin), each point mapped
+/// by `to_page` (local pixel offset to page pixel). Each run of connected
+/// curves is one closed contour; the glyph fills with the winding rule.
+fn glyph_path(
+    font: &FontArc,
+    glyph_id: ab_glyph::GlyphId,
+    scale: ab_glyph::PxScale,
+    to_page: impl Fn(f64, f64) -> (f64, f64),
+) -> Option<Path> {
+    let outline = font.outline(glyph_id)?;
+    let k = scale.x / font.height_unscaled();
+    let map = |p: ab_glyph::Point| {
+        let (x, y) = to_page((p.x * k) as f64, -(p.y * k) as f64);
+        (x as f32, y as f32)
+    };
+    let mut pb = PathBuilder::new();
+    let mut last_end: Option<ab_glyph::Point> = None;
+    for curve in &outline.curves {
+        use ab_glyph::OutlineCurve::*;
+        let (start, end) = match curve {
+            Line(a, b) => (*a, *b),
+            Quad(a, _, b) => (*a, *b),
+            Cubic(a, _, _, b) => (*a, *b),
+        };
+        if last_end != Some(start) {
+            if last_end.is_some() {
+                pb.close();
+            }
+            let (x, y) = map(start);
+            pb.move_to(x, y);
+        }
+        match curve {
+            Line(_, b) => {
+                let (x, y) = map(*b);
+                pb.line_to(x, y);
+            }
+            Quad(_, c, b) => {
+                let (cx, cy) = map(*c);
+                let (x, y) = map(*b);
+                pb.quad_to(cx, cy, x, y);
+            }
+            Cubic(_, c1, c2, b) => {
+                let (x1, y1) = map(*c1);
+                let (x2, y2) = map(*c2);
+                let (x, y) = map(*b);
+                pb.cubic_to(x1, y1, x2, y2, x, y);
+            }
+        }
+        last_end = Some(end);
+    }
+    if last_end.is_some() {
+        pb.close();
+    }
+    pb.finish()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1709,6 +1783,34 @@ mod tests {
             b.new_page();
             assert!(b.finish() == blank, "{threads} threads");
         }
+    }
+
+    /// A glyph larger than the page is filled as a clipped path, so a huge
+    /// `cex` paints, and an enormous one (whose glyph's pixel bounds would
+    /// be terabytes to rasterize) finishes without trying to allocate them.
+    #[test]
+    fn text_larger_than_the_page_is_painted() {
+        let style = |size_pt: f64| TextStyle {
+            color: Color::rgb(255, 0, 0),
+            face: FontFace::Plain,
+            size_pt,
+            rotation_deg: 0.0,
+        };
+        let blank = RasterBackend::new(2.0, 2.0, 72.0, Color::TRANSPARENT).finish();
+        // The pen origin that puts the page's centre inside the stem of
+        // "l" (x about 0.11 em in, y about 0.36 em up).
+        let origin = |size_pt: f64| {
+            let em_in = size_pt / 72.0;
+            Point::new(1.0 - 0.11 * em_in, 1.0 - 0.36 * em_in)
+        };
+        for size_pt in [12.0 * 1e2, 12.0 * 1e3, 12.0 * 1e4] {
+            let mut b = RasterBackend::new(2.0, 2.0, 72.0, Color::TRANSPARENT);
+            b.draw_text(origin(size_pt), "l", &style(size_pt));
+            assert_ne!(b.finish(), blank, "{size_pt} pt paints");
+        }
+        let mut b = RasterBackend::new(2.0, 2.0, 72.0, Color::TRANSPARENT);
+        b.draw_text(origin(12.0 * 1e6), "l", &style(12.0 * 1e6));
+        let _ = b.finish();
     }
 
     /// Stamping blends exactly as tiny-skia paints the same shape at the

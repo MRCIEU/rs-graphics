@@ -131,7 +131,7 @@ fn cases() -> Vec<Case> {
                 d.par().xpd(true).draw();
                 d.abline().h(1.5).xpd(false).col("grey").draw();
                 d.par().xpd(false).draw();
-                d.plot().x(X).y(Y).xlog(true).draw();
+                d.plot().x(X).y(Y).log("x").draw();
                 d.abline()
                     .a(1)
                     .b(0.5)

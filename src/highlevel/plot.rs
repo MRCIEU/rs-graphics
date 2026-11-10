@@ -12,25 +12,25 @@
 //!
 //! Only numeric x/y plots are supported: the vast majority of R's
 //! `plot.default` is dispatch logic and argument munging for other input
-//! types, which is out of scope here. Not supported: `lim2`, and `ann`
-//! (set [`par(ann)`] instead).
+//! types, which is out of scope here. Not supported: `lim2`.
 //!
 //! This is R's `plot(x, y, ...)`, ported from `plot.default` in
 //! `r-source/src/library/graphics/R/plot.R`.
-//!
-//! [`par(ann)`]: crate::par::Par::ann
 
 use crate::backend::{Backend, LineEnd};
 use crate::color::ColorSpec;
-use crate::device::{AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions};
+use crate::device::{
+    AxisOptions, BoxOptions, Device, PlotWindowOptions, TitleOptions, XyOptions,
+    check_window_limits,
+};
 use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
-use crate::par::{AxisStyle, AxisType, Bty, Xpd};
+use crate::par::{AxisStyle, AxisType, Bty, Log, Xpd};
 use crate::plotmath::Label;
 use crate::recording::Figure;
 
-use super::{InlineAxis, data_range};
+use super::{InlineAxis, Window, data_range};
 
 /// What a plot draws for its points: points, lines, both, vertical lines,
 /// stair steps or nothing.
@@ -157,10 +157,14 @@ crate::setters::options! {
         /// y axis limits. `None`: the range of the finite data, as for
         /// `xlim`.
         pub ylim: Option<(f64, f64)> => pair f64,
-        /// Makes the x axis logarithmic. Default `false`. R's `log = "x"`.
-        pub xlog: bool => value bool,
-        /// Makes the y axis logarithmic. Default `false`. R's `log = "y"`.
-        pub ylog: bool => value bool,
+        /// Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see [`Log`]);
+        /// default neither. Sets [`par(xlog)`]/[`par(ylog)`] for this plot.
+        ///
+        /// [`Log`]: crate::par::Log
+        /// [`par(xlog)`]: crate::par::ParOptions::xlog
+        /// [`par(ylog)`]: crate::par::ParOptions::ylog
+        #[doc(alias = "xlog", alias = "ylog")]
+        pub log: Log => value Log,
         /// Main title: text (`"Weight"`) or a plotmath expression
         /// (`Label::math("x^2")`), drawn by `title()`. `None`: none.
         pub main: Option<Label> => option Label,
@@ -219,6 +223,11 @@ crate::setters::options! {
         ///
         /// [`par(font.lab)`]: crate::par::Par::font_lab
         pub font_lab: Option<FontFace> => option FontFace,
+        /// Whether to draw the titles (`main`, `sub`, `xlab`, `ylab`).
+        /// `None`: [`par(ann)`]; overrides it for this call only.
+        ///
+        /// [`par(ann)`]: crate::par::Par::ann
+        pub ann: Option<bool> => option bool,
         /// Whether to draw the axes and the box around the plot. Default
         /// `true`.
         pub axes: bool => value bool,
@@ -352,8 +361,7 @@ impl Default for PlotOptions {
             cex: Vec::new(),
             xlim: None,
             ylim: None,
-            xlog: false,
-            ylog: false,
+            log: Log::default(),
             main: None,
             sub: None,
             xlab: None,
@@ -367,6 +375,7 @@ impl Default for PlotOptions {
             cex_lab: None,
             col_lab: None,
             font_lab: None,
+            ann: None,
             axes: true,
             bty: None,
             xaxt: None,
@@ -396,6 +405,30 @@ impl Default for PlotOptions {
     }
 }
 
+/// `plot()`'s window limits: `xlim`/`ylim`, else the data's range (on a log
+/// axis of the positive values only: R's `xy.coords()` makes the others
+/// `NA`, which `points()`/`lines()` then skip), checked as `plot.window()`
+/// does ([`check_window_limits`]), so no data or all-`NaN` data is R's
+/// "need finite 'xlim' values".
+pub(crate) fn plot_window_limits(
+    x: &[f64],
+    y: &[f64],
+    opts: &PlotOptions,
+) -> Result<Window, Error> {
+    let range = |v: &[f64], log: bool| {
+        if log {
+            let positive: Vec<f64> = v.iter().copied().filter(|&a| a > 0.0).collect();
+            data_range(&positive)
+        } else {
+            data_range(v)
+        }
+    };
+    let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.log.x));
+    let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.log.y));
+    check_window_limits(xlim, ylim)?;
+    Ok((xlim, ylim))
+}
+
 impl<B: Backend> Device<B> {
     /// Draws R's `plot()`; the public entry is
     /// [`Graphics::plot`](crate::graphics::Graphics::plot), whose docs
@@ -406,31 +439,19 @@ impl<B: Backend> Device<B> {
         y: &[f64],
         opts: &PlotOptions,
     ) -> Result<(), Error> {
-        // On a log axis, values <= 0 are dropped (R's `xy.coords()` makes
-        // them `NA`); `points()`/`lines()` then skip them.
-        let range = |v: &[f64], log: bool| {
-            if log {
-                let positive: Vec<f64> = v.iter().copied().filter(|&a| a > 0.0).collect();
-                data_range(&positive)
-            } else {
-                data_range(v)
-            }
-        };
-        let xlim = opts.xlim.unwrap_or_else(|| range(x, opts.xlog));
-        let ylim = opts.ylim.unwrap_or_else(|| range(y, opts.ylog));
+        let (xlim, ylim) = plot_window_limits(x, y, opts)?;
 
         self.plot_new_impl()?;
         // `localWindow(xlim, ylim, log, asp, ...)`.
         let window = PlotWindowOptions {
             deferred_error: None,
-            xlog: opts.xlog,
-            ylog: opts.ylog,
+            log: opts.log,
             asp: opts.asp,
             xaxs: opts.xaxs,
             yaxs: opts.yaxs,
             lab: opts.lab,
         };
-        self.plot_window_impl(xlim, ylim, &window);
+        self.plot_window_impl(xlim, ylim, &window)?;
         crate::extra::panel_bg(self, &opts.extra)?;
         if let Some(panel) = &opts.panel_first {
             self.try_add_figure(panel)?;
@@ -473,10 +494,13 @@ impl<B: Backend> Device<B> {
                 xpd: opts.xpd,
                 ..InlineAxis::default()
             };
-            for (side, axt, axp) in [(1, opts.xaxt, opts.xaxp), (2, opts.yaxt, opts.yaxp)] {
+            // `localAxis(side, ...)`: both axes get all four.
+            for side in [1, 2] {
                 let mut o = AxisOptions {
-                    axt,
-                    axp,
+                    xaxt: opts.xaxt,
+                    yaxt: opts.yaxt,
+                    xaxp: opts.xaxp,
+                    yaxp: opts.yaxp,
                     ..AxisOptions::default()
                 };
                 if side == 1 {
@@ -495,7 +519,8 @@ impl<B: Backend> Device<B> {
             })?;
         }
 
-        if self.par.ann {
+        // `if (ann) localTitle(...)`, `ann = par("ann")` by default.
+        if opts.ann.unwrap_or(self.par.ann) {
             self.title_impl(&TitleOptions {
                 main: opts.main.clone(),
                 sub: opts.sub.clone(),

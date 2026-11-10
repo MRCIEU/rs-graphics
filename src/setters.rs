@@ -232,12 +232,15 @@ impl<const N: usize> OptionArray<Option<[f64; N]>> for Option<[f64; N]> {
     }
 }
 
-/// One value or several: colours and `text()`'s `pos` (recycled per
-/// element, as R does), and `layout()`'s `widths` and `heights`.
+/// One value or several: colours, `text()`'s `pos` and `mtext()`'s `side`
+/// (recycled per element, as R does), and `layout()`'s `widths` and
+/// `heights`.
 ///
-/// Takes a single value (a colour or a `pos` code) or a `Vec`, array or
-/// slice of them, by value or by reference: `"red"`, `["red", "blue"]`,
-/// `[1, 2]`, ... Colours take anything that converts to a [`ColorSpec`]
+/// Takes a single value (a colour, a `pos` code or a side; layout sizes
+/// only as an array or `Vec`) or a `Vec`, array or slice of them, by value
+/// or by reference: `"red"`, `["red", "blue"]`,
+/// `[1, 2]`, ..., or a range of integer codes (`1..=9`, R's `1:9`: palette
+/// colours 1 to 9). Colours take anything that converts to a [`ColorSpec`]
 /// (one palette index as an `i32`; a `None` element is R's `NA`, nothing
 /// drawn). Settings whose other elements may be `NA` take [`NaValues`],
 /// numeric data [`Numbers`](crate::numbers::Numbers), and `pch` [`Pch`].
@@ -292,6 +295,24 @@ impl<T, U: IntoArg<T> + Clone> Values<T> for &Vec<U> {
     }
 }
 
+impl<T> Values<T> for std::ops::Range<i32>
+where
+    i32: IntoArg<T>,
+{
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.map(IntoArg::into_arg).collect()
+    }
+}
+
+impl<T> Values<T> for std::ops::RangeInclusive<i32>
+where
+    i32: IntoArg<T>,
+{
+    fn into_values(self) -> Result<Vec<T>, Error> {
+        self.map(IntoArg::into_arg).collect()
+    }
+}
+
 /// `impl Values<$t> for $single` (one value) for each listed type.
 macro_rules! single_values {
     ($t:ty: $($single:ty),*) => {
@@ -307,6 +328,7 @@ macro_rules! single_values {
 
 single_values!(ColorSpec: ColorSpec, Color, &str, String, &String, i32);
 single_values!(i32: i32);
+single_values!(crate::device::Side: crate::device::Side, i32);
 
 /// One value or several for a recycled style vector whose elements may be
 /// missing (`None`, R's `NA`).
@@ -315,7 +337,8 @@ single_values!(i32: i32);
 /// of either, by value or by reference: `19`, `[1, 2]`,
 /// `[Some(19), None]`, `"dashed"`, `[None, Some("solid")]`, `&lwd[..]`,
 /// ... Numeric settings take any number type ([`Num`](crate::numbers::Num))
-/// and integer ranges (`1..=3`). Rust arrays hold one element type, so
+/// and integer ranges (`1..=3`), and line types and fonts ranges of their
+/// codes (`1..=6`, R's `lty = 1:6`). Rust arrays hold one element type, so
 /// once one element is `None` the others are written `Some(..)`.
 ///
 /// `None` skips the element: no symbol, line or segment is drawn for it
@@ -487,13 +510,34 @@ mod na_numbers {
 }
 na_values!(LineType: IntoArg::<LineType>::into_arg; LineType, &str, String, &String, i32);
 na_values!(FontFace: IntoArg::<FontFace>::into_arg; FontFace, i32, &str, String, &String);
+na_values!(bool: IntoArg::<bool>::into_arg; bool);
+
+/// `NaValues<$t>` for ranges of integer codes (`1..=6`, R's `1:6`), each
+/// converted as one `i32` is.
+macro_rules! code_ranges {
+    ($($t:ty),*) => {
+        $(
+            impl NaValues<$t> for std::ops::Range<i32> {
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    self.map(|v| IntoArg::<$t>::into_arg(v).map(Some)).collect()
+                }
+            }
+            impl NaValues<$t> for std::ops::RangeInclusive<i32> {
+                fn into_na_values(self) -> Result<Vec<Option<$t>>, Error> {
+                    self.map(|v| IntoArg::<$t>::into_arg(v).map(Some)).collect()
+                }
+            }
+        )*
+    };
+}
+code_ranges!(LineType, FontFace);
 
 /// Plotting symbols for a `pch` setter: numbers, characters or strings.
 ///
-/// One or several numbers (`19`, `[1, 2]`, `&pch`), characters (`'a'`,
-/// `['a', 'b']`) or strings (`"a"`, `["a", "b"]`), by value or by
-/// reference; `None` elements are R's `NA`, no symbol (`[Some(19), None]`,
-/// `[Some("x"), None]`). Numbers are R's symbol codes 0 to 25 (see
+/// One or several numbers (`19`, `[1, 2]`, `&pch`, or a range such as
+/// `0..=25`, R's `0:25`), characters (`'a'`, `['a', 'b']`) or strings
+/// (`"a"`, `["a", "b"]`), by value or by reference; `None` elements are
+/// R's `NA`, no symbol (`[Some(19), None]`, `[Some("x"), None]`). Numbers are R's symbol codes 0 to 25 (see
 /// [`charts::pch`](crate::charts::pch)). A character is drawn as itself:
 /// ASCII ones are their character codes, other characters are stored as
 /// minus their Unicode code point (R's negative `pch`), so `'é'` is `-233`.
@@ -600,6 +644,148 @@ fn string_pch<S: AsRef<str>>(strings: &[Option<S>], legend: bool) -> Vec<Option<
     }
 }
 
+/// A palette: a palette's name, or two or more colours, as R's
+/// `palette()` takes.
+///
+/// One string is the name of one of R's colour sets, ignoring case,
+/// spaces and punctuation, or a unique start of one: `"R3"`, `"R4"` (the
+/// default, also `"default"`), `"ggplot2"`, `"Okabe-Ito"`, `"Accent"`,
+/// `"Dark 2"`, `"Paired"`, `"Pastel 1"`, `"Pastel 2"`, `"Set 1"`, `"Set 2"`,
+/// `"Set 3"`, `"Tableau 10"`, `"Classic Tableau"`, `"Polychrome 36"` and
+/// `"Alphabet"` (R's `palette.pals()`). Two or more colours (an array,
+/// `Vec` or slice of [`Color`]s or colour strings, by value or by
+/// reference) make a palette of their own. No colours leave the palette
+/// as it is.
+///
+/// This is R's `palette(value)`.
+///
+/// # Errors
+///
+/// One string that names no set ("unknown palette (need >= 2 colors)",
+/// as R; also for one colour), or starts several (an error naming them;
+/// R fails there with an internal error), more than 1024 colours ("maximum
+/// number of colors is 1024"), or a string that isn't a colour ("invalid
+/// color name '..'").
+///
+/// # Examples
+///
+/// ```
+/// use rs_graphics::setters::PaletteColors;
+/// # use rs_graphics::prelude::*;
+/// assert_eq!("okabe".into_palette().unwrap().unwrap().len(), 9);
+/// let own = ["black", "#E69F00", "navy"].into_palette().unwrap().unwrap();
+/// assert_eq!(own[1], Color::rgb(0xE6, 0x9F, 0x00));
+/// assert!("red".into_palette().is_err());
+/// # let mut dev = Device::null().open().unwrap();
+/// dev.par().palette("Okabe-Ito").draw();
+/// ```
+pub trait PaletteColors {
+    /// The palette's colours; `None` for no colours (unchanged).
+    ///
+    /// # Errors
+    ///
+    /// As the trait's doc says.
+    fn into_palette(self) -> Result<Option<Vec<Color>>, Error>;
+}
+
+/// An element a [`PaletteColors`] value is made of: a [`Color`] or a
+/// string.
+///
+/// Sealed: implemented only in this crate.
+pub trait PaletteElement: palette_sealed::Sealed {
+    /// The element as a palette name, if it is a string.
+    #[doc(hidden)]
+    fn as_name(&self) -> Option<&str>;
+    /// The element as a colour.
+    #[doc(hidden)]
+    fn to_color(&self) -> Result<Color, Error>;
+}
+
+mod palette_sealed {
+    pub trait Sealed {}
+}
+
+impl palette_sealed::Sealed for Color {}
+impl PaletteElement for Color {
+    fn as_name(&self) -> Option<&str> {
+        None
+    }
+    fn to_color(&self) -> Result<Color, Error> {
+        Ok(*self)
+    }
+}
+
+macro_rules! palette_strings {
+    ($($t:ty),*) => {
+        $(
+            impl palette_sealed::Sealed for $t {}
+            impl PaletteElement for $t {
+                fn as_name(&self) -> Option<&str> {
+                    Some(self.as_ref())
+                }
+                fn to_color(&self) -> Result<Color, Error> {
+                    Color::try_from(AsRef::<str>::as_ref(self))
+                }
+            }
+        )*
+    };
+}
+palette_strings!(&str, String, &String);
+
+/// R's `palette()` for `items`: see [`PaletteColors`].
+fn palette_of<E: PaletteElement>(items: &[E]) -> Result<Option<Vec<Color>>, Error> {
+    match items {
+        [] => Ok(None),
+        [one] => match one.as_name() {
+            Some(name) => crate::color::named_palette(name).map(Some),
+            None => Err(Error::invalid("unknown palette (need >= 2 colors)")),
+        },
+        _ if items.len() > 1024 => Err(Error::invalid("maximum number of colors is 1024")),
+        _ => items
+            .iter()
+            .map(PaletteElement::to_color)
+            .collect::<Result<_, _>>()
+            .map(Some),
+    }
+}
+
+macro_rules! palette_shape {
+    ($([$($g:tt)*] $ty:ty => |$v:ident| $items:expr;)*) => {
+        $(
+            impl<$($g)*> PaletteColors for $ty {
+                fn into_palette(self) -> Result<Option<Vec<Color>>, Error> {
+                    let $v = self;
+                    palette_of($items)
+                }
+            }
+        )*
+    };
+}
+palette_shape! {
+    [E: PaletteElement] E => |v| std::slice::from_ref(&v);
+    [E: PaletteElement, const N: usize] [E; N] => |v| &v;
+    [E: PaletteElement] Vec<E> => |v| &v;
+    [E: PaletteElement] &[E] => |v| v;
+    [E: PaletteElement, const N: usize] &[E; N] => |v| v;
+    [E: PaletteElement] &Vec<E> => |v| v;
+}
+
+/// One `pch` code for a `par()` parameter, checked as R's `par()` does:
+/// no value leaves it unchanged (`Ok(None)`), more than one is the wrong
+/// length, and `NA` (or `""`) is invalid.
+pub(crate) fn one_pch(codes: Vec<Option<i32>>, name: &str) -> Result<Option<i32>, Error> {
+    match codes.as_slice() {
+        [] => Ok(None),
+        [Some(code)] => Ok(Some(*code)),
+        [None] => Err(Error::invalid(format!(
+            "invalid value specified for graphical parameter \"{name}\""
+        ))),
+        _ => Err(Error::invalid(format!(
+            "graphical parameter \"{name}\" has the wrong length"
+        ))),
+    }
+}
+
 /// `Pch` for one shape of value: `$items` turns it into `Option` elements.
 macro_rules! pch_shape {
     ($([$($g:tt)*] $ty:ty => |$v:ident| $items:expr;)*) => {
@@ -631,6 +817,23 @@ pch_shape! {
     [E: PchElement + Clone] &Vec<E> => |v| v.iter().cloned().map(Some).collect::<Vec<_>>();
     [E: PchElement] &Vec<Option<E>> => |v| v;
 }
+
+/// Ranges of symbol codes (`0..=25`, R's `pch = 0:25`).
+macro_rules! pch_ranges {
+    ($($r:ty),*) => {
+        $(
+            impl Pch for $r {
+                fn into_pch(self) -> Vec<Option<i32>> {
+                    self.map(Some).collect()
+                }
+                fn into_legend_pch(self) -> Vec<Option<i32>> {
+                    self.into_pch()
+                }
+            }
+        )*
+    };
+}
+pch_ranges!(std::ops::Range<i32>, std::ops::RangeInclusive<i32>);
 
 /// A character's `pch` code, as R's `GEstring_to_pch()` in a UTF-8 locale:
 /// its ASCII code, or minus its Unicode code point for any other character
@@ -684,12 +887,19 @@ pub(crate) fn char_pch(c: char) -> i32 {
 /// from an array of any numbers), `option_array` (`Option<Option<[f64;
 /// N]>>`, for [`par(plt)`], from an array of any numbers or an `Option`,
 /// [`OptionArray`]), `int_array` (an integer array from any numbers,
-/// truncated), `na` (`Option<Option<f64>>`, R's
+/// truncated), `color` (`Option<ColorSpec>` for a `par()` colour, from a
+/// string, [`Color`](crate::color::Color), palette number or `Option`,
+/// resolved when the call runs), `na` (`Option<Option<f64>>`, R's
 /// `NA`-able number, from a number or `None` for `NA`), `count`
 /// (`Option<usize>` from any integer), `pch` (`Vec<Option<i32>>` from
-/// [`Pch`]) and `legend_pch` (the same, read as `legend()` does).
+/// [`Pch`]), `legend_pch` (the same, read as `legend()` does) and
+/// `one_pch` (`Option<i32>` from one [`Pch`] value, for [`par(pch)`]) and
+/// `palette` (`Option<Vec<Color>>` from [`PaletteColors`], for
+/// [`par(palette)`]).
 ///
 /// [`par(plt)`]: crate::par::Par::plt
+/// [`par(pch)`]: crate::par::Par::pch
+/// [`par(palette)`]: crate::par::Par::palette
 macro_rules! options {
     (
         $(#[$sattr:meta])*
@@ -755,6 +965,18 @@ macro_rules! options {
         pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
             match value.into_arg() {
                 Ok(v) => self$(.$p)?.$field = v,
+                Err(e) => self$(.$p)?.defer(e),
+            }
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident color $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes a colour name or `#RRGGBB[AA]` string, a [`Color`](crate::color::Color), a palette number (0: the background colour, as R's `par(bg)`) or an `Option` of one (`None`: R's `NA`, transparent); a number is looked up in the palette when the call runs, as R's `par()` stores the colour."]
+        pub fn $field(mut self, value: impl $crate::setters::IntoArg<$t>) -> Self {
+            match value.into_arg() {
+                Ok(v) => self$(.$p)?.$field = Some(v),
                 Err(e) => self$(.$p)?.defer(e),
             }
             self
@@ -845,6 +1067,32 @@ macro_rules! options {
         #[doc = "Takes numbers, characters or strings; `None` is R's `NA` (see [`Pch`](crate::setters::Pch))."]
         pub fn $field(mut self, values: impl $crate::setters::Pch) -> Self {
             self$(.$p)?.$field = values.into_pch();
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident palette $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes a palette's name, or two or more colours (see [`PaletteColors`](crate::setters::PaletteColors))."]
+        pub fn $field(mut self, value: impl $crate::setters::PaletteColors) -> Self {
+            match value.into_palette() {
+                Ok(Some(v)) => self$(.$p)?.$field = Some(v),
+                Ok(None) => {}
+                Err(e) => self$(.$p)?.defer(e),
+            }
+            self
+        }
+    };
+    (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident one_pch $t:ty) => {
+        $($a)*
+        #[doc = ""]
+        #[doc = "Takes one number, character or string (see [`Pch`](crate::setters::Pch))."]
+        pub fn $field(mut self, value: impl $crate::setters::Pch) -> Self {
+            match $crate::setters::one_pch(value.into_pch(), stringify!($field)) {
+                Ok(Some(v)) => self$(.$p)?.$field = Some(v),
+                Ok(None) => {}
+                Err(e) => self$(.$p)?.defer(e),
+            }
             self
         }
     };
@@ -941,12 +1189,13 @@ macro_rules! options {
     (@one [$($p:ident)?] [$($a:tt)*] $ty:ident $field:ident int_array $t:ty) => {
         $($a)*
         #[doc = ""]
-        #[doc = "Takes an array of any numbers; fractions are truncated, as R's `as.integer()`."]
+        #[doc = "Takes an array of any numbers, read as R's `as.integer()`: fractions are truncated, and `NaN` or a value beyond R's integer range is R's `NA` (an error in `par()`)."]
         pub fn $field<U: $crate::numbers::Num, const N: usize>(mut self, values: [U; N]) -> Self
         where
             [i32; N]: Into<$t>,
         {
-            let values: [i32; N] = values.map(|v| $crate::numbers::Num::to_f64(v) as i32);
+            let values: [i32; N] =
+                values.map(|v| $crate::numbers::as_integer($crate::numbers::Num::to_f64(v)));
             self$(.$p)?.$field = Some(values.into());
             self
         }
@@ -1045,12 +1294,18 @@ mod tests {
         assert_eq!(a.lend, Some(crate::backend::LineEnd::Butt));
         // A bare `None` resets a number.
         assert!(AxisOptions::default().line(2).line(None).line.is_none());
-        // Where R has an `NA` (`par(tck)`, legend `vadj`), `None` is it.
+        // Where R has an `NA` (`par(tck)`, legend `adj`), `None` is it.
         let p = ParOptions::default().tck(0.02);
         assert_eq!(p.tck, Some(Some(0.02)));
         assert_eq!(p.tck(None).tck, Some(None));
-        let l = crate::device::LegendOptions::default().vadj(None);
-        assert_eq!(l.vadj, Some(None));
+        let l = crate::device::LegendOptions::default().adj([Some(0.5), None]);
+        assert_eq!(
+            l.adj,
+            Some(crate::device::Adj {
+                x: Some(0.5),
+                y: None
+            })
+        );
         assert_eq!(ParOptions::default().tck(f64::NAN).tck, Some(None));
         assert_eq!(ParOptions::default().cex(Some(1.5)).cex, Some(1.5));
         // A failed conversion inside the `Option` is kept for `try_draw()`.
@@ -1118,15 +1373,15 @@ mod tests {
 
     #[test]
     fn label_setters_take_one_label_or_several() {
-        use crate::device::AxisOptions;
+        use crate::device::{AxisLabels, AxisOptions};
         use crate::highlevel::{BarplotOptions, BoxplotOptions, PieOptions};
         use crate::plotmath::Label;
 
         let a = Label::from("A");
         let bars = BarplotOptions::default()
-            .names("A")
+            .names_arg("A")
             .legend_text(String::from("A"));
-        assert_eq!(bars.names, Some(vec![Some(a.clone())]));
+        assert_eq!(bars.names_arg, Some(vec![Some(a.clone())]));
         assert_eq!(bars.legend_text, Some(vec![Some(a.clone())]));
         let names = vec!["A".to_string(), "B".to_string()];
         let boxes = BoxplotOptions::default().names(&names);
@@ -1137,18 +1392,28 @@ mod tests {
         let pie = PieOptions::default().labels(Label::math("x^2"));
         assert_eq!(pie.labels, Some(vec![Some(Label::math("x^2"))]));
         // Every label list may hold R's `NA`.
-        let bars = BarplotOptions::default().names([Some("a"), None]);
-        assert_eq!(bars.names, Some(vec![Some(Label::from("a")), None]));
+        let bars = BarplotOptions::default().names_arg([Some("a"), None]);
+        assert_eq!(bars.names_arg, Some(vec![Some(Label::from("a")), None]));
         // Axis labels may hold R's `NA`.
         let axis = AxisOptions::default().labels("A");
-        assert_eq!(axis.labels, Some(vec![Some(a.clone())]));
+        assert_eq!(axis.labels, AxisLabels::Text(vec![Some(a.clone())]));
         let axis = AxisOptions::default().labels([Some("A"), None]);
-        assert_eq!(axis.labels, Some(vec![Some(a), None]));
+        assert_eq!(axis.labels, AxisLabels::Text(vec![Some(a), None]));
+        // And R's `TRUE`/`FALSE`.
+        assert_eq!(AxisOptions::default().labels, AxisLabels::Values);
+        assert_eq!(
+            AxisOptions::default().labels(false).labels,
+            AxisLabels::None
+        );
+        assert_eq!(
+            AxisOptions::default().labels(true).labels,
+            AxisLabels::Values
+        );
     }
 
     #[test]
     fn setters_set_the_fields() {
-        use crate::device::{AblineOptions, AxisOptions, TextOptions, XyOptions};
+        use crate::device::{AblineOptions, AxisLabels, AxisOptions, TextOptions, XyOptions};
         use crate::highlevel::{BarplotOptions, PlotOptions};
         use crate::plotmath::Label;
 
@@ -1173,7 +1438,7 @@ mod tests {
         assert_eq!(axis.at, Some(vec![1.0, 2.0]));
         assert_eq!(
             axis.labels,
-            Some(vec![Some(Label::from("a")), Some(Label::from("b"))])
+            AxisLabels::Text(vec![Some(Label::from("a")), Some(Label::from("b"))])
         );
         assert_eq!(axis.las, Some(1));
 
@@ -1188,9 +1453,9 @@ mod tests {
         assert_eq!(plot.main, Some(Label::math("x^2")));
         assert!(!plot.axes);
 
-        let bars = BarplotOptions::default().names(["a", "b"]).col("grey");
+        let bars = BarplotOptions::default().names_arg(["a", "b"]).col("grey");
         assert_eq!(
-            bars.names,
+            bars.names_arg,
             Some(vec![Some(Label::from("a")), Some(Label::from("b"))])
         );
         assert_eq!(bars.col, vec![ColorSpec::try_from("grey").unwrap()]);
@@ -1258,7 +1523,7 @@ mod tests {
             (p.type_, p.xaxt),
             (Some(PlotType::Histogram), Some(AxisType::None))
         );
-        assert_eq!(AxisOptions::default().axt("n").axt, Some(AxisType::None));
+        assert_eq!(AxisOptions::default().xaxt("n").xaxt, Some(AxisType::None));
         assert_eq!(LegendOptions::default().bty("n").bty, Some(Bty::N));
         assert_eq!(
             BarplotOptions::default().order_h("decr").order_h,
@@ -1287,7 +1552,7 @@ mod tests {
         use crate::par::Bty;
         let par = ParOptions::default().bty("l").col_main("red");
         assert_eq!(par.bty, Some(Bty::L));
-        assert_eq!(par.col_main, Some(Color::rgb(255, 0, 0)));
+        assert_eq!(par.col_main, Some(ColorSpec::Color(Color::rgb(255, 0, 0))));
         assert_eq!(BoxOptions::default().bty("]").bty, Some(Bty::Bracket));
         assert_eq!(PlotOptions::default().bty("[").bty, Some(Bty::C));
         assert_eq!(Bty::parse("7"), Some(Bty::Seven));
@@ -1324,5 +1589,124 @@ mod tests {
             .unwrap();
         assert_eq!(e.message(), "'ncol' must be a count, not -1");
         assert!(XyOptions::default().lty("dashed").deferred_error.is_none());
+    }
+
+    #[test]
+    fn adj_takes_one_value_two_or_two_options() {
+        use crate::device::{Adj, LegendOptions, TextOptions};
+
+        let adj = |a: Adj| TextOptions::default().adj(a).adj;
+        assert_eq!(TextOptions::default().adj, None);
+        // One value: R's one-value `adj`, the vertical `NA`.
+        let one = Adj {
+            x: Some(1.0),
+            y: None,
+        };
+        assert_eq!(TextOptions::default().adj(1).adj, Some(one));
+        assert_eq!(TextOptions::default().adj(1.0_f32).adj, Some(one));
+        assert_eq!(
+            adj([0, 1].into()),
+            Some(Adj {
+                x: Some(0.0),
+                y: Some(1.0)
+            })
+        );
+        assert_eq!(
+            adj((0, 0.5).into()),
+            Some(Adj {
+                x: Some(0.0),
+                y: Some(0.5)
+            })
+        );
+        assert_eq!(
+            LegendOptions::default().adj([None, Some(1)]).adj,
+            Some(Adj {
+                x: None,
+                y: Some(1.0)
+            })
+        );
+        // An old `NaN` is `NA`.
+        assert_eq!(
+            Adj::from([f64::NAN, 0.2]),
+            Adj {
+                x: None,
+                y: Some(0.2)
+            }
+        );
+        // `NA`, or a value that isn't finite, centres.
+        let na = Adj {
+            x: None,
+            y: Some(f64::INFINITY),
+        };
+        assert_eq!((na.hadj(), na.vadj()), (0.5, None));
+        let set = Adj {
+            x: Some(0.2),
+            y: Some(0.7),
+        };
+        assert_eq!((set.hadj(), set.vadj()), (0.2, Some(0.7)));
+    }
+
+    #[test]
+    fn integer_code_settings_take_ranges() {
+        use crate::color::ColorSpec;
+        use crate::device::Side;
+        // Each range is the array of its codes, as R's `1:n`.
+        let col: Vec<ColorSpec> = (1..=9).into_values().unwrap();
+        assert_eq!(col, [1, 2, 3, 4, 5, 6, 7, 8, 9].into_values().unwrap());
+        let col: Vec<ColorSpec> = (1..4).into_values().unwrap();
+        assert_eq!(col, [1, 2, 3].into_values().unwrap());
+        assert_eq!(
+            (0..=25).into_pch(),
+            (0..26).collect::<Vec<i32>>().into_pch()
+        );
+        assert_eq!((15..18).into_legend_pch(), [15, 16, 17].into_legend_pch());
+        let lty: Vec<Option<LineType>> = (1..=6).into_na_values().unwrap();
+        assert_eq!(lty, [1, 2, 3, 4, 5, 6].into_na_values().unwrap());
+        let font: Vec<Option<FontFace>> = (1..5).into_na_values().unwrap();
+        assert_eq!(font, [1, 2, 3, 4].into_na_values().unwrap());
+        let side: Vec<Side> = (1..=4).into_values().unwrap();
+        assert_eq!(side, [1, 2, 3, 4].into_values().unwrap());
+        let pos: Vec<i32> = (1..=4).into_values().unwrap();
+        assert_eq!(pos, [1, 2, 3, 4]);
+        // A code that doesn't convert is the same error as in an array.
+        let e = Values::<Side>::into_values(1..=5).unwrap_err();
+        assert_eq!(e.message(), "invalid axis number 5");
+        let e = NaValues::<FontFace>::into_na_values(1..=6).unwrap_err();
+        assert!(e.message().starts_with("invalid font 6"), "{e}");
+    }
+
+    #[test]
+    fn palettes_take_a_name_or_two_or_more_colours() {
+        use crate::color::Color;
+        let (red, blue) = (Color::rgb(255, 0, 0), Color::rgb(0, 0, 255));
+        assert_eq!([red, blue].into_palette().unwrap(), Some(vec![red, blue]));
+        assert_eq!(
+            vec!["red", "blue"].into_palette().unwrap(),
+            Some(vec![red, blue])
+        );
+        assert_eq!(Vec::<Color>::new().into_palette().unwrap(), None);
+        // One colour is not a palette, as R's "need >= 2 colors".
+        let e = red.into_palette().unwrap_err();
+        assert_eq!(e.message(), "unknown palette (need >= 2 colors)");
+        assert!(["red"].into_palette().is_err());
+        let p = crate::par::ParOptions::default().palette(["red", "blue"]);
+        assert_eq!(p.palette, Some(vec![red, blue]));
+        let p = crate::par::ParOptions::default().palette("red");
+        assert!(p.palette.is_none() && p.deferred_error.is_some());
+    }
+
+    #[test]
+    fn par_pch_takes_one_number_character_or_string() {
+        use crate::par::ParOptions;
+        let p = |v: ParOptions| (v.pch, v.deferred_error.is_some());
+        assert_eq!(p(ParOptions::default().pch(17)), (Some(17), false));
+        assert_eq!(p(ParOptions::default().pch('+')), (Some(43), false));
+        assert_eq!(p(ParOptions::default().pch("ab")), (Some(97), false));
+        assert_eq!(p(ParOptions::default().pch('\u{e9}')), (Some(-233), false));
+        // No value leaves it unchanged, as R's `par(pch = character(0))`.
+        assert_eq!(p(ParOptions::default().pch([0i32; 0])), (None, false));
+        // R's errors: tested against R in `tests/all/errors_matches_r.rs`.
+        assert_eq!(p(ParOptions::default().pch([1, 2])), (None, true));
+        assert_eq!(p(ParOptions::default().pch(None::<i32>)), (None, true));
     }
 }

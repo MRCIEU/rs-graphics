@@ -138,8 +138,9 @@ impl Error {
     }
 
     /// Returns the name of the R function that raised the error, such as
-    /// `"plot.new"` or `"hist"`; empty for an error from a string
-    /// conversion.
+    /// `"plot.new"` or `"hist"`; usually empty for an error from a string
+    /// conversion (a [`Log`](crate::par::Log)'s names `plot.window`, as R's
+    /// does).
     pub fn call(&self) -> &str {
         self.call
     }
@@ -300,7 +301,7 @@ mod string_route_tests {
     use crate::font::FontFace;
     use crate::highlevel::{HistBreaks, OrderH, PlotType};
     use crate::lty::LineType;
-    use crate::par::{AxisStyle, AxisType, Bty, Pty};
+    use crate::par::{AxisStyle, AxisType, Bty, Log, Pty};
     use std::fmt::Debug;
     use std::str::FromStr;
 
@@ -337,5 +338,6 @@ mod string_route_tests {
         same::<LegendKeyword>("topr", "to");
         same::<LegendPos>("topleft", "middle");
         same::<Units>("cm", "pt");
+        same::<Log>("yx", "z");
     }
 }

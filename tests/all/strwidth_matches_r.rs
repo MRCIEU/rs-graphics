@@ -15,8 +15,6 @@
 
 use crate::common;
 
-use std::process::Command;
-
 use rs_graphics::device::Device;
 use rs_graphics::graphics::Graphics;
 
@@ -110,10 +108,7 @@ fn strwidth_and_strheight_match_r() {
     }
     let path = std::env::temp_dir().join("rs_graphics_strwidth.R");
     std::fs::write(&path, script).unwrap();
-    let out = Command::new("Rscript")
-        .arg(&path)
-        .output()
-        .expect("run Rscript");
+    let out = common::rscript().arg(&path).output().expect("run Rscript");
     assert!(
         out.status.success(),
         "Rscript failed: {}",

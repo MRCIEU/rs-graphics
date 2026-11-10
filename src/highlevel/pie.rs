@@ -16,7 +16,7 @@ use std::f64::consts::PI;
 use crate::backend::Backend;
 use crate::color::{Color, ColorSpec};
 use crate::device::{
-    Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
+    Adj, Device, PlotWindowOptions, PolygonOptions, TextOptions, TitleOptions, XyOptions,
 };
 use crate::error::Error;
 use crate::font::FontFace;
@@ -107,9 +107,10 @@ crate::setters::options! {
         ///
         /// [`par(font.main)`]: crate::par::Par::font_main
         pub font_main: Option<FontFace> => option FontFace,
-        /// Approximate number of polygon edges for a full circle. `None`:
-        /// 200.
-        pub edges: Option<usize> => option usize,
+        /// Approximate number of polygon edges for a full circle (each slice
+        /// gets at least 2); not finite, or a slice's share beyond R's longest
+        /// vector (2^52), is R's error. `None`: 200.
+        pub edges: Option<f64> => number f64,
         /// Whether slices go clockwise. Default `false` (counterclockwise).
         pub clockwise: bool => value bool,
         /// Starting angle in degrees. `None`: 90 (12 o'clock) when
@@ -148,7 +149,7 @@ impl<B: Backend> Device<B> {
     /// [`Graphics::pie`](crate::graphics::Graphics::pie), whose docs
     /// describe it.
     pub(crate) fn pie_impl(&mut self, x: &[f64], opts: &PieOptions) -> Result<(), Error> {
-        check_pie(x)?;
+        check_pie(x, opts)?;
         let nx = x.len();
         let total: f64 = x.iter().sum();
 
@@ -173,7 +174,7 @@ impl<B: Backend> Device<B> {
             asp: Some(1.0),
             ..PlotWindowOptions::default()
         };
-        self.plot_window_impl(xlim, ylim, &window);
+        self.plot_window_impl(xlim, ylim, &window)?;
 
         let twopi = if opts.clockwise { -2.0 * PI } else { 2.0 * PI };
         let init = opts
@@ -181,7 +182,7 @@ impl<B: Backend> Device<B> {
             .unwrap_or(if opts.clockwise { 90.0 } else { 0.0 })
             .to_radians();
         let radius = opts.radius.unwrap_or(0.8);
-        let edges = opts.edges.unwrap_or(200);
+        let edges = opts.edges.unwrap_or(200.0);
         let t2xy = |t: f64| -> (f64, f64) {
             let tp = twopi * t + init;
             (radius * tp.cos(), radius * tp.sin())
@@ -199,7 +200,8 @@ impl<B: Backend> Device<B> {
 
         for i in 0..nx {
             let dxi = cum[i + 1] - cum[i];
-            let n = (2usize).max((edges as f64 * dxi).floor() as usize);
+            // `n <- max(2, floor(edges * dx))`.
+            let n = (edges * dxi).floor().max(2.0) as usize;
             let mut xs = Vec::with_capacity(n + 1);
             let mut ys = Vec::with_capacity(n + 1);
             for k in 0..n {
@@ -249,7 +251,7 @@ impl<B: Backend> Device<B> {
                 // `text(1.1 * P$x, 1.1 * P$y, labels[i], xpd = TRUE, adj =
                 // ifelse(P$x < 0, 1, 0))`.
                 let at = TextOptions {
-                    adj: Some(if px < 0.0 { 1.0 } else { 0.0 }),
+                    adj: Some(Adj::from(if px < 0.0 { 1.0 } else { 0.0 })),
                     xpd: Some(Xpd::Figure),
                     srt: opts.srt,
                     cex: opts.cex.into_iter().map(Some).collect(),
@@ -274,9 +276,23 @@ impl<B: Backend> Device<B> {
 }
 
 /// R's check of `pie()`'s `x`: values present, finite and not negative.
-pub(crate) fn check_pie(x: &[f64]) -> Result<(), Error> {
+pub(crate) fn check_pie(x: &[f64], opts: &PieOptions) -> Result<(), Error> {
     if x.is_empty() || !x.iter().all(|&v| v.is_finite() && v >= 0.0) {
         return Err(Error::invalid("'x' values must be positive."));
+    }
+    // R's `seq.int(.., length.out = n)` with a non-finite `edges`.
+    if opts.edges.is_some_and(|e| !e.is_finite()) {
+        return Err(Error::invalid("'length.out' must be a finite number"));
+    }
+    // A slice's `floor(edges * dx)` beyond R's longest vector
+    // (`R_XLEN_T_MAX`, 2^52).
+    let total: f64 = x.iter().sum();
+    let widest = x.iter().fold(0.0_f64, |m, &v| m.max(v)) / total;
+    if opts
+        .edges
+        .is_some_and(|e| (e * widest).floor() > 4_503_599_627_370_496.0)
+    {
+        return Err(Error::invalid("result would be too long a vector"));
     }
     Ok(())
 }

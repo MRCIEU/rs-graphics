@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Cross-checks `NA` (`None`) in the high-level plots' label lists against
-//! a real R `pdf()` device's uncompressed output: `barplot()`'s `names`
+//! a real R `pdf()` device's uncompressed output: `barplot()`'s `names_arg`
 //! (no label under that bar) and `legend_text` (the key without a label),
 //! `boxplot()`'s `names` (no label under that box) and `pie()`'s `labels`
 //! (neither label nor tick line for that slice). Every painted path and
@@ -36,7 +36,7 @@ fn cases() -> Vec<Case> {
             ours: |d| {
                 d.barplot()
                     .height([3, 5, 2])
-                    .names([Some("a"), None, Some("c")])
+                    .names_arg([Some("a"), None, Some("c")])
                     .legend_text([Some("x"), None, Some("z")])
                     .draw();
             },

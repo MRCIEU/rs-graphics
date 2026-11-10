@@ -23,7 +23,7 @@
 //!
 //! // Build a figure without a device...
 //! let mut fig = Figure::new();
-//! fig.barplot().height([3.0, 5.0, 2.0]).names(["a", "b", "c"]).draw();
+//! fig.barplot().height([3.0, 5.0, 2.0]).names_arg(["a", "b", "c"]).draw();
 //! fig.abline().h(4.0).lty("dashed").draw();
 //!
 //! // ...and draw it later, as often as needed.
@@ -107,8 +107,8 @@ use crate::device::{
 use crate::error::Error;
 use crate::graphics::{Graphics, ParPage};
 use crate::highlevel::barplot::bar_layout;
-use crate::highlevel::boxplot::boxplot_all_stats;
-use crate::highlevel::hist::hist_bins;
+use crate::highlevel::boxplot::{boxplot_all_stats, boxplot_window};
+use crate::highlevel::hist::{hist_bins, hist_heights, hist_window};
 use crate::highlevel::{
     BarHeights, BarplotOptions, BoxStats, BoxplotOptions, HistOptions, HistResult, PieOptions,
     PlotOptions,
@@ -227,7 +227,7 @@ enum Call {
     Axis(Side, AxisOptions),
     Abline(AblineOptions),
     Legend(LegendPos, Vec<Option<Label>>, LegendOptions),
-    Mtext(Vec<Option<Label>>, Side, MtextOptions),
+    Mtext(Vec<Option<Label>>, Vec<Side>, MtextOptions),
     Title(TitleOptions),
 }
 
@@ -283,6 +283,9 @@ impl Graphics for Figure {
     }
     fn emit_hist(&mut self, x: &[f64], opts: HistOptions) -> Result<HistResult, Error> {
         let result = hist_bins(x, &opts)?;
+        if opts.plot.unwrap_or(true) && !opts.add {
+            hist_window(&result.breaks, &hist_heights(&result, &opts), &opts)?;
+        }
         self.calls.push(Call::Hist(x.to_vec(), opts));
         Ok(result)
     }
@@ -301,12 +304,18 @@ impl Graphics for Figure {
         opts: BoxplotOptions,
     ) -> Result<Vec<BoxStats>, Error> {
         let stats = boxplot_all_stats(groups, &opts)?;
+        let n = groups.len();
+        let at: Vec<f64> = opts
+            .at
+            .clone()
+            .unwrap_or_else(|| (1..=n).map(|i| i as f64).collect());
+        boxplot_window(&stats, &at, &opts)?;
         self.calls
             .push(Call::Boxplot(groups.to_vec(), Box::new(opts)));
         Ok(stats)
     }
     fn emit_pie(&mut self, x: &[f64], opts: PieOptions) -> Result<(), Error> {
-        crate::highlevel::check_pie(x)?;
+        crate::highlevel::check_pie(x, &opts)?;
         self.calls.push(Call::Pie(x.to_vec(), opts));
         Ok(())
     }
@@ -411,10 +420,10 @@ impl Graphics for Figure {
     fn emit_mtext(
         &mut self,
         text: Vec<Option<Label>>,
-        side: Side,
+        side: Vec<Side>,
         opts: MtextOptions,
     ) -> Result<(), Error> {
-        crate::device::check_mtext(&text)?;
+        crate::device::check_mtext(&text, &side)?;
         self.calls.push(Call::Mtext(text, side, opts));
         Ok(())
     }
@@ -548,7 +557,7 @@ impl<B: Backend> Device<B> {
                 Call::Legend(pos, labels, o) => d
                     .emit_legend(*pos, labels.clone(), o.clone())
                     .map(|l| out.legends.push(l)),
-                Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), *side, o.clone()),
+                Call::Mtext(text, side, o) => d.emit_mtext(text.clone(), side.clone(), o.clone()),
                 Call::Title(o) => d.emit_title(o.clone()),
             };
             r.map_err(|e| e.in_call(call.r_name()))?;

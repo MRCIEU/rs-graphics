@@ -73,7 +73,7 @@ use crate::layout::{LayoutRespect, LayoutSize};
 use crate::numbers::{Groups, Num, Numbers, Pair};
 use crate::par::ParOptions;
 use crate::plotmath::{Label, Labels};
-use crate::setters::IntoArg;
+use crate::setters::{IntoArg, Values};
 
 pub(crate) mod sealed {
     pub trait Sealed {}
@@ -234,7 +234,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing (`argument "x" is missing, with no default`) or `x` and `y` have
-    /// different lengths ("'x' and 'y' lengths differ"), with R's messages.
+    /// different lengths ("'x' and 'y' lengths differ"), with R's messages;
+    /// and, as `plot.window()`'s error, if a limit isn't finite: a given
+    /// `xlim`/`ylim` with a `NaN` or infinity, or no finite data to take
+    /// the range of ("need finite 'xlim' values", then `'ylim'`).
     fn plot(&mut self) -> PlotCall<'_, Self> {
         PlotCall::start(self)
     }
@@ -266,7 +269,11 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing, or with R's errors for invalid `breaks` (for example edges that
-    /// don't span the data).
+    /// don't span the data; no finite data at all is "invalid number of
+    /// 'breaks'" with the default rule, and the `pretty()` error with the
+    /// others or a count), or, as `plot.window()`'s error, if a given
+    /// `xlim`/`ylim` isn't finite ("need finite 'xlim' values"; not checked
+    /// with `add`).
     fn hist(&mut self) -> HistCall<'_, Self> {
         HistCall::start(self)
     }
@@ -292,7 +299,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// let mids = dev.barplot().height([3, 5, 2]).names(["A", "B", "C"]).ylim([0, 6]).draw();
+    /// let mids = dev.barplot().height([3, 5, 2]).names_arg(["A", "B", "C"]).ylim([0, 6]).draw();
     /// dev.text().x(&mids).y([3.3, 5.3, 2.3]).labels(["3", "5", "2"]).draw();
     /// ```
     ///
@@ -300,9 +307,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `height`
     /// is missing or empty, or a matrix's columns are empty or of different
-    /// lengths; if `names` has neither one name per bar nor (for `beside`) one per
-    /// column; and, with a log value axis, if any `height + offset`, or a given
-    /// limit of a log axis, is <= 0.
+    /// lengths; if `names_arg` has neither one name per bar nor (for `beside`) one
+    /// per column; with a log value axis, if any `height + offset`, or a
+    /// given limit of a log axis, is <= 0; and, as `plot.window()`'s error, if
+    /// a limit isn't finite: a given `xlim`/`ylim` with a `NaN` or infinity,
+    /// no finite height, or a `NaN` `space` ("need finite 'ylim' values";
+    /// `'xlim'` for the category axis, or when `horiz`).
     fn barplot(&mut self) -> BarplotCall<'_, Self> {
         BarplotCall::start(self)
     }
@@ -336,8 +346,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
-    /// missing or has no groups, or `at` or `width` doesn't have one value per
-    /// group (or a width isn't positive).
+    /// missing or has no groups, `at` or `width` doesn't have one value per
+    /// group (or a width isn't positive), or `range` is negative ("'coef'
+    /// must not be negative"); and, as `plot.window()`'s error, if
+    /// a limit isn't finite: a given `xlim`/`ylim` with a `NaN` or infinity,
+    /// or no finite value in any group ("need finite 'ylim' values"; the
+    /// names swap when `horizontal`, as R's `bxp()` passes them).
     fn boxplot(&mut self) -> BoxplotCall<'_, Self> {
         BoxplotCall::start(self)
     }
@@ -364,7 +378,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
     /// missing or empty or has a negative or non-finite value ("'x' values must be
-    /// positive").
+    /// positive"), or `edges` isn't finite ("'length.out' must be a finite
+    /// number") or is too large for one slice ("result would be too long a
+    /// vector"), with R's messages.
     fn pie(&mut self) -> PieCall<'_, Self> {
         PieCall::start(self)
     }
@@ -380,22 +396,22 @@ pub trait Graphics: sealed::Sealed + Sized {
     ///
     /// - `xlim`/`ylim` are in data units, also on a log axis, and may be
     ///   decreasing (a reversed axis).
-    /// - `xlog`/`ylog` make that axis log10. [`Device::usr`] is then in log10
-    ///   units on that axis.
+    /// - `log` (`"x"`, `"y"` or `"xy"`) makes that axis log10, setting
+    ///   `dev.par()`'s `xlog`/`ylog`. [`Device::usr`] is then in log10 units
+    ///   on that axis.
     /// - `asp` (linear axes only): first widens whichever range is needed so
     ///   that one x unit is `asp` y units long on the page, centred on the given
     ///   limits.
     /// - Each range is then extended: with [`par(xaxs)`]/[`par(yaxs)`] `"r"`
     ///   (the default) by 4% at each end; with `"i"` the limits are used as given. A
     ///   zero-width range is widened, to -1..1 around 0, otherwise by 40% of the
-    ///   value either side. Non-finite limits are replaced by huge finite ones;
-    ///   on a log axis, a limit <= 0 gives a lower end of about 1e-307 (R warns
-    ///   there; this doesn't).
+    ///   value either side. On a log axis, a limit <= 0 gives a lower end of
+    ///   about 1e-307 (R warns there; this doesn't).
     /// - Sets [`par(xaxp)`]/[`par(yaxp)`] (the default tick range and count)
     ///   from the new range and [`par(lab)`]. Later calls to `axis()` without
     ///   `at` read them; changing [`par(lab)`] afterwards doesn't change them.
     ///
-    /// This is R's `plot.window()`; its `log = "x"` is `.xlog(true)`.
+    /// This is R's `plot.window()`.
     ///
     /// # Examples
     ///
@@ -403,14 +419,15 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
     /// dev.plot_new();
-    /// dev.plot_window().xlim([1, 1000]).ylim([0, 1]).xlog(true).draw();
+    /// dev.plot_window().xlim([1, 1000]).ylim([0, 1]).log("x").draw();
     /// dev.axis().side(1).draw();
     /// ```
     ///
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `xlim` or
-    /// `ylim` is missing (R's message).
+    /// `ylim` is missing, or has a `NaN` or infinity ("need finite 'xlim'
+    /// values", then `'ylim'`), with R's messages.
     ///
     /// [`par(xaxs)`]: crate::par::Par::xaxs
     /// [`par(yaxs)`]: crate::par::Par::yaxs
@@ -532,7 +549,10 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x0` or
-    /// `y0` is missing (R's message).
+    /// `y0` is missing, `length` is negative or not finite ("invalid arrow
+    /// head length"), `angle` isn't finite ("invalid arrow head angle"), or
+    /// `code` is above 3 ("invalid arrow head specification"), with R's
+    /// messages.
     fn arrows(&mut self) -> ArrowsCall<'_, Self> {
         ArrowsCall::start(self)
     }
@@ -606,13 +626,14 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// plotmath expressions (`Label::math("alpha^2")`); without them, the
     /// labels are the indices `"1"`, `"2"`, .... The other arguments are in
     /// [`TextOptions`]. `x` and `y` are recycled to the longer, and the labels
-    /// over the points (extra labels are ignored). Horizontally, `adj` sets
-    /// which part of a label is at its point (0 its left end, 0.5 its centre, 1
-    /// its right end); vertically see [`TextOptions::vadj`]; labels are rotated
-    /// by `srt`, else [`par(srt)`]. A label with newlines (`"one\ntwo"`) is
-    /// drawn line by line, [`par(lheight)`] line heights apart, as all text
-    /// is. A label at a non-finite position (a missing value, or a value <=
-    /// 0 on a log axis) is skipped.
+    /// over the points (extra labels are ignored). `adj`
+    /// ([`Adj`](crate::device::Adj)) sets which part of a label is at its
+    /// point: horizontally 0 its left end, 0.5 its centre, 1 its right end;
+    /// vertically its baseline or, by default, its ink centred. Labels are
+    /// rotated by `srt`, else [`par(srt)`]. A label with newlines
+    /// (`"one\ntwo"`) is drawn line by line, [`par(lheight)`] line heights
+    /// apart, as all text is. A label at a non-finite position (a missing
+    /// value, or a value <= 0 on a log axis) is skipped.
     ///
     /// This is R's `text()`.
     ///
@@ -628,7 +649,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `x` is
-    /// missing (R's message) or a `pos` isn't 1 to 4 ("invalid 'pos' value").
+    /// missing (R's message), a `pos` isn't 1 to 4 ("invalid 'pos' value"),
+    /// or `srt` isn't finite (R's [`par(srt)`](crate::par::Par::srt) error).
     ///
     /// [`par(lheight)`]: crate::par::Par::lheight
     /// [`par(srt)`]: crate::par::Par::srt
@@ -698,8 +720,12 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `side` is missing or not 1 to 4, `labels` is given without `at` or
-    /// their lengths differ, or a log axis's `axp` code isn't 1, 2 or 3.
+    /// `side` is missing or not 1 to 4, no value of a given `at` is finite
+    /// ("no locations are finite"), `labels` is given without `at` or
+    /// their lengths differ; on a log axis, if the code (third value) of the
+    /// `xaxp`/`yaxp` it uses isn't 1, 2 or 3 (a negative value is a count
+    /// and allowed); and if a given `xaxp` or `yaxp` for a log direction has
+    /// a code of 0 or above 4, whichever the side.
     fn axis(&mut self) -> AxisCall<'_, Self> {
         AxisCall::start(self)
     }
@@ -765,7 +791,8 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `pos`
     /// or `labels` is missing, `pos` is a string that isn't one of the nine
     /// keywords (or a unique prefix of one), there are no labels ("'legend' is of length
-    /// 0"), or a `text_width` is negative or has `NaN` among several values.
+    /// 0"), `ncol` is 0 (R's "invalid 'times' argument"), or a `text_width`
+    /// is negative or has `NaN` among several values.
     fn legend(&mut self) -> LegendCall<'_, Self> {
         LegendCall::start(self)
     }
@@ -775,8 +802,9 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// [`text`](MtextCall::text) is required: text, or a plotmath expression
     /// (`Label::math(...)`) aligned on its bounding box by `adj`/`padj`.
     /// [`side`](MtextCall::side) defaults to 3, the top. The other arguments
-    /// (the margin line, `at`, `outer`, ...) are in [`MtextOptions`]; the text
-    /// and those arguments are recycled over the longest. Text is rotated
+    /// (the margin line, `at`, `outer`, ...) are in [`MtextOptions`]; the
+    /// text, `side` and those arguments are recycled over the longest, so
+    /// one call can write on several sides. Text is rotated
     /// according to `las` (else [`par(las)`]), and a `None` text (a missing
     /// value) is skipped.
     ///
@@ -794,7 +822,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `text` is missing or empty, or `side` isn't 1 to 4.
+    /// `text` is missing or empty, or `side` is empty or isn't 1 to 4.
     ///
     /// [`par(las)`]: crate::par::Par::las
     fn mtext(&mut self) -> MtextCall<'_, Self> {
@@ -867,13 +895,21 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it (also when a
-    /// `Figure` records the call), if `usr` has a `NaN` or `x0 == x1` or `y0 == y1`
-    /// ("invalid value specified for graphical parameter \"usr\""), or `lmitre`
-    /// is below 1 (the same message, naming `lmitre`), or `xaxp`/`yaxp` is set
-    /// for a log axis with a third value that isn't 1 to 4 (R's `logAxpCheck`;
-    /// the same message, naming it). Some page layout values
-    /// are checked on a device only (see [`mfrow`](ParCall::mfrow) and the
-    /// other layout setters).
+    /// `Figure` records the call), for a value R's `par()` rejects, with R's
+    /// message `invalid value specified for graphical parameter "<name>"`:
+    /// `adj` outside 0 to 1; `cex` (and `cex.axis`, `cex.lab`, `cex.main`,
+    /// `cex.sub`), `lwd`, `mex` or `lheight` not positive or not finite;
+    /// `mar`, `mai`, `oma`, `omi`, `plt` or `pin` negative or not finite;
+    /// `omd` outside 0 to 1; `mgp` or `srt` not finite; `las` outside 0 to
+    /// 3; `ps` negative or not finite; `lab` (see [`lab`](ParCall::lab));
+    /// `xaxp`/`yaxp` with a non-finite limit, or a third value of 0 or above
+    /// 4 (truncated) on a log axis (R's `logAxpCheck`) or a positive count
+    /// on a linear one; a negative palette number for a colour ("numerical
+    /// color values must be >= 0, found -1"); `usr` with a value that isn't
+    /// finite, or `x0 == x1` or `y0 == y1`; `lmitre` below 1;
+    /// `mfrow`/`mfcol`/`mfg`, `fig` and `fin` (see their setters); an
+    /// unknown string for `pty`, `bty`, `xaxs`, `xaxt`, `lend`, `ljoin`,
+    /// `lty`, `pch`, a colour or a palette (their own messages).
     fn par(&mut self) -> ParCall<'_, Self> {
         ParCall::start(self)
     }
@@ -901,7 +937,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// ```
     /// # use rs_graphics::prelude::*;
     /// # let mut dev = Device::null().open().unwrap();
-    /// let n = dev.layout().mat(&[[1, 1], [2, 3]]).heights([2, 1]).draw();
+    /// let n = dev.layout().mat([[1, 1], [2, 3]]).heights([2, 1]).draw();
     /// assert_eq!(n, 3);
     /// dev.plot().x([1, 2, 3]).draw(); // top
     /// dev.hist().x([1, 2, 2, 3]).draw(); // bottom left
@@ -1004,7 +1040,7 @@ pub trait Graphics: sealed::Sealed + Sized {
     fn emit_mtext(
         &mut self,
         text: Vec<Option<Label>>,
-        side: Side,
+        side: Vec<Side>,
         opts: MtextOptions,
     ) -> Result<(), Error>;
     #[doc(hidden)]
@@ -1057,10 +1093,7 @@ impl<B: Backend> Graphics for Device<B> {
         ylim: (f64, f64),
         opts: PlotWindowOptions,
     ) -> Result<(), Error> {
-        self.run(|d| {
-            d.plot_window_impl(xlim, ylim, &opts);
-            Ok(())
-        })
+        self.run(|d| d.plot_window_impl(xlim, ylim, &opts))
     }
     fn emit_points(&mut self, x: &[f64], y: &[f64], opts: XyOptions) -> Result<(), Error> {
         self.run(|d| d.points_impl(x, y, &opts))
@@ -1130,10 +1163,10 @@ impl<B: Backend> Graphics for Device<B> {
     fn emit_mtext(
         &mut self,
         text: Vec<Option<Label>>,
-        side: Side,
+        side: Vec<Side>,
         opts: MtextOptions,
     ) -> Result<(), Error> {
-        self.run(|d| d.mtext_impl(&text, side, &opts))
+        self.run(|d| d.mtext_impl(&text, &side, &opts))
     }
     fn emit_title(&mut self, opts: TitleOptions) -> Result<(), Error> {
         self.run(|d| {
@@ -1170,12 +1203,18 @@ impl<B: Backend> Graphics for Device<B> {
             if let Some((row, col)) = page.mfg {
                 d.mfg(row, col)?;
             }
-            // R checks `xaxp`/`yaxp` against the axis's log scale.
-            if let (Some(axp), true) = (opts.xaxp, opts.xlog.unwrap_or(d.xlog())) {
-                crate::device::check_log_axp("xaxp", axp)?;
-            }
-            if let (Some(axp), true) = (opts.yaxp, opts.ylog.unwrap_or(d.ylog())) {
-                crate::device::check_log_axp("yaxp", axp)?;
+            // R checks `xaxp`/`yaxp`'s third value against the axis's log
+            // scale: a code 1 to 4 on a log axis, a positive count on a
+            // linear one.
+            for (name, axp, log) in [
+                ("xaxp", opts.xaxp, opts.xlog.unwrap_or(d.xlog())),
+                ("yaxp", opts.yaxp, opts.ylog.unwrap_or(d.ylog())),
+            ] {
+                match (axp, log) {
+                    (Some(axp), true) => crate::device::check_log_axp(name, axp)?,
+                    (Some(axp), false) => crate::device::check_linear_axp(name, axp)?,
+                    (None, _) => {}
+                }
             }
             opts.apply(&mut d.par);
             // R's `par(oma/omi/omd = )`: "force eject of multiple figures",
@@ -1347,6 +1386,7 @@ call!(
     },
     |t, o| {
         let (x, y, index) = xy_coords(x, y, false)?;
+        crate::highlevel::plot::plot_window_limits(&x, &y, &o)?;
         let mut o = o;
         if index && o.xlab.is_none() {
             o.xlab = Some("Index".into());
@@ -1433,7 +1473,11 @@ call!(
     /// See [`Graphics::plot_window`] for the arguments and an example.
     PlotWindowCall("plot.window"), PlotWindowOptions => (),
     args { xlim: (f64, f64) = (manual), ylim: (f64, f64) = (manual) },
-    |t, o| { t.emit_plot_window(required(xlim, "xlim")?, required(ylim, "ylim")?, o) }
+    |t, o| {
+        let (xlim, ylim) = (required(xlim, "xlim")?, required(ylim, "ylim")?);
+        crate::device::check_window_limits(xlim, ylim)?;
+        t.emit_plot_window(xlim, ylim, o)
+    }
 );
 
 impl<G: Graphics> PlotWindowCall<'_, G> {
@@ -1542,6 +1586,7 @@ call!(
     },
     |t, o| {
         let [x0, y0, x1, y1] = segment_ends(x0, y0, x1, y1)?;
+        crate::device::check_arrows(&o)?;
         t.emit_arrows(&x0, &y0, &x1, &y1, o)
     }
 );
@@ -1707,12 +1752,15 @@ call!(
         /// [`Labels`]), recycled with the other arguments; a `None` element
         /// (R's `NA`) is skipped. Required.
         text: Vec<Option<Label>> = (impl Labels => Labels::into_labels),
-        /// The margin to write in: a [`Side`], or its number (1 below, 2
-        /// left, 3 above, 4 right); another number is an error of the call.
-        /// Default: 3, the top.
-        side: Side = (fallible impl IntoArg<Side> => IntoArg::into_arg),
+        /// The margin to write in, recycled per label: a [`Side`], or its
+        /// number (1 below, 2 left, 3 above, 4 right); another number is an
+        /// error of the call, and so is an empty list. Default: 3, the top.
+        side: Vec<Side> = (fallible impl Values<Side> => Values::into_values),
     },
-    |t, o| { t.emit_mtext(required(text, "text")?, side.unwrap_or(Side::Top), o) }
+    |t, o| {
+        let side = side.unwrap_or_else(|| vec![Side::Top]);
+        t.emit_mtext(required(text, "text")?, side, o)
+    }
 );
 call!(
     /// A [`title()`](Graphics::title) call being built: it adds titles.
@@ -1800,17 +1848,11 @@ pub(crate) enum ParGrid {
 }
 
 /// A pair of grid counts (`mfrow`, `mfcol`, `mfg`) as R's `as.integer()`
-/// reads them: fractions truncated. A negative or non-finite value becomes
-/// 0, which R's checks reject ("invalid value specified for graphical
-/// parameter").
+/// reads them: fractions truncated. A negative value, or one R's integer
+/// can't hold (`NaN`, beyond `i32::MAX`: R's `NA`), becomes 0, which R's
+/// checks reject ("invalid value specified for graphical parameter").
 fn grid_pair(p: impl Pair) -> (usize, usize) {
-    let count = |v: f64| {
-        if v.is_finite() && v >= 0.0 {
-            v as usize
-        } else {
-            0
-        }
-    };
+    let count = |v: f64| crate::numbers::as_integer(v).max(0) as usize;
     let (a, b) = p.into_pair();
     (count(a), count(b))
 }
@@ -1847,7 +1889,7 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `nrow` or
-    /// `ncol` is below 1 (or not finite).
+    /// `ncol` is below 1, not finite, or beyond R's integer range.
     ///
     /// [`par(cex)`]: crate::par::Par::cex
     pub fn mfrow(mut self, mfrow: impl Pair) -> Self {
@@ -1874,7 +1916,7 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if `nrow` or
-    /// `ncol` is below 1 (or not finite).
+    /// `ncol` is below 1, not finite, or beyond R's integer range.
     pub fn mfcol(mut self, mfcol: impl Pair) -> Self {
         let (nrow, ncol) = grid_pair(mfcol);
         self.page.grid = Some(ParGrid::Cols(nrow, ncol));
@@ -1906,7 +1948,8 @@ impl<G: Graphics> ParCall<'_, G> {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it, if
-    /// `row`/`col` are below 1 or outside the current arrangement.
+    /// `row`/`col` are below 1 (or not R's integers), or outside the current
+    /// arrangement.
     pub fn mfg(mut self, mfg: impl Pair) -> Self {
         self.page.mfg = Some(grid_pair(mfg));
         self

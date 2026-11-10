@@ -11,7 +11,9 @@
 //! mis-recycled `offset`), `orderH` (with tied heights), `add = TRUE`
 //! (titles off by default, and `ann = TRUE`) and `args.legend` (keyword
 //! position with `bty`/`inset`/`title`; `(x, y)` with `ncol`/`xjust`/`cex`)
-//! against a real R `pdf()` device's uncompressed output. Compares every
+//! and `border` (a vector with `NA`, recycled beside and per stack; with
+//! `orderH` it follows the rows, as the colours do, where R keeps it in
+//! segment order: see `border_order_h`) against a real R `pdf()` device's uncompressed output. Compares every
 //! painted path and text item in order (see `common::pdf::assert_same`),
 //! except the origins of labels with a minus sign (R's `pdf()` draws `-`
 //! as a wider `/minus`, which we deliberately don't copy). Skipped if `Rscript` isn't
@@ -68,7 +70,7 @@ fn cases() -> Vec<Case> {
                 d.barplot()
                     .height([3.0, 1.0, 2.0, 4.0])
                     .offset([1.0, 5.0, 2.0])
-                    .names(["a", "b", "c", "d"])
+                    .names_arg(["a", "b", "c", "d"])
                     .draw();
             },
         },
@@ -137,7 +139,7 @@ fn cases() -> Vec<Case> {
                     .space([1.0])
                     .col("white")
                     .main("hidden")
-                    .names(["x", "y", "z"])
+                    .names_arg(["x", "y", "z"])
                     .draw();
             },
         },
@@ -192,6 +194,59 @@ fn cases() -> Vec<Case> {
                     .ylim([0.0, 8.0])
                     .legend_pos((2.0, 7.5))
                     .args_legend(LegendOptions::default().ncol(3usize).xjust(0.0).cex(0.8))
+                    .draw();
+            },
+        },
+        Case {
+            // `border` recycled over the bars; `NA` draws no border.
+            name: "border_vector",
+            r: "barplot(c(3, 1, 2, 4, 2), border = c('red', NA, 'blue'))",
+            ours: |d| {
+                d.barplot()
+                    .height([3, 1, 2, 4, 2])
+                    .border([Some("red"), None, Some("blue")])
+                    .draw();
+            },
+        },
+        Case {
+            // Beside: one `rect()` call, so recycled over all 12 bars.
+            name: "border_beside",
+            r: "barplot(m, beside = TRUE, border = c('red', 'blue'))",
+            ours: |d| {
+                d.barplot()
+                    .height(mat())
+                    .beside(true)
+                    .border(["red", "blue"])
+                    .draw();
+            },
+        },
+        Case {
+            // Stacked: one `rect()` call per stack, so recycled afresh in
+            // each (red, blue, red).
+            name: "border_stacked",
+            r: "barplot(m, border = c('red', 'blue'))",
+            ours: |d| {
+                d.barplot().height(mat()).border(["red", "blue"]).draw();
+            },
+        },
+        Case {
+            // With `orderH`, a segment's border follows its row, as its
+            // colour does. R keeps `border` in segment order instead (an R
+            // bug, not copied); every column here sorts the same way (rows
+            // 2, 3, 1), so R gets the rows' borders in that order.
+            name: "border_order_h",
+            r: "barplot(cbind(c(1, 3, 2), c(2, 5, 4), c(1, 4, 3)), orderH = 'decr', \
+                col = c('red', 'green', 'blue'), border = c('purple', 'black', 'orange'))",
+            ours: |d| {
+                d.barplot()
+                    .height(vec![
+                        vec![1.0, 3.0, 2.0],
+                        vec![2.0, 5.0, 4.0],
+                        vec![1.0, 4.0, 3.0],
+                    ])
+                    .order_h("decr")
+                    .col(["red", "green", "blue"])
+                    .border(["orange", "purple", "black"])
                     .draw();
             },
         },

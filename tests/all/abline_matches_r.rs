@@ -247,8 +247,7 @@ fn abline_matches_r() {
             dev.plot_window()
                 .xlim((xl.0, xl.1))
                 .ylim((yl.0, yl.1))
-                .xlog(c.log.contains('x'))
-                .ylog(c.log.contains('y'))
+                .log(c.log)
                 .draw();
             (c.draw)(dev);
         });

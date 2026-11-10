@@ -11,17 +11,17 @@
 | `type` | `.type_()` | What to draw: points, lines, both, steps, ... |
 | `xlim` | `.xlim()` | x axis limits. |
 | `ylim` | `.ylim()` | y axis limits. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `main` | `.main()` | Main title: text (`"Weight"`) or a plotmath expression (`Label::math("x^2")`), drawn by `title()`. |
 | `sub` | `.sub()` | Subtitle. |
 | `xlab` | `.xlab()` | x axis label. |
 | `ylab` | `.ylab()` | y axis label. |
+| `ann` | `.ann()` | Whether to draw the titles (`main`, `sub`, `xlab`, `ylab`). |
 | `axes` | `.axes()` | Whether to draw the axes and the box around the plot. |
 | `frame.plot` | `.frame_plot()` | Whether to draw the box around the plot region (shaped by `bty`). |
 | `panel.first` | `.panel_first()` | Low-level calls (a `Figure`) drawn after the window is set and before the points, e.g. grid lines; added with `Device::add_figure`, so its `par()` changes don't last. |
 | `panel.last` | `.panel_last()` | As `panel_first`, but drawn after the points and before the axes. |
 | `asp` | `.asp()` | Aspect ratio: one x unit is `asp` y units long (1 for equal scales); ignored on log axes. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `pch` | `.pch()` | Plotting symbols, recycled over the points: R's symbol codes, characters or strings (a string's first character). |
 | `col` | `.col()` | Colours, recycled over the points. |
 | `bg` | `.bg()` | Fill of symbols 21-25, recycled over the points. |
@@ -60,7 +60,7 @@
 | *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
 | *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
-R's arguments not available: `lim2`, `ann` (use `dev.par().ann(false)`), `xgap.axis`, `ygap.axis`.
+R's arguments not available: `lim2`, `xgap.axis`, `ygap.axis`.
 
 ### `hist()`
 
@@ -87,10 +87,9 @@ R's arguments not available: `lim2`, `ann` (use `dev.par().ann(false)`), `xgap.a
 | `plot` | `.plot()` | Whether to draw: `false` only returns the bins. |
 | `labels` | `.labels()` | Labels above the bars: `HistLabels::Values` writes each bar's count (or, with densities, its density to 3 decimals), `Text` the given labels. |
 | `lty` | `.lty()` | Line types of the bar borders, recycled over the bars. |
-| `add` | `.add()` | Draws the bars on the current plot, without a new plot, window, title or axes (so `main`, `xlab`, `ylab`, `axes`, `xlog`, `ylog`, `xlim`, `ylim`, `ann` and `panel_bg` are ignored). |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
+| `add` | `.add()` | Draws the bars on the current plot, without a new plot, window, title or axes (so `main`, `xlab`, `ylab`, `axes`, `log`, `xlim`, `ylim`, `ann` and `panel_bg` are ignored, as in R). |
 | `ann` | `.ann()` | Whether to draw the titles. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `cex.main` | `.cex_main()` | Size of the main title, relative to `par(cex)`. |
 | `col.main` | `.col_main()` | Colour of the main title. |
 | `font.main` | `.font_main()` | Font of the main title (a `FontFace`). |
@@ -120,14 +119,14 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `height` | `.height()` | The bar heights: a vector, one bar per value, or a matrix given as its columns (see `BarHeights`). |
 | `width` | `.width()` | Bar widths, recycled. |
 | `space` | `.space()` | Space before each bar, as a fraction of the mean bar width: one value, or `[within group, between groups]` for a `beside` matrix. |
-| `names.arg` | `.names()` | Labels under the bars, or beside them if `horiz`. |
+| `names.arg` | `.names_arg()` | Labels under the bars, or beside them if `horiz`. |
 | `legend.text` | `.legend_text()` | Legend labels, one per row of a matrix or per bar of a vector, filled with `col`. |
 | `beside` | `.beside()` | Matrix only: draws the bars side by side instead of stacked. |
 | `horiz` | `.horiz()` | Draws horizontal bars. |
 | `density` | `.density()` | Shading lines per inch in the bars, recycled as `col` is; the lines take the bar's `col`. |
 | `angle` | `.angle()` | Angle of the shading lines in degrees, recycled as `density` is. |
 | `col` | `.col()` | Fill colours, recycled over the bars of a vector or the rows of a matrix. |
-| `border` | `.border()` | Colour of the bar borders. |
+| `border` | `.border()` | Colours of the bar borders, recycled as `col` is. |
 | `main` | `.main()` | Main title, text or a plotmath expression, as for `plot()`. |
 | `sub` | `.sub()` | Subtitle. |
 | `xlab` | `.xlab()` | Label of the x axis. |
@@ -135,6 +134,7 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `xlim` | `.xlim()` | Limits of the x axis. |
 | `ylim` | `.ylim()` | Limits of the y axis. |
 | `xpd` | `.xpd()` | Clipping of the bars, names and legend; the setter also takes `false`/`true`. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `axes` | `.axes()` | Draws the value axis. |
 | `axisnames` | `.axisnames()` | Draws the names. |
 | `cex.axis` | `.cex_axis()` | Size of the axis labels. |
@@ -147,8 +147,6 @@ R's arguments not available: `probability` (use `.freq(false)`), `nclass` (use `
 | `args.legend` | `.args_legend()` | Legend options (e.g. `bty`, `inset`, `ncol`, `cex`, `title`, `fill`); every setting made here overrides barplot's choice (`fill` from `col`, `xjust = yjust = 1`, otherwise `legend()`'s defaults). |
 | `orderH` | `.order_h()` | Stacked bars only: order of the segments within each stack; each segment keeps its row's colour. |
 | `args.legend` (`x`, `y`) | `.legend_pos()` | Position of the legend, e.g. `"topleft"` or `(x, y)`. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `cex.main` | `.cex_main()` | Size of the main title, relative to `par(cex)`. |
 | `col.main` | `.col_main()` | Colour of the main title. |
 | `font.main` | `.font_main()` | Font of the main title. |
@@ -186,38 +184,13 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | `names` | `.names()` | Group labels on the name axis (side 1, or 2 if `horizontal`). |
 | `border` | `.border()` | Colours of the box outlines, median, whiskers, staples and outliers, recycled over the boxes. |
 | `col` | `.col()` | Box fill colours, recycled over the boxes. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `ann` | `.ann()` | Whether to draw the titles. |
 | `horizontal` | `.horizontal()` | Draws horizontal boxes: group names on side 2, values on side 1. |
 | `add` | `.add()` | Draws on the current plot instead of starting a new one. |
 | `at` | `.at()` | Box positions on the name axis, one per group. |
 | `frame.plot` | `.frame_plot()` | Draws the box around the plot region. |
 | `show.names` | `.show_names()` | Labels the boxes with `names`. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic: the position axis, or the value axis when `horizontal`. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic: the value axis, or the position axis when `horizontal`. |
-| `pars = list(boxwex = )` | `.boxwex()` | Box widths, in units of the position axis (of its natural log on a log axis). |
-| `pars = list(staplewex = )` | `.staplewex()` | Staple width as a fraction of the box width. |
-| `pars = list(outwex = )` | `.outwex()` | Width of the outlier lines (see `outlty`) as a fraction of the box width. |
-| `pars = list(boxlty = )` | `.boxlty()` | Line type of the box outline. |
-| `pars = list(boxlwd = )` | `.boxlwd()` | Line width of the box outline. |
-| `pars = list(boxcol = )` | `.boxcol()` | Colour of the box outline. |
-| `pars = list(medlty = )` | `.medlty()` | Line type of the median. |
-| `pars = list(medlwd = )` | `.medlwd()` | Line width of the median. |
-| `pars = list(medpch = )` | `.medpch()` | Symbol drawn at the median. |
-| `pars = list(medcex = )` | `.medcex()` | Size of the median symbol. |
-| `pars = list(medcol = )` | `.medcol()` | Colour of the median line and symbol. |
-| `pars = list(medbg = )` | `.medbg()` | Fill of the median symbol. |
-| `pars = list(whisklty = )` | `.whisklty()` | Line type of the whiskers. |
-| `pars = list(whisklwd = )` | `.whisklwd()` | Line width of the whiskers. |
-| `pars = list(whiskcol = )` | `.whiskcol()` | Colour of the whiskers. |
-| `pars = list(staplelty = )` | `.staplelty()` | Line type of the staples. |
-| `pars = list(staplelwd = )` | `.staplelwd()` | Line width of the staples. |
-| `pars = list(staplecol = )` | `.staplecol()` | Colour of the staples. |
-| `pars = list(outlty = )` | `.outlty()` | Line type of a short line across each outlier (`outwex` wide). |
-| `pars = list(outlwd = )` | `.outlwd()` | Line width of the outlier lines and symbols. |
-| `pars = list(outpch = )` | `.outpch()` | Outlier symbol. |
-| `pars = list(outcex = )` | `.outcex()` | Size of the outlier symbols. |
-| `pars = list(outcol = )` | `.outcol()` | Colour of the outlier lines and symbols. |
-| `pars = list(outbg = )` | `.outbg()` | Fill of the outlier symbols. |
 | `xlim` | `.xlim()` | Limits of the position axis. |
 | `ylim` | `.ylim()` | Limits of the value axis, also when `horizontal` (as in R). |
 | `main` | `.main()` | Main title, text or a plotmath expression, as for `plot()`. |
@@ -231,11 +204,35 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | `cex.lab` | `.cex_lab()` | Size of the axis labels `xlab` and `ylab`, relative to `par(cex)`. |
 | `col.lab` | `.col_lab()` | Colour of `xlab` and `ylab`. |
 | `axes` | `.axes()` | Draws the axes and the box around the plot, also with `add` (as in R). |
+| `boxwex` | `.boxwex()` | Box widths, in units of the position axis (of its natural log on a log axis). |
+| `staplewex` | `.staplewex()` | Staple width as a fraction of the box width. |
+| `outwex` | `.outwex()` | Width of the outlier lines (see `outlty`) as a fraction of the box width. |
 | `lty` | `.lty()` | Default line type of the box, median and staples, and of the whiskers. |
 | `lwd` | `.lwd()` | Default line width of every part (the median: 3 times it). |
 | `pch` | `.pch()` | Default outlier symbol. |
 | `cex` | `.cex()` | Default size of the median and outlier symbols. |
 | `bg` | `.bg()` | Default fill of the median and outlier symbols (21 to 25). |
+| `boxlty` | `.boxlty()` | Line type of the box outline. |
+| `boxlwd` | `.boxlwd()` | Line width of the box outline. |
+| `boxcol` | `.boxcol()` | Colour of the box outline. |
+| `medlty` | `.medlty()` | Line type of the median. |
+| `medlwd` | `.medlwd()` | Line width of the median. |
+| `medpch` | `.medpch()` | Symbol drawn at the median. |
+| `medcex` | `.medcex()` | Size of the median symbol. |
+| `medcol` | `.medcol()` | Colour of the median line and symbol. |
+| `medbg` | `.medbg()` | Fill of the median symbol. |
+| `whisklty` | `.whisklty()` | Line type of the whiskers. |
+| `whisklwd` | `.whisklwd()` | Line width of the whiskers. |
+| `whiskcol` | `.whiskcol()` | Colour of the whiskers. |
+| `staplelty` | `.staplelty()` | Line type of the staples. |
+| `staplelwd` | `.staplelwd()` | Line width of the staples. |
+| `staplecol` | `.staplecol()` | Colour of the staples. |
+| `outlty` | `.outlty()` | Line type of a short line across each outlier (`outwex` wide). |
+| `outlwd` | `.outlwd()` | Line width of the outlier lines and symbols. |
+| `outpch` | `.outpch()` | Outlier symbol. |
+| `outcex` | `.outcex()` | Size of the outlier symbols. |
+| `outcol` | `.outcol()` | Colour of the outlier lines and symbols. |
+| `outbg` | `.outbg()` | Fill of the outlier symbols. |
 | `las` | `.las()` | Orientation of the axis labels: 0 parallel to the axis, 1 horizontal, 2 perpendicular, 3 vertical. |
 | `cex.axis` | `.cex_axis()` | Size of the axis labels. |
 | `col.axis` | `.col_axis()` | Colour of the axis labels. |
@@ -247,7 +244,7 @@ R's arguments not available: `inside`, `panel.first`, `panel.last`.
 | *not in R* | `.label_srt()` | Rotates the x axis's tick labels (`barplot()`, `boxplot()`: the names axis) by this many degrees; see `axis()`'s `label_srt`. |
 | *not in R* | `.panel_bg()` | Fills the plot region with this colour before anything is drawn in it, so the data, grid lines and axes sit on top. |
 
-R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, `panel.first`, `panel.last`.
+R's arguments not available: `plot` (use `boxplot_stats()`), `pars` (use its elements' own setters, as `.boxwex()` and `.medcol()`), `z`, `notch.frac`, `panel.first`, `panel.last`.
 
 ### `pie()`
 
@@ -257,7 +254,7 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 |---|---|---|
 | `x` | `.x()` | The slice sizes. |
 | `labels` | `.labels()` | Slice labels (text or plotmath expressions). |
-| `edges` | `.edges()` | Approximate number of polygon edges for a full circle. |
+| `edges` | `.edges()` | Approximate number of polygon edges for a full circle (each slice gets at least 2); not finite, or a slice's share beyond R's longest vector (2^52), is R's error. |
 | `radius` | `.radius()` | Pie radius in user units, where the plot region's shorter side spans `[-1, 1]` before the usual 4% axis extension. |
 | `clockwise` | `.clockwise()` | Whether slices go clockwise. |
 | `init.angle` | `.init_angle()` | Starting angle in degrees. |
@@ -282,9 +279,8 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 |---|---|---|
 | `xlim` | `.xlim()` | The x range shown, `[from, to]` in data units (also on a log axis); decreasing for a reversed axis. |
 | `ylim` | `.ylim()` | The y range shown; as `xlim`. |
+| `log` | `.log()` | Which axes are logarithmic: `"x"`, `"y"` or `"xy"` (see `Log`); default neither. |
 | `asp` | `.asp()` | Aspect ratio: one x unit is `asp` y units long on the page. |
-| `log = "x"` | `.xlog()` | Makes the x axis logarithmic. |
-| `log = "y"` | `.ylog()` | Makes the y axis logarithmic. |
 | `xaxs` | `.xaxs()` | How the x range is extended: `"r"` adds 4% at each end, `"i"` nothing. |
 | `yaxs` | `.yaxs()` | As `xaxs`, for the y axis. |
 | `lab` | `.lab()` | Approximate numbers of x and y ticks (and label length) for the default ticks this window sets. |
@@ -305,9 +301,9 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `lwd` | `.lwd()` | Line widths, recycled over the points (lines use the first). |
 | `lty` | `.lty()` | Line type of the lines. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
-| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"` or `"square"`. |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2. |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 | `font` | `.font()` | Font of character symbols (such as `pch = "a"` or `'é'`). |
 
 ### `lines()`
@@ -326,9 +322,9 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `lwd` | `.lwd()` | Line widths, recycled over the points (lines use the first). |
 | `lty` | `.lty()` | Line type of the lines. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
-| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"` or `"square"`. |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2. |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 | `font` | `.font()` | Font of character symbols (such as `pch = "a"` or `'é'`). |
 
 ### `segments()`
@@ -346,8 +342,8 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `lwd` | `.lwd()` | Line widths, recycled per segment. |
 | `lend` | `.lend()` | How the segment ends are drawn: `"round"`, `"butt"` or `"square"`. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 
 ### `arrows()`
 
@@ -359,16 +355,16 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `y0` | `.y0()` | The y coordinates of the starts. |
 | `x1` | `.x1()` | The x coordinates of the ends. |
 | `y1` | `.y1()` | The y coordinates of the ends. |
-| `length` | `.length()` | Length of the edges of each head, in inches. |
-| `angle` | `.angle()` | Angle between the shaft and each edge of the head, in degrees (90 gives flat caps, as for error bars). |
-| `code` | `.code()` | Where the heads go: at the start (1), the end (2) or both ends (3). |
+| `length` | `.length()` | Length of the edges of each head, in inches; negative or not finite is R's error. |
+| `angle` | `.angle()` | Angle between the shaft and each edge of the head, in degrees (90 gives flat caps, as for error bars); not finite is R's error. |
+| `code` | `.code()` | Where the heads go: none (0), at the start (1), the end (2) or both ends (3); above 3 is R's error. |
 | `col` | `.col()` | Arrow colours, recycled per arrow. |
 | `lty` | `.lty()` | Line types, recycled per arrow. |
 | `lwd` | `.lwd()` | Line widths, recycled per arrow. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
-| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"` or `"square"`. |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2. |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 
 ### `rect()`
 
@@ -387,9 +383,9 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `lty` | `.lty()` | Border line types, recycled per rectangle. |
 | `lwd` | `.lwd()` | Border line widths, recycled per rectangle. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
-| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"` or `"square"`. |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2. |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 
 ### `polygon()`
 
@@ -407,9 +403,9 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `fillOddEven` | `.fill_odd_even()` | Uses the even-odd rule for shading: lines go where the border encircles a point an odd number of times, rather than a non-zero number (so a pentagram's centre isn't shaded). |
 | `lwd` | `.lwd()` | Border line width, one for all polygons. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
-| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"` or `"square"`. |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2. |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 
 ### `text()`
 
@@ -420,14 +416,13 @@ R's arguments not available: `plot` (use `boxplot_stats()`), `z`, `notch.frac`, 
 | `x` | `.x()` | The x coordinates of the labels, or, without `y`, the y values against their index. |
 | `y` | `.y()` | The y coordinates of the labels; `x` and `y` are recycled to the longer. |
 | `labels` | `.labels()` | The labels: text or plotmath expressions, one or several (see `Labels`); a `None` element (R's `NA`) is skipped. |
-| `adj` | `.adj()` | Horizontal justification: 0 left, 0.5 centred, 1 right. |
-| `pos` | `.pos()` | Puts each label below (1), to the left of (2), above (3) or to the right of (4) its point, `offset` away, recycled per label; overrides `adj`/`vadj`. |
+| `adj` | `.adj()` | Justification of the text on its point, horizontal and vertical (`Adj`): one number (horizontal; vertical `None`), two, or two `Option`s (`None`: R's `NA`, centred). |
+| `pos` | `.pos()` | Puts each label below (1), to the left of (2), above (3) or to the right of (4) its point, `offset` away, recycled per label; overrides `adj`. |
 | `offset` | `.offset()` | Distance of a label from its point when `pos` is given, in character heights (1.2 times the starting point size, times `par(cex)`; R's docs call it a character width). |
 | `cex` | `.cex()` | Text sizes, relative to `par(cex)`, recycled per label. |
 | `col` | `.col()` | Text colours, recycled per label. |
 | `font` | `.font()` | Fonts, recycled per label: R's numbers 1 to 5, names or `FontFace` values. |
-| `adj` (second value) | `.vadj()` | Vertical justification. |
-| `srt` | `.srt()` | Rotation in degrees, anticlockwise. |
+| `srt` | `.srt()` | Rotation in degrees, anticlockwise; not finite is R's error. |
 | `xpd` | `.xpd()` | Where drawing is clipped: `Xpd::Plot`, `Xpd::Figure` or `Xpd::Device` (the setter also takes `false`/`true`). |
 
 R's arguments not available: `vfont`.
@@ -444,9 +439,9 @@ R's arguments not available: `vfont`.
 | `fg` | `.fg()` | Colour of the box when `col` isn't given (or is `None`). |
 | `lwd` | `.lwd()` | Line width. |
 | `bty` | `.bty()` | Which sides of the plot region to draw. |
-| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"` or `"square"`. |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2. |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 
 ### `axis()`
 
@@ -455,8 +450,8 @@ R's arguments not available: `vfont`.
 | R | Rust | |
 |---|---|---|
 | `side` | `.side()` | The side to draw on: a `Side`, or its number (1 below, 2 left, 3 above, 4 right); another number is an error of the call. |
-| `at` | `.at()` | Tick positions, in user coordinates (data units, also on a log axis). |
-| `labels` | `.labels()` | Labels for the ticks in `at` (requires `at`, as many; otherwise an error of the call): text or plotmath expressions (`Some("a".into())`, `Some(Label::math("10^5"))`). |
+| `at` | `.at()` | Tick positions, in user coordinates (data units, also on a log axis); a `NaN` is skipped, but none finite is R's error. |
+| `labels` | `.labels()` | The tick labels (`AxisLabels`): `true` (the default), the tick positions formatted like R's `formatReal()`; `false`, none; or one label per tick in `at` (which they require, as many; otherwise an error of the call), text or plotmath expressions (`"a"`, `Label::math("10^5")`). |
 | `tick` | `.tick()` | Whether to draw the axis line and tick marks. |
 | `line` | `.line()` | Distance of the axis line from the plot region (inner region for `outer`), in margin lines; the labels sit `mgp[1]` lines beyond it. |
 | `pos` | `.pos()` | Where to draw the axis line, as a user coordinate on the other axis; overrides `line`. |
@@ -470,17 +465,18 @@ R's arguments not available: `vfont`.
 | `hadj` | `.hadj()` | Justification of every label along its reading direction. |
 | `padj` | `.padj()` | Justification across each label, recycled over the ticks in increasing order of `at`. |
 | `gap.axis` | `.gap_axis()` | Minimum gap between labels, in "m" widths (labels parallel to the axis) or "M" heights (perpendicular); a label closer than that to the previous one is dropped. |
-| `labels = FALSE` | `.draw_labels()` | Whether to draw the tick labels. |
-| `xaxp`, `yaxp` | `.axp()` | Range and number of the default ticks, used when `at` is `None`. |
-| `xaxt`, `yaxt` | `.axt()` | Whether to draw the axis at all: `AxisType::None` draws nothing. |
 | `cex.axis` | `.cex_axis()` | Size of the labels. |
 | `col.axis` | `.col_axis()` | Colour of the labels. |
 | `las` | `.las()` | Orientation of the labels. |
+| `xaxp` | `.xaxp()` | Range and number of the default ticks of an x axis (sides 1, 3), used when `at` is `None`; a y axis ignores it, as in R. |
+| `yaxp` | `.yaxp()` | As `xaxp`, for a y axis (sides 2, 4). |
 | `mgp` | `.mgp()` | Margin lines for the axis title, labels and line (only the labels and line are used here). |
+| `xaxt` | `.xaxt()` | Whether to draw an x axis (sides 1, 3) at all: `AxisType::None` draws nothing; a y axis ignores it, as in R. |
+| `yaxt` | `.yaxt()` | As `xaxt`, for a y axis (sides 2, 4). |
 | `tck` | `.tck()` | Tick length as a fraction of the plot region (of its height for an x axis if above 0.5, else of its smaller side); positive points inwards. |
 | `tcl` | `.tcl()` | Tick length in margin lines; negative points outwards. |
 | `xpd` | `.xpd()` | How far ticks and labels may reach along the axis: the plot region, figure region or device, as for `par(xpd)`. |
-| `lend` | `.lend()` | Ends of the axis line and ticks (`"round"`, `"butt"`, `"square"`). |
+| `lend` | `.lend()` | Ends of the axis line and ticks (`"round"`, `"butt"`, `"square"` or R's codes 0 to 2). |
 | *not in R* | `.label_srt()` | Rotates the tick labels by this many degrees (anticlockwise, as `text()`'s `srt`), each ending at its tick: placed `mgp[1]` lines beyond the axis line, as `las = 2` labels are, right-justified on sides 1 and 2 (left on 3 and 4) unless `hadj` says otherwise, centred across on the "M" height unless `padj` does, and none dropped for overlapping. |
 
 ### `abline()`
@@ -498,9 +494,9 @@ R's arguments not available: `vfont`.
 | `lty` | `.lty()` | Line types, recycled over the lines. |
 | `lwd` | `.lwd()` | Line widths, recycled over the lines. |
 | `xpd` | `.xpd()` | How far the lines run and where they are clipped: the plot region for `Xpd::Plot`, the figure region for `Xpd::Figure`, the whole device for `Xpd::Device` (the setter also takes `false`/`true`). |
-| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"` or `"square"`. |
-| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"` or `"bevel"`. |
-| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1). |
+| `lend` | `.lend()` | How line ends are drawn: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2. |
+| `ljoin` | `.ljoin()` | How line corners are joined: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2. |
+| `lmitre` | `.lmitre()` | Mitre limit of mitred joins (at least 1; less is an error of the call). |
 
 R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coefficients), `coef` (use `.a()` and `.b()`).
 
@@ -531,13 +527,13 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `yjust` | `.yjust()` | Vertical justification of the box relative to its `y` position. |
 | `x.intersp` | `.x_intersp()` | Space between each key and its label, in character widths (a column is as wide as its widest). |
 | `y.intersp` | `.y_intersp()` | Space between rows, in character heights, recycled over the rows. |
-| `adj` | `.adj()` | Horizontal adjustment of the labels. |
+| `adj` | `.adj()` | Justification of the labels on their points, horizontal and vertical (`Adj`): one number (horizontal; vertical `None`), two, or two `Option`s (`None`: R's `NA`: centred horizontally, each label's ink centred vertically). |
 | `text.width` | `.text_width()` | Width of the label text, in x *user* units: one width for every column, or one per column; `None` (R's `NA`) makes each column as wide as its own widest label. |
 | `text.col` | `.text_col()` | Colours of the labels. |
 | `text.font` | `.text_font()` | Fonts of the labels (also for measuring them). |
 | `merge` | `.merge()` | Whether to draw each point in the middle of its line. |
 | `plot` | `.plot()` | Whether to draw: `false` works out the layout (returned as usual) but draws nothing. |
-| `ncol` | `.ncol()` | Number of columns. |
+| `ncol` | `.ncol()` | Number of columns; 0 is R's error. |
 | `horiz` | `.horiz()` | Whether to lay the entries out in one row. |
 | `title` | `.title()` | Text or a plotmath expression above the entries. |
 | `inset` | `.inset()` | Inset from the plot region's edges for keyword positions, as fractions of the plot region, `[x, y]` or one number for both. |
@@ -549,7 +545,6 @@ R's arguments not available: `reg` (use `.a()` and `.b()` with the model's coeff
 | `seg.len` | `.seg_len()` | Length of each key's line, in character widths. |
 | `x`, `y` | `.pos()` | Where the legend goes: a keyword such as `"topright"`, a point `[x, y]` for its top-left corner, or two corners `[[xa, xb], [ya, yb]]` (tuples work too; see `LegendPos`). |
 | `legend` | `.labels()` | The keys' labels: text or plotmath expressions, one or several (see `Labels`); a `None` element (R's `NA`) keeps its key but has no text and takes no room. |
-| `adj` (second value) | `.vadj()` | Vertical adjustment of the labels. |
 
 R's arguments not available: `trace`.
 
@@ -560,9 +555,9 @@ R's arguments not available: `trace`.
 | R | Rust | |
 |---|---|---|
 | `text` | `.text()` | The text: text or plotmath expressions, one or several (see `Labels`), recycled with the other arguments; a `None` element (R's `NA`) is skipped. |
-| `side` | `.side()` | The margin to write in: a `Side`, or its number (1 below, 2 left, 3 above, 4 right); another number is an error of the call. |
+| `side` | `.side()` | The margin to write in, recycled per label: a `Side`, or its number (1 below, 2 left, 3 above, 4 right); another number is an error of the call, and so is an empty list. |
 | `line` | `.line()` | Margin line, recycled per label, counting from 0 next to the plot region (or the inner region for `outer`); may be negative or fractional. |
-| `outer` | `.outer()` | Draws in the outer margins (`par(oma)`) rather than the figure's. |
+| `outer` | `.outer()` | Draws in the outer margins (`par(oma)`) rather than the figure's, recycled per label. |
 | `at` | `.at()` | Position along the side, recycled per label: a user coordinate for inner margins, or a fraction (0 to 1) of the inner region for outer ones. |
 | `adj` | `.adj()` | Justification along the text, recycled per label. |
 | `padj` | `.padj()` | Justification across the text, recycled per label. |
@@ -627,9 +622,9 @@ R's arguments not available: `trace`.
 | `font.sub` | `.font_sub()` | Font face of the subtitle, as `font`. |
 | `lab` | `.lab()` | Approximate number of tick intervals on the x and y axes for default ticks; the third value (label length) is unused, as in R. |
 | `las` | `.las()` | Orientation of axis labels and `mtext()` text: 0 = parallel to the axis (the default), 1 = horizontal, 2 = perpendicular to the axis, 3 = vertical. |
-| `lend` | `.lend()` | Line end style. |
+| `lend` | `.lend()` | Line end style: `"round"`, `"butt"`, `"square"` or R's codes 0 to 2 (`LineEnd`). |
 | `lheight` | `.lheight()` | Multiplies the spacing of the lines of text with newlines, when drawn and in `Device::strheight`. |
-| `ljoin` | `.ljoin()` | Line join style. |
+| `ljoin` | `.ljoin()` | Line join style: `"round"`, `"mitre"`, `"bevel"` or R's codes 0 to 2 (`LineJoin`). |
 | `lmitre` | `.lmitre()` | Mitre limit for mitred joins. |
 | `lty` | `.lty()` | Line type. |
 | `lwd` | `.lwd()` | Line width; 1 is 1/96 inch, as in R. |
@@ -644,7 +639,7 @@ R's arguments not available: `trace`.
 | `oma` | `.oma()` | Outer margins, in lines. |
 | `omd` | `.omd()` | Inner region (the device less the outer margins) as fractions of the device, `[x0, x1, y0, y1]`. |
 | `omi` | `.omi()` | Outer margins in inches, instead of lines. |
-| `pch` | `.pch()` | Default plotting symbol. |
+| `pch` | `.pch()` | Default plotting symbol: a symbol code (0 to 25), or a character drawn as itself (a string's first character). |
 | `pin` | `.pin()` | Plot region size in inches, `[width, height]`, centred in the figure, instead of the figure less `mar`. |
 | `plt` | `.plt()` | Plot region as fractions of the figure region, `[x0, x1, y0, y1]`, instead of the figure less `mar`. |
 | `ps` | `.ps()` | Base text size, in big points. |
@@ -662,8 +657,8 @@ R's arguments not available: `trace`.
 | `yaxs` | `.yaxs()` | Range style of the y axis, as `xaxs`. |
 | `yaxt` | `.yaxt()` | As `xaxt`, for y axes (sides 2 and 4). |
 | `ylbias` | `.ylbias()` | How far text parallel to its side is moved out from its margin line: `1 - ylbias` lines on sides 1 and 4, `ylbias` on sides 2 and 3 (divided by `mex`). |
-| `ylog` | `.ylog()` | As `xlog`, for the y axis. |
-| `palette()` (a function in R) | `.palette()` | Colours that colour numbers (`col = 2`) index, from 1. |
+| `ylog` | `.ylog()` | As `xlog`, for the y axis (`.log("y")` on the plotting calls). |
+| `palette()` (a function in R) | `.palette()` | Colours that colour numbers (`col = 2`) index, from 1, on this device only: each device has its own palette. |
 
 R's arguments not available: `ask`, `crt`, `err`, `family`, `mkh`, `smo`.
 
@@ -726,7 +721,7 @@ R's arguments not available: `vfont`.
 | `compress` | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
 | (none) | `.units()` | Units of `width` and `height`. |
 | (none) | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
-| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
+| *not in R* | `.threads()` | Threads drawing a PNG, PNG only. |
 
 R's arguments not available: `family`, `title`, `fonts`, `version`, `paper`, `encoding`, `fg`, `pagecentre`, `colormodel`, `useDingbats`, `useKerning`, `fillOddEven`, `timestamp`, `producer`, `author`.
 
@@ -745,7 +740,7 @@ R's arguments not available: `family`, `title`, `fonts`, `version`, `paper`, `en
 | (none) | `.units()` | Units of `width` and `height`. |
 | (none) | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
 | (none) | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
-| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
+| *not in R* | `.threads()` | Threads drawing a PNG, PNG only. |
 
 R's arguments not available: `family`, `antialias`, `symbolfamily`.
 
@@ -763,7 +758,7 @@ R's arguments not available: `family`, `antialias`, `symbolfamily`.
 | `bg` | `.bg()` | Page background, and the starting `par(bg)`; a colour that draws nothing (`ColorSpec::None`, `"transparent"`) is transparent. |
 | `res` | `.res()` | Resolution in pixels per inch, PNG only (ignored for PDF and SVG). |
 | (none) | `.compress()` | Compresses the output: a PDF's page contents (`None`: `true`), or a whole SVG document, gzipped as a `.svgz` file (`None`: `false`). |
-| (none) | `.threads()` | Threads drawing a PNG, PNG only. |
+| *not in R* | `.threads()` | Threads drawing a PNG, PNG only. |
 | (none) | `.onefile()` | Puts all pages in one file, PDF only. |
 
 R's arguments not available: `type`, `antialias`.
