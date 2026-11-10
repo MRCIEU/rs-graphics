@@ -30,6 +30,59 @@ fn argument_errors<G: Graphics>() -> Vec<(&'static str, &'static str, Call<G>)> 
             g.text().x(1).y(1).labels("a").pos(5).try_draw()
         }),
         ("pie(c(1, -1))", "pie", |g| g.pie().x([1, -1]).try_draw()),
+        // `par()`'s value checks (R's `par-common.c` and `par.c`).
+        ("par(adj = 1.5)", "par", |g| g.par().adj(1.5).try_draw()),
+        ("par(adj = NA)", "par", |g| g.par().adj(f64::NAN).try_draw()),
+        ("par(cex = 0)", "par", |g| g.par().cex(0).try_draw()),
+        ("par(cex = Inf)", "par", |g| {
+            g.par().cex(f64::INFINITY).try_draw()
+        }),
+        ("par(cex.axis = -1)", "par", |g| {
+            g.par().cex_axis(-1).try_draw()
+        }),
+        ("par(cex.lab = NA)", "par", |g| {
+            g.par().cex_lab(f64::NAN).try_draw()
+        }),
+        ("par(cex.main = 0)", "par", |g| {
+            g.par().cex_main(0).try_draw()
+        }),
+        ("par(cex.sub = 0)", "par", |g| g.par().cex_sub(0).try_draw()),
+        ("par(lwd = 0)", "par", |g| g.par().lwd(0).try_draw()),
+        ("par(mex = -1)", "par", |g| g.par().mex(-1).try_draw()),
+        ("par(lheight = 0)", "par", |g| g.par().lheight(0).try_draw()),
+        ("par(mar = c(-1, 1, 1, 1))", "par", |g| {
+            g.par().mar([-1, 1, 1, 1]).try_draw()
+        }),
+        ("par(mai = c(1, NA, 1, 1))", "par", |g| {
+            g.par().mai([1.0, f64::NAN, 1.0, 1.0]).try_draw()
+        }),
+        ("par(oma = c(1, 1, Inf, 1))", "par", |g| {
+            g.par().oma([1.0, 1.0, f64::INFINITY, 1.0]).try_draw()
+        }),
+        ("par(omi = c(1, 1, 1, -1))", "par", |g| {
+            g.par().omi([1, 1, 1, -1]).try_draw()
+        }),
+        ("par(plt = c(-0.1, 1, 0, 1))", "par", |g| {
+            g.par().plt([-0.1, 1.0, 0.0, 1.0]).try_draw()
+        }),
+        ("par(pin = c(NA, 1))", "par", |g| {
+            g.par().pin([f64::NAN, 1.0]).try_draw()
+        }),
+        ("par(omd = c(0, 1.5, 0, 1))", "par", |g| {
+            g.par().omd([0.0, 1.5, 0.0, 1.0]).try_draw()
+        }),
+        ("par(mgp = c(3, NA, 0))", "par", |g| {
+            g.par().mgp([3.0, f64::NAN, 0.0]).try_draw()
+        }),
+        ("par(srt = Inf)", "par", |g| {
+            g.par().srt(f64::INFINITY).try_draw()
+        }),
+        ("par(las = 4)", "par", |g| g.par().las(4).try_draw()),
+        ("par(las = -1)", "par", |g| g.par().las(-1).try_draw()),
+        ("par(ps = -1)", "par", |g| g.par().ps(-1).try_draw()),
+        ("par(xaxp = c(NA, 2, 5))", "par", |g| {
+            g.par().xaxp([f64::NAN, 2.0, 5.0]).try_draw()
+        }),
         ("axis(1, labels = c('a', 'b'))", "axis", |g| {
             g.axis().side(1).labels(["a", "b"]).try_draw().map(drop)
         }),
@@ -214,6 +267,14 @@ fn device_errors() -> Vec<(&'static str, &'static str, DeviceCall)> {
         }),
         ("par(lab = c(1e300, 5, 7))", "par", |d| {
             d.par().lab([1e300, 5.0, 7.0]).try_draw()
+        }),
+        // The third value's check depends on the axis's log scale, which
+        // only the device knows: a positive count on a linear axis.
+        ("par(yaxp = c(1, 2, 0))", "par", |d| {
+            d.par().yaxp([1, 2, 0]).try_draw()
+        }),
+        ("par(xaxp = c(1, 2, -1))", "par", |d| {
+            d.par().xaxp([1, 2, -1]).try_draw()
         }),
         (
             "plot(1:100, log = 'x'); par(xaxp = c(1, 100, 7))",

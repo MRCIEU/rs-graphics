@@ -24,6 +24,7 @@
 //! [`par(cex)`]: crate::par::Par::cex
 
 use crate::color::{Color, ColorSpec, DEFAULT_PALETTE};
+use crate::error::Error;
 use crate::font::FontFace;
 use crate::lty::LineType;
 
@@ -519,23 +520,119 @@ macro_rules! par_options {
         }
 
         impl ParOptions {
-            /// R's checks of `usr`, `lmitre` and `lab`, made when the call is
-            /// drawn or recorded.
+            /// R's checks of the values, made when the call is drawn or
+            /// recorded: [`check_values`](ParOptions::check_values).
             pub(crate) fn check(&self) -> Result<(), $crate::error::Error> {
-                if let Some([x0, x1, y0, y1]) = self.usr {
-                    let ok = ![x0, x1, y0, y1].iter().any(|v| v.is_nan()) && x0 != x1 && y0 != y1;
-                    if !ok {
-                        return Err($crate::error::Error::invalid(
-                            "invalid value specified for graphical parameter \"usr\"",
-                        ));
-                    }
-                }
-                $crate::device::check_lmitre(self.lmitre)?;
-                $crate::device::check_lab(self.lab)?;
-                Ok(())
+                self.check_values()
             }
         }
     };
+}
+
+impl ParOptions {
+    /// R's checks of a `par()` call's values (`par.c` and `par-common.c`),
+    /// each failing with R's `invalid value specified for graphical
+    /// parameter "<name>"`: `adj` in 0 to 1; `cex` (and `cex.axis`,
+    /// `cex.lab`, `cex.main`, `cex.sub`), `lwd`, `mex` and `lheight`
+    /// positive and finite; `mar`, `mai`, `oma`, `omi`, `plt` and `pin`
+    /// non-negative and finite; `omd` in 0 to 1; `mgp` and `srt` finite;
+    /// `las` 0 to 3; `ps` non-negative and finite; `xaxp`/`yaxp`'s first
+    /// two values finite (the third is checked against the axis's log
+    /// scale when the call runs); `usr` finite with `x0 != x1` and `y0 !=
+    /// y1`; `lmitre` at least 1; `lab` (see
+    /// [`check_lab`](crate::device::check_lab)). `xaxp`/`yaxp`'s third
+    /// value, `fig`, `fin`, `mfrow`/`mfcol`/`mfg` and `pch` are checked
+    /// elsewhere.
+    pub(crate) fn check_values(&self) -> Result<(), Error> {
+        use crate::device::par_error;
+        let pos = |name: &str, v: Option<f64>| match v {
+            Some(x) if !x.is_finite() || x <= 0.0 => Err(par_error(name)),
+            _ => Ok(()),
+        };
+        let finite = |name: &str, v: &[f64]| {
+            if v.iter().any(|x| !x.is_finite()) {
+                Err(par_error(name))
+            } else {
+                Ok(())
+            }
+        };
+        let nonneg = |name: &str, v: &[f64]| {
+            if v.iter().any(|x| !x.is_finite() || *x < 0.0) {
+                Err(par_error(name))
+            } else {
+                Ok(())
+            }
+        };
+        let unit = |name: &str, v: &[f64]| {
+            if v.iter().any(|x| !x.is_finite() || *x < 0.0 || *x > 1.0) {
+                Err(par_error(name))
+            } else {
+                Ok(())
+            }
+        };
+        let sides = |s: &Sides<f64>| [s.bottom, s.left, s.top, s.right];
+
+        if let Some(adj) = self.adj {
+            unit("adj", &[adj])?;
+        }
+        pos("cex", self.cex)?;
+        pos("cex.axis", self.cex_axis)?;
+        pos("cex.lab", self.cex_lab)?;
+        pos("cex.main", self.cex_main)?;
+        pos("cex.sub", self.cex_sub)?;
+        pos("lwd", self.lwd)?;
+        pos("mex", self.mex)?;
+        pos("lheight", self.lheight)?;
+        if let Some(m) = &self.mar {
+            nonneg("mar", &sides(m))?;
+        }
+        if let Some(m) = &self.mai {
+            nonneg("mai", &sides(m))?;
+        }
+        if let Some(m) = &self.oma {
+            nonneg("oma", &sides(m))?;
+        }
+        if let Some(m) = &self.omi {
+            nonneg("omi", &sides(m))?;
+        }
+        if let Some(Some(plt)) = self.plt {
+            nonneg("plt", &plt)?;
+        }
+        if let Some(pin) = self.pin {
+            nonneg("pin", &pin)?;
+        }
+        if let Some(omd) = self.omd {
+            unit("omd", &omd)?;
+        }
+        if let Some(mgp) = self.mgp {
+            finite("mgp", &mgp)?;
+        }
+        if let Some(srt) = self.srt {
+            finite("srt", &[srt])?;
+        }
+        if let Some(las) = self.las {
+            if !(0..=3).contains(&las) {
+                return Err(par_error("las"));
+            }
+        }
+        if let Some(ps) = self.ps {
+            nonneg("ps", &[ps])?;
+        }
+        if let Some(axp) = self.xaxp {
+            finite("xaxp", &axp[..2])?;
+        }
+        if let Some(axp) = self.yaxp {
+            finite("yaxp", &axp[..2])?;
+        }
+        if let Some([x0, x1, y0, y1]) = self.usr {
+            if [x0, x1, y0, y1].iter().any(|v| v.is_nan()) || x0 == x1 || y0 == y1 {
+                return Err(par_error("usr"));
+            }
+        }
+        crate::device::check_lmitre(self.lmitre)?;
+        crate::device::check_lab(self.lab)?;
+        Ok(())
+    }
 }
 
 par_options! {

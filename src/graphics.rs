@@ -873,13 +873,19 @@ pub trait Graphics: sealed::Sealed + Sized {
     /// # Errors
     ///
     /// `.try_draw()` returns R's error, and `.draw()` panics with it (also when a
-    /// `Figure` records the call), if `usr` has a `NaN` or `x0 == x1` or `y0 == y1`
-    /// ("invalid value specified for graphical parameter \"usr\""), or `lmitre`
-    /// is below 1 (the same message, naming `lmitre`), or `xaxp`/`yaxp` is set
-    /// for a log axis with a third value that isn't 1 to 4 (R's `logAxpCheck`;
-    /// the same message, naming it). Some page layout values
-    /// are checked on a device only (see [`mfrow`](ParCall::mfrow) and the
-    /// other layout setters).
+    /// `Figure` records the call), for a value R's `par()` rejects, with R's
+    /// message `invalid value specified for graphical parameter "<name>"`:
+    /// `adj` outside 0 to 1; `cex` (and `cex.axis`, `cex.lab`, `cex.main`,
+    /// `cex.sub`), `lwd`, `mex` or `lheight` not positive or not finite;
+    /// `mar`, `mai`, `oma`, `omi`, `plt` or `pin` negative or not finite;
+    /// `omd` outside 0 to 1; `mgp` or `srt` not finite; `las` outside 0 to
+    /// 3; `ps` negative or not finite; `lab` (see [`lab`](ParCall::lab));
+    /// `xaxp`/`yaxp` with a non-finite limit, or a third value that isn't 1
+    /// to 4 on a log axis (R's `logAxpCheck`) or a positive count on a
+    /// linear one; `usr` with a `NaN` or `x0 == x1` or `y0 == y1`; `lmitre`
+    /// below 1; `mfrow`/`mfcol`/`mfg`, `fig` and `fin` (see their setters);
+    /// an unknown string for `pty`, `bty`, `xaxs`, `xaxt`, `lend`, `ljoin`,
+    /// `lty`, `pch`, a colour or a palette (their own messages).
     fn par(&mut self) -> ParCall<'_, Self> {
         ParCall::start(self)
     }
@@ -1176,12 +1182,18 @@ impl<B: Backend> Graphics for Device<B> {
             if let Some((row, col)) = page.mfg {
                 d.mfg(row, col)?;
             }
-            // R checks `xaxp`/`yaxp` against the axis's log scale.
-            if let (Some(axp), true) = (opts.xaxp, opts.xlog.unwrap_or(d.xlog())) {
-                crate::device::check_log_axp("xaxp", axp)?;
-            }
-            if let (Some(axp), true) = (opts.yaxp, opts.ylog.unwrap_or(d.ylog())) {
-                crate::device::check_log_axp("yaxp", axp)?;
+            // R checks `xaxp`/`yaxp`'s third value against the axis's log
+            // scale: a code 1 to 4 on a log axis, a positive count on a
+            // linear one.
+            for (name, axp, log) in [
+                ("xaxp", opts.xaxp, opts.xlog.unwrap_or(d.xlog())),
+                ("yaxp", opts.yaxp, opts.ylog.unwrap_or(d.ylog())),
+            ] {
+                match (axp, log) {
+                    (Some(axp), true) => crate::device::check_log_axp(name, axp)?,
+                    (Some(axp), false) => crate::device::check_linear_axp(name, axp)?,
+                    (None, _) => {}
+                }
             }
             opts.apply(&mut d.par);
             // R's `par(oma/omi/omd = )`: "force eject of multiple figures",

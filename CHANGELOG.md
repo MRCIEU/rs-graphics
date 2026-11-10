@@ -60,6 +60,15 @@ come with a table of old and new calls.
 
 - `mtext()` recycles `side` and `outer` over the labels, and `barplot()`
   recycles `border` over the bars, as R does.
+- `par()` checks its values as R's `par()` does (`par-common.c`), each
+  with R's `invalid value specified for graphical parameter "<name>"`:
+  `adj` in 0 to 1; `cex` (and `cex.axis`/`cex.lab`/`cex.main`/`cex.sub`),
+  `lwd`, `mex` and `lheight` positive and finite; `mar`, `mai`, `oma`,
+  `omi`, `plt` and `pin` non-negative and finite; `omd` in 0 to 1; `mgp`
+  and `srt` finite; `las` 0 to 3; `ps` non-negative and finite;
+  `xaxp`/`yaxp` with finite limits and, on a linear axis, a positive
+  count. Before, `par(cex = 0)` or `par(mar = c(-1, 1, 1, 1))` was
+  accepted and the next plot drew nonsense or failed with another error.
 - Three crashes found by a pre-release review: `par(mfrow)`/`mfcol`/`mfg`
   with a value beyond R's integer range (`1e300`) overflowed a figure
   count (a panic in debug builds) instead of R's `invalid value specified

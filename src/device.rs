@@ -2543,6 +2543,23 @@ pub(crate) fn check_log_axp(name: &str, axp: [f64; 3]) -> Result<(), Error> {
     Ok(())
 }
 
+/// R's error for a `par()` value it rejects (`par_error()` in `par.c`).
+pub(crate) fn par_error(name: &str) -> Error {
+    Error::invalid(format!(
+        "invalid value specified for graphical parameter \"{name}\""
+    ))
+}
+
+/// R's check of `par(xaxp/yaxp = )` on a linear axis: the count `axp[2]`,
+/// as an integer, is positive (`posIntCheck`; `NaN` is R's `NA`).
+pub(crate) fn check_linear_axp(name: &str, axp: [f64; 3]) -> Result<(), Error> {
+    let n = crate::numbers::as_integer(axp[2]);
+    if n == crate::numbers::NA_INTEGER || n <= 0 {
+        return Err(par_error(name));
+    }
+    Ok(())
+}
+
 /// R's check of `lmitre` (in `par()` or inline): at least 1.
 pub(crate) fn check_lmitre(lmitre: Option<f64>) -> Result<(), Error> {
     match lmitre {
